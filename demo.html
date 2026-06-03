@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Checki — Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0f1117;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* TOPBAR */
+    .topbar {
+      background: #1a1d2e;
+      border-bottom: 1px solid #2d3148;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .logo {
+      font-size: 20px;
+      font-weight: 700;
+      color: #7c6af7;
+      letter-spacing: 1px;
+    }
+    .logo span { color: #e2e8f0; }
+    .topbar-tabs {
+      display: flex;
+      gap: 4px;
+      margin-left: 12px;
+    }
+    .tab {
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      color: #94a3b8;
+      border: none;
+      background: transparent;
+      transition: all 0.15s;
+    }
+    .tab:hover { background: #2d3148; color: #e2e8f0; }
+    .tab.active { background: #7c6af7; color: #fff; }
+    .topbar-right {
+      margin-left: auto;
+      display: flex;
+      gap: 8px;
+    }
+    .btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .btn-primary { background: #7c6af7; color: #fff; }
+    .btn-primary:hover { background: #6b5ce7; }
+    .btn-ghost { background: transparent; color: #94a3b8; border: 1px solid #2d3148; }
+    .btn-ghost:hover { border-color: #7c6af7; color: #7c6af7; }
+
+    /* MAIN LAYOUT */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 220px;
+      background: #13151f;
+      border-right: 1px solid #2d3148;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .sidebar-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #4a5568;
+      padding: 8px 8px 4px;
+    }
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #94a3b8;
+      transition: all 0.15s;
+      border: none;
+      background: transparent;
+      width: 100%;
+      text-align: left;
+      font-family: inherit;
+    }
+    .sidebar-item:hover { background: #1e2235; color: #e2e8f0; }
+    .sidebar-item.active { background: #2a1f5c; color: #a78bfa; }
+    .sidebar-item .icon { font-size: 15px; width: 20px; text-align: center; }
+    .badge {
+      margin-left: auto;
+      background: #ef4444;
+      color: #fff;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 10px;
+    }
+    .badge-warn { background: #f59e0b; }
+
+    /* EDITOR AREA */
+    .editor-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .editor-header {
+      background: #1a1d2e;
+      border-bottom: 1px solid #2d3148;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    .file-tab {
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-bottom: none;
+      padding: 5px 14px;
+      border-radius: 6px 6px 0 0;
+      color: #e2e8f0;
+      font-size: 12px;
+    }
+    .editor-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 0;
+      background: #0f1117;
+    }
+
+    /* CODE LINES */
+    .code-line {
+      display: flex;
+      align-items: center;
+      padding: 1px 16px;
+      min-height: 24px;
+      position: relative;
+      gap: 0;
+    }
+    .code-line:hover { background: #1a1d2e; }
+    .line-num {
+      width: 36px;
+      text-align: right;
+      color: #3d4a63;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .line-content {
+      flex: 1;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      padding-left: 16px;
+      white-space: pre;
+    }
+    .question-btn {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #2d3148;
+      color: #7c6af7;
+      font-size: 11px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.15s;
+      position: relative;
+      margin-left: 8px;
+    }
+    .code-line:hover .question-btn { opacity: 1; }
+    .question-btn:hover { background: #7c6af7; color: #fff; }
+
+    /* TOOLTIP */
+    .tooltip {
+      position: absolute;
+      right: 40px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: #1e2235;
+      border: 1px solid #7c6af7;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 12px;
+      color: #e2e8f0;
+      width: 280px;
+      z-index: 100;
+      display: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      line-height: 1.5;
+    }
+    .tooltip::after {
+      content: '';
+      position: absolute;
+      right: -6px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 10px;
+      height: 10px;
+      background: #1e2235;
+      border-right: 1px solid #7c6af7;
+      border-top: 1px solid #7c6af7;
+      transform: translateY(-50%) rotate(45deg);
+    }
+    .tooltip-label {
+      font-size: 10px;
+      color: #7c6af7;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .question-btn:hover .tooltip { display: block; }
+
+    /* SYNTAX COLORS */
+    .kw { color: #c678dd; }
+    .fn { color: #61afef; }
+    .str { color: #98c379; }
+    .num { color: #d19a66; }
+    .cm { color: #5c6370; font-style: italic; }
+    .var { color: #e06c75; }
+    .op { color: #56b6c2; }
+
+    /* RIGHT PANEL */
+    .right-panel {
+      width: 320px;
+      background: #13151f;
+      border-left: 1px solid #2d3148;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid #2d3148;
+      font-size: 13px;
+      font-weight: 600;
+      color: #a78bfa;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-body {
+      padding: 16px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ANALYSIS CARDS */
+    .analysis-card {
+      background: #1a1d2e;
+      border-radius: 8px;
+      padding: 12px 14px;
+      border-left: 3px solid #7c6af7;
+    }
+    .analysis-card.warn { border-left-color: #f59e0b; }
+    .analysis-card.error { border-left-color: #ef4444; }
+    .analysis-card.ok { border-left-color: #22c55e; }
+    .card-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-bottom: 4px;
+    }
+    .card-desc {
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+    .card-line {
+      font-size: 11px;
+      color: #4a5568;
+      margin-top: 6px;
+    }
+
+    /* AI CHAT */
+    .ai-input-area {
+      padding: 12px;
+      border-top: 1px solid #2d3148;
+      display: flex;
+      gap: 8px;
+    }
+    .ai-input {
+      flex: 1;
+      background: #1a1d2e;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #e2e8f0;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+    }
+    .ai-input:focus { border-color: #7c6af7; }
+    .ai-input::placeholder { color: #4a5568; }
+    .send-btn {
+      background: #7c6af7;
+      border: none;
+      border-radius: 8px;
+      width: 34px;
+      height: 34px;
+      cursor: pointer;
+      color: #fff;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .send-btn:hover { background: #6b5ce7; }
+
+    /* STATUS BAR */
+    .statusbar {
+      background: #7c6af7;
+      padding: 3px 16px;
+      font-size: 11px;
+      color: #fff;
+      display: flex;
+      gap: 16px;
+    }
+    .statusbar span { opacity: 0.8; }
+
+    /* HIGHLIGHT lines */
+    .code-line.dead { background: rgba(239,68,68,0.07); }
+    .code-line.warn-line { background: rgba(245,158,11,0.07); }
+    .dead .line-num { color: #ef4444; }
+    .warn-line .line-num { color: #f59e0b; }
+  </style>
+</head>
+<body>
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="logo">Checki<span>.</span></div>
+    <div class="topbar-tabs">
+      <button class="tab active" onclick="switchTab(this, 'analiza')">Analiza kodu</button>
+      <button class="tab" onclick="switchTab(this, 'nauka')">Tryb nauki</button>
+      <button class="tab" onclick="switchTab(this, 'text2code')">Text → Kod</button>
+      <button class="tab" onclick="switchTab(this, 'agenci')">Agenci</button>
+      <button class="tab" onclick="switchTab(this, 'archiwum')">Archiwum</button>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost">Wgraj plik</button>
+      <button class="btn btn-primary">▶ Analizuj</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-label">Funkcje</div>
+      <button class="sidebar-item active" onclick="setActive(this)">
+        <span class="icon">📄</span> Tłumacz kod
+      </button>
+      <button class="sidebar-item" onclick="setActive(this)">
+        <span class="icon">💀</span> Martwy kod
+        <span class="badge">2</span>
+      </button>
+      <button class="sidebar-item" onclick="setActive(this)">
+        <span class="icon">⚠️</span> Błędne wzorce
+        <span class="badge badge-warn">1</span>
+      </button>
+      <button class="sidebar-item" onclick="setActive(this)">
+        <span class="icon">🔍</span> Opis linii
+      </button>
+      <button class="sidebar-item" onclick="setActive(this)">
+        <span class="icon">🔧</span> Refaktor
+      </button>
+      <button class="sidebar-item" onclick="setActive(this)">
+        <span class="icon">🧪</span> Generuj testy
+      </button>
+
+      <button class="sidebar-item" onclick="setActive(this); showHistoria()">
+        <span class="icon">🕓</span> Historia
+      </button>
+
+      <div class="sidebar-label" style="margin-top:8px;">Agenci</div>
+      <button class="sidebar-item" onclick="setActive(this)">
+        <span class="icon">🤖</span> Agent Backend
+      </button>
+      <button class="sidebar-item" onclick="setActive(this)">
+        <span class="icon">🛡️</span> Agent Security
+      </button>
+      <button class="sidebar-item" onclick="setActive(this)">
+        <span class="icon">🎨</span> Agent Frontend
+      </button>
+    </div>
+
+    <!-- EDITOR -->
+    <div class="editor-area">
+      <div class="editor-header">
+        <div class="file-tab">📄 app.py</div>
+        <span style="margin-left:auto; font-size:12px;">Python 3.11</span>
+      </div>
+      <div class="editor-body" id="editor">
+        <!-- Lines generated by JS -->
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="right-panel">
+      <div class="panel-header">
+        🤖 Analiza AI
+      </div>
+      <div class="panel-body" id="panel-body">
+
+        <div style="font-size:12px; color:#94a3b8; margin-bottom:4px;">
+          Podsumowanie kodu:
+        </div>
+        <div class="analysis-card ok">
+          <div class="card-title">📄 Co robi ten kod?</div>
+          <div class="card-desc">
+            Prosta aplikacja Flask z jednym endpointem <code style="color:#a78bfa">/users</code>.
+            Pobiera użytkowników z bazy danych i zwraca jako JSON. Zawiera 2 problemy do naprawienia.
+          </div>
+        </div>
+
+        <div class="analysis-card error">
+          <div class="card-title">💀 Martwy kod</div>
+          <div class="card-desc">
+            Funkcja <code style="color:#a78bfa">old_get_users()</code> nigdy nie jest wywoływana.
+            Można ją usunąć.
+          </div>
+          <div class="card-line">→ linia 18–22</div>
+        </div>
+
+        <div class="analysis-card warn">
+          <div class="card-title">⚠️ Złe rozwiązanie</div>
+          <div class="card-desc">
+            Hasło do bazy danych jest wpisane bezpośrednio w kodzie (hardcoded).
+            Użyj zmiennej środowiskowej <code style="color:#f59e0b">os.environ</code>.
+          </div>
+          <div class="card-line">→ linia 4</div>
+        </div>
+
+        <div class="analysis-card">
+          <div class="card-title">💡 Sugestia</div>
+          <div class="card-desc">
+            Rozważ dodanie obsługi błędów przy połączeniu z bazą danych (try/except).
+          </div>
+          <div class="card-line">→ linia 8–10</div>
+        </div>
+
+      </div>
+      <div class="ai-input-area">
+        <input class="ai-input" placeholder="Zapytaj o kod..." id="ai-input" />
+        <button class="send-btn" onclick="sendAI()">➤</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- STATUSBAR -->
+  <div class="statusbar">
+    <span>✅ Gotowy</span>
+    <span>25 linii</span>
+    <span>2 błędy</span>
+    <span>1 ostrzeżenie</span>
+    <span style="margin-left:auto;">Checki v0.1 — demo</span>
+  </div>
+
+<script>
+  const lines = [
+    { code: `<span class="kw">from</span> flask <span class="kw">import</span> Flask, jsonify`, tip: "Importujemy Flask — bibliotekę do budowania serwerów webowych, oraz jsonify — funkcję która zamienia dane Pythona na format JSON." },
+    { code: `<span class="kw">import</span> sqlite3`, tip: "Importujemy sqlite3 — wbudowaną bibliotekę Pythona do obsługi bazy danych SQLite." },
+    { code: ``, tip: null },
+    { code: `DB_PASSWORD = <span class="str">"haslo123"</span>  <span class="cm"># ⚠️ hardcoded!</span>`, tip: "PROBLEM: Hasło jest wpisane bezpośrednio w kodzie. Jeśli ktoś zobaczy ten plik, zobaczy hasło. Lepiej użyć: os.environ.get('DB_PASSWORD')", warn: true },
+    { code: `app = Flask(<span class="var">__name__</span>)`, tip: "Tworzymy instancję aplikacji Flask. __name__ mówi Flaskowi jaki jest główny plik aplikacji." },
+    { code: ``, tip: null },
+    { code: `<span class="kw">def</span> <span class="fn">get_db_connection</span>():`, tip: "Definiujemy funkcję która tworzy połączenie z bazą danych. Słowo 'def' zaczyna definicję funkcji." },
+    { code: `    conn = sqlite3.<span class="fn">connect</span>(<span class="str">'users.db'</span>)`, tip: "Otwieramy plik bazy danych o nazwie 'users.db'. Jeśli plik nie istnieje, SQLite go utworzy." },
+    { code: `    conn.row_factory = sqlite3.Row`, tip: "Ustawiamy sposób zwracania wyników — zamiast krotek (tupli) dostajemy obiekty które można czytać po nazwie kolumny, np. row['name']." },
+    { code: `    <span class="kw">return</span> conn`, tip: "Zwracamy połączenie z bazą danych do miejsca gdzie funkcja została wywołana." },
+    { code: ``, tip: null },
+    { code: `<span class="op">@</span>app.<span class="fn">route</span>(<span class="str">'/users'</span>)`, tip: "Dekorator — mówi Flaskowi że funkcja poniżej ma obsługiwać adres URL /users. Gdy ktoś wejdzie na /users, Flask wywoła tę funkcję." },
+    { code: `<span class="kw">def</span> <span class="fn">get_users</span>():`, tip: "Definiujemy funkcję obsługującą endpoint /users. Flask wywoła ją automatycznie gdy przyjdzie żądanie GET." },
+    { code: `    conn = <span class="fn">get_db_connection</span>()`, tip: "Wywołujemy funkcję z linii 7 — otwieramy połączenie z bazą danych." },
+    { code: `    users = conn.<span class="fn">execute</span>(<span class="str">'SELECT * FROM users'</span>).<span class="fn">fetchall</span>()`, tip: "Wykonujemy zapytanie SQL które pobiera wszystkich użytkowników z tabeli 'users'. fetchall() zwraca wszystkie wyniki naraz." },
+    { code: `    <span class="kw">return</span> <span class="fn">jsonify</span>([<span class="fn">dict</span>(u) <span class="kw">for</span> u <span class="kw">in</span> users])`, tip: "Zamieniamy każdego użytkownika na słownik (dict), potem całą listę na JSON i wysyłamy jako odpowiedź HTTP." },
+    { code: ``, tip: null },
+    { code: `<span class="cm"># === STARY KOD — nigdy nie wywoływany ===</span>`, tip: "To jest komentarz — Python go ignoruje. Służy jako notatka dla programisty.", dead: true },
+    { code: `<span class="kw">def</span> <span class="fn">old_get_users</span>():  <span class="cm"># 💀 martwy kod</span>`, tip: "PROBLEM: Ta funkcja nigdy nie jest wywoływana nigdzie w kodzie. To 'martwy kod' — można ją bezpiecznie usunąć.", dead: true },
+    { code: `    <span class="kw">return</span> []`, tip: "Zwraca pustą listę. Ta linia jest martwa — nigdy się nie wykona bo funkcja nie jest wywoływana.", dead: true },
+    { code: ``, tip: null },
+    { code: `<span class="kw">if</span> <span class="var">__name__</span> == <span class="str">"__main__"</span>:`, tip: "Ten blok wykonuje się tylko gdy uruchomisz ten plik bezpośrednio (python app.py). Nie wykona się gdy inny plik zaimportuje ten moduł." },
+    { code: `    app.<span class="fn">run</span>(debug=<span class="kw">True</span>)`, tip: "Uruchamiamy serwer Flask. debug=True oznacza że serwer automatycznie restartuje się gdy zmienisz kod — wygodne podczas tworzenia." },
+  ];
+
+  const editor = document.getElementById('editor');
+
+  lines.forEach((line, i) => {
+    const div = document.createElement('div');
+    div.className = 'code-line' + (line.dead ? ' dead' : '') + (line.warn ? ' warn-line' : '');
+
+    const numSpan = document.createElement('span');
+    numSpan.className = 'line-num';
+    numSpan.textContent = i + 1;
+
+    const contentSpan = document.createElement('span');
+    contentSpan.className = 'line-content';
+    contentSpan.innerHTML = line.code;
+
+    div.appendChild(numSpan);
+    div.appendChild(contentSpan);
+
+    if (line.tip) {
+      const btn = document.createElement('button');
+      btn.className = 'question-btn';
+      btn.innerHTML = `?
+        <div class="tooltip">
+          <div class="tooltip-label">Co robi ta linia?</div>
+          ${line.tip}
+        </div>`;
+      div.appendChild(btn);
+    }
+
+    editor.appendChild(div);
+  });
+
+  function switchTab(el, tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+
+    const panel = document.getElementById('panel-body');
+
+    if (tab === 'nauka') {
+      panel.innerHTML = `
+        <div style="font-size:12px; color:#94a3b8; margin-bottom:8px;">Tryb nauki — AI pisze najprostszy możliwy kod</div>
+        <div class="analysis-card ok">
+          <div class="card-title">🎓 Zasada trybu nauki</div>
+          <div class="card-desc">AI będzie pisać kod bez skrótów, bez magii. Każdy krok osobno, z komentarzami. Idealny do nauki przez czytanie.</div>
+        </div>
+        <div class="analysis-card">
+          <div class="card-title">Przykład — tryb normalny:</div>
+          <div class="card-desc"><code style="color:#a78bfa">users = [u for u in db.execute('SELECT * FROM users')]</code></div>
+        </div>
+        <div class="analysis-card ok">
+          <div class="card-title">Przykład — tryb nauki:</div>
+          <div class="card-desc" style="line-height:2">
+            <code style="color:#98c379">wyniki = db.execute('SELECT * FROM users')</code><br>
+            <code style="color:#98c379">lista_uzytkownikow = []</code><br>
+            <code style="color:#98c379">for uzytkownik in wyniki:</code><br>
+            <code style="color:#98c379">&nbsp;&nbsp;&nbsp;&nbsp;lista_uzytkownikow.append(uzytkownik)</code>
+          </div>
+        </div>`;
+    } else if (tab === 'text2code') {
+      panel.innerHTML = `
+        <div style="font-size:12px; color:#94a3b8; margin-bottom:8px;">Opisz co chcesz zrobić</div>
+        <div class="analysis-card">
+          <div class="card-title">Przykładowe polecenie:</div>
+          <div class="card-desc">"stwórz funkcję która pobiera użytkowników z bazy i zwraca tylko tych którzy mają więcej niż 18 lat"</div>
+        </div>
+        <div class="analysis-card ok">
+          <div class="card-title">✅ Wygenerowany kod:</div>
+          <div class="card-desc" style="line-height:2">
+            <code style="color:#98c379">def pobierz_doroslych():</code><br>
+            <code style="color:#98c379">&nbsp;&nbsp;conn = get_db_connection()</code><br>
+            <code style="color:#98c379">&nbsp;&nbsp;query = 'SELECT * FROM users WHERE wiek > 18'</code><br>
+            <code style="color:#98c379">&nbsp;&nbsp;return conn.execute(query).fetchall()</code>
+          </div>
+        </div>`;
+    } else if (tab === 'agenci') {
+      panel.innerHTML = `
+        <div style="font-size:12px; color:#94a3b8; margin-bottom:8px;">Wybierz agenta</div>
+        <div class="analysis-card" style="cursor:pointer">
+          <div class="card-title">🤖 Agent Backend</div>
+          <div class="card-desc">Pisze profesjonalny kod serwerowy — API, bazy danych, autentykacja.</div>
+        </div>
+        <div class="analysis-card warn" style="cursor:pointer">
+          <div class="card-title">🛡️ Agent Security</div>
+          <div class="card-desc">Analizuje kod pod kątem luk bezpieczeństwa i proponuje poprawki.</div>
+        </div>
+        <div class="analysis-card" style="cursor:pointer">
+          <div class="card-title">🎨 Agent Frontend</div>
+          <div class="card-desc">Tworzy komponenty UI, style, responsywny layout.</div>
+        </div>`;
+    } else if (tab === 'archiwum') {
+      panel.innerHTML = `
+        <div style="font-size:12px; color:#94a3b8; margin-bottom:8px;">Archiwum bibliotek i komend</div>
+        <div class="analysis-card ok">
+          <div class="card-title">📦 Flask</div>
+          <div class="card-desc">Mikro-framework webowy. Używaj do budowania API i stron webowych.</div>
+        </div>
+        <div class="analysis-card ok">
+          <div class="card-title">📦 sqlite3</div>
+          <div class="card-desc">Wbudowana baza danych w Pythonie. Idealna do małych projektów.</div>
+        </div>
+        <div class="analysis-card">
+          <div class="card-title">⌨️ .fetchall()</div>
+          <div class="card-desc">Pobiera wszystkie wyniki zapytania SQL naraz jako listę.</div>
+        </div>
+        <div class="analysis-card">
+          <div class="card-title">⌨️ jsonify()</div>
+          <div class="card-desc">Zamienia dane Pythona (dict, list) na odpowiedź HTTP w formacie JSON.</div>
+        </div>`;
+    } else {
+      panel.innerHTML = `
+        <div style="font-size:12px; color:#94a3b8; margin-bottom:4px;">Podsumowanie kodu:</div>
+        <div class="analysis-card ok">
+          <div class="card-title">📄 Co robi ten kod?</div>
+          <div class="card-desc">Prosta aplikacja Flask z jednym endpointem <code style="color:#a78bfa">/users</code>. Pobiera użytkowników z bazy danych i zwraca jako JSON. Zawiera 2 problemy do naprawienia.</div>
+        </div>
+        <div class="analysis-card error">
+          <div class="card-title">💀 Martwy kod</div>
+          <div class="card-desc">Funkcja <code style="color:#a78bfa">old_get_users()</code> nigdy nie jest wywoływana. Można ją usunąć.</div>
+          <div class="card-line">→ linia 18–22</div>
+        </div>
+        <div class="analysis-card warn">
+          <div class="card-title">⚠️ Złe rozwiązanie</div>
+          <div class="card-desc">Hasło do bazy danych jest wpisane bezpośrednio w kodzie. Użyj zmiennej środowiskowej <code style="color:#f59e0b">os.environ</code>.</div>
+          <div class="card-line">→ linia 4</div>
+        </div>
+        <div class="analysis-card">
+          <div class="card-title">💡 Sugestia</div>
+          <div class="card-desc">Rozważ dodanie obsługi błędów przy połączeniu z bazą danych (try/except).</div>
+          <div class="card-line">→ linia 8–10</div>
+        </div>`;
+    }
+  }
+
+  function setActive(el) {
+    document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  function sendAI() {
+    const input = document.getElementById('ai-input');
+    const val = input.value.trim();
+    if (!val) return;
+    const panel = document.getElementById('panel-body');
+    const card = document.createElement('div');
+    card.className = 'analysis-card ok';
+    card.innerHTML = `<div class="card-title">💬 Ty: ${val}</div><div class="card-desc" style="color:#a78bfa">🤖 AI analizuje... (to demo, AI odpowie po podpięciu backendu)</div>`;
+    panel.prepend(card);
+    input.value = '';
+  }
+
+  document.getElementById('ai-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') sendAI();
+  });
+
+  const historia = [
+    {
+      nazwa: 'app.py',
+      jezyk: 'Python',
+      data: 'dzisiaj, 14:32',
+      linie: 23,
+      bledy: 2,
+      ostrzezenia: 1,
+      opis: 'Aplikacja Flask z endpointem /users. Pobiera użytkowników z bazy SQLite i zwraca JSON.',
+      problemy: ['Hardcoded hasło w linii 4', 'Martwa funkcja old_get_users() nigdy nie wywoływana'],
+      sugestie: ['Dodać obsługę błędów (try/except) przy połączeniu z bazą']
+    },
+    {
+      nazwa: 'auth.js',
+      jezyk: 'JavaScript',
+      data: 'wczoraj, 18:10',
+      linie: 47,
+      bledy: 0,
+      ostrzezenia: 3,
+      opis: 'Moduł autoryzacji z JWT tokenami. Obsługuje logowanie, wylogowanie i odświeżanie tokena.',
+      problemy: [],
+      sugestie: ['Token nie ma ustawionego czasu wygaśnięcia', 'Brak walidacji długości hasła', 'console.log z danymi użytkownika — usuń przed produkcją']
+    },
+    {
+      nazwa: 'database.py',
+      jezyk: 'Python',
+      data: '2 dni temu, 09:45',
+      linie: 61,
+      bledy: 1,
+      ostrzezenia: 0,
+      opis: 'Klasa do obsługi bazy danych PostgreSQL. Zawiera metody CRUD dla tabeli users i orders.',
+      problemy: ['Brak zamknięcia połączenia po operacji — wyciek zasobów w linii 34'],
+      sugestie: ['Rozważ użycie context managera (with) dla połączeń']
+    },
+    {
+      nazwa: 'scraper.py',
+      jezyk: 'Python',
+      data: '3 dni temu, 11:20',
+      linie: 89,
+      bledy: 0,
+      ostrzezenia: 2,
+      opis: 'Web scraper używający BeautifulSoup. Pobiera oferty pracy z kilku serwisów i zapisuje do bazy.',
+      problemy: [],
+      sugestie: ['Brak obsługi timeout przy żądaniach HTTP', 'Brak rate limiting — ryzyko zablokowania IP']
+    }
+  ];
+
+  function showHistoria() {
+    const panel = document.getElementById('panel-body');
+
+    panel.innerHTML = `
+      <div style="font-size:12px; color:#94a3b8; margin-bottom:8px;">Ostatnio analizowane pliki</div>
+      ${historia.map((h, i) => `
+        <div class="analysis-card ${h.bledy > 0 ? 'error' : h.ostrzezenia > 0 ? 'warn' : 'ok'}"
+             style="cursor:pointer; transition: transform 0.1s;"
+             onclick="showHistoriaDetail(${i})"
+             onmouseover="this.style.transform='translateX(3px)'"
+             onmouseout="this.style.transform='translateX(0)'">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div class="card-title" style="flex:1">📄 ${h.nazwa}</div>
+            <span style="font-size:10px; background:#0f1117; padding:2px 8px; border-radius:10px; color:#94a3b8">${h.jezyk}</span>
+          </div>
+          <div class="card-desc">${h.opis}</div>
+          <div style="display:flex; gap:12px; margin-top:8px;">
+            <span style="font-size:11px; color:#4a5568">🕓 ${h.data}</span>
+            <span style="font-size:11px; color:#4a5568">${h.linie} linii</span>
+            ${h.bledy > 0 ? `<span style="font-size:11px; color:#ef4444">● ${h.bledy} błędy</span>` : ''}
+            ${h.ostrzezenia > 0 ? `<span style="font-size:11px; color:#f59e0b">● ${h.ostrzezenia} ostrzeżenia</span>` : ''}
+            ${h.bledy === 0 && h.ostrzezenia === 0 ? `<span style="font-size:11px; color:#22c55e">● Czysto</span>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    `;
+  }
+
+  function showHistoriaDetail(i) {
+    const h = historia[i];
+    const panel = document.getElementById('panel-body');
+
+    panel.innerHTML = `
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+        <button onclick="showHistoria()" style="background:#2d3148; border:none; color:#94a3b8; border-radius:6px; padding:5px 10px; cursor:pointer; font-size:12px; font-family:inherit">← Wróć</button>
+        <span style="font-size:13px; font-weight:600; color:#e2e8f0">📄 ${h.nazwa}</span>
+        <span style="font-size:10px; background:#1a1d2e; padding:2px 8px; border-radius:10px; color:#94a3b8; border:1px solid #2d3148">${h.jezyk}</span>
+      </div>
+
+      <div class="analysis-card ok">
+        <div class="card-title">📋 Co zawierał kod?</div>
+        <div class="card-desc">${h.opis}</div>
+        <div style="display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;">
+          <span style="font-size:11px; color:#4a5568">🕓 ${h.data}</span>
+          <span style="font-size:11px; color:#4a5568">📏 ${h.linie} linii</span>
+        </div>
+      </div>
+
+      ${h.problemy.length > 0 ? `
+        <div class="analysis-card error">
+          <div class="card-title">🔴 Błędy (${h.bledy})</div>
+          ${h.problemy.map(p => `<div class="card-desc" style="margin-top:6px;">• ${p}</div>`).join('')}
+        </div>
+      ` : `
+        <div class="analysis-card ok">
+          <div class="card-title">✅ Brak błędów</div>
+          <div class="card-desc">Kod nie zawierał krytycznych problemów.</div>
+        </div>
+      `}
+
+      ${h.sugestie.length > 0 ? `
+        <div class="analysis-card warn">
+          <div class="card-title">💡 Sugestie (${h.ostrzezenia || h.sugestie.length})</div>
+          ${h.sugestie.map(s => `<div class="card-desc" style="margin-top:6px;">• ${s}</div>`).join('')}
+        </div>
+      ` : ''}
+    `;
+  }
+</script>
+</body>
+</html>
