@@ -60,15 +60,14 @@ Nie dotykasz innych folderów.
 ## Aktualny status
 - [x] Założenia zapisane
 - [x] Demo wizualne (demo.html) — gotowe
-- [ ] Setup frontendu (Next.js)
-- [ ] Setup backendu (FastAPI)
-- [ ] Podpięcie Claude API
+- [x] Setup frontendu (Next.js)
+- [x] Setup backendu (FastAPI)
+- [x] Podpięcie Gemini API
 
 ## Kolejne kroki
-1. Zbudować frontend w Next.js
-2. Zbudować edytor kodu z numerami linii i tooltipami
-3. Postawić backend FastAPI
-4. Podpiąć Gemini API do analizy
+1. [ ] feature/translator — tłumaczenie kodu na tekst (pierwsza funkcja end-to-end)
+2. [ ] Edytor kodu z numerami linii i tooltipami
+3. [ ] Pozostałe 10 funkcji
 
 ## Zasady projektu
 - Kod ma być prosty i czytelny — projekt jest też narzędziem do nauki
