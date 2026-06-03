@@ -82,9 +82,11 @@ Nie dotykasz innych folderów.
      Ikona różdżki (🪄): usuwa kod, scala tłumaczenia w ciągły tekst od początku do końca
 2. [ ] feature/agents-demo — agenci-specjaliści w demo_v2
      Każdy agent bada kod przez pryzmat swojej profesji:
-       🤖 Agent Backend  — architektura, API, wydajność serwera
-       🛡️ Agent Security — luki, złe praktyki, podatności
-       🎨 Agent Frontend — UI/UX, dostępność, responsywność
+       🏗️ Agent Architektury — struktura, wzorce, podział odpowiedzialności
+       🛡️ Agent Security     — luki, złe praktyki, podatności
+       ⚡ Agent Performance  — wąskie gardła, złożoność, optymalizacje
+       ✨ Agent Clean Code   — czytelność, nazewnictwo, SOLID
+       🧪 Agent Testing      — pokrycie testami, edge cases, testowalność
      Każdy agent zwraca własny raport w prawym panelu
 3. [ ] feature/dead-code — wykrywanie martwego kodu
 2. [ ] feature/bad-patterns — wykrywanie złych wzorców
