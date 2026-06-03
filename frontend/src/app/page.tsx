@@ -1,65 +1,40 @@
-import Image from "next/image";
+import Link from "next/link";
+
+const features = [
+  { href: "/translator", label: "Translator", desc: "Tłumaczy kod na prosty język polski", ready: true },
+  { href: "/line-tooltip", label: "Opis linii", desc: "Wyjaśnienie każdej linii z osobna", ready: false },
+  { href: "/dead-code", label: "Martwy kod", desc: "Wykrywa kod który nigdy się nie wykonuje", ready: false },
+  { href: "/bad-patterns", label: "Złe wzorce", desc: "Wskazuje błędy i antywzorce", ready: false },
+  { href: "/text-to-code", label: "Tekst → Kod", desc: "Opisz co chcesz, dostaniesz kod", ready: false },
+  { href: "/learn-mode", label: "Tryb nauki", desc: "Najprostszy możliwy zapis kodu", ready: false },
+];
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="max-w-3xl mx-auto px-6 py-16 w-full">
+      <h1 className="text-3xl font-semibold mb-2">Witaj w Checki</h1>
+      <p className="text-zinc-400 mb-12">Wybierz narzędzie które chcesz użyć.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {features.map((f) => (
+          <Link
+            key={f.href}
+            href={f.ready ? f.href : "#"}
+            className={`rounded-xl border p-5 transition-colors ${
+              f.ready
+                ? "border-zinc-700 hover:border-zinc-500 hover:bg-zinc-900 cursor-pointer"
+                : "border-zinc-800 opacity-40 cursor-not-allowed"
+            }`}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-medium">{f.label}</span>
+              {f.ready && (
+                <span className="text-xs bg-emerald-900 text-emerald-400 px-2 py-0.5 rounded-full">gotowe</span>
+              )}
+            </div>
+            <p className="text-sm text-zinc-400">{f.desc}</p>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }
