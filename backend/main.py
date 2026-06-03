@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from features.translator.router import router as translator_router
+from features.line_tooltip.router import router as line_tooltip_router
 
 app = FastAPI(title="Checki API")
 
@@ -13,6 +14,7 @@ app.add_middleware(
 )
 
 app.include_router(translator_router)
+app.include_router(line_tooltip_router)
 
 
 @app.get("/")
