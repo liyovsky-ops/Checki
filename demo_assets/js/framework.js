@@ -48,6 +48,9 @@ function renderTiles(category, containerId) {
     tile.className = 'fw-tile';
     tile.style.background = hexToRgba(fw.color, 0.07);
     tile.style.borderColor = hexToRgba(fw.color, 0.2);
+    tile.style.setProperty('--tc-bg',    hexToRgba(fw.color, 0.18));
+    tile.style.setProperty('--tc-border',hexToRgba(fw.color, 0.6));
+    tile.style.setProperty('--tc-glow',  hexToRgba(fw.color, 0.25));
     tile.onclick = function() { openFramework(fw); };
 
     tile.innerHTML =
