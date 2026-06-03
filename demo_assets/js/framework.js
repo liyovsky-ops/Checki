@@ -93,6 +93,53 @@ function initScrollTheme() {
   sections.forEach(function(s) { observer.observe(s); });
 }
 
+// ─── WYSZUKIWARKA ───
+
+function onFwSearch(query) {
+  var suggestionsEl = document.getElementById('fw-suggestions');
+  suggestionsEl.innerHTML = '';
+  if (!query.trim()) return;
+
+  var q = query.toLowerCase();
+  var matches = ALL_FRAMEWORKS.filter(function(fw) {
+    return fw.name.toLowerCase().includes(q) || fw.cat.toLowerCase().includes(q);
+  }).slice(0, 10);
+
+  matches.forEach(function(fw) {
+    var chip = document.createElement('button');
+    chip.className = 'fw-suggestion-chip';
+    chip.style.borderColor = hexToRgba(fw.color, 0.4);
+    chip.style.color = fw.color;
+    chip.innerHTML = fw.icon + ' ' + fw.name + ' <span>' + fw.cat + '</span>';
+    chip.onclick = function() { showFwResult(fw); };
+    suggestionsEl.appendChild(chip);
+  });
+}
+
+function showFwResult(fw) {
+  document.getElementById('fw-search-view').style.display = 'none';
+  var resultView = document.getElementById('fw-result-view');
+  resultView.style.display = 'flex';
+
+  var tile = document.getElementById('fw-result-tile');
+  tile.style.background = hexToRgba(fw.color, 0.08);
+  tile.style.borderColor = hexToRgba(fw.color, 0.3);
+  tile.style.boxShadow = '0 0 80px ' + hexToRgba(fw.color, 0.15) + ', inset 0 0 60px ' + hexToRgba(fw.color, 0.04);
+  tile.innerHTML =
+    '<div class="fw-fs-icon">' + fw.icon + '</div>' +
+    '<div class="fw-fs-name">' + fw.name + '</div>' +
+    '<div class="fw-fs-desc">' + fw.desc + '</div>' +
+    '<div class="fw-fs-lang">' + fw.lang + '</div>' +
+    '<div class="fw-fs-cat">' + fw.cat + '</div>';
+}
+
+function clearFwSearch() {
+  document.getElementById('fw-result-view').style.display = 'none';
+  document.getElementById('fw-search-view').style.display = 'flex';
+  document.getElementById('fw-search-input').value = '';
+  document.getElementById('fw-suggestions').innerHTML = '';
+}
+
 // Init po załadowaniu DOM
 document.addEventListener('DOMContentLoaded', function() {
   renderTiles('frontend', 'fw-tiles-frontend');

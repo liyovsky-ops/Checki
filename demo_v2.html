@@ -105,6 +105,18 @@
 
   <!-- FRAMEWORK PAGE -->
   <div id="framework-page" style="display:none; flex:1; overflow-y:auto; flex-direction:column;">
+    <div class="fw-section fw-search-section" data-theme="search">
+      <div id="fw-search-view">
+        <div class="fw-search-title">checki<span>.</span>framework</div>
+        <div class="fw-search-sub">znajdź framework</div>
+        <input class="fw-search-input" id="fw-search-input" placeholder="🔍 Wpisz nazwę..." oninput="onFwSearch(this.value)" autocomplete="off" />
+        <div class="fw-suggestions" id="fw-suggestions"></div>
+      </div>
+      <div id="fw-result-view" style="display:none;">
+        <div class="fw-fullscreen-tile" id="fw-result-tile"></div>
+        <button class="fw-back-btn" onclick="clearFwSearch()">← wróć</button>
+      </div>
+    </div>
     <div class="fw-section" data-theme="frontend">
       <div class="fw-section-header">Frontend</div>
       <div class="fw-tiles-grid" id="fw-tiles-frontend"></div>
