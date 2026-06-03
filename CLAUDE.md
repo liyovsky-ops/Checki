@@ -106,7 +106,8 @@ Nie dotykasz innych folderów.
        🔵 Info       — np. deprecated API, nieoptymalna praktyka
      Najechanie na ikonę → dymek od "komentatora" który tłumaczy konkretne
      zagrożenie tej linii: co może się stać, jak można to wykorzystać
-     AI analizuje cały kod i zwraca mapę linii → poziom ryzyka + opis
+     AI analizuje cały kod i zwraca mapę linii → poziom ryzyka + opis + bezpieczna alternatywa
+     Dymek pokazuje: co jest złe → dlaczego → jak to naprawić (gotowy fragment kodu)
 6. [ ] feature/programming-schools — szkoły programowania jako drugi wymiar trybu
      - Clean Code (Uncle Bob) — czytelność, nazwy które mówią same za siebie
      - Unix Philosophy — jedna funkcja jedna odpowiedzialność, małe kompozycje
