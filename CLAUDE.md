@@ -7,7 +7,7 @@ Skierowane do początkujących programistów — główny nacisk na prostotę i 
 ## Stack technologiczny
 - **Frontend:** Next.js + Tailwind CSS
 - **Backend:** Python + FastAPI
-- **AI:** Claude API (Anthropic)
+- **AI:** Gemini API (Google, model: gemini-2.5-flash)
 - **Baza danych:** do ustalenia
 
 ## Struktura
@@ -68,7 +68,7 @@ Nie dotykasz innych folderów.
 1. Zbudować frontend w Next.js
 2. Zbudować edytor kodu z numerami linii i tooltipami
 3. Postawić backend FastAPI
-4. Podpiąć Claude API do analizy
+4. Podpiąć Gemini API do analizy
 
 ## Zasady projektu
 - Kod ma być prosty i czytelny — projekt jest też narzędziem do nauki
