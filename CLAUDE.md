@@ -80,7 +80,13 @@ Nie dotykasz innych folderów.
      Widok "przypisy": kod po lewej/górze, pod każdą linią mniejsza czcionka z tłumaczeniem
        — styl jak przypisy w książce, inna czcionka dla tłumaczenia
      Ikona różdżki (🪄): usuwa kod, scala tłumaczenia w ciągły tekst od początku do końca
-2. [ ] feature/dead-code — wykrywanie martwego kodu
+2. [ ] feature/agents-demo — agenci-specjaliści w demo_v2
+     Każdy agent bada kod przez pryzmat swojej profesji:
+       🤖 Agent Backend  — architektura, API, wydajność serwera
+       🛡️ Agent Security — luki, złe praktyki, podatności
+       🎨 Agent Frontend — UI/UX, dostępność, responsywność
+     Każdy agent zwraca własny raport w prawym panelu
+3. [ ] feature/dead-code — wykrywanie martwego kodu
 2. [ ] feature/bad-patterns — wykrywanie złych wzorców
 3. [ ] feature/text-to-code — tekst → kod
 4. [ ] feature/learn-mode — tryb nauki (najprostszy zapis kodu)
