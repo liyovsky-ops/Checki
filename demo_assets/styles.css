@@ -21,10 +21,28 @@
     .logo {
       font-size: 20px;
       font-weight: 700;
-      color: #7c6af7;
       letter-spacing: 1px;
+      display: flex;
+      align-items: baseline;
+      gap: 0;
     }
-    .logo span { color: #e2e8f0; }
+    .logo-checki {
+      color: #4a5568;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .logo-checki.active { color: #7c6af7; }
+    .logo-checki:hover  { color: #7c6af7; }
+    .logo-dot { color: #2d3148; }
+    .logo-framework {
+      color: #4a5568;
+      font-weight: 300;
+      font-size: 15px;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .logo-framework.active { color: #e2e8f0; }
+    .logo-framework:hover  { color: #e2e8f0; }
     .topbar-tabs {
       display: flex;
       gap: 4px;
@@ -444,3 +462,81 @@
   }
 
 /* Tryb programowania — patrz: programming-mode-themes.css */
+
+/* ─── FRAMEWORK PAGE ─── */
+
+#framework-page {
+  background: #0d0a1f;
+  overflow-y: auto;
+}
+
+.fw-section {
+  min-height: calc(100vh - 70px);
+  display: flex;
+  flex-direction: column;
+}
+
+.fw-section-header {
+  padding: 20px 28px 10px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: rgba(255,255,255,0.25);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.fw-tiles-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+}
+
+.fw-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 20px;
+  border: 1px solid rgba(255,255,255,0.06);
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.fw-tile:hover {
+  transform: scale(1.03);
+  z-index: 2;
+  border-color: rgba(255,255,255,0.2);
+}
+
+.fw-tile-icon {
+  font-size: 52px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.fw-tile-name {
+  font-size: 19px;
+  font-weight: 700;
+  color: #e2e8f0;
+  letter-spacing: 0.3px;
+}
+
+.fw-tile-desc {
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  text-align: center;
+  max-width: 160px;
+  line-height: 1.4;
+}
+
+.fw-tile-lang {
+  font-size: 10px;
+  color: rgba(255,255,255,0.25);
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
+}

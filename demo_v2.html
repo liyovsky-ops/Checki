@@ -11,7 +11,9 @@
 
   <!-- TOPBAR -->
   <div class="topbar">
-    <div class="logo">Checki<span>.</span></div>
+    <div class="logo">
+      <span class="logo-checki active" onclick="showApp('checki')">Checki</span><span class="logo-dot">.</span><span class="logo-framework" onclick="showApp('framework')">framework</span>
+    </div>
     <div class="topbar-tabs">
       <button class="tab active" onclick="switchTab(this, 'analiza')">Analiza kodu</button>
       <button class="tab" onclick="switchTab(this, 'nauka')">Tryb nauki</button>
@@ -25,8 +27,8 @@
     </div>
   </div>
 
-  <!-- MAIN -->
-  <div class="main">
+  <!-- MAIN — Checki -->
+  <div class="main" id="checki-page">
 
     <!-- SIDEBAR -->
     <div class="sidebar">
@@ -101,6 +103,26 @@
 
   </div>
 
+  <!-- FRAMEWORK PAGE -->
+  <div id="framework-page" style="display:none; flex:1; overflow-y:auto; flex-direction:column;">
+    <div class="fw-section" data-theme="frontend">
+      <div class="fw-section-header">Frontend</div>
+      <div class="fw-tiles-grid" id="fw-tiles-frontend"></div>
+    </div>
+    <div class="fw-section" data-theme="backend">
+      <div class="fw-section-header">Backend</div>
+      <div class="fw-tiles-grid" id="fw-tiles-backend"></div>
+    </div>
+    <div class="fw-section" data-theme="database">
+      <div class="fw-section-header">Database</div>
+      <div class="fw-tiles-grid" id="fw-tiles-database"></div>
+    </div>
+    <div class="fw-section" data-theme="devops">
+      <div class="fw-section-header">DevOps</div>
+      <div class="fw-tiles-grid" id="fw-tiles-devops"></div>
+    </div>
+  </div>
+
   <!-- STATUSBAR -->
   <div class="statusbar">
     <span>✅ Gotowy</span>
@@ -154,6 +176,8 @@
   <script src="demo_assets/js/tabs.js"></script>
   <script src="demo_assets/js/tooltips.js"></script>
   <script src="demo_assets/js/programming-mode.js"></script>
+  <script src="demo_assets/data/frameworks.js"></script>
+  <script src="demo_assets/js/framework.js"></script>
 
 </body>
 </html>
