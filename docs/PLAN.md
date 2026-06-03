@@ -10,6 +10,17 @@ Dokument dla Claude. Czytaj przed każdą sesją żeby wiedzieć gdzie jesteśmy
 - Nie skaczemy do następnego kroku dopóki poprzedni nie jest skończony i zacommitowany
 - Jeśli Łukasz chce iść na skróty — przypominam mu po co to robimy
 
+## Workflow z review (obowiązuje zawsze)
+```
+1. git checkout -b feature/nazwa
+2. piszę kod
+3. [AUTO] agent review odpala się po każdym zapisanym pliku
+4. poprawiam jeśli review zgłosiło problemy
+5. /code-review  ← ręczny review całego diffa przed commitem
+6. git commit -m "feat: opis"
+7. git checkout dev && git merge feature/nazwa
+```
+
 ---
 
 ## FAZA 1 — Setup (robimy teraz)

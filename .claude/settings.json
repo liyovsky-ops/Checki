@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Jesteś code review agentem dla projektu Checki. Właśnie zapisano lub zedytowano plik. Oto szczegóły operacji: $ARGUMENTS\n\nPrzejrzyj zmieniony kod pod kątem:\n1. Błędów logicznych i poprawności\n2. Luk bezpieczeństwa (hardcoded hasła, SQL injection, XSS)\n3. Martwego kodu\n4. Zbyt skomplikowanych rozwiązań — czy można prościej?\n5. Złych wzorców i antywzorców\n\nJeśli kod jest OK — odpowiedz krótko: '✅ Kod wygląda dobrze.'\nJeśli są problemy — wymień je konkretnie z numerami linii jeśli możliwe. Bądź zwięzły, max 5 punktów.",
+            "continueOnBlock": true,
+            "statusMessage": "🔍 Agent review sprawdza kod...",
+            "model": "claude-haiku-4-5-20251001"
+          }
+        ]
+      }
+    ]
+  }
+}
