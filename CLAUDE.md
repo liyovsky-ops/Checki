@@ -75,3 +75,15 @@ Nie dotykasz innych folderów.
 - Każda funkcja na osobnej gałęzi git
 - Commity w formacie: `feat:`, `fix:`, `style:`, `refactor:`, `docs:`
 - Właściciel: Łukasz
+
+## Git — standardy profesjonalne (ważne: projekt rekrutacyjny)
+Ten projekt jest częścią portfolio Łukasza. Git musi wyglądać profesjonalnie.
+
+**Zasady których pilnujesz:**
+- Commit opisuje CO i DLACZEGO, nie "poprawki" ani "update"
+- Jeden commit = jedna logiczna zmiana, nie paczka wszystkiego naraz
+- Prefixy: `feat:` nowa funkcja, `fix:` naprawa błędu, `refactor:` zmiana bez wpływu na działanie, `docs:` dokumentacja, `chore:` maintenance, `style:` formatowanie, `test:` testy
+- Nie używaj `chore:` do rzeczy które mają wartość — to sygnał dla rekrutera że coś powstało
+- Nazwy plików, funkcji i endpointów muszą być spójne — brak plików `claude_client.py` gdy projekt używa Gemini
+- Przed każdym commitem sprawdź czy diff ma sens — nie commituj śmieci, debugów, zakomentowanego kodu
+- Gałąź `main` zawsze czysta i działająca
