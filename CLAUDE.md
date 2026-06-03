@@ -93,7 +93,12 @@ Nie dotykasz innych folderów.
 3. [ ] feature/text-to-code — tekst → kod
 4. [ ] feature/learn-mode — tryb nauki (najprostszy zapis kodu)
 5. [ ] Podpięcie backendu pod demo_v2.html (docelowy UI)
-6. [ ] feature/programming-schools — szkoły programowania jako drugi wymiar trybu
+4. [ ] feature/programming-mode-extended — rozszerzony tryb programowania
+     Po wyborze trybu (eco/sport/etc.) obok "Przepisany" pojawia się dobór standardów:
+       SOLID, Clean Architecture, Clean Code, DRY, KISS, YAGNI, TDD, DDD
+     Zaznaczone standardy doklejane do promptu agenta — generuje kod trzymający się
+     wybranych zasad jednocześnie z wybranym trybem (np. Sport + SOLID + Clean Code)
+5. [ ] feature/programming-schools — szkoły programowania jako drugi wymiar trybu
      - Clean Code (Uncle Bob) — czytelność, nazwy które mówią same za siebie
      - Unix Philosophy — jedna funkcja jedna odpowiedzialność, małe kompozycje
      - MIT / Hacker Culture — elegancja przez spryt, liczy się piękno rozwiązania
