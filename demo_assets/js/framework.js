@@ -11,6 +11,11 @@ function showApp(app) {
     btnChecki.classList.remove('active');
     btnFw.classList.add('active');
     applyFwTheme('frontend');
+    // Startuj na Frontend, nie na wyszukiwarce
+    setTimeout(function() {
+      var frontendSection = document.querySelector('.fw-section[data-theme="frontend"]');
+      if (frontendSection) frontendSection.scrollIntoView({ behavior: 'instant' });
+    }, 0);
   } else {
     fw.style.display = 'none';
     checki.style.display = 'flex';
