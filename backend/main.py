@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from shared.claude_client import ask_gemini
+from shared.gemini_client import ask_gemini
 
 app = FastAPI(title="Checki API")
 
