@@ -59,15 +59,27 @@ Nie dotykasz innych folderów.
 
 ## Aktualny status
 - [x] Założenia zapisane
-- [x] Demo wizualne (demo.html) — gotowe
+- [x] Demo wizualne (demo.html) — gotowe i podzielone na moduły
 - [x] Setup frontendu (Next.js)
 - [x] Setup backendu (FastAPI)
 - [x] Podpięcie Gemini API
 
+### Backend — funkcje gotowe
+- [x] `translator` — tłumaczenie kodu na prosty język polski (`/translator/explain`)
+- [x] `line-tooltip` — analiza całego kodu jednym callem, lookup po linii bez LLM (`/line-tooltip/analyze`, `/line-tooltip/lookup`)
+- [x] `builtins` — detekcja tokenów Pythona w kodzie, słownik 194 wpisów (`/builtins/detect`)
+
+### Demo — nadplanowe funkcje
+- [x] Dymki na hover dla tokenów Pythona (.kw, .fn) — słownik wbudowany w demo
+- [x] Archiwum bibliotek — 108 bibliotek, 10 kategorii, wyszukiwarka, modal ze szczegółami
+- [x] Podział demo.html (1275 linii) na 8 modułowych plików w `demo_assets/`
+
 ## Kolejne kroki
-1. [ ] feature/translator — tłumaczenie kodu na tekst (pierwsza funkcja end-to-end)
-2. [ ] Edytor kodu z numerami linii i tooltipami
-3. [ ] Pozostałe 10 funkcji
+1. [ ] feature/dead-code — wykrywanie martwego kodu
+2. [ ] feature/bad-patterns — wykrywanie złych wzorców
+3. [ ] feature/text-to-code — tekst → kod
+4. [ ] feature/learn-mode — tryb nauki (najprostszy zapis kodu)
+5. [ ] Podpięcie backendu pod demo_v2.html (docelowy UI)
 
 ## Zasady projektu
 - Kod ma być prosty i czytelny — projekt jest też narzędziem do nauki
