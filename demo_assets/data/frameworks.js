@@ -31,4 +31,12 @@ const FRAMEWORKS = {
     { id: 'terraform',name: 'Terraform',    icon: '🏗️', color: '#7b42bc', lang: 'HCL',     desc: 'Infrastruktura jako kod' },
     { id: 'linux',    name: 'Linux',        icon: '🐧', color: '#f7c948', lang: 'Bash',     desc: 'Podstawa każdego serwera' },
   ],
+  ai: [
+    { id: 'pytorch',    name: 'PyTorch',      icon: '🔥', color: '#ee4c2c', lang: 'Python', desc: 'ML/research od Meta' },
+    { id: 'tensorflow', name: 'TensorFlow',   icon: '🧠', color: '#ff6f00', lang: 'Python', desc: 'ML na masową skalę od Google' },
+    { id: 'huggingface',name: 'Hugging Face', icon: '🤗', color: '#ffd21e', lang: 'Python', desc: 'Centrum modeli i transformerów' },
+    { id: 'langchain',  name: 'LangChain',    icon: '🔗', color: '#1c3c3c', lang: 'Python', desc: 'Orkiestracja aplikacji LLM' },
+    { id: 'openai',     name: 'OpenAI SDK',   icon: '✦',  color: '#10a37f', lang: 'Python', desc: 'Najpopularniejsze API do LLM' },
+    { id: 'sklearn',    name: 'scikit-learn', icon: '📊', color: '#f89939', lang: 'Python', desc: 'Klasyczne ML, podstawa data science' },
+  ],
 };

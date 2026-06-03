@@ -26,6 +26,7 @@ var FW_THEMES = {
   backend:  { bg: '#050f05', border: 'rgba(68,183,139,0.15)',  label: '#44b78b' },
   database: { bg: '#08050f', border: 'rgba(90,103,216,0.15)',  label: '#5a67d8' },
   devops:   { bg: '#050a10', border: 'rgba(36,150,237,0.15)',  label: '#2496ed' },
+  ai:       { bg: '#0f0a05', border: 'rgba(238,76,44,0.15)',   label: '#ee4c2c' },
 };
 
 function applyFwTheme(theme) {
@@ -95,5 +96,6 @@ document.addEventListener('DOMContentLoaded', function() {
   renderTiles('backend',  'fw-tiles-backend');
   renderTiles('database', 'fw-tiles-database');
   renderTiles('devops',   'fw-tiles-devops');
+  renderTiles('ai',       'fw-tiles-ai');
   initScrollTheme();
 });
