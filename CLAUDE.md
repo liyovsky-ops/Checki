@@ -98,7 +98,16 @@ Nie dotykasz innych folderów.
        SOLID, Clean Architecture, Clean Code, DRY, KISS, YAGNI, TDD, DDD
      Zaznaczone standardy doklejane do promptu agenta — generuje kod trzymający się
      wybranych zasad jednocześnie z wybranym trybem (np. Sport + SOLID + Clean Code)
-5. [ ] feature/programming-schools — szkoły programowania jako drugi wymiar trybu
+5. [ ] feature/line-risk-indicators — ikony ryzyka przy każdej linii kodu
+     Zamiast tylko "?" każda linia dostaje zestaw ikon oznaczających ryzyko:
+       🔴 Krytyczne  — np. SQL injection, eval(), hardcoded credentials
+       🟠 Wysokie    — np. niebezpieczny import, brak walidacji inputu
+       🟡 Średnie    — np. potencjalny wyciek danych, niezabezpieczone zasoby
+       🔵 Info       — np. deprecated API, nieoptymalna praktyka
+     Najechanie na ikonę → dymek od "komentatora" który tłumaczy konkretne
+     zagrożenie tej linii: co może się stać, jak można to wykorzystać
+     AI analizuje cały kod i zwraca mapę linii → poziom ryzyka + opis
+6. [ ] feature/programming-schools — szkoły programowania jako drugi wymiar trybu
      - Clean Code (Uncle Bob) — czytelność, nazwy które mówią same za siebie
      - Unix Philosophy — jedna funkcja jedna odpowiedzialność, małe kompozycje
      - MIT / Hacker Culture — elegancja przez spryt, liczy się piękno rozwiązania
