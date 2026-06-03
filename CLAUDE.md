@@ -80,6 +80,13 @@ Nie dotykasz innych folderów.
 3. [ ] feature/text-to-code — tekst → kod
 4. [ ] feature/learn-mode — tryb nauki (najprostszy zapis kodu)
 5. [ ] Podpięcie backendu pod demo_v2.html (docelowy UI)
+6. [ ] feature/programming-schools — szkoły programowania jako drugi wymiar trybu
+     - Clean Code (Uncle Bob) — czytelność, nazwy które mówią same za siebie
+     - Unix Philosophy — jedna funkcja jedna odpowiedzialność, małe kompozycje
+     - MIT / Hacker Culture — elegancja przez spryt, liczy się piękno rozwiązania
+     - Puryzm — czyste funkcje, zero side effects, dane niezmienne
+     Pomysł: po wyborze trybu (eco/sport/etc.) można dodatkowo wybrać szkołę
+     i Gemini dostaje oba wymiary w prompcie naraz.
 
 ## Zasady projektu
 - Kod ma być prosty i czytelny — projekt jest też narzędziem do nauki
