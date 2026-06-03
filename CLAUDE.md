@@ -13,12 +13,35 @@ Skierowane do początkujących programistów — główny nacisk na prostotę i 
 ## Struktura
 ```
 Checki/
-├── frontend/     — Next.js, komponenty UI
-├── backend/      — FastAPI, logika AI, analiza kodu
-├── docs/         — decyzje, notatki
-├── ZALOZENIA.md  — pełna lista funkcji
-└── demo.html     — prototyp wizualny (gotowy)
+├── frontend/
+│   ├── app/                  — routing Next.js, layout
+│   ├── shared/               — wspólne komponenty (Button, Layout itp.)
+│   └── features/
+│       ├── translator/       — tłumaczenie kodu na tekst
+│       ├── dead-code/        — wykrywanie martwego kodu
+│       ├── line-tooltip/     — pytajnik przy każdej linii
+│       ├── bad-patterns/     — błędne i szkodliwe rozwiązania
+│       ├── text-to-code/     — tekst → kod
+│       ├── learn-mode/       — tryb nauki
+│       ├── agents/           — agenci-specjaliści
+│       ├── archive/          — archiwum bibliotek i komend
+│       └── history/          — historia analizowanych plików
+├── backend/
+│   ├── shared/               — wspólna logika, połączenie z AI
+│   └── features/             — lustrzana struktura do frontend
+│       └── (te same foldery co w frontend/features)
+├── docs/
+├── ZALOZENIA.md
+└── demo.html
 ```
+
+## Zasada pracy z funkcjami
+Każda funkcja = osobny folder w `features/`.
+Gdy pracujesz nad funkcją X — ruszasz się tylko w:
+- `frontend/features/X/`
+- `backend/features/X/`
+
+Nie dotykasz innych folderów.
 
 ## Funkcje (11 sztuk)
 1. Tłumaczenie kodu na tekst
