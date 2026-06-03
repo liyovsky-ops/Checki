@@ -468,12 +468,17 @@
 #framework-page {
   background: #0d0a1f;
   overflow-y: auto;
+  scroll-snap-type: y mandatory;
 }
+
 
 .fw-section {
   min-height: calc(100vh - 70px);
+  height: calc(100vh - 70px);
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
+  scroll-snap-align: start;
 }
 
 .fw-section-header {
