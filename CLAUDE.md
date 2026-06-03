@@ -75,7 +75,12 @@ Nie dotykasz innych folderów.
 - [x] Podział demo.html (1275 linii) na 8 modułowych plików w `demo_assets/`
 
 ## Kolejne kroki
-1. [ ] feature/dead-code — wykrywanie martwego kodu
+1. [ ] feature/translator-demo — nowy widok tłumacza w demo_v2 (priorytet na jutro)
+     UX: kliknięcie "Tłumacz kod" wysuwa panel z dołu ekranu (jak dymek/drawer)
+     Widok "przypisy": kod po lewej/górze, pod każdą linią mniejsza czcionka z tłumaczeniem
+       — styl jak przypisy w książce, inna czcionka dla tłumaczenia
+     Ikona różdżki (🪄): usuwa kod, scala tłumaczenia w ciągły tekst od początku do końca
+2. [ ] feature/dead-code — wykrywanie martwego kodu
 2. [ ] feature/bad-patterns — wykrywanie złych wzorców
 3. [ ] feature/text-to-code — tekst → kod
 4. [ ] feature/learn-mode — tryb nauki (najprostszy zapis kodu)
