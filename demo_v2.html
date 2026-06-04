@@ -36,7 +36,7 @@
       <div class="sidebar-label">Funkcje</div>
       <button class="sidebar-item active" onclick="setActive(this); openTranslator()"><span class="icon">📄</span> Tłumacz kod</button>
       <button class="sidebar-item" onclick="setActive(this); openVivisekcja()"><span class="icon">🔬</span> Vivisekcja kodu</button>
-      <button class="sidebar-item" onclick="setActive(this)"><span class="icon">💀</span> Martwy kod<span class="badge">2</span></button>
+      <button class="sidebar-item" onclick="setActive(this); toggleDeadCode()"><span class="icon">💀</span> Martwy kod<span class="badge dead-code-badge"></span></button>
       <button class="sidebar-item" onclick="setActive(this)"><span class="icon">⚠️</span> Błędne wzorce<span class="badge badge-warn">1</span></button>
       <button class="sidebar-item" onclick="setActive(this); showHistoria()"><span class="icon">🕓</span> Historia</button>
       <div class="sidebar-label" style="margin-top:8px;">Agenci</div>
@@ -73,25 +73,8 @@
     <div class="right-panel">
       <div class="panel-header">🤖 Analiza AI</div>
       <div class="panel-body" id="panel-body">
-        <div style="font-size:12px; color:#94a3b8; margin-bottom:4px;">Podsumowanie kodu:</div>
-        <div class="analysis-card ok">
-          <div class="card-title">📄 Co robi ten kod?</div>
-          <div class="card-desc">Prosta aplikacja Flask z jednym endpointem <code style="color:#a78bfa">/users</code>. Pobiera użytkowników z bazy danych i zwraca jako JSON. Zawiera 2 problemy do naprawienia.</div>
-        </div>
-        <div class="analysis-card error">
-          <div class="card-title">💀 Martwy kod</div>
-          <div class="card-desc">Funkcja <code style="color:#a78bfa">old_get_users()</code> nigdy nie jest wywoływana. Można ją usunąć.</div>
-          <div class="card-line">→ linia 18–22</div>
-        </div>
-        <div class="analysis-card warn">
-          <div class="card-title">⚠️ Złe rozwiązanie</div>
-          <div class="card-desc">Hasło do bazy danych jest wpisane bezpośrednio w kodzie. Użyj zmiennej środowiskowej <code style="color:#f59e0b">os.environ</code>.</div>
-          <div class="card-line">→ linia 4</div>
-        </div>
-        <div class="analysis-card">
-          <div class="card-title">💡 Sugestia</div>
-          <div class="card-desc">Rozważ dodanie obsługi błędów przy połączeniu z bazą danych (try/except).</div>
-          <div class="card-line">→ linia 8–10</div>
+        <div style="font-size:12px; color:#4a5568; padding: 16px 0; text-align:center;">
+          Wybierz funkcję z panelu bocznego aby zobaczyć wyniki analizy.
         </div>
       </div>
       <div class="ai-input-area">
@@ -216,6 +199,7 @@
   <script src="demo_assets/js/framework.js"></script>
   <script src="demo_assets/js/translator.js"></script>
   <script src="demo_assets/js/vivisekcja.js"></script>
+  <script src="demo_assets/js/dead-code.js"></script>
 
 </body>
 </html>

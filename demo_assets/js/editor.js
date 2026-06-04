@@ -125,8 +125,14 @@ function handleFileUpload(input) {
       translatorCodeSnapshot = null;
     }
 
+    // Wyczyść dead code — nowy plik
+    if (typeof resetDeadCode === 'function') resetDeadCode();
+
     renderEditor();
     input.value = '';
+
+    // Dodaj do historii
+    addToHistoria(file.name, lines.length);
 
     // Pobierz opisy linii z backendu i dodaj przyciski ?
     analyzeCodeForTooltips(text);
