@@ -37,7 +37,7 @@
       <button class="sidebar-item active" onclick="setActive(this); openTranslator()"><span class="icon">📄</span> Tłumacz kod</button>
       <button class="sidebar-item" onclick="setActive(this); openVivisekcja()"><span class="icon">🔬</span> Vivisekcja kodu</button>
       <button class="sidebar-item" onclick="setActive(this); toggleDeadCode()"><span class="icon">💀</span> Martwy kod<span class="badge dead-code-badge"></span></button>
-      <button class="sidebar-item" onclick="setActive(this)"><span class="icon">⚠️</span> Błędne wzorce<span class="badge badge-warn">1</span></button>
+      <button class="sidebar-item" onclick="setActive(this); toggleBadPatterns()"><span class="icon">⚠️</span> Złe wzorce<span class="badge bad-patterns-badge" style="display:none;"></span></button>
       <button class="sidebar-item" onclick="setActive(this); showHistoria()"><span class="icon">🕓</span> Historia</button>
       <div class="sidebar-label" style="margin-top:8px;">Agenci</div>
       <button class="sidebar-item" onclick="setActive(this)"><span class="icon">🤖</span> Agent Backend</button>
@@ -200,6 +200,7 @@
   <script src="demo_assets/js/translator.js"></script>
   <script src="demo_assets/js/vivisekcja.js"></script>
   <script src="demo_assets/js/dead-code.js"></script>
+  <script src="demo_assets/js/bad-patterns.js"></script>
 
 </body>
 </html>
