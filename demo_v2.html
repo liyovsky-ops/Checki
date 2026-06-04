@@ -35,6 +35,7 @@
     <div class="sidebar">
       <div class="sidebar-label">Funkcje</div>
       <button class="sidebar-item active" onclick="setActive(this); openTranslator()"><span class="icon">📄</span> Tłumacz kod</button>
+      <button class="sidebar-item" onclick="setActive(this); openVivisekcja()"><span class="icon">🔬</span> Vivisekcja kodu</button>
       <button class="sidebar-item" onclick="setActive(this)"><span class="icon">💀</span> Martwy kod<span class="badge">2</span></button>
       <button class="sidebar-item" onclick="setActive(this)"><span class="icon">⚠️</span> Błędne wzorce<span class="badge badge-warn">1</span></button>
       <button class="sidebar-item" onclick="setActive(this)"><span class="icon">🔍</span> Opis linii</button>
@@ -175,6 +176,15 @@
     </div>
   </div>
 
+  <!-- VIVISEKCJA PANEL (wysuwa się z góry) -->
+  <div id="vivisekcja-panel" class="vivisekcja-panel">
+    <div class="vivisekcja-header">
+      <span class="vivisekcja-title">🔬 Vivisekcja kodu — analiza krok po kroku</span>
+      <button class="vivisekcja-close-btn" onclick="closeVivisekcja()">✕</button>
+    </div>
+    <div class="vivisekcja-body" id="vivisekcja-body"></div>
+  </div>
+
   <!-- TRANSLATOR DRAWER -->
   <div id="translator-drawer" class="translator-drawer">
     <div class="translator-drawer-header">
@@ -208,6 +218,7 @@
   <script src="demo_assets/data/frameworks.js"></script>
   <script src="demo_assets/js/framework.js"></script>
   <script src="demo_assets/js/translator.js"></script>
+  <script src="demo_assets/js/vivisekcja.js"></script>
 
 </body>
 </html>

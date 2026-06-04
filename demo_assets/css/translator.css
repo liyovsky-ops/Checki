@@ -108,3 +108,110 @@
   padding: 16px 0;
 }
 .translator-error { color: #ef4444; }
+
+/* ========== VIVISEKCJA PANEL (z góry) ========== */
+.vivisekcja-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 70vh;
+  background: #1a1d2e;
+  border-bottom: 2px solid #7c6af7;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+  z-index: 200;
+}
+.vivisekcja-panel.open {
+  transform: translateY(0);
+}
+.vivisekcja-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid #2d3148;
+  flex-shrink: 0;
+}
+.vivisekcja-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+.vivisekcja-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 2px 6px;
+  line-height: 1;
+}
+.vivisekcja-close-btn:hover { color: #e2e8f0; }
+.vivisekcja-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 32px;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Markdown elementy */
+.viv-h1 { font-size: 18px; font-weight: 700; color: #e2e8f0; margin: 20px 0 10px; }
+.viv-h2 { font-size: 15px; font-weight: 700; color: #7c6af7; margin: 24px 0 8px; border-left: 3px solid #7c6af7; padding-left: 10px; }
+.viv-h3 { font-size: 13px; font-weight: 600; color: #a78bfa; margin: 16px 0 6px; }
+.viv-p  { font-size: 13px; color: #c8d0e0; line-height: 1.7; margin: 4px 0; }
+.viv-hr { border: none; border-top: 1px solid #2d3148; margin: 20px 0; }
+.viv-gap { height: 8px; }
+
+.viv-code {
+  background: #0f1117;
+  border: 1px solid #2d3148;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #98c379;
+  white-space: pre-wrap;
+  margin: 8px 0;
+  overflow-x: auto;
+}
+.viv-inline-code {
+  background: #0f1117;
+  color: #a78bfa;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.viv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin: 8px 0 16px;
+}
+.viv-table th {
+  background: #2d3148;
+  color: #e2e8f0;
+  padding: 7px 12px;
+  text-align: left;
+  font-weight: 600;
+}
+.viv-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid #2d3148;
+  color: #c8d0e0;
+  vertical-align: top;
+}
+.viv-table tr:hover td { background: #1e2235; }
+
+.viv-loading, .viv-error {
+  font-size: 13px;
+  color: #94a3b8;
+  padding: 24px 0;
+}
+.viv-error { color: #ef4444; }
