@@ -41,6 +41,7 @@ Open `demo_v2.html` in a browser (with backend running on port 8000).
 | Złe wzorce | 🔜 Planned | Flags dangerous or inefficient patterns |
 | Text → Kod | 🔜 Planned | Describe in Polish, get working code |
 | Agenci specjaliści | 🔜 Planned | 5 specialist agents: Architecture, Security, Performance, Clean Code, Testing |
+| Akademia | 🔜 Planned | Collect Python commands like Pokémon — mark each as known 🟢, familiar 🟡, or unknown 🔴 |
 
 ---
 

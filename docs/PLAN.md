@@ -20,6 +20,7 @@
 - [ ] `feature/agents` — 5 agentów: Architektura, Security, Performance, Clean Code, Testing
 - [ ] `feature/text-to-code` — opisz po polsku → dostań kod
 - [ ] `feature/programming-mode-extended` — standardy (SOLID, DDD, TDD) doklejane do promptu
+- [ ] `feature/academy` — kolekcja komend Pythona z oznaczaniem znajomości (🟢🟡🔴)
 
 ---
 
