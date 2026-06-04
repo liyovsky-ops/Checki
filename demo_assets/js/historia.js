@@ -1,7 +1,9 @@
 // Historia analizowanych plików — dane i renderowanie
 // Wywoływana przez tabs.js gdy user kliknie w sidebar
 
-const historia = [
+var HISTORIA_KEY = 'checki_historia';
+
+var HISTORIA_DEFAULTS = [
   {
     nazwa: 'app.py', jezyk: 'Python', data: 'dzisiaj, 14:32', linie: 23, bledy: 2, ostrzezenia: 1,
     opis: 'Aplikacja Flask z endpointem /users. Pobiera użytkowników z bazy SQLite i zwraca JSON.',
@@ -32,8 +34,29 @@ const historia = [
   }
 ];
 
+function loadHistoria() {
+  try {
+    var saved = localStorage.getItem(HISTORIA_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch(e) {
+    return [];
+  }
+}
+
+function saveHistoria() {
+  try {
+    localStorage.setItem(HISTORIA_KEY, JSON.stringify(historia));
+  } catch(e) {}
+}
+
+var historia = loadHistoria();
+
 function showHistoria() {
   const panel = document.getElementById('panel-body');
+  if (historia.length === 0) {
+    panel.innerHTML = '<div style="font-size:12px;color:#94a3b8;padding:8px 0;">Brak historii — wgraj plik aby zacząć.</div>';
+    return;
+  }
   panel.innerHTML =
     '<div style="font-size:12px; color:#94a3b8; margin-bottom:8px;">Ostatnio analizowane pliki</div>' +
     historia.map(function(h, i) {
@@ -63,6 +86,7 @@ function showHistoriaDetail(i) {
     '<button onclick="showHistoria()" style="background:#2d3148;border:none;color:#94a3b8;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;font-family:inherit">← Wróć</button>' +
     '<span style="font-size:13px;font-weight:600;color:#e2e8f0">📄 ' + h.nazwa + '</span>' +
     '<span style="font-size:10px;background:#1a1d2e;padding:2px 8px;border-radius:10px;color:#94a3b8;border:1px solid #2d3148">' + h.jezyk + '</span>' +
+    (h.kod ? '<button onclick="loadKodFromHistoria(' + i + ')" style="margin-left:auto;background:#4f46e5;border:none;color:#fff;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;font-family:inherit">⬆ Wczytaj do edytora</button>' : '') +
     '</div>' +
     '<div class="analysis-card ok">' +
     '<div class="card-title">📋 Co zawierał kod?</div>' +
@@ -91,12 +115,16 @@ function showHistoriaDetail(i) {
     );
 }
 
-function addToHistoria(nazwa, linie) {
+function addToHistoria(nazwa, linie, kodText) {
   var now = new Date();
   var godzina = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0');
 
-  // Jeśli ten plik już jest na górze — nie duplikuj
-  if (historia.length > 0 && historia[0].nazwa === nazwa) return;
+  // Jeśli ten plik już jest na górze — zaktualizuj tylko kod
+  if (historia.length > 0 && historia[0].nazwa === nazwa) {
+    if (kodText) historia[0].kod = kodText;
+    saveHistoria();
+    return;
+  }
 
   historia.unshift({
     nazwa: nazwa,
@@ -108,8 +136,73 @@ function addToHistoria(nazwa, linie) {
     opis: 'Wgrany plik — analiza w toku.',
     problemy: [],
     sugestie: [],
-    translatorData: null
+    translatorData: null,
+    kod: kodText || null
   });
+
+  if (historia.length > 20) historia = historia.slice(0, 20);
+  saveHistoria();
+}
+
+function loadKodFromHistoria(i) {
+  var h = historia[i];
+  if (!h.kod) return;
+
+  var ext = h.nazwa.split('.').pop().toLowerCase();
+  var lines = h.kod.split('\n');
+
+  CODE_LINES.length = 0;
+  lines.forEach(function(line) {
+    CODE_LINES.push({ code: highlightLine(line, ext), tip: null });
+  });
+
+  var fileTab = document.querySelector('.file-tab');
+  if (fileTab) fileTab.textContent = '📄 ' + h.nazwa;
+
+  if (typeof resetDeadCode === 'function') resetDeadCode();
+  if (typeof resetBadPatterns === 'function') resetBadPatterns();
+
+  renderEditor();
+
+  // Po wyrenderowaniu — przywróć wszystkie wyniki LLM
+  var currentCode = getOriginalCodeText();
+
+  // Translator
+  if (h.translatorData) {
+    translatorData = h.translatorData;
+    translatorCodeSnapshot = currentCode;
+    if (typeof translationCache !== 'undefined') translationCache[currentCode] = h.translatorData;
+  } else {
+    translatorData = null;
+    translatorCodeSnapshot = null;
+  }
+
+  // Vivisekcja
+  if (h.vivisekcjaData) {
+    vivisekcjaCache = h.vivisekcjaData;
+    vivisekcjaCodeSnapshot = currentCode;
+  } else {
+    vivisekcjaCache = null;
+    vivisekcjaCodeSnapshot = null;
+  }
+
+  // Martwy kod — przywróć highlights
+  if (h.deadCodeData && h.deadCodeData.length > 0) {
+    deadCodeCache = h.deadCodeData;
+    deadCodeSnapshot = currentCode;
+    deadCodeActive = true;
+    applyDeadCodeResults(h.deadCodeData);
+  }
+
+  // Złe wzorce — przywróć highlights
+  if (h.badPatternsData && h.badPatternsData.length > 0) {
+    badPatternsCache = h.badPatternsData;
+    badPatternsSnapshot = currentCode;
+    badPatternsActive = true;
+    applyBadPatternResults(h.badPatternsData);
+  }
+
+  showHistoria();
 }
 
 function guessLanguage(filename) {

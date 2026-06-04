@@ -3,13 +3,6 @@ var deadCodeCache = null;
 var deadCodeSnapshot = null;
 
 function toggleDeadCode() {
-  if (deadCodeActive) {
-    clearDeadCodeHighlights();
-    deadCodeActive = false;
-    restoreDefaultPanel();
-    return;
-  }
-
   deadCodeActive = true;
   var currentCode = getOriginalCodeText();
 
@@ -33,6 +26,13 @@ function fetchDeadCode(code) {
     deadCodeCache = data.dead;
     deadCodeSnapshot = code;
     applyDeadCodeResults(data.dead);
+    if (typeof historia !== 'undefined' && historia.length > 0) {
+      historia[0].deadCodeData = data.dead;
+      var deadLabels = data.dead.map(function(d) { return d.label + ' (linia ' + d.lines[0] + ')'; });
+      historia[0].problemy = (historia[0].problemy || []).concat(deadLabels);
+      historia[0].bledy = (historia[0].bledy || 0) + data.dead.length;
+      if (typeof saveHistoria === 'function') saveHistoria();
+    }
   })
   .catch(function() {
     showDeadCodeError();

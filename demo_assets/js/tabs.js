@@ -69,6 +69,9 @@ function switchTab(el, tab) {
 function setActive(el) {
   document.querySelectorAll('.sidebar-item').forEach(function(i) { i.classList.remove('active'); });
   el.classList.add('active');
+  // Wyczyść wszystkie featury przy przełączeniu
+  if (typeof clearDeadCodeHighlights === 'function') { clearDeadCodeHighlights(); deadCodeActive = false; }
+  if (typeof clearBadPatternHighlights === 'function') { clearBadPatternHighlights(); badPatternsActive = false; }
 }
 
 function sendAI() {

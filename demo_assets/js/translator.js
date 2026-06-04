@@ -15,8 +15,9 @@ function openTranslator() {
 
   var currentCode = getOriginalCodeText();
 
-  // Jeśli kod się nie zmienił i mamy dane — pokaż od razu
-  if (translatorData && translatorCodeSnapshot === currentCode) {
+  // Mamy dane — użyj cache (translatorData jest czyszczone przy wgraniu nowego pliku)
+  if (translatorData) {
+    translatorCodeSnapshot = currentCode;
     if (translatorWandMode) {
       renderTranslatorWand();
     } else {
@@ -81,6 +82,7 @@ function saveTranslationToHistoria(lines) {
       break;
     }
   }
+  if (typeof saveHistoria === 'function') saveHistoria();
 }
 
 function renderTranslatorLoading() {

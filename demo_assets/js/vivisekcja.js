@@ -11,8 +11,10 @@ function openVivisekcja() {
 
   var currentCode = getOriginalCodeText();
 
-  if (vivisekcjaCache && vivisekcjaCodeSnapshot === currentCode) {
-    return; // już mamy — nic nie rób
+  if (vivisekcjaCache) {
+    vivisekcjaCodeSnapshot = currentCode;
+    renderVivisekcjaContent(vivisekcjaCache);
+    return;
   }
 
   vivisekcjaCache = null;
@@ -39,6 +41,12 @@ function fetchVivisekcja(code) {
     vivisekcjaCache = data.markdown;
     vivisekcjaCodeSnapshot = code;
     renderVivisekcjaContent(data.markdown);
+    if (typeof historia !== 'undefined' && historia.length > 0) {
+      historia[0].vivisekcjaData = data.markdown;
+      var firstLine = data.markdown.split('\n').find(function(l) { return l.trim() && !l.startsWith('#'); }) || '';
+      if (firstLine) historia[0].opis = firstLine.replace(/\*\*/g, '').trim();
+      if (typeof saveHistoria === 'function') saveHistoria();
+    }
   })
   .catch(function() {
     renderVivisekcjaError();

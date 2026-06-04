@@ -132,8 +132,8 @@ function handleFileUpload(input) {
     renderEditor();
     input.value = '';
 
-    // Dodaj do historii
-    addToHistoria(file.name, lines.length);
+    // Dodaj do historii (z kodem)
+    addToHistoria(file.name, lines.length, text);
 
     // Pobierz opisy linii z backendu i dodaj przyciski ?
     analyzeCodeForTooltips(text);

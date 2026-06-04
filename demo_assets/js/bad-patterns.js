@@ -25,13 +25,6 @@ var CATEGORY_ICON = {
 };
 
 function toggleBadPatterns() {
-  if (badPatternsActive) {
-    clearBadPatternHighlights();
-    badPatternsActive = false;
-    restoreDefaultPanel();
-    return;
-  }
-
   badPatternsActive = true;
   var currentCode = getOriginalCodeText();
 
@@ -55,6 +48,18 @@ function fetchBadPatterns(code) {
     badPatternsCache = data.issues;
     badPatternsSnapshot = code;
     applyBadPatternResults(data.issues);
+    if (typeof historia !== 'undefined' && historia.length > 0) {
+      historia[0].badPatternsData = data.issues;
+      var critical = data.issues.filter(function(i) { return i.severity === 'critical' || i.severity === 'high'; });
+      var warnings = data.issues.filter(function(i) { return i.severity === 'medium' || i.severity === 'low'; });
+      var critLabels = critical.map(function(i) { return '[' + i.category + '] ' + i.label + ' (linia ' + i.lines[0] + ')'; });
+      var warnLabels = warnings.map(function(i) { return '[' + i.category + '] ' + i.label + ' (linia ' + i.lines[0] + ')'; });
+      historia[0].problemy = (historia[0].problemy || []).concat(critLabels);
+      historia[0].sugestie = (historia[0].sugestie || []).concat(warnLabels);
+      historia[0].bledy = (historia[0].bledy || 0) + critical.length;
+      historia[0].ostrzezenia = (historia[0].ostrzezenia || 0) + warnings.length;
+      if (typeof saveHistoria === 'function') saveHistoria();
+    }
   })
   .catch(function() {
     showBadPatternsError();
