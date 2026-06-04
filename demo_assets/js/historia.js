@@ -90,3 +90,30 @@ function showHistoriaDetail(i) {
       : ''
     );
 }
+
+function addToHistoria(nazwa, linie) {
+  var now = new Date();
+  var godzina = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0');
+
+  // Jeśli ten plik już jest na górze — nie duplikuj
+  if (historia.length > 0 && historia[0].nazwa === nazwa) return;
+
+  historia.unshift({
+    nazwa: nazwa,
+    jezyk: guessLanguage(nazwa),
+    data: 'dzisiaj, ' + godzina,
+    linie: linie,
+    bledy: 0,
+    ostrzezenia: 0,
+    opis: 'Wgrany plik — analiza w toku.',
+    problemy: [],
+    sugestie: [],
+    translatorData: null
+  });
+}
+
+function guessLanguage(filename) {
+  var ext = filename.split('.').pop().toLowerCase();
+  var map = { py: 'Python', js: 'JavaScript', ts: 'TypeScript', html: 'HTML', css: 'CSS', json: 'JSON', txt: 'Text' };
+  return map[ext] || ext.toUpperCase();
+}

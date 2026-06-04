@@ -372,3 +372,22 @@
     .code-line.warn-line { background: rgba(245,158,11,0.07); }
     .dead .line-num { color: #ef4444; }
     .warn-line .line-num { color: #f59e0b; }
+
+/* Dead code highlights */
+.code-line.dead-highlight {
+  background: rgba(239, 68, 68, 0.08);
+  border-left: 3px solid #ef4444;
+}
+.code-line.dead-highlight .line-content {
+  opacity: 0.5;
+  text-decoration: line-through;
+  text-decoration-color: rgba(239, 68, 68, 0.5);
+}
+.code-line.dead-pulse {
+  animation: deadPulse 0.6s ease;
+}
+@keyframes deadPulse {
+  0%   { background: rgba(239, 68, 68, 0.08); }
+  50%  { background: rgba(239, 68, 68, 0.25); }
+  100% { background: rgba(239, 68, 68, 0.08); }
+}
