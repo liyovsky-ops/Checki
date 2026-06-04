@@ -125,8 +125,9 @@ function handleFileUpload(input) {
       translatorCodeSnapshot = null;
     }
 
-    // Wyczyść dead code — nowy plik
+    // Wyczyść dead code i bad patterns — nowy plik
     if (typeof resetDeadCode === 'function') resetDeadCode();
+    if (typeof resetBadPatterns === 'function') resetBadPatterns();
 
     renderEditor();
     input.value = '';

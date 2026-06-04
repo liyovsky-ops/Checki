@@ -391,3 +391,17 @@
   50%  { background: rgba(239, 68, 68, 0.25); }
   100% { background: rgba(239, 68, 68, 0.08); }
 }
+
+/* Bad pattern highlights */
+.code-line.bad-pattern-highlight {
+  background: color-mix(in srgb, var(--bad-color, #f59e0b) 8%, transparent);
+  border-left: 3px solid var(--bad-color, #f59e0b);
+}
+.code-line.bad-pattern-pulse {
+  animation: badPulse 0.6s ease;
+}
+@keyframes badPulse {
+  0%   { background: color-mix(in srgb, var(--bad-color, #f59e0b) 8%, transparent); }
+  50%  { background: color-mix(in srgb, var(--bad-color, #f59e0b) 28%, transparent); }
+  100% { background: color-mix(in srgb, var(--bad-color, #f59e0b) 8%, transparent); }
+}
