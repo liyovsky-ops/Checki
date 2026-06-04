@@ -1,0 +1,139 @@
+/* ─── TRYB PROGRAMOWANIA — style i motywy kolorystyczne ─── */
+
+body, .topbar, .sidebar, .editor-header, .editor-body, .right-panel, .statusbar,
+.tab.active, .btn-primary, .send-btn {
+  transition: background 0.35s ease, border-color 0.35s ease, color 0.35s ease;
+}
+
+/* Kropka koloru przy przycisku trybu w sidebarze */
+.mode-btn .mode-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+.mode-btn[data-mode="eco"] .mode-dot        { background: #22c55e; }
+.mode-btn[data-mode="comfort"] .mode-dot    { background: #d97706; }
+.mode-btn[data-mode="sport"] .mode-dot      { background: #ef4444; }
+.mode-btn[data-mode="enterprise"] .mode-dot { background: #eab308; }
+.mode-btn[data-mode="security"] .mode-dot   { background: #3b82f6; }
+
+/* Zakładki edytora (Oryginalny / Przepisany) */
+.editor-tab {
+  padding: 4px 12px;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #94a3b8;
+  border: 1px solid #2d3148;
+  background: transparent;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.editor-tab:hover  { color: #e2e8f0; border-color: #7c6af7; }
+.editor-tab.active { background: #2a1f5c; color: #a78bfa; border-color: #7c6af7; }
+
+/* ─── ECO ─── */
+body.mode-eco { background: #040f04; }
+body.mode-eco .topbar               { background: #0a150a; border-color: #1a3d1a; }
+body.mode-eco .sidebar              { background: #080f08; border-color: #1a3d1a; }
+body.mode-eco .tab.active           { background: #16a34a; }
+body.mode-eco .btn-primary          { background: #16a34a; }
+body.mode-eco .btn-primary:hover    { background: #15803d; }
+body.mode-eco .send-btn             { background: #16a34a; }
+body.mode-eco .send-btn:hover       { background: #15803d; }
+body.mode-eco .sidebar-item.active  { background: rgba(34,197,94,0.15); color: #4ade80; }
+body.mode-eco .editor-header        { background: #0a150a; border-color: #1a3d1a; }
+body.mode-eco .editor-body          { background: #040f04; }
+body.mode-eco .right-panel          { background: #080f08; border-color: #1a3d1a; }
+body.mode-eco .panel-header         { color: #4ade80; }
+body.mode-eco .analysis-card        { background: #0a1a0a; border-left-color: #22c55e; }
+body.mode-eco .statusbar            { background: #16a34a; }
+body.mode-eco .ai-input:focus       { border-color: #22c55e; }
+body.mode-eco .logo                 { color: #22c55e; }
+body.mode-eco .editor-tab.active    { background: rgba(34,197,94,0.15); color: #4ade80; border-color: #22c55e; }
+body.mode-eco .editor-tab:hover     { border-color: #22c55e; color: #4ade80; }
+
+/* ─── COMFORT ─── */
+body.mode-comfort { background: #0f0d07; }
+body.mode-comfort .topbar               { background: #161108; border-color: #3d2d0f; }
+body.mode-comfort .sidebar              { background: #130f09; border-color: #3d2d0f; }
+body.mode-comfort .tab.active           { background: #b45309; }
+body.mode-comfort .btn-primary          { background: #b45309; }
+body.mode-comfort .btn-primary:hover    { background: #92400e; }
+body.mode-comfort .send-btn             { background: #b45309; }
+body.mode-comfort .send-btn:hover       { background: #92400e; }
+body.mode-comfort .sidebar-item.active  { background: rgba(217,119,6,0.15); color: #fbbf24; }
+body.mode-comfort .editor-header        { background: #161108; border-color: #3d2d0f; }
+body.mode-comfort .editor-body          { background: #0f0d07; }
+body.mode-comfort .right-panel          { background: #130f09; border-color: #3d2d0f; }
+body.mode-comfort .panel-header         { color: #fbbf24; }
+body.mode-comfort .analysis-card        { background: #1a1508; border-left-color: #d97706; }
+body.mode-comfort .statusbar            { background: #b45309; }
+body.mode-comfort .ai-input:focus       { border-color: #d97706; }
+body.mode-comfort .logo                 { color: #d97706; }
+body.mode-comfort .editor-tab.active    { background: rgba(217,119,6,0.15); color: #fbbf24; border-color: #d97706; }
+body.mode-comfort .editor-tab:hover     { border-color: #d97706; color: #fbbf24; }
+
+/* ─── SPORT ─── */
+body.mode-sport { background: #0f0404; }
+body.mode-sport .topbar               { background: #160a0a; border-color: #3d1515; }
+body.mode-sport .sidebar              { background: #130808; border-color: #3d1515; }
+body.mode-sport .tab.active           { background: #dc2626; }
+body.mode-sport .btn-primary          { background: #dc2626; }
+body.mode-sport .btn-primary:hover    { background: #b91c1c; }
+body.mode-sport .send-btn             { background: #dc2626; }
+body.mode-sport .send-btn:hover       { background: #b91c1c; }
+body.mode-sport .sidebar-item.active  { background: rgba(239,68,68,0.15); color: #f87171; }
+body.mode-sport .editor-header        { background: #160a0a; border-color: #3d1515; }
+body.mode-sport .editor-body          { background: #0f0404; }
+body.mode-sport .right-panel          { background: #130808; border-color: #3d1515; }
+body.mode-sport .panel-header         { color: #f87171; }
+body.mode-sport .analysis-card        { background: #1a0a0a; border-left-color: #ef4444; }
+body.mode-sport .statusbar            { background: #dc2626; }
+body.mode-sport .ai-input:focus       { border-color: #ef4444; }
+body.mode-sport .logo                 { color: #ef4444; }
+body.mode-sport .editor-tab.active    { background: rgba(239,68,68,0.15); color: #f87171; border-color: #ef4444; }
+body.mode-sport .editor-tab:hover     { border-color: #ef4444; color: #f87171; }
+
+/* ─── ENTERPRISE ─── */
+body.mode-enterprise { background: #0f0f04; }
+body.mode-enterprise .topbar               { background: #16160a; border-color: #3d3a0f; }
+body.mode-enterprise .sidebar              { background: #131308; border-color: #3d3a0f; }
+body.mode-enterprise .tab.active           { background: #ca8a04; }
+body.mode-enterprise .btn-primary          { background: #ca8a04; }
+body.mode-enterprise .btn-primary:hover    { background: #a16207; }
+body.mode-enterprise .send-btn             { background: #ca8a04; }
+body.mode-enterprise .send-btn:hover       { background: #a16207; }
+body.mode-enterprise .sidebar-item.active  { background: rgba(234,179,8,0.15); color: #facc15; }
+body.mode-enterprise .editor-header        { background: #16160a; border-color: #3d3a0f; }
+body.mode-enterprise .editor-body          { background: #0f0f04; }
+body.mode-enterprise .right-panel          { background: #131308; border-color: #3d3a0f; }
+body.mode-enterprise .panel-header         { color: #facc15; }
+body.mode-enterprise .analysis-card        { background: #1a1a08; border-left-color: #eab308; }
+body.mode-enterprise .statusbar            { background: #ca8a04; }
+body.mode-enterprise .ai-input:focus       { border-color: #eab308; }
+body.mode-enterprise .logo                 { color: #eab308; }
+body.mode-enterprise .editor-tab.active    { background: rgba(234,179,8,0.15); color: #facc15; border-color: #eab308; }
+body.mode-enterprise .editor-tab:hover     { border-color: #eab308; color: #facc15; }
+
+/* ─── SECURITY ─── */
+body.mode-security { background: #04040f; }
+body.mode-security .topbar               { background: #0a0a16; border-color: #0f1a3d; }
+body.mode-security .sidebar              { background: #080813; border-color: #0f1a3d; }
+body.mode-security .tab.active           { background: #1d4ed8; }
+body.mode-security .btn-primary          { background: #1d4ed8; }
+body.mode-security .btn-primary:hover    { background: #1e40af; }
+body.mode-security .send-btn             { background: #1d4ed8; }
+body.mode-security .send-btn:hover       { background: #1e40af; }
+body.mode-security .sidebar-item.active  { background: rgba(59,130,246,0.15); color: #93c5fd; }
+body.mode-security .editor-header        { background: #0a0a16; border-color: #0f1a3d; }
+body.mode-security .editor-body          { background: #04040f; }
+body.mode-security .right-panel          { background: #080813; border-color: #0f1a3d; }
+body.mode-security .panel-header         { color: #93c5fd; }
+body.mode-security .analysis-card        { background: #080818; border-left-color: #3b82f6; }
+body.mode-security .statusbar            { background: #1d4ed8; }
+body.mode-security .ai-input:focus       { border-color: #3b82f6; }
+body.mode-security .logo                 { color: #3b82f6; }
+body.mode-security .editor-tab.active    { background: rgba(59,130,246,0.15); color: #93c5fd; border-color: #3b82f6; }
+body.mode-security .editor-tab:hover     { border-color: #3b82f6; color: #93c5fd; }

@@ -59,15 +59,62 @@ Nie dotykasz innych folderów.
 
 ## Aktualny status
 - [x] Założenia zapisane
-- [x] Demo wizualne (demo.html) — gotowe
+- [x] Demo wizualne (demo.html) — gotowe i podzielone na moduły
 - [x] Setup frontendu (Next.js)
 - [x] Setup backendu (FastAPI)
 - [x] Podpięcie Gemini API
 
+### Backend — funkcje gotowe
+- [x] `translator` — tłumaczenie kodu na prosty język polski (`/translator/explain`)
+- [x] `line-tooltip` — analiza całego kodu jednym callem, lookup po linii bez LLM (`/line-tooltip/analyze`, `/line-tooltip/lookup`)
+- [x] `builtins` — detekcja tokenów Pythona w kodzie, słownik 194 wpisów (`/builtins/detect`)
+
+### Demo — nadplanowe funkcje
+- [x] Dymki na hover dla tokenów Pythona (.kw, .fn) — słownik wbudowany w demo
+- [x] Archiwum bibliotek — 108 bibliotek, 10 kategorii, wyszukiwarka, modal ze szczegółami
+- [x] Podział demo.html (1275 linii) na 8 modułowych plików w `demo_assets/`
+
 ## Kolejne kroki
-1. [ ] feature/translator — tłumaczenie kodu na tekst (pierwsza funkcja end-to-end)
-2. [ ] Edytor kodu z numerami linii i tooltipami
-3. [ ] Pozostałe 10 funkcji
+1. [ ] feature/translator-demo — nowy widok tłumacza w demo_v2 (priorytet na jutro)
+     UX: kliknięcie "Tłumacz kod" wysuwa panel z dołu ekranu (jak dymek/drawer)
+     Widok "przypisy": kod po lewej/górze, pod każdą linią mniejsza czcionka z tłumaczeniem
+       — styl jak przypisy w książce, inna czcionka dla tłumaczenia
+     Ikona różdżki (🪄): usuwa kod, scala tłumaczenia w ciągły tekst od początku do końca
+2. [ ] feature/agents-demo — agenci-specjaliści w demo_v2
+     Każdy agent bada kod przez pryzmat swojej profesji:
+       🏗️ Agent Architektury — struktura, wzorce, podział odpowiedzialności
+       🛡️ Agent Security     — luki, złe praktyki, podatności
+       ⚡ Agent Performance  — wąskie gardła, złożoność, optymalizacje
+       ✨ Agent Clean Code   — czytelność, nazewnictwo, SOLID
+       🧪 Agent Testing      — pokrycie testami, edge cases, testowalność
+     Każdy agent zwraca własny raport w prawym panelu
+3. [ ] feature/dead-code — wykrywanie martwego kodu
+2. [ ] feature/bad-patterns — wykrywanie złych wzorców
+3. [ ] feature/text-to-code — tekst → kod
+4. [ ] feature/learn-mode — tryb nauki (najprostszy zapis kodu)
+5. [ ] Podpięcie backendu pod demo_v2.html (docelowy UI)
+4. [ ] feature/programming-mode-extended — rozszerzony tryb programowania
+     Po wyborze trybu (eco/sport/etc.) obok "Przepisany" pojawia się dobór standardów:
+       SOLID, Clean Architecture, Clean Code, DRY, KISS, YAGNI, TDD, DDD
+     Zaznaczone standardy doklejane do promptu agenta — generuje kod trzymający się
+     wybranych zasad jednocześnie z wybranym trybem (np. Sport + SOLID + Clean Code)
+5. [ ] feature/line-risk-indicators — ikony ryzyka przy każdej linii kodu
+     Zamiast tylko "?" każda linia dostaje zestaw ikon oznaczających ryzyko:
+       🔴 Krytyczne  — np. SQL injection, eval(), hardcoded credentials
+       🟠 Wysokie    — np. niebezpieczny import, brak walidacji inputu
+       🟡 Średnie    — np. potencjalny wyciek danych, niezabezpieczone zasoby
+       🔵 Info       — np. deprecated API, nieoptymalna praktyka
+     Najechanie na ikonę → dymek od "komentatora" który tłumaczy konkretne
+     zagrożenie tej linii: co może się stać, jak można to wykorzystać
+     AI analizuje cały kod i zwraca mapę linii → poziom ryzyka + opis + bezpieczna alternatywa
+     Dymek pokazuje: co jest złe → dlaczego → jak to naprawić (gotowy fragment kodu)
+6. [ ] feature/programming-schools — szkoły programowania jako drugi wymiar trybu
+     - Clean Code (Uncle Bob) — czytelność, nazwy które mówią same za siebie
+     - Unix Philosophy — jedna funkcja jedna odpowiedzialność, małe kompozycje
+     - MIT / Hacker Culture — elegancja przez spryt, liczy się piękno rozwiązania
+     - Puryzm — czyste funkcje, zero side effects, dane niezmienne
+     Pomysł: po wyborze trybu (eco/sport/etc.) można dodatkowo wybrać szkołę
+     i Gemini dostaje oba wymiary w prompcie naraz.
 
 ## Zasady projektu
 - Kod ma być prosty i czytelny — projekt jest też narzędziem do nauki

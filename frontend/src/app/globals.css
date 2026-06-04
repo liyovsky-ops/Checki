@@ -1,26 +1,55 @@
 @import "tailwindcss";
 
+/* ---- Default theme ---- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --page-bg: #09090b;        /* zinc-950 */
+  --header-border: #27272a;  /* zinc-800 */
+  --mode-accent: #3b82f6;    /* blue-500 */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ---- Eco (green) ---- */
+html[data-mode="eco"] {
+  --page-bg: #040f04;
+  --header-border: #14532d;
+  --mode-accent: #22c55e;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ---- Comfort (warm cream) ---- */
+html[data-mode="comfort"] {
+  --page-bg: #0f0d08;
+  --header-border: #78350f;
+  --mode-accent: #d97706;
 }
 
+/* ---- Sport (red) ---- */
+html[data-mode="sport"] {
+  --page-bg: #0f0404;
+  --header-border: #7f1d1d;
+  --mode-accent: #ef4444;
+}
+
+/* ---- Enterprise (yellow) ---- */
+html[data-mode="enterprise"] {
+  --page-bg: #0f0f04;
+  --header-border: #713f12;
+  --mode-accent: #eab308;
+}
+
+/* ---- Security (blue) ---- */
+html[data-mode="security"] {
+  --page-bg: #04040f;
+  --header-border: #1e3a8a;
+  --mode-accent: #3b82f6;
+}
+
+/* ---- Apply theme to elements ---- */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--page-bg);
+  font-family: var(--font-geist-sans, Arial, Helvetica, sans-serif);
+  transition: background-color 0.4s ease;
+}
+
+.header-styled {
+  border-color: var(--header-border);
+  transition: border-color 0.4s ease;
 }
