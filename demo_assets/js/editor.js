@@ -135,6 +135,10 @@ function handleFileUpload(input) {
     // Dodaj do historii (z kodem)
     addToHistoria(file.name, lines.length, text);
 
+    // Prefetch wszystkich analiz w tle
+    var normalizedCode = getOriginalCodeText();
+    if (typeof prefetchAll === 'function') prefetchAll(normalizedCode, file.name);
+
     // Pobierz opisy linii z backendu i dodaj przyciski ?
     analyzeCodeForTooltips(text);
   };
