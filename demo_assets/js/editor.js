@@ -1,6 +1,6 @@
 // Renderowanie edytora kodu z numerami linii i tooltipami przy każdej linii
 
-const CODE_LINES = [
+var CODE_LINES = [
   { code: '<span class="kw">from</span> flask <span class="kw">import</span> Flask, jsonify', tip: "Importujemy Flask — bibliotekę do budowania serwerów webowych, oraz jsonify — funkcję która zamienia dane Pythona na format JSON." },
   { code: '<span class="kw">import</span> sqlite3', tip: "Importujemy sqlite3 — wbudowaną bibliotekę Pythona do obsługi bazy danych SQLite." },
   { code: '', tip: null },
@@ -26,18 +26,19 @@ const CODE_LINES = [
   { code: '    app.<span class="fn">run</span>(debug=<span class="kw">True</span>)', tip: "Uruchamiamy serwer Flask. debug=True oznacza że serwer automatycznie restartuje się gdy zmienisz kod — wygodne podczas tworzenia." },
 ];
 
-document.addEventListener('DOMContentLoaded', function() {
-  const editor = document.getElementById('editor');
+function renderEditor() {
+  var editor = document.getElementById('editor');
+  editor.innerHTML = '';
 
   CODE_LINES.forEach(function(line, i) {
-    const div = document.createElement('div');
+    var div = document.createElement('div');
     div.className = 'code-line' + (line.dead ? ' dead' : '') + (line.warn ? ' warn-line' : '');
 
-    const numSpan = document.createElement('span');
+    var numSpan = document.createElement('span');
     numSpan.className = 'line-num';
     numSpan.textContent = i + 1;
 
-    const contentSpan = document.createElement('span');
+    var contentSpan = document.createElement('span');
     contentSpan.className = 'line-content';
     contentSpan.innerHTML = line.code;
 
@@ -45,7 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
     div.appendChild(contentSpan);
 
     if (line.tip) {
-      const btn = document.createElement('button');
+      var btn = document.createElement('button');
       btn.className = 'question-btn';
       btn.innerHTML = '?<div class="tooltip"><div class="tooltip-label">Co robi ta linia?</div>' + line.tip + '</div>';
       div.appendChild(btn);
@@ -53,4 +54,129 @@ document.addEventListener('DOMContentLoaded', function() {
 
     editor.appendChild(div);
   });
+}
+
+var PY_KEYWORDS = /\b(False|None|True|and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield)\b/g;
+
+function highlightLine(raw, ext) {
+  // Escape HTML najpierw
+  var s = raw
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  if (ext === 'py' || ext === 'python') {
+    // Komentarz — wszystko od # do końca (musi być pierwsze żeby nie tokenizować wnętrza)
+    s = s.replace(/(#.*)$/, '<span class="cm">$1</span>');
+
+    // Stringi — triple i single quote (tylko jeśli nie w komentarzu)
+    s = s.replace(/("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, function(m) {
+      // Nie highlightuj jeśli już wewnątrz spana
+      return '<span class="str">' + m + '</span>';
+    });
+
+    // Dekoratory
+    s = s.replace(/(@\w+)/g, '<span class="op">$1</span>');
+
+    // Słowa kluczowe (tylko poza spanami)
+    s = s.replace(PY_KEYWORDS, function(m) {
+      return '<span class="kw">' + m + '</span>';
+    });
+
+    // Nazwy funkcji — słowo przed (
+    s = s.replace(/\b(\w+)(?=\s*\()/g, function(m, name) {
+      // Nie owijaj jeśli już jest wewnątrz spana (uproszczone sprawdzenie)
+      return '<span class="fn">' + name + '</span>';
+    });
+
+    // Liczby
+    s = s.replace(/\b(\d+\.?\d*)\b/g, '<span class="str">$1</span>');
+
+    // Zmienne specjalne (__name__, __main__ itp.)
+    s = s.replace(/(__\w+__)/g, '<span class="var">$1</span>');
+  }
+
+  return s;
+}
+
+function handleFileUpload(input) {
+  var file = input.files[0];
+  if (!file) return;
+
+  var ext = file.name.split('.').pop().toLowerCase();
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var text = e.target.result;
+    var lines = text.split('\n');
+
+    CODE_LINES.length = 0;
+    lines.forEach(function(line) {
+      CODE_LINES.push({ code: highlightLine(line, ext), tip: null });
+    });
+
+    // Zaktualizuj nazwę pliku w zakładce
+    var fileTab = document.querySelector('.file-tab');
+    if (fileTab) fileTab.textContent = '📄 ' + file.name;
+
+    // Wyczyść cache tłumaczenia — nowy plik
+    if (typeof translatorData !== 'undefined') {
+      translatorData = null;
+      translatorCodeSnapshot = null;
+    }
+
+    renderEditor();
+    input.value = '';
+
+    // Pobierz opisy linii z backendu i dodaj przyciski ?
+    analyzeCodeForTooltips(text);
+  };
+  reader.readAsText(file);
+}
+
+function analyzeCodeForTooltips(code) {
+  fetch('http://localhost:8000/line-tooltip/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: code })
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    var blocks = data.blocks;
+
+    // Przypisz tip do każdej linii na podstawie bloku
+    CODE_LINES.forEach(function(line, idx) {
+      var lineNum = idx + 1;
+      var block = findBlock(blocks, lineNum);
+      if (block) {
+        line.tip = '<strong>' + block.blok + '</strong><br>' + block.wyjasnienie;
+      }
+    });
+
+    renderEditor();
+  })
+  .catch(function() {
+    // Brak backendu — zostają linie bez tooltipów, nic się nie psuje
+  });
+}
+
+function findBlock(blocks, lineNum) {
+  for (var i = 0; i < blocks.length; i++) {
+    if (blocks[i].start <= lineNum && lineNum <= blocks[i].end) {
+      return blocks[i];
+    }
+  }
+  return null;
+}
+
+function escHtmlEditor(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  renderEditor();
 });
+

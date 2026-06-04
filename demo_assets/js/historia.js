@@ -6,25 +6,29 @@ const historia = [
     nazwa: 'app.py', jezyk: 'Python', data: 'dzisiaj, 14:32', linie: 23, bledy: 2, ostrzezenia: 1,
     opis: 'Aplikacja Flask z endpointem /users. Pobiera użytkowników z bazy SQLite i zwraca JSON.',
     problemy: ['Hardcoded hasło w linii 4', 'Martwa funkcja old_get_users() nigdy nie wywoływana'],
-    sugestie: ['Dodać obsługę błędów (try/except) przy połączeniu z bazą']
+    sugestie: ['Dodać obsługę błędów (try/except) przy połączeniu z bazą'],
+    translatorData: null
   },
   {
     nazwa: 'auth.js', jezyk: 'JavaScript', data: 'wczoraj, 18:10', linie: 47, bledy: 0, ostrzezenia: 3,
     opis: 'Moduł autoryzacji z JWT tokenami. Obsługuje logowanie, wylogowanie i odświeżanie tokena.',
     problemy: [],
-    sugestie: ['Token nie ma ustawionego czasu wygaśnięcia', 'Brak walidacji długości hasła', 'console.log z danymi użytkownika — usuń przed produkcją']
+    sugestie: ['Token nie ma ustawionego czasu wygaśnięcia', 'Brak walidacji długości hasła', 'console.log z danymi użytkownika — usuń przed produkcją'],
+    translatorData: null
   },
   {
     nazwa: 'database.py', jezyk: 'Python', data: '2 dni temu, 09:45', linie: 61, bledy: 1, ostrzezenia: 0,
     opis: 'Klasa do obsługi bazy danych PostgreSQL. Zawiera metody CRUD dla tabeli users i orders.',
     problemy: ['Brak zamknięcia połączenia po operacji — wyciek zasobów w linii 34'],
-    sugestie: ['Rozważ użycie context managera (with) dla połączeń']
+    sugestie: ['Rozważ użycie context managera (with) dla połączeń'],
+    translatorData: null
   },
   {
     nazwa: 'scraper.py', jezyk: 'Python', data: '3 dni temu, 11:20', linie: 89, bledy: 0, ostrzezenia: 2,
     opis: 'Web scraper używający BeautifulSoup. Pobiera oferty pracy z kilku serwisów i zapisuje do bazy.',
     problemy: [],
-    sugestie: ['Brak obsługi timeout przy żądaniach HTTP', 'Brak rate limiting — ryzyko zablokowania IP']
+    sugestie: ['Brak obsługi timeout przy żądaniach HTTP', 'Brak rate limiting — ryzyko zablokowania IP'],
+    translatorData: null
   }
 ];
 
@@ -76,6 +80,13 @@ function showHistoriaDetail(i) {
     (h.sugestie.length > 0 ?
       '<div class="analysis-card warn"><div class="card-title">💡 Sugestie (' + (h.ostrzezenia || h.sugestie.length) + ')</div>' +
       h.sugestie.map(function(s) { return '<div class="card-desc" style="margin-top:6px;">• ' + s + '</div>'; }).join('') + '</div>'
+      : ''
+    ) +
+    (h.translatorData ?
+      '<div class="analysis-card ok" style="cursor:pointer;" onclick="openTranslatorFromHistoria(historia[' + i + '].translatorData)">' +
+      '<div class="card-title">📄 Tłumaczenie kodu</div>' +
+      '<div class="card-desc">Kod był już przetłumaczony. Kliknij aby otworzyć.</div>' +
+      '</div>'
       : ''
     );
 }

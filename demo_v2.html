@@ -22,7 +22,8 @@
       <button class="tab" onclick="switchTab(this, 'archiwum')">Archiwum</button>
     </div>
     <div class="topbar-right">
-      <button class="btn btn-ghost">Wgraj plik</button>
+      <input type="file" id="file-input" accept=".py,.js,.ts,.html,.css,.json,.txt" style="display:none" onchange="handleFileUpload(this)" />
+      <button class="btn btn-ghost" onclick="document.getElementById('file-input').click()">Wgraj plik</button>
       <button class="btn btn-primary" onclick="handleAnalizuj()">▶ Analizuj</button>
     </div>
   </div>
@@ -33,7 +34,7 @@
     <!-- SIDEBAR -->
     <div class="sidebar">
       <div class="sidebar-label">Funkcje</div>
-      <button class="sidebar-item active" onclick="setActive(this)"><span class="icon">📄</span> Tłumacz kod</button>
+      <button class="sidebar-item active" onclick="setActive(this); openTranslator()"><span class="icon">📄</span> Tłumacz kod</button>
       <button class="sidebar-item" onclick="setActive(this)"><span class="icon">💀</span> Martwy kod<span class="badge">2</span></button>
       <button class="sidebar-item" onclick="setActive(this)"><span class="icon">⚠️</span> Błędne wzorce<span class="badge badge-warn">1</span></button>
       <button class="sidebar-item" onclick="setActive(this)"><span class="icon">🔍</span> Opis linii</button>
@@ -174,6 +175,18 @@
     </div>
   </div>
 
+  <!-- TRANSLATOR DRAWER -->
+  <div id="translator-drawer" class="translator-drawer">
+    <div class="translator-drawer-header">
+      <span class="translator-drawer-title">📄 Tłumaczenie kodu</span>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button id="translator-wand-btn" class="translator-wand-btn" onclick="toggleWand()" title="Scal w tekst">🪄</button>
+        <button class="translator-close-btn" onclick="closeTranslator()">✕</button>
+      </div>
+    </div>
+    <div class="translator-body" id="translator-body"></div>
+  </div>
+
   <!-- DICT TOOLTIP -->
   <div class="dict-tooltip" id="dictTooltip">
     <div class="dict-tooltip-label" id="dictTooltipLabel"></div>
@@ -194,6 +207,7 @@
   <script src="demo_assets/js/programming-mode.js"></script>
   <script src="demo_assets/data/frameworks.js"></script>
   <script src="demo_assets/js/framework.js"></script>
+  <script src="demo_assets/js/translator.js"></script>
 
 </body>
 </html>
