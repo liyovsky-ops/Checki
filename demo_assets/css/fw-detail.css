@@ -558,6 +558,227 @@
 
 .fwd-coming-icon { font-size: 48px; opacity: 0.4; }
 
+/* ── Command Modal ── */
+#fwd-cmd-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 8, 20, 0.75);
+  backdrop-filter: blur(6px);
+  padding: 24px;
+}
+
+#fwd-cmd-modal.fwd-cmd-modal--visible {
+  display: flex;
+}
+
+.fwd-cmd-modal-box {
+  background: #1a1728;
+  border: 1px solid rgba(124,90,247,0.3);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 620px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(124,90,247,0.1);
+  animation: fwdFadeUp 0.2s ease both;
+  overflow: hidden;
+}
+
+.fwd-cmd-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: #0d0b14;
+  border-bottom: 1px solid rgba(124,90,247,0.2);
+  flex-shrink: 0;
+}
+
+.fwd-cmd-modal-cmd-wrap {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fwd-cmd-modal-dollar {
+  color: rgba(124,90,247,0.5);
+  font-family: monospace;
+  font-size: 14px;
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+
+.fwd-cmd-modal-cmd-text {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: #61dafb;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.fwd-cmd-modal-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.fwd-cmd-copy-btn {
+  background: rgba(124,90,247,0.15);
+  border: 1px solid rgba(124,90,247,0.3);
+  color: #c8b9ff;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.fwd-cmd-copy-btn:hover {
+  background: rgba(124,90,247,0.28);
+  border-color: rgba(124,90,247,0.5);
+}
+
+.fwd-cmd-modal-close {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.4);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.fwd-cmd-modal-close:hover {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.7);
+}
+
+.fwd-cmd-modal-body {
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124,90,247,0.2) transparent;
+}
+
+.fwd-cmd-modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fwd-cmd-modal-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(200,185,255,0.4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.fwd-cmd-modal-text {
+  font-size: 13px;
+  color: rgba(220,215,240,0.75);
+  line-height: 1.75;
+}
+
+.fwd-cmd-flags {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fwd-cmd-flag-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 7px 12px;
+  background: rgba(124,90,247,0.06);
+  border: 1px solid rgba(124,90,247,0.12);
+  border-radius: 6px;
+}
+
+.fwd-cmd-flag-name {
+  font-family: monospace;
+  font-size: 12px;
+  color: #61dafb;
+  flex-shrink: 0;
+}
+
+.fwd-cmd-flag-desc {
+  font-size: 12px;
+  color: rgba(200,185,255,0.5);
+}
+
+.fwd-cmd-tips {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fwd-cmd-tips li {
+  font-size: 12px;
+  color: rgba(200,185,255,0.6);
+  padding: 6px 12px 6px 10px;
+  border-left: 2px solid rgba(97,218,251,0.35);
+  background: rgba(97,218,251,0.04);
+  border-radius: 0 6px 6px 0;
+  line-height: 1.6;
+}
+
+.fwd-cmd-note {
+  font-size: 12px;
+  color: rgba(251,191,36,0.85);
+  background: rgba(251,191,36,0.08);
+  border: 1px solid rgba(251,191,36,0.2);
+  border-left: 3px solid rgba(251,191,36,0.5);
+  border-radius: 6px;
+  padding: 10px 14px;
+  line-height: 1.6;
+}
+
+/* Clickable terminal rows */
+.fwd-terminal-row--clickable {
+  cursor: pointer;
+}
+
+.fwd-terminal-row--clickable:hover {
+  background: rgba(124,90,247,0.1);
+}
+
+.fwd-terminal-hint {
+  font-size: 11px;
+  color: rgba(124,90,247,0.5);
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 8px;
+  transition: transform 0.15s, color 0.15s;
+}
+
+.fwd-terminal-row--clickable:hover .fwd-terminal-hint {
+  color: rgba(200,185,255,0.7);
+  transform: translateX(3px);
+}
+
 /* ── Animation ── */
 @keyframes fwdFadeUp {
   from { opacity: 0; transform: translateY(10px); }
