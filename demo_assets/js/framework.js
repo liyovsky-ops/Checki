@@ -77,10 +77,7 @@ function hexToRgba(hex, alpha) {
   return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
 }
 
-function openFramework(fw) {
-  // Na razie placeholder — docelowo pełna strona szczegółów
-  alert(fw.name + ' — szczegóły frameworka będą tutaj');
-}
+// openFramework zdefiniowany w fw-detail.js
 
 // Scroll — zmiana motywu gdy sekcja wchodzi w widok
 function initScrollTheme() {
