@@ -1,9 +1,9 @@
 const FW_REACT_DATA = {
   meta: {
-    id: 'react', name: 'React', icon: '⚛️', color: '#61dafb',
+    id: 'react', name: 'React', icon: '⚛️', color: '#61dafb', color2: '#7c5af7',
     tagline: 'Biblioteka UI do budowania interfejsów użytkownika',
     year: 2013, author: 'Meta (Facebook)', lang: 'JavaScript / TypeScript',
-    github: 'facebook/react', stars: '220k+'
+    github: 'facebook/react', stars: '220k+', codeLang: 'JSX'
   },
 
   tabs: [
@@ -18,6 +18,12 @@ const FW_REACT_DATA = {
 
   content: {
     podstawy: {
+      labels: {
+        concepts: 'Kluczowe koncepcje',
+        whenToUse: 'Kiedy używać React?',
+        firstComponent: 'Twój pierwszy komponent',
+        firstComponentLang: 'JSX'
+      },
       intro: {
         title: 'Czym jest React?',
         desc: 'React to deklaratywna biblioteka JavaScript do budowania interfejsów użytkownika. Stworzona przez Meta w 2013 roku, jest dziś najpopularniejszym narzędziem frontendowym na świecie — używana przez Facebook, Instagram, Airbnb, Netflix i tysiące innych produktów.',
@@ -40,7 +46,7 @@ const FW_REACT_DATA = {
         },
         {
           title: 'JSX',
-          desc: 'JSX to rozszerzenie składni JavaScript które wygląda jak HTML. Piszesz <div> bezpośrednio w JS — Babel kompiluje to do React.createElement() wywołań.',
+          desc: 'JSX to rozszerzenie składni JavaScript które wygląda jak HTML. Piszesz tagi (div, h1, MyComponent) bezpośrednio w JS — Babel kompiluje to do React.createElement() wywołań.',
           icon: '📝'
         }
       ],
