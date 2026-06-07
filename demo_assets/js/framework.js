@@ -112,27 +112,27 @@ function onFwSearch(query) {
     chip.className = 'fw-suggestion-chip';
     chip.style.borderColor = hexToRgba(fw.color, 0.4);
     chip.style.color = fw.color;
-    chip.innerHTML = fw.icon + ' ' + fw.name + ' <span>' + fw.cat + '</span>';
+    chip.innerHTML =
+      '<span class="fw-chip-icon">' + fw.icon + '</span>' +
+      '<span class="fw-chip-name">' + fw.name + '</span>' +
+      '<span class="fw-chip-cat">' + fw.cat + '</span>' +
+      '<span class="fw-chip-arrow" style="color:' + fw.color + '">→</span>';
     chip.onclick = function() { showFwResult(fw); };
     suggestionsEl.appendChild(chip);
   });
+
+  // Enter = otwórz pierwszy wynik
+  if (matches.length > 0) {
+    document.getElementById('fw-search-input').onkeydown = function(e) {
+      if (e.key === 'Enter') showFwResult(matches[0]);
+    };
+  }
 }
 
 function showFwResult(fw) {
-  document.getElementById('fw-search-view').style.display = 'none';
-  var resultView = document.getElementById('fw-result-view');
-  resultView.style.display = 'flex';
-
-  var tile = document.getElementById('fw-result-tile');
-  tile.style.background = hexToRgba(fw.color, 0.08);
-  tile.style.borderColor = hexToRgba(fw.color, 0.3);
-  tile.style.boxShadow = '0 0 80px ' + hexToRgba(fw.color, 0.15) + ', inset 0 0 60px ' + hexToRgba(fw.color, 0.04);
-  tile.innerHTML =
-    '<div class="fw-fs-icon">' + fw.icon + '</div>' +
-    '<div class="fw-fs-name">' + fw.name + '</div>' +
-    '<div class="fw-fs-desc">' + fw.desc + '</div>' +
-    '<div class="fw-fs-lang">' + fw.lang + '</div>' +
-    '<div class="fw-fs-cat">' + fw.cat + '</div>';
+  // Zamknij wyszukiwarkę i od razu otwórz stronę szczegółów
+  clearFwSearch();
+  openFramework(fw);
 }
 
 function clearFwSearch() {
@@ -149,5 +149,6 @@ document.addEventListener('DOMContentLoaded', function() {
   renderTiles('database', 'fw-tiles-database');
   renderTiles('devops',   'fw-tiles-devops');
   renderTiles('ai',       'fw-tiles-ai');
+  renderTiles('testing',  'fw-tiles-testing');
   initScrollTheme();
 });

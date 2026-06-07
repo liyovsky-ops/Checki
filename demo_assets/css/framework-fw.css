@@ -54,34 +54,61 @@
 
 .fw-suggestions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
   width: 100%;
+  max-width: 480px;
 }
 
 .fw-suggestion-chip {
-  padding: 6px 14px;
-  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 10px;
   border: 1px solid;
-  background: transparent;
+  background: rgba(255,255,255,0.03);
   font-family: inherit;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s;
+  text-align: left;
 }
 
 .fw-suggestion-chip:hover {
-  background: rgba(255,255,255,0.06);
-  transform: translateY(-1px);
+  background: rgba(255,255,255,0.08);
+  transform: translateX(4px);
 }
 
-.fw-suggestion-chip span {
+.fw-chip-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.fw-chip-name {
+  font-weight: 600;
+  flex: 1;
+}
+
+.fw-chip-cat {
   font-size: 10px;
-  opacity: 0.5;
-  margin-left: 4px;
+  opacity: 0.4;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.fw-chip-arrow {
+  font-size: 14px;
+  opacity: 0.6;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.fw-suggestion-chip:hover .fw-chip-arrow {
+  transform: translateX(3px);
+  opacity: 1;
 }
 
 /* Full-screen result tile */

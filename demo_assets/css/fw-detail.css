@@ -6,10 +6,11 @@
   z-index: 500;
   display: none;
   flex-direction: column;
-  background: #13111c;
+  background: #0e0e0e;
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(124,90,247,0.18) 0%, transparent 70%),
-    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(97,218,251,0.06) 0%, transparent 60%);
+    radial-gradient(ellipse 80% 50% at 50% -10%, color-mix(in srgb, var(--fw-color, #7c5af7) 22%, transparent) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 50% at 100% 60%, color-mix(in srgb, var(--fw-color-2, #61dafb) 12%, transparent) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 40% at 0% 100%, color-mix(in srgb, var(--fw-color, #7c5af7) 8%, transparent) 0%, transparent 50%);
   overflow: hidden;
 }
 
@@ -24,16 +25,16 @@
   gap: 16px;
   padding: 0 32px;
   height: 72px;
-  border-bottom: 1px solid rgba(124,90,247,0.18);
+  border-bottom: 1px solid color-mix(in srgb, var(--fw-color, #7c5af7) 20%, transparent);
   flex-shrink: 0;
   background: rgba(19,17,28,0.7);
   backdrop-filter: blur(12px);
 }
 
 .fwd-back-btn {
-  background: rgba(124,90,247,0.12);
-  border: 1px solid rgba(124,90,247,0.25);
-  color: rgba(200,185,255,0.7);
+  background: color-mix(in srgb, var(--fw-color, #7c5af7) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fw-color, #7c5af7) 25%, transparent);
+  color: rgba(200,200,200,0.7);
   border-radius: 8px;
   padding: 7px 14px;
   cursor: pointer;
@@ -44,9 +45,9 @@
 }
 
 .fwd-back-btn:hover {
-  background: rgba(124,90,247,0.22);
-  color: #c8b9ff;
-  border-color: rgba(124,90,247,0.5);
+  background: color-mix(in srgb, var(--fw-color, #7c5af7) 22%, transparent);
+  color: #fff;
+  border-color: color-mix(in srgb, var(--fw-color, #7c5af7) 50%, transparent);
 }
 
 .fwd-header-icon {
@@ -89,7 +90,7 @@
 /* ── Tab Bar ── */
 .fwd-tabs {
   display: flex;
-  border-bottom: 1px solid rgba(124,90,247,0.15);
+  border-bottom: 1px solid color-mix(in srgb, var(--fw-color, #7c5af7) 15%, transparent);
   flex-shrink: 0;
   padding: 0 32px;
   overflow-x: auto;
@@ -128,7 +129,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, #7c5af7, #61dafb);
+  background: linear-gradient(90deg, var(--fw-color, #7c5af7), var(--fw-color-2, #61dafb));
   border-radius: 2px 2px 0 0;
 }
 
@@ -136,7 +137,9 @@
 .fwd-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 32px;
+  min-width: 0;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.1) transparent;
 }
@@ -146,8 +149,8 @@
 
 /* ── Cards ── */
 .fwd-card {
-  background: rgba(124,90,247,0.05);
-  border: 1px solid rgba(124,90,247,0.15);
+  background: color-mix(in srgb, var(--fw-color, #7c5af7) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fw-color, #7c5af7) 15%, transparent);
   border-radius: 12px;
   padding: 20px 24px;
   margin-bottom: 12px;
@@ -156,13 +159,15 @@
 }
 
 .fwd-card:hover {
-  border-color: rgba(124,90,247,0.3);
-  box-shadow: 0 0 20px rgba(124,90,247,0.08);
+  border-color: color-mix(in srgb, var(--fw-color, #7c5af7) 30%, transparent);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--fw-color, #7c5af7) 8%, transparent);
 }
 
 .fwd-card-accent {
-  border-left: 3px solid #7c5af7;
-  background: rgba(124,90,247,0.07);
+  border-left: 3px solid var(--fw-color, #7c5af7);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--fw-color, #7c5af7) 8%, transparent),
+    color-mix(in srgb, var(--fw-color-2, #61dafb) 4%, transparent));
 }
 
 .fwd-card-title {
@@ -228,7 +233,7 @@
 /* ── Intro (Podstawy) ── */
 .fwd-intro-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
   margin-bottom: 12px;
 }
@@ -323,12 +328,12 @@
 
 .fwd-hook-when {
   font-size: 11px;
-  color: rgba(200,185,255,0.35);
+  color: rgba(220,220,220,0.4);
   margin-bottom: 12px;
   padding: 6px 10px;
-  background: rgba(124,90,247,0.06);
+  background: color-mix(in srgb, var(--fw-color-2, #61dafb) 6%, transparent);
   border-radius: 6px;
-  border-left: 2px solid rgba(97,218,251,0.3);
+  border-left: 2px solid color-mix(in srgb, var(--fw-color-2, #61dafb) 35%, transparent);
 }
 
 /* ── Routing ── */
@@ -336,15 +341,15 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #0d0b14;
-  border: 1px solid rgba(124,90,247,0.2);
-  border-left: 3px solid #61dafb;
+  background: color-mix(in srgb, var(--fw-color) 5%, #0d0b14);
+  border: 1px solid color-mix(in srgb, var(--fw-color, #7c5af7) 20%, transparent);
+  border-left: 3px solid var(--fw-color-2, #61dafb);
   border-radius: 8px;
   padding: 12px 20px;
   margin-bottom: 20px;
   font-family: monospace;
   font-size: 13px;
-  color: #61dafb;
+  color: var(--fw-color-2, #61dafb);
 }
 
 .fwd-install-label {
@@ -576,8 +581,8 @@
 }
 
 .fwd-cmd-modal-box {
-  background: #1a1728;
-  border: 1px solid rgba(124,90,247,0.3);
+  background: #151515;
+  border: 1px solid color-mix(in srgb, var(--fw-color, #7c5af7) 35%, transparent);
   border-radius: 16px;
   width: 100%;
   max-width: 620px;
@@ -618,7 +623,7 @@
 .fwd-cmd-modal-cmd-text {
   font-family: 'Courier New', monospace;
   font-size: 13px;
-  color: #61dafb;
+  color: var(--fw-color-2, #61dafb);
   line-height: 1.5;
   word-break: break-all;
 }
@@ -631,9 +636,9 @@
 }
 
 .fwd-cmd-copy-btn {
-  background: rgba(124,90,247,0.15);
-  border: 1px solid rgba(124,90,247,0.3);
-  color: #c8b9ff;
+  background: color-mix(in srgb, var(--fw-color, #7c5af7) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fw-color, #7c5af7) 30%, transparent);
+  color: var(--fw-color-2, #c8b9ff);
   border-radius: 6px;
   padding: 5px 12px;
   font-size: 12px;
@@ -644,8 +649,8 @@
 }
 
 .fwd-cmd-copy-btn:hover {
-  background: rgba(124,90,247,0.28);
-  border-color: rgba(124,90,247,0.5);
+  background: color-mix(in srgb, var(--fw-color, #7c5af7) 28%, transparent);
+  border-color: color-mix(in srgb, var(--fw-color, #7c5af7) 50%, transparent);
 }
 
 .fwd-cmd-modal-close {
@@ -737,10 +742,10 @@
 
 .fwd-cmd-tips li {
   font-size: 12px;
-  color: rgba(200,185,255,0.6);
+  color: rgba(220,220,220,0.6);
   padding: 6px 12px 6px 10px;
-  border-left: 2px solid rgba(97,218,251,0.35);
-  background: rgba(97,218,251,0.04);
+  border-left: 2px solid color-mix(in srgb, var(--fw-color-2, #61dafb) 40%, transparent);
+  background: color-mix(in srgb, var(--fw-color-2, #61dafb) 4%, transparent);
   border-radius: 0 6px 6px 0;
   line-height: 1.6;
 }

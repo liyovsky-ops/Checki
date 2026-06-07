@@ -1,10 +1,14 @@
 // Framework Detail Page — pełna strona szczegółów frameworka
 
 var FW_DETAIL_ACTIVE_TAB = 'podstawy';
+var FW_DETAIL_ACTIVE_FW  = 'react';
 
 // Mapa danych per framework
 var FW_DATA_MAP = {
-  'react': typeof FW_REACT_DATA !== 'undefined' ? FW_REACT_DATA : null,
+  'react':     typeof FW_REACT_DATA     !== 'undefined' ? FW_REACT_DATA     : null,
+  'fastapi':   typeof FW_FASTAPI_DATA   !== 'undefined' ? FW_FASTAPI_DATA   : null,
+  'pytest':    typeof FW_PYTEST_DATA    !== 'undefined' ? FW_PYTEST_DATA    : null,
+  'requests':  typeof FW_REQUESTS_DATA  !== 'undefined' ? FW_REQUESTS_DATA  : null,
 };
 
 // Nadpisuje stub z framework.js
@@ -13,10 +17,13 @@ function openFramework(fw) {
   if (!overlay) return;
 
   var fwId = fw.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  FW_DETAIL_ACTIVE_FW = fwId;
   var data = FW_DATA_MAP[fwId] || null;
-  var color = fw.color || '#61dafb';
+  var color  = fw.color  || '#61dafb';
+  var color2 = (data && data.meta && data.meta.color2) ? data.meta.color2 : color;
 
-  overlay.style.setProperty('--fw-color', color);
+  overlay.style.setProperty('--fw-color',  color);
+  overlay.style.setProperty('--fw-color-2', color2);
   FW_DETAIL_ACTIVE_TAB = 'podstawy';
 
   if (data) {
@@ -44,6 +51,7 @@ function onFwDetailEscape(e) {
 function renderDetailPage(fw, data, overlay) {
   FW_CMD_GROUPS_REF = data.content.komendy || null;
   var color = fw.color || '#61dafb';
+  var icon = (data.meta && data.meta.icon) ? data.meta.icon : fw.icon;
   var tabs = data.tabs.map(function(tab) {
     return '<button class="fwd-tab' + (tab.id === FW_DETAIL_ACTIVE_TAB ? ' active' : '') + '" ' +
       'onclick="switchDetailTab(\'' + tab.id + '\')">' + tab.label + '</button>';
@@ -52,9 +60,9 @@ function renderDetailPage(fw, data, overlay) {
   overlay.innerHTML =
     '<div class="fwd-header">' +
     '<button class="fwd-back-btn" onclick="closeDetailPage()">← Powrót</button>' +
-    '<div class="fwd-header-icon">' + fw.icon + '</div>' +
+    '<div class="fwd-header-icon">' + icon + '</div>' +
     '<div class="fwd-header-info">' +
-    '<div class="fwd-header-name" style="background:linear-gradient(90deg,#c8b9ff,#61dafb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">' + data.meta.name + '</div>' +
+    '<div class="fwd-header-name" style="background:linear-gradient(90deg,var(--fw-color),var(--fw-color-2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">' + data.meta.name + '</div>' +
     '<div class="fwd-header-tagline">' + data.meta.tagline + '</div>' +
     '</div>' +
     '<div class="fwd-header-badges">' +
@@ -84,7 +92,7 @@ function renderComingSoon(fw, overlay) {
     '<div class="fwd-coming-soon">' +
     '<div class="fwd-coming-icon">' + fw.icon + '</div>' +
     '<div>Szczegóły <strong>' + fw.name + '</strong> wkrótce...</div>' +
-    '<div style="font-size:12px;color:rgba(255,255,255,0.15)">Na razie dostępny jest React — kolejne frameworki w budowie</div>' +
+    '<div style="font-size:12px;color:rgba(255,255,255,0.15)">Dostępne: React, FastAPI, pytest, requests — kolejne frameworki w budowie</div>' +
     '</div></div>';
 }
 
@@ -94,8 +102,7 @@ function switchDetailTab(tabId) {
   var activeTab = document.querySelector('.fwd-tab[onclick*="\'' + tabId + '\'"]');
   if (activeTab) activeTab.classList.add('active');
 
-  var fwId = 'react'; // rozszerz gdy będą kolejne frameworki
-  var data = FW_DATA_MAP[fwId];
+  var data = FW_DATA_MAP[FW_DETAIL_ACTIVE_FW];
   if (data) renderTabContent(tabId, data);
 }
 
@@ -103,12 +110,13 @@ function renderTabContent(tabId, data) {
   var el = document.getElementById('fwd-content');
   if (!el) return;
   el.scrollTop = 0;
+  var meta = data.meta || {};
 
   switch (tabId) {
-    case 'podstawy':   el.innerHTML = renderBasics(data.content.podstawy);   break;
-    case 'komponenty': el.innerHTML = renderComponents(data.content.komponenty); break;
+    case 'podstawy':   el.innerHTML = renderBasics(data.content.podstawy, meta);   break;
+    case 'komponenty': el.innerHTML = renderComponents(data.content.komponenty, meta); break;
     case 'hooki':      el.innerHTML = renderHooks(data.content.hooki);        break;
-    case 'routing':    el.innerHTML = renderRouting(data.content.routing);    break;
+    case 'routing':    el.innerHTML = renderRouting(data.content.routing, meta);    break;
     case 'state':      el.innerHTML = renderState(data.content.state);        break;
     case 'rywale':     el.innerHTML = renderRivals(data.content.rywale);      break;
     case 'komendy':    el.innerHTML = renderCommands(data.content.komendy);   break;
@@ -117,26 +125,33 @@ function renderTabContent(tabId, data) {
 }
 
 // ── Podstawy ──
-function renderBasics(b) {
+function renderBasics(b, meta) {
   var html = '';
+  var labels = b.labels || {};
+  var defaultLang = (meta && meta.codeLang) ? meta.codeLang : 'Code';
+  var conceptsLabel       = labels.concepts       || 'Kluczowe koncepcje';
+  var whenToUseLabel      = labels.whenToUse      || 'Kiedy używać?';
+  var firstComponentLabel = labels.firstComponent || 'Pierwszy przykład';
+  var firstComponentLang  = labels.firstComponentLang || defaultLang;
 
+  var icon = (meta && meta.icon) ? meta.icon + ' ' : '';
   html += '<div class="fwd-card fwd-card-accent">' +
-    '<div class="fwd-card-title">⚛️ ' + b.intro.title + '</div>' +
+    '<div class="fwd-card-title">' + icon + b.intro.title + '</div>' +
     '<div class="fwd-card-desc">' + b.intro.desc + '</div>' +
     '</div>';
 
-  html += '<div class="fwd-section-title">Kluczowe koncepcje</div>';
+  html += '<div class="fwd-section-title">' + conceptsLabel + '</div>';
   html += '<div class="fwd-intro-grid">';
   b.concepts.forEach(function(c) {
     html += '<div class="fwd-concept-card">' +
       '<div class="fwd-concept-icon">' + c.icon + '</div>' +
-      '<div class="fwd-concept-title">' + c.title + '</div>' +
-      '<div class="fwd-concept-desc">' + c.desc + '</div>' +
+      '<div class="fwd-concept-title">' + escFwd(c.title) + '</div>' +
+      '<div class="fwd-concept-desc">' + escFwd(c.desc) + '</div>' +
       '</div>';
   });
   html += '</div>';
 
-  html += '<div class="fwd-section-title">Kiedy używać React?</div>';
+  html += '<div class="fwd-section-title">' + whenToUseLabel + '</div>';
   html += '<div class="fwd-card">';
   html += '<ul class="fwd-when-list">';
   b.whenToUse.forEach(function(w) {
@@ -144,10 +159,10 @@ function renderBasics(b) {
   });
   html += '</ul></div>';
 
-  html += '<div class="fwd-section-title">Twój pierwszy komponent</div>';
+  html += '<div class="fwd-section-title">' + firstComponentLabel + '</div>';
   html += '<div class="fwd-card">' +
     '<div class="fwd-code-wrap">' +
-    '<span class="fwd-code-lang">JSX</span>' +
+    '<span class="fwd-code-lang">' + firstComponentLang + '</span>' +
     '<pre class="fwd-code">' + escFwd(b.firstComponent) + '</pre>' +
     '</div></div>';
 
@@ -155,14 +170,15 @@ function renderBasics(b) {
 }
 
 // ── Komponenty ──
-function renderComponents(items) {
+function renderComponents(items, meta) {
   var html = '';
+  var defaultLang = (meta && meta.codeLang) ? meta.codeLang : 'Code';
   items.forEach(function(item, i) {
     html += '<div class="fwd-card" style="animation-delay:' + (i * 0.05) + 's">' +
       '<div class="fwd-card-title">' + item.title + '</div>' +
       '<div class="fwd-card-desc">' + item.desc + '</div>' +
       '<div class="fwd-code-wrap">' +
-      '<span class="fwd-code-lang">JSX</span>' +
+      '<span class="fwd-code-lang">' + (item.lang || defaultLang) + '</span>' +
       '<pre class="fwd-code">' + escFwd(item.code) + '</pre>' +
       '</div></div>';
   });
@@ -186,7 +202,8 @@ function renderHooks(items) {
 }
 
 // ── Routing ──
-function renderRouting(r) {
+function renderRouting(r, meta) {
+  var defaultLang = (meta && meta.codeLang) ? meta.codeLang : 'Code';
   var html = '<div class="fwd-install-bar">' +
     '<span class="fwd-install-label">Instalacja</span>' +
     '<span>$ ' + r.install + '</span>' +
@@ -197,7 +214,7 @@ function renderRouting(r) {
     html += '<div class="fwd-card" style="animation-delay:' + (i * 0.05) + 's">' +
       '<div class="fwd-card-title">' + s.title + '</div>' +
       '<div class="fwd-code-wrap">' +
-      '<span class="fwd-code-lang">JSX</span>' +
+      '<span class="fwd-code-lang">' + (s.lang || defaultLang) + '</span>' +
       '<pre class="fwd-code">' + escFwd(s.code) + '</pre>' +
       '</div></div>';
   });
@@ -391,7 +408,8 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Uzupełnij mapę danych po załadowaniu
-  if (typeof FW_REACT_DATA !== 'undefined') {
-    FW_DATA_MAP['react'] = FW_REACT_DATA;
-  }
+  if (typeof FW_REACT_DATA     !== 'undefined') FW_DATA_MAP['react']    = FW_REACT_DATA;
+  if (typeof FW_FASTAPI_DATA   !== 'undefined') FW_DATA_MAP['fastapi']  = FW_FASTAPI_DATA;
+  if (typeof FW_PYTEST_DATA    !== 'undefined') FW_DATA_MAP['pytest']   = FW_PYTEST_DATA;
+  if (typeof FW_REQUESTS_DATA  !== 'undefined') FW_DATA_MAP['requests'] = FW_REQUESTS_DATA;
 });
