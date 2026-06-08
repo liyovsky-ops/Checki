@@ -13,6 +13,7 @@ const FW_REACT_DATA = {
     { id: 'routing',    label: 'Routing' },
     { id: 'state',      label: 'State' },
     { id: 'rywale',     label: 'Rywale' },
+    { id: 'pluginy',    label: 'Ekosystem' },
     { id: 'komendy',    label: 'Komendy' },
   ],
 
@@ -594,6 +595,183 @@ function Counter() {
         cons: ['Mała społeczność', 'Nowa technologia — ryzyko', 'Inny model myślenia niż React', 'Mało tutoriali'],
         vsReact: 'Qwik rozwiązuje problem hydration który React ma w SSR. Zamiast pobierać i uruchamiać JS na kliencie, wznawia stan serwera. Futurystyczne podejście.',
         bestFor: 'Strony gdzie liczy się Core Web Vitals, content-heavy sites'
+      }
+    ],
+
+    pluginy: [
+      {
+        name: 'Next.js',
+        icon: '▲',
+        color: '#e2e8f0',
+        tagline: 'Full-stack React framework — SSR, SSG, API routes',
+        install: 'npx create-next-app@latest my-app --typescript',
+        use: 'React na serwerze — SEO, szybkie first load, API routes w tym samym projekcie, file-based routing, Image optimization. Standard dla produkcyjnych aplikacji React.',
+        example: `// app/page.tsx — Server Component (domyślnie)
+export default async function Home() {
+  const data = await fetch('https://api.example.com/posts')
+  const posts = await data.json()
+  return <PostList posts={posts} />
+}
+
+// app/api/hello/route.ts — API endpoint
+export async function GET() {
+  return Response.json({ message: 'Hello from API' })
+}`
+      },
+      {
+        name: 'React Router',
+        icon: '🛣️',
+        color: '#CA4245',
+        tagline: 'Routing po stronie klienta (SPA)',
+        install: 'npm install react-router-dom',
+        use: 'Nawigacja między widokami bez przeładowania strony. Zagnieżdżone trasy, parametry URL, lazy loading komponentów. Standard dla aplikacji SPA bez Next.js.',
+        example: `import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+
+<BrowserRouter>
+  <nav>
+    <Link to="/">Home</Link>
+    <Link to="/users">Users</Link>
+  </nav>
+  <Routes>
+    <Route path="/" element={<Home />} />
+    <Route path="/users/:id" element={<UserPage />} />
+  </Routes>
+</BrowserRouter>`
+      },
+      {
+        name: 'TanStack Query',
+        icon: '🔄',
+        color: '#FF4154',
+        tagline: 'Server state — fetching, caching, synchronizacja',
+        install: 'npm install @tanstack/react-query',
+        use: 'Zarządzanie danymi z serwera — automatyczne cachowanie, background refetch, loading/error states, pagination. Zastępuje useState+useEffect do fetchowania. Must-have w każdym projekcie.',
+        example: `const { data, isLoading, error } = useQuery({
+  queryKey: ['users', userId],
+  queryFn: () => fetch(\`/api/users/\${userId}\`).then(r => r.json()),
+  staleTime: 5 * 60 * 1000,  // 5 min cache
+})
+
+const mutation = useMutation({
+  mutationFn: (data) => fetch('/api/users', { method: 'POST', body: JSON.stringify(data) }),
+  onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+})`
+      },
+      {
+        name: 'Zustand',
+        icon: '🐻',
+        color: '#FF6B35',
+        tagline: 'Lekki globalny state management',
+        install: 'npm install zustand',
+        use: 'Globalny stan bez Redux boilerplate. Prosty API — jeden plik, jeden hook. TypeScript-friendly. Dla małych i średnich projektów. Devtools support.',
+        example: `import { create } from 'zustand'
+
+const useStore = create((set) => ({
+  count: 0,
+  user: null,
+  increment: () => set((state) => ({ count: state.count + 1 })),
+  setUser: (user) => set({ user }),
+}))
+
+function Counter() {
+  const { count, increment } = useStore()
+  return <button onClick={increment}>{count}</button>
+}`
+      },
+      {
+        name: 'Redux Toolkit',
+        icon: '🔵',
+        color: '#764ABC',
+        tagline: 'Zaawansowany state management (duże projekty)',
+        install: 'npm install @reduxjs/toolkit react-redux',
+        use: 'Redux bez boilerplate. RTK Query do fetchu danych (jak TanStack Query), slices zamiast reducers+actions osobno. Dla dużych zespołów i złożonego stanu globalnego.',
+        example: `const counterSlice = createSlice({
+  name: 'counter',
+  initialState: { value: 0, status: 'idle' },
+  reducers: {
+    increment: (state) => { state.value += 1 },
+    decrement: (state) => { state.value -= 1 },
+  },
+})
+
+export const { increment, decrement } = counterSlice.actions`
+      },
+      {
+        name: 'React Hook Form',
+        icon: '📝',
+        color: '#EC5990',
+        tagline: 'Wydajne formularze — minimum re-renderów',
+        install: 'npm install react-hook-form',
+        use: 'Zarządzanie formularzami z walidacją. Uncontrolled inputs = zero re-renderów przy każdym keystroke. Integracja z Zod, Yup, Joi. Najszybszy formularz w React.',
+        example: `const { register, handleSubmit, formState: { errors } } = useForm({
+  resolver: zodResolver(LoginSchema)
+})
+
+<form onSubmit={handleSubmit(onSubmit)}>
+  <input {...register('email')} />
+  {errors.email && <span>{errors.email.message}</span>}
+  <input type="password" {...register('password')} />
+  <button type="submit">Zaloguj</button>
+</form>`
+      },
+      {
+        name: 'Zod',
+        icon: '🛡️',
+        color: '#3068B7',
+        tagline: 'Walidacja schematu TypeScript-first',
+        install: 'npm install zod',
+        use: 'Definiujesz schemat → Zod inferuje typy TypeScript + waliduje runtime. Używany z RHF (formularze), API response validation, tRPC. Jeden schemat = typ + walidacja.',
+        example: `import { z } from 'zod'
+
+const UserSchema = z.object({
+  name: z.string().min(2, 'Za krótkie'),
+  email: z.string().email('Zły email'),
+  age: z.number().int().min(18, 'Wymagane 18+'),
+})
+
+type User = z.infer<typeof UserSchema>  // automatyczny typ TS
+
+const result = UserSchema.safeParse(rawData)
+if (!result.success) console.log(result.error.flatten())`
+      },
+      {
+        name: 'shadcn/ui',
+        icon: '🎨',
+        color: '#a78bfa',
+        tagline: 'Komponenty UI — kopiujesz kod, nie instalujesz package',
+        install: 'npx shadcn@latest init',
+        use: 'Radix UI + Tailwind CSS. Komponenty lądują w twoim projekcie — pełna kontrola nad kodem. Accessibility wbudowana. Nie biblioteka — kolekcja komponentów do modyfikacji.',
+        example: `# Dodaj konkretny komponent:
+npx shadcn@latest add button dialog table
+
+# Użycie:
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog"
+
+<Dialog>
+  <DialogContent>
+    <DialogHeader>Tytuł</DialogHeader>
+    <Button variant="outline">Anuluj</Button>
+  </DialogContent>
+</Dialog>`
+      },
+      {
+        name: 'Framer Motion',
+        icon: '✨',
+        color: '#FF0055',
+        tagline: 'Animacje i przejścia — deklaratywnie',
+        install: 'npm install framer-motion',
+        use: 'Animacje CSS bez pisania CSS. Definiujesz stan docelowy, Framer oblicza jak tam dotrzeć. Gesture support (drag, hover, tap). Layout animations — React animuje zmiany layoutu.',
+        example: `import { motion, AnimatePresence } from 'framer-motion'
+
+<motion.div
+  initial={{ opacity: 0, y: -20 }}
+  animate={{ opacity: 1, y: 0 }}
+  exit={{ opacity: 0, scale: 0.9 }}
+  transition={{ duration: 0.3, ease: 'easeOut' }}
+  whileHover={{ scale: 1.02 }}
+>
+  <p>Animowana zawartość</p>
+</motion.div>`
       }
     ],
 

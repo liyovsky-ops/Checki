@@ -5,10 +5,12 @@ var FW_DETAIL_ACTIVE_FW  = 'react';
 
 // Mapa danych per framework
 var FW_DATA_MAP = {
-  'react':     typeof FW_REACT_DATA     !== 'undefined' ? FW_REACT_DATA     : null,
-  'fastapi':   typeof FW_FASTAPI_DATA   !== 'undefined' ? FW_FASTAPI_DATA   : null,
-  'pytest':    typeof FW_PYTEST_DATA    !== 'undefined' ? FW_PYTEST_DATA    : null,
-  'requests':  typeof FW_REQUESTS_DATA  !== 'undefined' ? FW_REQUESTS_DATA  : null,
+  'react':          typeof FW_REACT_DATA     !== 'undefined' ? FW_REACT_DATA     : null,
+  'fastapi':        typeof FW_FASTAPI_DATA   !== 'undefined' ? FW_FASTAPI_DATA   : null,
+  'pytest':         typeof FW_PYTEST_DATA    !== 'undefined' ? FW_PYTEST_DATA    : null,
+  'requests':       typeof FW_REQUESTS_DATA  !== 'undefined' ? FW_REQUESTS_DATA  : null,
+  'beautifulsoup':  typeof FW_BS4_DATA       !== 'undefined' ? FW_BS4_DATA       : null,
+  'asyncio':        typeof FW_ASYNCIO_DATA   !== 'undefined' ? FW_ASYNCIO_DATA   : null,
 };
 
 // Nadpisuje stub z framework.js
@@ -119,6 +121,7 @@ function renderTabContent(tabId, data) {
     case 'routing':    el.innerHTML = renderRouting(data.content.routing, meta);    break;
     case 'state':      el.innerHTML = renderState(data.content.state);        break;
     case 'rywale':     el.innerHTML = renderRivals(data.content.rywale);      break;
+    case 'pluginy':    el.innerHTML = renderPlugins(data.content.pluginy);    break;
     case 'komendy':    el.innerHTML = renderCommands(data.content.komendy);   break;
     default: el.innerHTML = '<div class="fwd-coming-soon"><div>Wkrótce...</div></div>';
   }
@@ -268,6 +271,29 @@ function renderRivals(items) {
   return html;
 }
 
+// ── Pluginy / Ekosystem ──
+function renderPlugins(items) {
+  var html = '<div class="fwd-plugins-grid">';
+  items.forEach(function(p, i) {
+    var exampleHtml = p.example
+      ? '<div class="fwd-code-wrap" style="margin-top:10px"><pre class="fwd-code" style="font-size:11px">' + escFwd(p.example) + '</pre></div>'
+      : '';
+    html += '<div class="fwd-plugin-card" style="animation-delay:' + (i * 0.05) + 's;border-left:3px solid ' + p.color + '">' +
+      '<div class="fwd-plugin-header">' +
+      '<span style="font-size:22px">' + p.icon + '</span>' +
+      '<div>' +
+      '<div class="fwd-plugin-name" style="color:' + p.color + '">' + escFwd(p.name) + '</div>' +
+      '<div class="fwd-plugin-tagline">' + escFwd(p.tagline) + '</div>' +
+      '</div></div>' +
+      '<div class="fwd-plugin-install"><code>' + escFwd(p.install) + '</code></div>' +
+      '<div class="fwd-plugin-use">' + escFwd(p.use) + '</div>' +
+      exampleHtml +
+      '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
 // ── Komendy ──
 function renderCommands(groups) {
   var html = '';
@@ -411,5 +437,7 @@ document.addEventListener('DOMContentLoaded', function() {
   if (typeof FW_REACT_DATA     !== 'undefined') FW_DATA_MAP['react']    = FW_REACT_DATA;
   if (typeof FW_FASTAPI_DATA   !== 'undefined') FW_DATA_MAP['fastapi']  = FW_FASTAPI_DATA;
   if (typeof FW_PYTEST_DATA    !== 'undefined') FW_DATA_MAP['pytest']   = FW_PYTEST_DATA;
-  if (typeof FW_REQUESTS_DATA  !== 'undefined') FW_DATA_MAP['requests'] = FW_REQUESTS_DATA;
+  if (typeof FW_REQUESTS_DATA  !== 'undefined') FW_DATA_MAP['requests']      = FW_REQUESTS_DATA;
+  if (typeof FW_BS4_DATA       !== 'undefined') FW_DATA_MAP['beautifulsoup'] = FW_BS4_DATA;
+  if (typeof FW_ASYNCIO_DATA   !== 'undefined') FW_DATA_MAP['asyncio']       = FW_ASYNCIO_DATA;
 });
