@@ -118,15 +118,17 @@ function renderTabContent(tabId, data) {
   el.scrollTop = 0;
   var meta = data.meta || {};
 
+  function isGeneric(val) { return val && Array.isArray(val.items); }
+
   switch (tabId) {
-    case 'podstawy':   el.innerHTML = renderBasics(data.content.podstawy, meta);   break;
-    case 'komponenty': el.innerHTML = renderComponents(data.content.komponenty, meta); break;
-    case 'hooki':      el.innerHTML = renderHooks(data.content.hooki);        break;
-    case 'routing':    el.innerHTML = renderRouting(data.content.routing, meta);    break;
-    case 'state':      el.innerHTML = renderState(data.content.state);        break;
-    case 'rywale':     el.innerHTML = renderRivals(data.content.rywale);      break;
-    case 'pluginy':    el.innerHTML = renderPlugins(data.content.pluginy);    break;
-    case 'komendy':    el.innerHTML = renderCommands(data.content.komendy);   break;
+    case 'podstawy':   el.innerHTML = renderBasics(data.content.podstawy, meta); break;
+    case 'komponenty': el.innerHTML = isGeneric(data.content.komponenty) ? renderGenericSection(data.content.komponenty, meta) : renderComponents(data.content.komponenty, meta); break;
+    case 'hooki':      el.innerHTML = isGeneric(data.content.hooki)      ? renderGenericSection(data.content.hooki, meta)      : renderHooks(data.content.hooki);               break;
+    case 'routing':    el.innerHTML = isGeneric(data.content.routing)    ? renderGenericSection(data.content.routing, meta)    : renderRouting(data.content.routing, meta);      break;
+    case 'state':      el.innerHTML = isGeneric(data.content.state)      ? renderGenericSection(data.content.state, meta)      : renderState(data.content.state);               break;
+    case 'rywale':     el.innerHTML = renderRivals(data.content.rywale);   break;
+    case 'pluginy':    el.innerHTML = renderPlugins(data.content.pluginy); break;
+    case 'komendy':    el.innerHTML = renderCommands(data.content.komendy); break;
     default: el.innerHTML = '<div class="fwd-coming-soon"><div>Wkrótce...</div></div>';
   }
 }
@@ -173,6 +175,26 @@ function renderBasics(b, meta) {
     '<pre class="fwd-code">' + escFwd(b.firstComponent) + '</pre>' +
     '</div></div>';
 
+  return html;
+}
+
+// ── Generic section {title, items: [{name, desc, code}]} — dla frameworków nie-React ──
+function renderGenericSection(section, meta) {
+  var defaultLang = (meta && meta.codeLang) ? meta.codeLang : 'Code';
+  var html = '';
+  if (section.title) {
+    html += '<div class="fwd-section-title">' + escFwd(section.title) + '</div>';
+  }
+  (section.items || []).forEach(function(item, i) {
+    html += '<div class="fwd-card" style="animation-delay:' + (i * 0.05) + 's">' +
+      '<div class="fwd-card-title">' + escFwd(item.name || item.title || '') + '</div>' +
+      '<div class="fwd-card-desc">' + escFwd(item.desc || '') + '</div>' +
+      (item.code
+        ? '<div class="fwd-code-wrap"><span class="fwd-code-lang">' + escFwd(item.lang || defaultLang) + '</span>' +
+          '<pre class="fwd-code">' + escFwd(item.code) + '</pre></div>'
+        : '') +
+      '</div>';
+  });
   return html;
 }
 
