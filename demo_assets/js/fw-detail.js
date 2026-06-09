@@ -11,6 +11,8 @@ var FW_DATA_MAP = {
   'requests':       typeof FW_REQUESTS_DATA  !== 'undefined' ? FW_REQUESTS_DATA  : null,
   'beautifulsoup':  typeof FW_BS4_DATA       !== 'undefined' ? FW_BS4_DATA       : null,
   'asyncio':        typeof FW_ASYNCIO_DATA   !== 'undefined' ? FW_ASYNCIO_DATA   : null,
+  'git':            typeof FW_GIT_DATA       !== 'undefined' ? FW_GIT_DATA       : null,
+  'docker':         typeof FW_DOCKER_DATA    !== 'undefined' ? FW_DOCKER_DATA    : null,
 };
 
 // Nadpisuje stub z framework.js
@@ -440,4 +442,6 @@ document.addEventListener('DOMContentLoaded', function() {
   if (typeof FW_REQUESTS_DATA  !== 'undefined') FW_DATA_MAP['requests']      = FW_REQUESTS_DATA;
   if (typeof FW_BS4_DATA       !== 'undefined') FW_DATA_MAP['beautifulsoup'] = FW_BS4_DATA;
   if (typeof FW_ASYNCIO_DATA   !== 'undefined') FW_DATA_MAP['asyncio']       = FW_ASYNCIO_DATA;
+  if (typeof FW_GIT_DATA       !== 'undefined') FW_DATA_MAP['git']           = FW_GIT_DATA;
+  if (typeof FW_DOCKER_DATA    !== 'undefined') FW_DATA_MAP['docker']        = FW_DOCKER_DATA;
 });
