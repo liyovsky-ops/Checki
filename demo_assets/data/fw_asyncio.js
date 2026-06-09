@@ -727,6 +727,24 @@ async def test_fetch():
 
     komendy: [
       {
+        category: 'Instalacja bibliotek async',
+        icon: '📦',
+        items: [
+          { cmd: 'pip install aiohttp', desc: 'Async HTTP klient i serwer',
+            detail: { what: 'Najczęściej używana biblioteka HTTP dla asyncio. Zastępuje requests w kodzie async. Szybsza przy wielu równoległych requestach.', how: 'async with aiohttp.ClientSession() as session: async with session.get(url) as r: data = await r.json()', tips: ['Zawsze używaj ClientSession jako context manager (async with)', 'pip install aiohttp[speedups] — opcjonalnie szybszy z cchardet i aiodns', 'aiohttp.ClientTimeout(total=10) — timeout'] }
+          },
+          { cmd: 'pip install aiofiles', desc: 'Async I/O plików',
+            detail: { what: 'Pozwala czytać i pisać pliki asynchronicznie — nie blokuje event loop podczas operacji dyskowych.', how: 'async with aiofiles.open("plik.txt", "r") as f: content = await f.read()', tips: ['Zwykłe open() blokuje event loop — przy dużych plikach użyj aiofiles', 'API identyczne jak wbudowane open() — tylko dodaj async/await'] }
+          },
+          { cmd: 'pip install asyncpg', desc: 'Async driver PostgreSQL',
+            detail: { what: 'Najszybszy async driver do PostgreSQL. Używany z FastAPI i SQLAlchemy async.', how: 'conn = await asyncpg.connect(dsn). Lub pool: pool = await asyncpg.create_pool(dsn)', tips: ['pip install asyncpg — samodzielnie', 'pip install sqlalchemy[asyncio] asyncpg — z SQLAlchemy', 'pip install databases[postgresql] — wysokopoziomowe async ORM'] }
+          },
+          { cmd: 'pip install redis[asyncio]', desc: 'Async klient Redis',
+            detail: { what: 'Async wersja redis-py. Używaj w FastAPI i asyncio do cache, pubsub, queues.', how: 'r = redis.asyncio.from_url("redis://localhost"). await r.set("key", "val"). await r.get("key")', tips: ['pip install redis[asyncio] — oficjalny klient', 'ConnectionPool zarządza połączeniami automatycznie', 'await r.aclose() — zamknij połączenie'] }
+          },
+        ]
+      },
+      {
         category: 'Uruchamianie',
         icon: '▶️',
         items: [
@@ -771,6 +789,27 @@ async def test_fetch():
           },
           { cmd: 'asyncio.all_tasks()', desc: 'Lista wszystkich aktywnych Tasks',
             detail: { what: 'Zwraca set wszystkich Task które nie są skończone. Przydatne do debugowania wycieków tasków.', how: 'for task in asyncio.all_tasks(): print(task.get_name(), task.get_coro())', tips: ['Zbyt wiele tasks = wyciek — sprawdź czy wszystkie są cancel/await', 'task.get_stack() — stack trace aktywnego task'] }
+          },
+          { cmd: 'PYTHONASYNCIODEBUG=1 python script.py', desc: 'Włącz tryb debug przez zmienną środowiskową',
+            detail: { what: 'Alternatywa dla asyncio.run(debug=True) — działa bez modyfikacji kodu. Loguje ostrzeżenia o blokowaniu event loop i niezaawaitowanych korutynach.', how: 'Windows: set PYTHONASYNCIODEBUG=1 && python script.py', tips: ['Zawsze włącz w development', 'Ostrzeżenie slow callback >100ms = synchroniczny kod blokuje pętlę', 'import logging; logging.basicConfig(level=logging.DEBUG) — więcej szczegółów'] }
+          },
+        ]
+      },
+      {
+        category: 'Wzorce zaawansowane',
+        icon: '⚡',
+        items: [
+          { cmd: 'queue = asyncio.Queue()', desc: 'Async kolejka — producer/consumer',
+            detail: { what: 'Kolejka FIFO dla komunikacji między korutynami. Producer wkłada (await queue.put()), consumer pobiera (await queue.get()).', how: 'Wzorzec: N producerów → Queue → M consumerów. Automatyczna synchronizacja bez Lock.', tips: ['asyncio.Queue(maxsize=100) — ogranicz rozmiar (blokuje producera gdy pełna)', 'await queue.join() — czekaj aż wszystkie elementy zostaną przetworzone', 'queue.task_done() — consumerr sygnalizuje zakończenie przetwarzania'] }
+          },
+          { cmd: 'async with asyncio.timeout(5.0):', desc: 'Blok z limitem czasu (Python 3.11+)',
+            detail: { what: 'Nowoczesny context manager dla timeoutów. Czytelniejszy niż asyncio.wait_for(). Rzuca TimeoutError.', how: 'try: async with asyncio.timeout(5): await download() except TimeoutError: print("za wolno")', tips: ['Zastępuje asyncio.wait_for() w Python 3.11+', 'asyncio.timeout_at(deadline) — absolutny timestamp zamiast delta', 'Można sprawdzić: asyncio.current_task().cancelling()'] }
+          },
+          { cmd: 'async with asyncio.TaskGroup() as tg:', desc: 'Grupuj Tasks — strukturalna współbieżność (Python 3.11+)',
+            detail: { what: 'TaskGroup uruchamia Tasks i czeka na wszystkie. Jeśli jeden rzuci wyjątek — anuluje pozostałe i propaguje ExceptionGroup.', how: 'async with asyncio.TaskGroup() as tg: t1 = tg.create_task(f1()); t2 = tg.create_task(f2())', tips: ['Nowocześniejszy niż asyncio.gather() — automatyczna obsługa błędów', 'Zastępuje try/finally z task.cancel()', 'except* ExceptionGroup as eg: — nowa składnia dla ExceptionGroup'] }
+          },
+          { cmd: 'results = await asyncio.gather(*coros, return_exceptions=True)', desc: 'Zbierz wyniki lub błędy bez rzucania',
+            detail: { what: 'return_exceptions=True: zamiast rzucać wyjątek gdy korutyna padnie, zwraca go jako element listy wyników. Możesz przetworzyć co się udało a co nie.', how: 'results = await asyncio.gather(*tasks, return_exceptions=True); errors = [r for r in results if isinstance(r, Exception)]', tips: ['Bez return_exceptions: jeden błąd anuluje wszystkie i rzuca wyjątek', 'Sprawdź: [r for r in results if not isinstance(r, Exception)] — sukcesy', 'Dobre dla batch operacji gdzie częściowy sukces jest akceptowalny'] }
           },
         ]
       },

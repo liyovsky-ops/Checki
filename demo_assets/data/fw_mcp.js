@@ -664,6 +664,15 @@ result = await agent.run("Jakie pliki są w folderze projects?")`
               tips: ['mcp dev server.py — uruchom serwer z MCP Inspector', 'mcp run server.py — uruchom serwer bez Inspectora', 'Zalecane podczas developmentu']
             }
           },
+          {
+            cmd: 'pip install "mcp[cli]" httpx python-dotenv',
+            desc: 'Pełny stack MCP + HTTP + env vars',
+            detail: {
+              what: 'Instaluje wszystko potrzebne do typowego serwera MCP: SDK z CLI, httpx do zewnętrznych API, dotenv do konfiguracji.',
+              how: 'Większość serwerów MCP woła zewnętrzne API — httpx i dotenv są standardem.',
+              tips: ['pip install fastmcp — uproszczony framework MCP (alternatywa)', 'pip show mcp — sprawdź zainstalowaną wersję', 'Utwórz venv dla każdego serwera MCP — izoluj zależności']
+            }
+          },
         ]
       },
       {
@@ -730,6 +739,24 @@ result = await agent.run("Jakie pliki są w folderze projects?")`
               tips: ['Nie usuwa pliku serwera — tylko konfigurację', 'Przydatne przy przebudowie serwera lub zmianie ścieżki']
             }
           },
+          {
+            cmd: 'claude mcp add nazwa python /path/to/server.py -e API_KEY=abc',
+            desc: 'Dodaj serwer MCP z zmienną środowiskową',
+            detail: {
+              what: 'Rejestruje serwer z przekazanymi env vars. Serwer otrzyma API_KEY w środowisku — bezpiecznie, bez hardkodowania w kodzie.',
+              how: '-e VAR=value można powtórzyć wielokrotnie dla wielu zmiennych.',
+              tips: ['claude mcp add --scope global — dostępny we wszystkich projektach', 'claude mcp add --scope local — tylko bieżący projekt (.claude/settings.json)', 'Wartości env vars są przechowywane w konfiguracji — nie w kodzie serwera']
+            }
+          },
+          {
+            cmd: 'claude mcp get nazwa',
+            desc: 'Pokaż szczegóły konkretnego serwera MCP',
+            detail: {
+              what: 'Wyświetla konfigurację: komendę, argumenty, zmienne środowiskowe, scope dla danego serwera.',
+              how: 'Przydatne gdy serwer nie działa — sprawdź czy ścieżka i konfiguracja są prawidłowe.',
+              tips: ['claude mcp list — lista wszystkich serwerów', 'Sprawdź czy ścieżka do server.py istnieje: ls -la /path/to/server.py']
+            }
+          },
         ]
       },
       {
@@ -752,6 +779,57 @@ result = await agent.run("Jakie pliki są w folderze projects?")`
               what: 'Szybki test importu. Jeśli wyświetla "MCP OK" — pakiet jest zainstalowany.',
               how: 'Importuje FastMCP — główną klasę SDK.',
               tips: ['Jeśli błąd ModuleNotFoundError: pip install mcp', 'Sprawdź aktywny venv: which python']
+            }
+          },
+          {
+            cmd: 'tail -f debug.log',
+            desc: 'Śledź logi serwera na żywo',
+            detail: {
+              what: 'Wyświetla nowe linie debug.log w czasie rzeczywistym. Uruchom w osobnym terminalu gdy testujesz serwer.',
+              how: 'Wymaga że serwer loguje do debug.log: python server.py 2>debug.log',
+              tips: ['tail -n 50 -f debug.log — ostatnie 50 linii + live', 'grep "ERROR" debug.log — filtruj błędy', 'Ctrl+C aby zatrzymać śledzenie']
+            }
+          },
+          {
+            cmd: 'python -c "import mcp; print(mcp.__version__)"',
+            desc: 'Sprawdź wersję MCP SDK',
+            detail: {
+              what: 'Wyświetla zainstalowaną wersję pakietu mcp. Ważne — API zmienia się między wersjami.',
+              how: 'pip show mcp — więcej informacji (lokalizacja, zależności).',
+              tips: ['pip install --upgrade mcp — zaktualizuj do najnowszej', 'Sprawdź changelog na github.com/modelcontextprotocol/python-sdk']
+            }
+          },
+        ]
+      },
+      {
+        category: 'Środowisko i konfiguracja',
+        icon: '⚙️',
+        items: [
+          {
+            cmd: 'export ANTHROPIC_API_KEY="sk-ant-..."',
+            desc: 'Ustaw API key dla serwera korzystającego z Claude',
+            detail: {
+              what: 'Zmienna środowiskowa dostępna dla serwera MCP. Claude Code przekazuje env vars zdefiniowane przy claude mcp add -e.',
+              how: 'Windows: set ANTHROPIC_API_KEY=sk-ant-... Lub użyj .env + python-dotenv w serwerze.',
+              tips: ['Nie hardkoduj kluczy w kodzie serwera — ładuj z os.environ', 'from dotenv import load_dotenv; load_dotenv() — wczytaj z .env', 'claude mcp add nazwa python server.py -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY']
+            }
+          },
+          {
+            cmd: 'cat ~/.claude/settings.json | python3 -m json.tool',
+            desc: 'Podejrzyj konfigurację Claude Code (sformatowaną)',
+            detail: {
+              what: 'Pokazuje cały plik konfiguracyjny Claude Code z formatowaniem JSON. Tu są zapisane serwery MCP, permissions, hooks.',
+              how: 'Lokalizacja lokalna: .claude/settings.json w bieżącym projekcie.',
+              tips: ['Sprawdź sekcję "mcpServers" — tam są Twoje serwery', 'Możesz edytować ręcznie jeśli claude mcp add nie ma potrzebnych opcji', 'Backup przed ręczną edycją: cp ~/.claude/settings.json ~/.claude/settings.json.bak']
+            }
+          },
+          {
+            cmd: 'mcp dev server.py --transport sse',
+            desc: 'Uruchom serwer z transportem SSE (HTTP)',
+            detail: {
+              what: 'SSE (Server-Sent Events) transport zamiast domyślnego stdio. Serwer nasłuchuje na HTTP — może obsługiwać wielu klientów.',
+              how: 'Domyślny transport to stdio (jeden klient). SSE dla integracji webowych.',
+              tips: ['stdio = jeden klient (Claude Code), SSE = wielu klientów przez HTTP', 'mcp run server.py --transport sse --port 8080', 'Użyj SSE gdy chcesz serwer dostępny przez sieć']
             }
           },
         ]

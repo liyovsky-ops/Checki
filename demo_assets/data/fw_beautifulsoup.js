@@ -693,6 +693,42 @@ class ProductSpider(Spider):
           },
         ]
       },
+      {
+        category: 'Pipeline scrapingu',
+        icon: '🕷️',
+        items: [
+          { cmd: 'soup = BeautifulSoup(requests.get(url).content, "lxml")', desc: 'Pobierz stronę i parsuj jedną linią',
+            detail: { what: 'Kompletny pipeline: requests pobiera stronę, .content (bytes) przekazuje do BS4, lxml parsuje.', how: 'requests.get(url, headers={"User-Agent": "Mozilla/5.0"}) — dodaj UA żeby uniknąć blokad.', tips: ['Użyj .content (bytes) nie .text (str) — BS4 samo wykryje encoding', 'Zawsze ustawiaj timeout: requests.get(url, timeout=10)', 'headers z User-Agent gdy strona blokuje boty'] }
+          },
+          { cmd: 'from urllib.parse import urljoin', desc: 'Absolutyzacja względnych URL-i',
+            detail: { what: 'Zamienia href="/strona" na "https://example.com/strona". Niezbędne przy scrapingu linków — większość href na stronach to względne URL-e.', how: 'urljoin(base_url, href) = absolutny URL. Działa dla ../, /, ./path itp.', tips: ['for a in soup.find_all("a", href=True): url = urljoin(base, a["href"])', 'urljoin("https://example.com/a/b", "../c") = "https://example.com/a/c"', 'Nie używaj string concatenation dla URL-i — urljoin obsługuje edge cases'] }
+          },
+          { cmd: 'print(soup.prettify())', desc: 'Sformatuj HTML do debugowania',
+            detail: { what: 'Zwraca HTML z wcięciami i nowymi liniami. Użyj żeby zobaczyć strukturę drzewa DOM przed pisaniem selektorów.', how: 'print(soup.find("div", class_="main").prettify()) — sformatuj fragment.', tips: ['Niezbędne przy debugowaniu — widzisz gdzie są dane', 'soup.prettify()[:2000] — tylko pierwsze 2000 znaków (strony są duże)', 'Otwórz DevTools w Chrome/Firefox zamiast prettify dla całej strony'] }
+          },
+          { cmd: 'el.decompose()', desc: 'Usuń element z drzewa DOM',
+            detail: { what: 'Usuwa element i wszystkie jego dzieci z drzewa. Przydatne gdy chcesz usunąć reklamy, nawigację przed wyciąganiem tekstu.', how: 'for el in soup.find_all("script"): el.decompose() — usuń wszystkie script tagy.', tips: ['el.extract() — usuwa i zwraca element (możesz go użyć dalej)', 'soup.find("nav").decompose() — usuń nawigację przed get_text()'] }
+          },
+          { cmd: 'next_page = soup.select_one("a.next-page")', desc: 'Paginacja — znajdź link do następnej strony',
+            detail: { what: 'Wzorzec scrapingu wielu stron: znajdź link "następna strona" i kontynuuj pętlę.', how: 'while True: soup = ...; next = soup.select_one("a.next"); if not next: break; url = urljoin(base, next["href"])', tips: ['Dodaj time.sleep(1) między requestami — nie bombarduj serwera', 'Sprawdź robots.txt zanim zaczniesz scrapować', 'Ustaw limit stron na starcie — while page < 100:'] }
+          },
+        ]
+      },
+      {
+        category: 'Parsowanie zaawansowane',
+        icon: '⚙️',
+        items: [
+          { cmd: 'soup.find_all(True)', desc: 'Wszystkie tagi (dowolny element)',
+            detail: { what: 'True jako argument zwraca wszystkie tagi. Przydatne z atrybutem: soup.find_all(True, attrs={"data-id": True}).', how: 'soup.find_all(["h1","h2","h3"]) — lista tagów = znajdź wszystkie nagłówki.', tips: ['soup.find_all(re.compile("^h")) — tagi pasujące do regex (h1,h2,h3...)', 'soup.find(lambda tag: tag.name=="div" and "card" in tag.get("class",[])) — custom filter'] }
+          },
+          { cmd: 'soup.find("meta", attrs={"name":"description"})', desc: 'Pobierz meta tag (og:title, description)',
+            detail: { what: 'Meta tagi zawierają SEO i OpenGraph dane. Użyj do wyciągania tytułów, opisów, obrazków ze stron.', how: 'el["content"] — wartość atrybutu content.', tips: ['soup.find("meta", property="og:title")["content"] — Open Graph title', 'soup.find("title").get_text() — tytuł strony', 'soup.find("link", rel="canonical")["href"] — kanoniczny URL'] }
+          },
+          { cmd: 'data = [el.get_text(strip=True) for el in soup.select(".item")]', desc: 'List comprehension — szybkie zbieranie danych',
+            detail: { what: 'Pythonowy idiom do zbierania danych z wielu elementów jedną linią.', how: 'Lista wszystkich tekstów elementów o klasie .item.', tips: ['[{"name": el.find("h3").text, "price": el.find(".price").text} for el in soup.select(".product")]', 'Dodaj if el.find("h3") żeby pominąć elementy bez tytułu'] }
+          },
+        ]
+      },
     ]
   }
 };
