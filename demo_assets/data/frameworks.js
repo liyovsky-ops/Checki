@@ -86,6 +86,7 @@ const ALL_FRAMEWORKS = [
   { name:'ChromaDB',      icon:'🌈',  color:'#e91e63', lang:'Python',     cat:'Database',  desc:'Wektorowa baza dla AI' },
   { name:'Pinecone',      icon:'🌲',  color:'#0099ff', lang:'Python',     cat:'Database',  desc:'Managed vector database' },
   // DevOps
+  { name:'Git',           icon:'🌿',  color:'#F05033', lang:'Shell',      cat:'DevOps',    desc:'Rozproszony system kontroli wersji' },
   { name:'Docker',        icon:'🐳',  color:'#2496ed', lang:'YAML',       cat:'DevOps',    desc:'Konteneryzacja aplikacji' },
   { name:'Kubernetes',    icon:'☸️',  color:'#326ce5', lang:'YAML',       cat:'DevOps',    desc:'Orkiestracja kontenerów' },
   { name:'Terraform',     icon:'🏗️', color:'#7b42bc', lang:'HCL',        cat:'DevOps',    desc:'Infrastruktura jako kod' },
@@ -159,9 +160,7 @@ const FRAMEWORKS = {
     { id: 'asyncio',       name: 'asyncio',       icon: '⚡',  color: '#5865F2', lang: 'Python',     desc: 'Asynchroniczny Python' },
     { id: 'beautifulsoup', name: 'BeautifulSoup', icon: '🍲',  color: '#3CB371', lang: 'Python',     desc: 'Parsowanie HTML i XML' },
     { id: 'pyautogui',     name: 'PyAutoGUI',     icon: '🖱️', color: '#FF6B6B', lang: 'Python',     desc: 'Automatyzacja UI i GUI' },
-    { id: 'django',        name: 'Django',        icon: '🎸',  color: '#44b78b', lang: 'Python',     desc: 'Bateryjny framework webowy' },
     { id: 'flask',         name: 'Flask',         icon: '🌶️', color: '#a0a0a0', lang: 'Python',     desc: 'Mikro-framework webowy' },
-    { id: 'express',       name: 'Express',       icon: '🟨',  color: '#f7df1e', lang: 'JavaScript', desc: 'Minimalny framework Node.js' },
   ],
   database: [
     { id: 'postgresql', name: 'PostgreSQL', icon: '🐘', color: '#336791', lang: 'SQL',       desc: 'Zaawansowana baza relacyjna' },
@@ -172,11 +171,11 @@ const FRAMEWORKS = {
     { id: 'firebase',   name: 'Firebase',   icon: '🔥', color: '#ffca28', lang: 'NoSQL',    desc: 'BaaS od Google' },
   ],
   devops: [
+    { id: 'git',      name: 'Git',        icon: '🌿',  color: '#F05033', lang: 'Shell',  desc: 'Rozproszony system kontroli wersji' },
     { id: 'docker',    name: 'Docker',     icon: '🐳',  color: '#2496ed', lang: 'YAML',   desc: 'Konteneryzacja aplikacji' },
     { id: 'terraform', name: 'Terraform',  icon: '🏗️', color: '#7b42bc', lang: 'HCL',    desc: 'Infrastruktura jako kod' },
     { id: 'cicd',      name: 'CI/CD',      icon: '🔁',  color: '#F05033', lang: 'YAML',   desc: 'Ciągła integracja i wdrażanie' },
     { id: 'wsl',       name: 'WSL',        icon: '🐧',  color: '#E95420', lang: 'Shell',  desc: 'Linux na Windows' },
-    { id: 'github',    name: 'GitHub Actions', icon: '⚙️', color: '#2088ff', lang: 'YAML', desc: 'CI/CD w repozytorium' },
     { id: 'k8s',       name: 'Kubernetes', icon: '☸️',  color: '#326ce5', lang: 'YAML',   desc: 'Orkiestracja kontenerów' },
   ],
   testing: [

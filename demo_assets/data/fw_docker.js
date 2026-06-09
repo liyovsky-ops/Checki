@@ -387,8 +387,8 @@ API_KEY=abc123
 services:
   api:
     environment:
-      - SECRET_KEY=${SECRET_KEY}
-      - DATABASE_URL=postgresql://user:${POSTGRES_PASSWORD}@db/mydb
+      - SECRET_KEY=\${SECRET_KEY}
+      - DATABASE_URL=postgresql://user:\${POSTGRES_PASSWORD}@db/mydb
 
   # Lub z pliku env:
   db:
