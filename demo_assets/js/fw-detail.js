@@ -13,6 +13,8 @@ var FW_DATA_MAP = {
   'asyncio':        typeof FW_ASYNCIO_DATA   !== 'undefined' ? FW_ASYNCIO_DATA   : null,
   'git':            typeof FW_GIT_DATA       !== 'undefined' ? FW_GIT_DATA       : null,
   'docker':         typeof FW_DOCKER_DATA    !== 'undefined' ? FW_DOCKER_DATA    : null,
+  'pyautogui':      typeof FW_PYAUTOGUI_DATA !== 'undefined' ? FW_PYAUTOGUI_DATA : null,
+  'mcp':            typeof FW_MCP_DATA       !== 'undefined' ? FW_MCP_DATA       : null,
 };
 
 // Nadpisuje stub z framework.js
@@ -444,4 +446,6 @@ document.addEventListener('DOMContentLoaded', function() {
   if (typeof FW_ASYNCIO_DATA   !== 'undefined') FW_DATA_MAP['asyncio']       = FW_ASYNCIO_DATA;
   if (typeof FW_GIT_DATA       !== 'undefined') FW_DATA_MAP['git']           = FW_GIT_DATA;
   if (typeof FW_DOCKER_DATA    !== 'undefined') FW_DATA_MAP['docker']        = FW_DOCKER_DATA;
+  if (typeof FW_PYAUTOGUI_DATA !== 'undefined') FW_DATA_MAP['pyautogui']     = FW_PYAUTOGUI_DATA;
+  if (typeof FW_MCP_DATA       !== 'undefined') FW_DATA_MAP['mcp']           = FW_MCP_DATA;
 });
