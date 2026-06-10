@@ -78,3 +78,16 @@ Object.assign(window, {
   // Archiwum modal
   pokazModal, zamknijModal,
 });
+
+// ── Dev panel (DEV only — stripped from production build) ──
+if (import.meta.env.DEV) {
+  import('./dev/logger.js').then(({ wrap }) => {
+    const fns = [
+      'addToHistoria', 'switchTab', 'openFramework', 'closeDetailPage', 'switchDetailTab',
+      'openTranslator', 'closeTranslator', 'toggleDeadCode', 'toggleBadPatterns',
+      'sendAI', 'handleAnalizuj', 'openVivisekcja', 'closeVivisekcja', 'showHistoria',
+    ];
+    fns.forEach(fn => { if (window[fn]) window[fn] = wrap('app', fn, window[fn]); });
+  });
+  import('./dev/panel.js').then(m => m.initDevPanel());
+}
