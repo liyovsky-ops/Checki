@@ -1,5 +1,6 @@
 // Ecosystem: rywale + pluginy
-FW_REACT_DATA.content.rywale  = [
+export default {
+rywale: [
       {
         name: 'Vue.js',
         icon: '💚',
@@ -60,8 +61,8 @@ FW_REACT_DATA.content.rywale  = [
         vsReact: 'Qwik rozwiązuje problem hydration który React ma w SSR. Zamiast pobierać i uruchamiać JS na kliencie, wznawia stan serwera. Futurystyczne podejście.',
         bestFor: 'Strony gdzie liczy się Core Web Vitals, content-heavy sites'
       }
-    ];
-FW_REACT_DATA.content.pluginy = [
+    ],
+  pluginy: [
       {
         name: 'Next.js',
         icon: '▲',
@@ -118,4 +119,5 @@ const mutation = useMutation({
   mutationFn: (data) => fetch('/api/users', { method: 'POST', body: JSON.stringify(data) }),
   onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
 })`
-      }];
+      }]
+};

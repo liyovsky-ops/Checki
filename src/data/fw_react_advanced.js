@@ -1,5 +1,6 @@
 // Advanced patterns: routing + state
-FW_REACT_DATA.content.routing  = {
+export default {
+routing: {
       install: 'npm install react-router-dom',
       version: 'React Router v7 (API zgodne z v6)',
       sections: [
@@ -105,8 +106,8 @@ function LoginForm() {
 } />`
         }
       ]
-    };
-FW_REACT_DATA.content.state    = [
+    },
+  state: [
       {
         name: 'useState',
         icon: '⚛️',
@@ -167,4 +168,5 @@ const { count, increment } = useStore();`
 
 const { increment } = counterSlice.actions;
 dispatch(increment());`
-      }];
+      }]
+};
