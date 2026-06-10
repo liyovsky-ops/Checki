@@ -85,6 +85,13 @@ export const ALL_FRAMEWORKS = [
   { name:'PlanetScale',   icon:'🪐',  color:'#ffffff', lang:'MySQL',      cat:'Database',  desc:'Serverless MySQL' },
   { name:'ChromaDB',      icon:'🌈',  color:'#e91e63', lang:'Python',     cat:'Database',  desc:'Wektorowa baza dla AI' },
   { name:'Pinecone',      icon:'🌲',  color:'#0099ff', lang:'Python',     cat:'Database',  desc:'Managed vector database' },
+  // Cloud
+  { name:'AWS',           icon:'☁️',  color:'#FF9900', lang:'Multi',      cat:'Cloud',     desc:'Amazon Web Services — największa platforma cloud' },
+  { name:'Azure',         icon:'🔷',  color:'#0078D4', lang:'Multi',      cat:'Cloud',     desc:'Microsoft Cloud — enterprise i .NET' },
+  { name:'GCP',           icon:'🌈',  color:'#4285F4', lang:'Multi',      cat:'Cloud',     desc:'Google Cloud — ML/AI i Kubernetes' },
+  { name:'DigitalOcean',  icon:'🌊',  color:'#0080FF', lang:'Multi',      cat:'Cloud',     desc:'Prosty VPS dla developerów' },
+  { name:'Hetzner',       icon:'🟠',  color:'#D50C2D', lang:'Multi',      cat:'Cloud',     desc:'Najtańszy europejski cloud' },
+
   // DevOps
   { name:'Git',           icon:'🌿',  color:'#F05033', lang:'Shell',      cat:'DevOps',    desc:'Rozproszony system kontroli wersji' },
   { name:'Docker',        icon:'🐳',  color:'#2496ed', lang:'YAML',       cat:'DevOps',    desc:'Konteneryzacja aplikacji' },
