@@ -76,6 +76,21 @@ export const FW_AWS_DATA = {
           desc: 'Każdy zasób można otagować: klucz=wartość (Env=prod, Team=backend, Project=checki). Bez tagów nie wiesz które zasoby za co kosztują. Cost Allocation Tags → Cost Explorer → "backend kosztuje $1500/mies, frontend $200". Obowiązkowe w każdej organizacji.',
           icon: '🏷️'
         },
+        {
+          title: 'Well-Architected Framework — 6 Filarów',
+          desc: 'Framework AWS do projektowania solidnych systemów cloud. Narzędzie bezpłatne w Console — robi review architektury i wskazuje High/Medium Risk.\n\n1. Operational Excellence — automatyzacja, IaC, observability, continuous improvement. "Fail small, recover fast."\n2. Security — IAM least privilege, szyfrowanie at-rest i in-transit, WAF, GuardDuty, audit logs. Treat identities as perimeter.\n3. Reliability — multi-AZ deploy, auto-scaling, backup + DR, chaos engineering, retry z exponential backoff.\n4. Performance Efficiency — właściwy typ instancji, caching (ElastiCache), CDN (CloudFront), database selection.\n5. Cost Optimization — reserved/spot instances, auto-scaling down, S3 lifecycle policies, rightsizing. Serverless tam gdzie możliwe.\n6. Sustainability — energy efficiency, minimize waste, graviton (arm) zamiast x86, serverless, shared infra.',
+          icon: '🏛️'
+        },
+        {
+          title: 'Migracja do AWS — 7R i Snow Family',
+          desc: 'Strategia migracji aplikacji (Gartner 7R):\n\n• Retire — wyłącz to co niepotrzebne (20-30% zasobów)\n• Retain — zostaw na-premises to co nie może być migrowane jeszcze\n• Relocate — VMware Cloud on AWS, przeniesienie wirtualnych maszyn bez refactoru\n• Rehost (Lift & Shift) — EC2, szybko, 0 kodu zmienionego\n• Replatform (Lift & Tinker) — RDS zamiast MySQL na EC2, Fargate zamiast ECS EC2\n• Repurchase — przejdź na SaaS (Salesforce zamiast własnego CRM)\n• Refactor (Re-architect) — mikroserwisy, serverless, cloud-native — max korzyści, max pracy\n\nAWS Migration Hub — centralny dashboard śledzenia postępu migracji.\nMigration Evaluator — szacuje TCO (Total Cost of Ownership) przed migracją.',
+          icon: '🚚'
+        },
+        {
+          title: 'Pricing Calculator & Cost Management',
+          desc: 'Narzędzia kontroli kosztów AWS:\n\n• AWS Pricing Calculator (calculator.aws) — oszacuj koszty PRZED deployem\n• Cost Explorer — analiza historycznych kosztów, forecastowanie, anomaly detection\n• AWS Budgets — alerty gdy koszty/użycie przekraczają próg\n• Cost Anomaly Detection — ML wykrywa nieoczekiwane wzrosty kosztów\n• Savings Plans — 1 lub 3 lata, oszczędność 40-72% vs On-Demand\n• Compute Optimizer — AI rekomenduje rightsizing (np. zmień m5.xlarge na m5.large)\n• Cost Allocation Reports — S3 bucket z CSV per tag/service/account\n\nZasada: koszty zawsze rosną gdy się nie patrzy. Ustaw budżet i alerty od pierwszego dnia.',
+          icon: '💸'
+        },
       ],
       whenToUse: [
         'Startup potrzebuje skalować od 0 do milionów użytkowników bez zarządzania serwerami',
@@ -417,6 +432,310 @@ aws lightsail create-instance-snapshot \
 aws lightsail get-instances \
   --query "instances[].[name,state.name,publicIpAddress]" \
   --output table`,
+        lang: 'bash'
+      },
+      {
+        title: 'AWS Snow Family — Dane Fizyczne + Edge Computing',
+        desc: 'Kiedy łącze internetowe jest za wolne lub niedostępne — przenieś petabajty danych fizycznie.\n\n• Snowcone (8TB HDD / 14TB SSD, 4GB RAM, 2 vCPU) — najmniejszy, rozmiar zeszytu, wytrzymały. Drone delivery, remote locations, IoT edge.\n• Snowball Edge Storage (210TB) — skrzynka z zamkiem, 24TB NVMe do obliczeń. ETL na miejscu zanim wyślesz do AWS.\n• Snowball Edge Compute (52 vCPU, 208GB RAM, optional GPU) — przetwarzanie danych na miejscu (IoT factory, okręt wojenny, wiertnia)\n• Snowmobile (100 PB w ciężarówce) — dla hiperscale migracji. Fibre channel do ciężarówki.\n\nTypowy workflow:\n1. Zamów urządzenie online → AWS dostarcza FedEx\n2. Podepnij do sieci, skopiuj dane\n3. Odeślij do AWS → dane trafiają do S3/S3 Glacier\n\nLepszy niż internet gdy:\n100 TB przez 100 Mbps łącze = ~111 dni. Snowball = 2-3 tygodnie (+ czas transportu).\n\nOpsHub — GUI zamiast CLI dla Snowball.',
+        code: `# Zamów Snowball Edge
+aws snowball create-job \
+  --job-type IMPORT \
+  --resources '{"S3Resources":[{"BucketArn":"arn:aws:s3:::cel-bucket"}]}' \
+  --address-id ADID123 \
+  --kms-key-arn arn:aws:kms:eu-west-1:123:key/xxx \
+  --role-arn arn:aws:iam::123:role/SnowballRole \
+  --snowball-capacity T214 \
+  --shipping-option EXPRESS \
+  --snowball-type EDGE_STORAGE_OPTIMIZED
+
+# Na Snowball: uruchamiaj EC2 (AMI) lokalnie!
+# Załaduj AMI na Snowball → uruchom lokalny EC2 → przetworz dane → wyślij do S3
+snowballEdge describe-service --service-id ec2
+snowballEdge start-service --service-id ec2 --virtual-network-interface-arns ...
+
+# Snowcone — zbieranie danych IoT/edge
+aws datasync create-task \
+  --source-location-arn arn:aws:datasync:...:location/LOC-SNOWCONE \
+  --destination-location-arn arn:aws:datasync:...:location/LOC-S3 \
+  --cloud-watch-log-group-arn arn:aws:logs:...`,
+        lang: 'bash'
+      },
+      {
+        title: 'AWS Outposts — AWS On-Premises',
+        desc: 'Rack serwerów AWS zainstalowany w Twoim data center — te same serwisy AWS, te same API, ta sama konsola, ale sprzęt jest u Ciebie. "AWS za ścianą".\n\nDlaczego Outposts:\n• Latency < 5ms — dane muszą zostać lokalnie (manufacturing, healthcare, trading)\n• Data residency — prawo wymaga że dane fizycznie nie opuszczają konkretnej lokalizacji\n• Lokalne przetwarzanie z synchronizacją do chmury\n• Hybrid bursting: normalnie na Outpost, spike → AWS Region\n\nDostępne serwisy na Outpost:\nEC2 (wybrane typy), ECS, EKS, RDS, ElastiCache, EMR, ALB, SageMaker, EBS, S3 (Outpost S3)\n\nFormy:\n• Rack: pełna szafa serwerów (42U), 1-96 racków\n• Server: mniejszy format (1U/2U), do 3 serwerów\n\nBilling: 3-letni kontrakt, $120k-$3M+ zależnie od konfiguracji.\n\nłączność: wymaga dedykowanego połączenia do AWS Region (Direct Connect lub VPN).',
+        code: `# Outpost: te same API co AWS Region, ale lokalnie
+# EC2 na Outpost
+aws ec2 run-instances \
+  --image-id ami-xxx \
+  --instance-type m5.xlarge \
+  --subnet-id subnet-outpost-xxx  # subnet outpostowy
+
+# RDS na Outpost (PostgreSQL, MySQL)
+aws rds create-db-instance \
+  --db-instance-identifier local-db \
+  --db-instance-class db.m5.xlarge \
+  --engine postgres \
+  --outpost-identifier arn:aws:outposts:eu-west-1:123:outpost/op-xxx \
+  --db-subnet-group-name outpost-subnet-group
+
+# S3 on Outposts — przechowuj dane lokalnie
+aws s3api create-bucket \
+  --bucket local-data-bucket \
+  --outpost-id op-xxx
+
+# Lista Outpostów
+aws outposts list-outposts \
+  --query "Outposts[].[OutpostId,Name,LifeCycleStatus,Description]" \
+  --output table`,
+        lang: 'bash'
+      },
+      {
+        title: 'EC2 Image Builder — Automatyzacja AMI',
+        desc: 'Pipeline do automatycznego budowania, testowania i dystrybuowania AMI (Amazon Machine Images) i Docker images.\n\nDlaczego Image Builder:\n• Golden AMI Strategy: bazowy image z patchami, agentami (CloudWatch, SSM), hardening (CIS Benchmark), zamiast ręcznego aktualizowania\n• Automatyczne patche bezpieczeństwa — Schedule: co tydzień → nowy AMI z aktualnymi pakietami\n• Compliance: każdy AMI testowany przez Inspector przed dystrybucją\n• Multi-region distribution — jeden pipeline → AMI w 5 regionach\n\nKomponenty:\n• Recipe — bazowy image + lista komponentów (co instalować)\n• Component — YAML z fazami (build, validate, test)\n• Infrastructure Configuration — jaki typ EC2 do buildowania\n• Distribution Configuration — do których regionów i kont\n• Pipeline — łączy wszystko + schedule',
+        code: `# Component — instalacja agentów i konfiguracja (YAML)
+name: InstallAgents
+description: Install CloudWatch + SSM agents and harden
+schemaVersion: 1.0
+phases:
+  - name: build
+    steps:
+      - name: UpdateOS
+        action: UpdateOS
+      - name: InstallCloudWatchAgent
+        action: ExecuteBash
+        inputs:
+          commands:
+            - rpm -Uvh https://s3.amazonaws.com/amazoncloudwatch-agent/amazon_linux/amd64/latest/amazon-cloudwatch-agent.rpm
+            - /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a start
+      - name: DisableRootLogin
+        action: ExecuteBash
+        inputs:
+          commands:
+            - sed -i 's/^PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+  - name: validate
+    steps:
+      - name: CheckSSHConfig
+        action: ExecuteBash
+        inputs:
+          commands:
+            - grep "PermitRootLogin no" /etc/ssh/sshd_config || exit 1
+
+# Schedule: co poniedziałek nowy AMI
+aws imagebuilder create-image-pipeline \
+  --image-pipeline-name weekly-hardened-ami \
+  --image-recipe-arn arn:aws:imagebuilder:...:image-recipe/prod-recipe/1.0.0 \
+  --schedule '{"ScheduleExpression":"cron(0 9 ? * MON *)","PipelineExecutionStartCondition":"EXPRESSION_MATCH_AND_DEPENDENCY_UPDATES_AVAILABLE"}'`,
+        lang: 'yaml'
+      },
+      {
+        title: 'AWS Wavelength — 5G Edge Computing',
+        desc: 'Infrastruktura AWS wbudowana bezpośrednio w sieci 5G operatorów (Verizon, Vodafone, KDDI, SK Telecom). Ultra-niski latency: 1-10ms do urządzenia końcowego (vs 50-100ms przez internet do regionu).\n\nJak działa:\n• Wavelength Zone = mini AWS Region w RAN (Radio Access Network) operatora\n• Deploy EC2/ECS w Wavelength Zone → serwer jest fizycznie w stacji bazowej 5G\n• Telefon 5G → stacja bazowa → Wavelength Zone (1ms!) → nie wychodzi do internetu\n\nKiedy używać:\n• Autonomous vehicles — real-time decision making (AI inference <10ms)\n• Smart manufacturing — industrial IoT, roboty, CNC\n• Live video streaming — low-latency encoding na edge\n• Gaming — cloud gaming (streaming, 60fps), multiplayer servers\n• AR/VR — nie możesz mieć latency > 20ms dla VR bez motion sickness\n• Healthcare — remote surgery assistance, real-time imaging\n\nDostępność: US (Verizon), UK/Germany (Vodafone), Japan (KDDI/SoftBank), Korea (SK Telecom)',
+        code: `# Wavelength Zone = rozszerzenie regionu
+# eu-west-1-wl1-lon-wlz-1 = Wavelength Zone w Londynie (Vodafone)
+
+# Opt-in do Wavelength Zone
+aws ec2 modify-availability-zone-group \
+  --group-name eu-west-1-wl1-lon-wlz-1 \
+  --opt-in-status opted-in
+
+# Subnet w Wavelength Zone
+aws ec2 create-subnet \
+  --vpc-id vpc-xxx \
+  --cidr-block 10.0.100.0/24 \
+  --availability-zone-id euw1-wl1-lon-wlz1
+
+# EC2 w Wavelength Zone (inference serwer dla AI)
+aws ec2 run-instances \
+  --image-id ami-xxx \
+  --instance-type t3.medium \
+  --subnet-id subnet-wavelength \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=edge-inference}]'
+
+# Carrier IP — publiczny adres dostępny przez sieć 5G operatora
+aws ec2 allocate-address \
+  --network-border-group eu-west-1-wl1-lon-wlz-1
+
+# Aplikacja: telefon 5G → Carrier IP → EC2 w Wavelength Zone
+# Ruch nigdy nie opuszcza sieci Vodafone → 1-5ms latency!`,
+        lang: 'bash'
+      },
+      {
+        title: 'Amazon WorkSpaces — Wirtualne Pulpity (DaaS)',
+        desc: 'Desktop-as-a-Service — wirtualne pulpity Windows/Linux w chmurze AWS. Użytkownicy łączą się z dowolnego urządzenia (PC, Mac, Chromebook, tablet) przez klienta WorkSpaces lub przeglądarkę (WorkSpaces Web).\n\nDwa modele:\n• WorkSpaces Personal — dedykowany pulpit per użytkownik. Zawsze działa, zawsze dostępny.\n• WorkSpaces Pools — współdzielone pulpity, użytkownicy dostają dostęp na żądanie (jak AppStream ale pełny pulpit).\n\nSpecyfikacja:\n• Bundle: Value (2vCPU, 2GB RAM), Standard (2vCPU, 4GB), Performance (2vCPU, 7.5GB), Power (4vCPU, 16GB), Graphics (8vCPU, 15GB + GPU)\n• Storage: 80GB C: + 50GB D: (SSD, rozszerzalne)\n• OS: Windows 10/11, Amazon Linux 2, Ubuntu\n• Protokół: PCoIP lub WSP (WorkSpaces Streaming Protocol)\n\nKiedy używać:\n• Remote work/home office — bezpieczny dostęp do korporacyjnych danych\n• Kontrahenci/konsultanci — dostęp bez instalowania czegokolwiek na ich urządzeniu\n• Regulowane branże (finanse, zdrowie) — dane nigdy nie opuszczają AWS\n• BYOD environments — separacja korporacyjnych i prywatnych danych\n\nCena: od $21/mies (Value) do $88/mies (Power) + opłata za bundle',
+        code: `# Utwórz WorkSpaces Directory (AD Connector lub Simple AD)
+aws ds create-directory \
+  --name corp.example.com \
+  --password "SecureP@ss1" \
+  --size Small \
+  --vpc-settings VpcId=vpc-xxx,SubnetIds=subnet-1a,subnet-1b
+
+# Zarejestruj directory z WorkSpaces
+aws workspaces register-workspace-directory \
+  --directory-id d-xxx \
+  --subnet-ids subnet-1a subnet-1b \
+  --enable-work-docs
+
+# Utwórz WorkSpace dla użytkownika
+aws workspaces create-workspaces --workspaces '[
+  {
+    "DirectoryId": "d-xxx",
+    "UserName": "jan.kowalski",
+    "BundleId": "wsb-bh8rsxt14",
+    "WorkspaceProperties": {
+      "RunningMode": "ALWAYS_ON",
+      "RootVolumeSizeGib": 80,
+      "UserVolumeSizeGib": 50
+    },
+    "Tags": [{"Key": "Team", "Value": "Finance"}]
+  }
+]'
+
+# Lista WorkSpaces i status
+aws workspaces describe-workspaces --directory-id d-xxx \
+  --query "Workspaces[].[WorkspaceId,UserName,State,BundleId]" \
+  --output table`,
+        lang: 'bash'
+      },
+      {
+        title: 'Amazon AppStream 2.0 — Streaming Aplikacji',
+        desc: 'Streaming aplikacji desktopowych przez przeglądarkę — bez instalowania czegokolwiek na urządzeniu użytkownika. Uruchamiasz aplikację na instancji AWS, obraz jest streamowany do przeglądarki użytkownika.\n\nRóżnica AppStream vs WorkSpaces:\n• AppStream — stream konkretnych aplikacji (np. AutoCAD, SAP, Photoshop)\n• WorkSpaces — pełny pulpit Windows/Linux\n\nKluczowe koncepcje:\n• Fleet — pula instancji EC2 uruchamiających aplikacje\n• Stack — zbiera Fleet + polityki dostępu + ustawienia użytkownika\n• Image — Amazon Machine Image z zainstalowanymi aplikacjami\n• Image Builder — EC2 do tworzenia obrazów z aplikacjami\n\nTypy flot:\n• Always-On — instancje zawsze uruchomione, brak cold start, droższe\n• On-Demand — instancje startują gdy użytkownik się łączy (1-2min czekania)\n• Elastic Fleet — auto-scaling, płacisz za streaming seconds\n\nZastosowania:\n• CAD/CAM — AutoCAD, CATIA, SolidWorks ze słabego laptopa\n• Business apps — SAP, Oracle E-Business Suite, Citrix migracja\n• Education — każdy student ma te same aplikacje\n• Seasonal workers — dostęp do software tylko w sezonie',
+        code: `# Utwórz Image Builder (EC2 do budowania obrazu)
+aws appstream create-image-builder \
+  --name my-app-builder \
+  --instance-type stream.standard.medium \
+  --image-name AppStream-WinServer2019-08-05-2024
+
+# Po połączeniu przez konsolę → zainstaluj aplikacje → Image Actions → Create Image
+
+# Utwórz Fleet
+aws appstream create-fleet \
+  --name prod-fleet \
+  --instance-type stream.standard.medium \
+  --fleet-type ON_DEMAND \
+  --image-name my-company-apps-2024 \
+  --compute-capacity DesiredInstances=5 \
+  --max-user-duration-in-seconds 28800 \
+  --disconnect-timeout-in-seconds 900 \
+  --enable-default-internet-access
+
+# Utwórz Stack (łączy fleet z politykami)
+aws appstream create-stack \
+  --name prod-stack \
+  --display-name "Aplikacje Korporacyjne" \
+  --storage-connectors '[{"ConnectorType":"HOMEFOLDERS"}]' \
+  --user-settings '[
+    {"Action":"CLIPBOARD_COPY_FROM_LOCAL_DEVICE","Permission":"ENABLED"},
+    {"Action":"FILE_UPLOAD","Permission":"DISABLED"},
+    {"Action":"PRINTING_TO_LOCAL_DEVICE","Permission":"DISABLED"}
+  ]'
+
+# Powiąż Fleet ze Stackiem
+aws appstream associate-fleet --fleet-name prod-fleet --stack-name prod-stack
+
+# Wygeneruj URL dla użytkownika (ważny 1h)
+aws appstream create-streaming-url \
+  --stack-name prod-stack \
+  --fleet-name prod-fleet \
+  --user-id "jan.kowalski@example.com" \
+  --validity 3600`,
+        lang: 'bash'
+      },
+      {
+        title: 'Amazon Connect — Cloud Contact Center',
+        desc: 'Zarządzane call center w chmurze — to samo rozwiązanie co Amazon.com używa dla swoich 70,000 agentów. Setup w minutach, zero licencji per-seat.\n\nCo oferuje:\n• Inbound/Outbound voice (VoIP przez PSTN lub WebRTC w przeglądarce)\n• Omnichannel: telefon, chat (website widget), SMS, email, WhatsApp Business\n• Contact Flows — drag-and-drop IVR (Interactive Voice Response) designer\n• Real-time i historyczne metryki w dashboardzie\n• Call Recording — automatyczne nagrywanie, przechowywane w S3\n• Contact Lens — AI: transkrypcja, analiza sentymentu, keyword detection\n• Amazon Q in Connect — AI assistant dla agentów (real-time sugestie odpowiedzi)\n\nIntegracje:\n• Lambda — własna logika biznesowa (sprawdź zamówienie, zarezerwuj slot)\n• DynamoDB/RDS — baza klientów\n• Salesforce, Zendesk, ServiceNow — CRM integracja\n• Lex — chatbot w IVR menu\n\nCena: $0.018/min inbound voice, $0.025/min outbound, $0.004/chat message (pierwsze 12 mies 10% taniej przez Free Tier)',
+        code: `# Amazon Connect — programatyczne zarządzanie przez API
+
+# Utwórz instancję Connect
+aws connect create-instance \
+  --identity-management-type CONNECT_MANAGED \
+  --instance-alias my-contact-center \
+  --inbound-calls-enabled \
+  --outbound-calls-enabled
+
+# Przypisz numer telefonu do instancji
+aws connect associate-phone-number-contact-flow \
+  --phone-number-id pn-xxx \
+  --instance-id xxx \
+  --contact-flow-id cf-xxx
+
+# Utwórz użytkownika (agenta)
+aws connect create-user \
+  --username jan.kowalski \
+  --password "SecureP@ss1!" \
+  --identity-info FirstName=Jan,LastName=Kowalski \
+  --phone-config PhoneType=SOFT_PHONE,AutoAccept=false \
+  --routing-profile-id rp-xxx \
+  --security-profile-ids sp-xxx \
+  --instance-id xxx
+
+# Uruchom outbound call (programatyczny)
+aws connect start-outbound-voice-contact \
+  --destination-phone-number +48123456789 \
+  --contact-flow-id cf-outbound-xxx \
+  --instance-id xxx \
+  --source-phone-number +48800xxx \
+  --attributes '{"orderNumber":"ORD-001","customerName":"Jan"}'
+
+# Pobierz metryki real-time (ile agentów online, kolejka)
+aws connect get-current-metric-data \
+  --instance-id xxx \
+  --filters Channels=VOICE,Queues=queue-xxx \
+  --current-metrics '[{"Name":"AGENTS_ONLINE","Unit":"COUNT"},{"Name":"CONTACTS_IN_QUEUE","Unit":"COUNT"}]'`,
+        lang: 'bash'
+      },
+      {
+        title: 'Amazon GameLift — Serwery Dla Gier Multiplayer',
+        desc: 'Zarządzana infrastruktura dla real-time multiplayer game servers. Automatyczne skalowanie, matchmaking, low-latency na całym świecie.\n\nDwa tryby:\n• Managed GameLift — pełne zarządzanie; wgraj binarkę gry, AWS zarządza flotą EC2\n• Anywhere Fleet — uruchom game server na własnej infrastrukturze lub lokalnie (dev/test)\n\nKluczowe koncepcje:\n• Fleet — pula EC2 z uruchomionym game serverem\n• Game Session — jedna sesja gry (serwer dla 1 meczu/room)\n• Player Session — slot dla jednego gracza w game session\n• Matchmaker (FlexMatch) — elastyczny matchmaking: skill-based, region-based, custom rules\n• Spot Fleet — 70-80% taniej niż On-Demand dla game serverów (przerwanie z 2min notice)\n\nIntegracja z Realtime Servers:\n• GameLift Realtime Servers — lekki JavaScript relay server bez własnego kodu serwera\n• Dla prostych gier: tylko client-side logic, GameLift koordynuje sesje\n\nDlaczego GameLift a nie własne EC2?\n• Matchmaking + skalowanie gotowe out-of-the-box\n• Multi-region Fleet: gracze łączą się z najniższym latency\n• DDoS protection za EC2\n• Metryki: active sessions, player wait times, fleet utilization',
+        code: `# Deploy game server build
+aws gamelift upload-build \
+  --name "MyGame-v1.2" \
+  --build-version "1.2.0" \
+  --build-root ./build/server/ \
+  --operating-system AMAZON_LINUX_2023 \
+  --region eu-west-1
+
+# Utwórz Fleet z game serverem
+aws gamelift create-fleet \
+  --name prod-game-fleet \
+  --build-id build-xxx \
+  --ec2-instance-type c6g.large \
+  --ec2-inbound-permissions '[
+    {"FromPort":7777,"ToPort":7777,"IpRange":"0.0.0.0/0","Protocol":"UDP"}
+  ]' \
+  --runtime-configuration '{
+    "ServerProcesses": [{
+      "LaunchPath": "/local/game/GameServer",
+      "Parameters": "-logFile /local/game/logs/server.log -port 7777",
+      "ConcurrentExecutions": 1
+    }]
+  }' \
+  --new-game-session-protection-policy FULL_PROTECTION
+
+# Scaling policy — dodaj serwery gdy >80% wykorzystane
+aws gamelift put-scaling-policy \
+  --fleet-id fleet-xxx \
+  --name scale-up-policy \
+  --scaling-adjustment 2 \
+  --scaling-adjustment-type ChangeInCapacity \
+  --threshold 80 \
+  --comparison-operator GreaterThanOrEqualToThreshold \
+  --metric-name PercentAvailableGameSessions
+
+# FlexMatch — matchmaking (w Lambdzie)
+import boto3
+gamelift = boto3.client('gamelift', region_name='eu-west-1')
+gamelift.start_matchmaking(
+    TicketId='ticket-001',
+    ConfigurationName='ranked-1v1',
+    Players=[{
+        'PlayerId': 'player-123',
+        'PlayerAttributes': {
+            'skill': {'N': 1500},
+            'region': {'S': 'eu'}
+        },
+        'LatencyInMs': {'eu-west-1': 15, 'us-east-1': 120}
+    }]
+)`,
         lang: 'bash'
       },
     ],
@@ -781,6 +1100,424 @@ friends_of_friends = g.V().has('name', 'Alice')\
 g.V().hasLabel('Account')\
     .where(out('USES').count().is_(gt(2)))\
     .values('accountId').toList()`
+      },
+      {
+        name: 'Amazon FSx — Managed File Systems',
+        desc: 'Managed file systems dla wyspecjalizowanych workloadów — nie używaj EFS do wszystkiego.\n\n• FSx for Windows File Server — SMB, Active Directory integration, DFS Namespaces. Dla aplikacji Windows, SharePoint, SQL Server backup.\n• FSx for Lustre — High Performance Computing. Równoległy distributed filesystem, throughput do 1 TB/s. Bezpośrednia integracja z S3 (lazy load → tylko pobiera pliki gdy potrzebne). Dla ML training, genomics, seismic analysis, CFD.\n• FSx for NetApp ONTAP — pełne NetApp features w chmurze. Multi-protocol (NFS, SMB, iSCSI). Snapshots, replication, deduplication. Lift-and-shift aplikacji NetApp.\n• FSx for OpenZFS — ZFS filesystem. Snapshots, klony, szyfrowanie. Dla developerów znających ZFS na Linux.',
+        when: 'Windows apps wymagające SMB (FSx Windows), ML training z danymi w S3 (FSx Lustre), migracja workloadów NetApp (FSx ONTAP), ZFS na Linux (FSx OpenZFS)',
+        code: `# FSx for Lustre — ML training z danymi w S3
+aws fsx create-file-system \
+  --file-system-type LUSTRE \
+  --storage-capacity 1200 \
+  --lustre-configuration '{
+    "ImportPath": "s3://ml-datasets/imagenet/",
+    "ExportPath": "s3://ml-results/",
+    "AutoImportPolicy": "NEW_CHANGED_DELETED",
+    "DeploymentType": "SCRATCH_2",
+    "PerUnitStorageThroughput": 200
+  }' \
+  --subnet-ids subnet-xxx
+
+# Na instancji EC2/p3 (GPU) zamontuj Lustre
+amazon-linux-extras install lustre
+mount -t lustre fs-xxx.fsx.eu-west-1.amazonaws.com@tcp:/fsx /mnt/fsx
+# Teraz /mnt/fsx zawiera dane z S3 — lazy load przy pierwszym dostępie
+
+# FSx for Windows File Server — AD integration
+aws fsx create-file-system \
+  --file-system-type WINDOWS \
+  --storage-capacity 300 \
+  --windows-configuration '{
+    "ActiveDirectoryId": "d-xxx",
+    "ThroughputCapacity": 64,
+    "DeploymentType": "MULTI_AZ_1",
+    "PreferredSubnetId": "subnet-xxx",
+    "StandbySubnetId": "subnet-yyy"
+  }' \
+  --subnet-ids subnet-xxx subnet-yyy`
+      },
+      {
+        name: 'AWS Backup — Centralne Zarządzanie Backupami',
+        desc: 'Jeden serwis do zarządzania backupami wszystkich zasobów AWS. Policies, schedules, retention, cross-region, cross-account — z jednego miejsca zamiast konfigurowania backupów per-serwis.\n\nObsługuje: EBS, RDS (wszystkie silniki), Aurora, DynamoDB, EFS, FSx, EC2 (AMI), Storage Gateway, DocumentDB, Neptune, S3, VMware on-premises.\n\nKluczowe koncepcje:\n• Backup Plan — polityka: kiedy (cron), jak długo trzymać, do których vaultów\n• Backup Vault — kontener na recovery points. Vault Lock (WORM) = nieusuwalne przez X dni nawet przez root!\n• Recovery Points — poszczególne punkty przywrócenia\n• Cross-Region Backup — automatyczna kopia do innego regionu\n• Cross-Account Backup — kopia do izolowanego "backup account" (najlepsza praktyka dla ransomware protection)\n\nCompliance: GDPR, HIPAA, PCI-DSS wymagają backupów. AWS Backup generuje raporty zgodności.',
+        when: 'Enterprise backup strategy, compliance (GDPR/HIPAA), ransomware protection (cross-account vault), DR, centralne zarządzanie politykami backupu dla wielu kont AWS',
+        code: `# Backup Plan — codziennie o 2 AM, trzymaj 35 dni, kopia do drugiego regionu
+aws backup create-backup-plan --backup-plan '{
+  "BackupPlanName": "prod-backup-plan",
+  "Rules": [
+    {
+      "RuleName": "DailyBackup",
+      "TargetBackupVaultName": "prod-vault",
+      "ScheduleExpression": "cron(0 2 * * ? *)",
+      "StartWindowMinutes": 60,
+      "CompletionWindowMinutes": 120,
+      "Lifecycle": {
+        "MoveToColdStorageAfterDays": 30,
+        "DeleteAfterDays": 365
+      },
+      "CopyActions": [{
+        "DestinationBackupVaultArn": "arn:aws:backup:us-east-1:123:backup-vault:dr-vault",
+        "Lifecycle": {"DeleteAfterDays": 90}
+      }]
+    },
+    {
+      "RuleName": "MonthlyBackup",
+      "TargetBackupVaultName": "prod-vault",
+      "ScheduleExpression": "cron(0 3 1 * ? *)",
+      "Lifecycle": {"DeleteAfterDays": 2555}
+    }
+  ]
+}'
+
+# Vault Lock — WORM (Write Once Read Many)
+aws backup put-backup-vault-lock-configuration \
+  --backup-vault-name prod-vault \
+  --min-retention-days 7 \
+  --max-retention-days 365
+  # Nawet root nie może usunąć recovery points przez 7-365 dni
+  # Idealne: protection przed ransomware i złośliwymi administratorami`
+      },
+      {
+        name: 'Amazon Timestream — Baza Danych Szeregów Czasowych',
+        desc: 'Serverless time-series database zoptymalizowana dla danych z timestampem. 1000x szybsza od relacyjnych baz do time-series queries.\n\nArchitektura dwuwarstwowa:\n• Memory Store — ostatnie dane (hot data), dane "hot" trzymane w RAM, bardzo szybki zapis (milisekundy)\n• Magnetic Store — dane historyczne (cold data), tani S3-backed storage\n• Automatyczna tiering: po N dniach dane przenoszą się do Magnetic Store\n\nKluczowe cechy:\n• Wbudowane funkcje time-series: interpolate, smoothing, moving average, percentile, anomaly detection\n• SQL-like query language z time-series extensions\n• Scheduled Queries — precomputed aggregates (redukuje koszty)\n• AWS IoT Core, Kinesis Data Streams → Timestream (natywna integracja)\n• Grafana datasource out-of-the-box\n\nCena: $0.036/GB (memory) + $0.03/GB (magnetic) + $0.01/1M queries',
+        when: 'IoT sensor data (temperatury, ciśnienia, GPS), application metrics (CPU/RAM per sekunda), financial ticks (ceny akcji), infrastructure monitoring, clickstream analysis',
+        code: `import boto3
+
+timestream = boto3.client('timestream-write', region_name='eu-west-1')
+
+# Wstaw dane IoT (batch — do 100 rekordów)
+timestream.write_records(
+    DatabaseName='iot-data',
+    TableName='sensors',
+    CommonAttributes={
+        'Dimensions': [
+            {'Name': 'factory', 'Value': 'warszawa-1'},
+            {'Name': 'machine_id', 'Value': 'cnc-042'}
+        ],
+        'Time': str(int(time.time() * 1000)),
+        'TimeUnit': 'MILLISECONDS'
+    },
+    Records=[
+        {'MeasureName': 'temperature',   'MeasureValue': '72.5',  'MeasureValueType': 'DOUBLE'},
+        {'MeasureName': 'vibration',      'MeasureValue': '0.023', 'MeasureValueType': 'DOUBLE'},
+        {'MeasureName': 'rpm',            'MeasureValue': '1450',  'MeasureValueType': 'BIGINT'},
+        {'MeasureName': 'error_code',     'MeasureValue': '0',     'MeasureValueType': 'BIGINT'},
+    ]
+)
+
+# Query — average temperature z ostatnich 24h per maszyna
+query_client = boto3.client('timestream-query', region_name='eu-west-1')
+result = query_client.query(QueryString="""
+    SELECT machine_id,
+           AVG(measure_value::double) as avg_temp,
+           MAX(measure_value::double) as max_temp,
+           BIN(time, 1h) as hour_bucket
+    FROM "iot-data"."sensors"
+    WHERE measure_name = 'temperature'
+      AND time >= ago(24h)
+    GROUP BY machine_id, BIN(time, 1h)
+    HAVING AVG(measure_value::double) > 70
+    ORDER BY hour_bucket DESC
+""")`
+      },
+      {
+        name: 'Amazon MemoryDB for Redis — Durable In-Memory',
+        desc: 'Redis-kompatybilna baza danych w pełni trwała (persystentna, nie tylko cache). MemoryDB zachowuje dane nawet po restart/failover — w przeciwieństwie do ElastiCache Redis gdzie dane są w pamięci.\n\n• Multi-AZ transaction log — każdy zapis jest potwierdzony przez quorum w wielu AZ zanim zwróci ACK\n• Micro-second reads, single-digit millisecond writes\n• Redis 6.2/7.0 kompatybilny — te same komendy, te same data structures\n• Snapshots do S3, point-in-time recovery\n\nElastiCache Redis vs MemoryDB:\n• ElastiCache: cache layer (TTL, eviction, OK gdy dane giną). Tańszy.\n• MemoryDB: primary database. Dane nigdy nie giną. Droższy (3x).\n\nKiedy MemoryDB: Redis jako główna baza (nie tylko cache), potrzebujesz durability i Redis API, gaming leaderboards jako primary store, session DB które NIGDY nie może stracić danych.',
+        when: 'Redis jako primary database (nie cache), gaming leaderboards, session storage z gwarancją trwałości, real-time analytics przechowywane w Redis, aplikacje wymagające Redis + durability',
+        code: `import redis
+
+# Połączenie — identyczne jak ElastiCache Redis
+r = redis.Redis(
+    host='clustercfg.moj-klaster.xxx.memorydb.eu-west-1.amazonaws.com',
+    port=6379, ssl=True, decode_responses=True
+)
+
+# MemoryDB obsługuje cały Redis API — Sorted Sets, Streams, Hashes itp.
+
+# Gaming Leaderboard (Sorted Set) — trwały, nie wyparuje po restart!
+r.zadd('global-leaderboard', {'player:alice': 15420, 'player:bob': 12890})
+top10 = r.zrevrange('global-leaderboard', 0, 9, withscores=True)
+
+# Redis Streams — event log z gwarancją durability
+r.xadd('orders-stream', {
+    'orderId': 'ord-789',
+    'userId': 'user-123',
+    'total': '199.99',
+    'status': 'created'
+})
+# Consumer Group — równoległy processing z at-least-once delivery
+r.xgroup_create('orders-stream', 'payment-workers', id='0', mkstream=True)
+messages = r.xreadgroup('payment-workers', 'worker-1', {'orders-stream': '>'}, count=10)
+
+# Hash — user session (nigdy nie wygasa bez TTL!)
+r.hset('session:abc123', mapping={'userId': 'user-1', 'role': 'admin', 'loginAt': str(time.time())})`
+      },
+      {
+        name: 'AWS DataSync — Transfer Danych',
+        desc: 'Managed service do transferu danych między on-premises a AWS, między serwisami AWS lub między chmurami.\n\nŹródła i cele:\n• On-premises → AWS: NFS, SMB, HDFS, object storage\n• AWS → AWS: S3 ↔ S3 (inne regiony/konta), EFS ↔ EFS, FSx\n• Other clouds → AWS: Google Cloud Storage, Azure Blob, Wasabi\n\nCechy:\n• Automatyczna weryfikacja integralności (checksums)\n• Filtrowanie: include/exclude patterns\n• Scheduling: jednorazowo lub cyklicznie\n• Bandwidth throttling — nie blokuj produkcji\n• Szyfrowanie w transit (TLS) i at-rest\n• CloudWatch logi i metryki\n\nCena: $0.0125/GB transferowanych danych\n\nDataSync vs Snow Family:\n• DataSync: masz dobre łącze, < 100TB, cykliczne transfery\n• Snow: słabe łącze, > 100TB, jednorazowa migracja',
+        when: 'Migracja NAS/NFS do S3/EFS, cykliczne backupy on-premises do AWS, replikacja S3 między kontami/regionami, transfer między EFS filesystemami, migracja z GCS/Azure do S3',
+        code: `# Task = konfiguracja transferu (source → destination)
+aws datasync create-task \
+  --source-location-arn arn:aws:datasync:eu-west-1:123:location/LOC-xxx \
+  --destination-location-arn arn:aws:datasync:eu-west-1:123:location/LOC-yyy \
+  --name "daily-backup-sync" \
+  --options '{
+    "VerifyMode": "ONLY_FILES_TRANSFERRED",
+    "OverwriteMode": "ALWAYS",
+    "PreserveDeletedFiles": "PRESERVE",
+    "LogLevel": "TRANSFER"
+  }' \
+  --schedule '{"ScheduleExpression": "cron(0 2 * * ? *)"}' \
+  --cloud-watch-log-group-arn arn:aws:logs:...:log-group:datasync-logs
+
+# Utwórz Location dla NFS on-premises
+aws datasync create-location-nfs \
+  --server-hostname 192.168.1.50 \
+  --subdirectory /backup \
+  --on-prem-config '{"AgentArns": ["arn:aws:datasync:...:agent/agent-xxx"]}'
+
+# Agent DataSync: VM zainstalowana w Twoim DC
+# Komunikuje się z DataSync service przez port 443 (HTTPS)
+
+# Uruchom task jednorazowo
+aws datasync start-task-execution --task-arn arn:aws:datasync:...:task/task-xxx
+
+# Sprawdź status i statystyki
+aws datasync describe-task-execution \
+  --task-execution-arn arn:... \
+  --query "[Status,Result.TransferredFiles,Result.BytesTransferred]"`
+      },
+      {
+        name: 'Amazon QLDB — Quantum Ledger Database',
+        desc: 'Transparentny, niezmienny dziennik transakcji — każda zmiana jest kryptograficznie weryfikowalna. Nikt nie może potajemnie zmienić historii.\n\n• Immutable journal — append-only, żadna zmiana nie może być usunięta bez pozostawienia śladu\n• Kryptograficzna weryfikacja (SHA-256 digest) — możesz udowodnić że rekord NIE był zmieniany\n• Serverless — nie zarządzasz infrastrukturą\n• PartiQL — SQL-like query language\n\nKiedy QLDB vs Blockchain:\n• QLDB = centralized, Amazon jest trusted party, super proste\n• Blockchain (Amazon Managed Blockchain) = decentralized, wiele niezależnych stron, skomplikowany\n\nTypowe zastosowania:\n• Finanse: historia transakcji bankowych, audit trail transferów pieniędzy\n• Supply chain: historia każdego kroku towaru od producenta do klienta\n• Systemy tożsamości: historia zmian uprawnień i dostępów\n• Compliance: nienaruszalny audit log dla regulatorów',
+        when: 'Fintech (historia transakcji), healthcare (audit log dostępu do danych pacjenta), supply chain (nienaruszalny łańcuch dostaw), compliance (zapis działań w systemie który audytorzy muszą zweryfikować)',
+        code: `from pyqldb.driver.qldb_driver import QldbDriver
+
+driver = QldbDriver(ledger_name='fintech-ledger')
+
+# Wstaw transakcję
+def insert_transaction(driver, transaction_data):
+    def executor(transaction_executor):
+        transaction_executor.execute_statement(
+            "INSERT INTO Transactions VALUE ?",
+            transaction_data
+        )
+    driver.execute_lambda(executor)
+
+insert_transaction(driver, {
+    'transactionId': 'TXN-001',
+    'from_account': 'ACC-123',
+    'to_account': 'ACC-456',
+    'amount': 1500.00,
+    'currency': 'PLN',
+    'timestamp': '2024-01-15T10:30:00Z',
+    'type': 'TRANSFER'
+})
+
+# Sprawdź historię rekordu (kto co zmienił)
+def get_history(driver, doc_id):
+    def executor(transaction_executor):
+        return list(transaction_executor.execute_statement(
+            "SELECT * FROM history(Transactions) AS h WHERE h.metadata.id = ?",
+            doc_id
+        ))
+    return driver.execute_lambda(executor)
+
+# Weryfikacja kryptograficzna
+# Digest = SHA-256 hash całego journal
+# Możesz udowodnić że rekord istniał i nie był zmieniony MIĘDZY dwoma digestami
+aws qldb get-digest --name fintech-ledger`
+      },
+      {
+        name: 'AWS Transfer Family — Managed SFTP/FTP/FTPS',
+        desc: 'Managed file transfer service — SFTP, FTPS, FTP i AS2 bezposrednio do/z S3 lub EFS. Zero serwerow do zarzadzania, zero patchy, high availability w wielu AZ.\n\nProtokoly:\n• SFTP — SSH File Transfer Protocol (port 22). Najbardziej popularny.\n• FTPS — FTP over TLS (port 21). Legacy enterprise.\n• FTP — nieszyfrowany (tylko dla izolowanych sieci prywatnych).\n• AS2 — Applicability Statement 2, EDI dla B2B.\n\nGlowne koncepcje:\n• Server — endpoint SFTP/FTP. Jeden endpoint = jeden protokol.\n• User — konto z SSH key lub haslem. Kazdy user ma swoj "home directory" w S3.\n• Home directory — S3 prefix lub bucket. Ukrywasz strukture S3 przez logical home dirs.\n• Workflow — automatyczne akcje po transferze (Lambda, move, copy, decrypt).\n\nKiedy uzywac:\n• Partnerzy B2B przesylajacy pliki przez SFTP (zamowienia, faktury)\n• Systemy legacy wymagajace FTP/SFTP jako protokolu\n• Migracja z FTP serwera on-premises do cloud\n• Compliance: audit trail transferow (CloudWatch + S3 access logs)\n\nCena: $0.30/h per enabled protocol endpoint + $0.04/GB uploaded + $0.04/GB downloaded',
+        when: 'Partnerzy B2B wymagajacy SFTP, migracja FTP serwerow do cloud, systemy legacy potrzebujace file transfer, EDI/AS2 dla retail/healthcare',
+        code: `# Utworz Transfer Family Server (SFTP)
+aws transfer create-server \
+  --protocols SFTP \
+  --identity-provider-type SERVICE_MANAGED \
+  --endpoint-type PUBLIC \
+  --logging-role arn:aws:iam::123:role/TransferLoggingRole
+
+# Utworz uzytkownika z SSH key i home directory w S3
+aws transfer create-user \
+  --server-id s-xxx \
+  --user-name sftp-partner \
+  --role arn:aws:iam::123:role/SFTPUserRole \
+  --home-directory-type LOGICAL \
+  --home-directory-mappings '[{"Entry":"/","Target":"/moj-bucket/partners/partner-abc"}]' \
+  --ssh-public-key-body "ssh-rsa AAAAB3NzaC1yc2EAAA..."
+
+# Polityka IAM dla SFTP user (dostep tylko do swojego folderu)
+# s3:PutObject, GetObject, DeleteObject na moj-bucket/partners/partner-abc/*
+# s3:ListBucket z condition StringLike s3:prefix: partners/partner-abc/*
+
+# Workflow — automatycznie uruchom Lambda po kazdym transferze
+aws transfer create-workflow \
+  --steps '[
+    {"Type":"CUSTOM","CustomStepDetails":{"Name":"ProcessFile","Target":"arn:aws:lambda:...:process-sftp-upload","TimeoutSeconds":60}},
+    {"Type":"MOVE","MoveStepDetails":{"Name":"Archive","DestinationFileLocation":{"S3FileLocation":{"Bucket":"archive-bucket","Key":"processed/"}}}}
+  ]'`
+      },
+      {
+        name: 'Amazon MQ — Managed Message Broker',
+        desc: 'Managed message broker service — RabbitMQ i Apache ActiveMQ w chmurze. Lift-and-shift istniejacych aplikacji uzywajacych AMQP, MQTT, OpenWire, STOMP, bez przepisywania kodu.\n\nDwa silniki:\n• ActiveMQ — Java-based, dojrzaly. Protokoly: OpenWire (Java/JMS), AMQP 1.0, MQTT, STOMP, WebSocket.\n• RabbitMQ — Erlang-based, lekki, popularny. Protokol: AMQP 0-9-1, MQTT, STOMP.\n\nKiedy Amazon MQ vs SQS/SNS:\n• SQS/SNS — nowe aplikacje cloud-native, prostsze, tansze, skaluje sie bez limitu\n• Amazon MQ — migracja existing aplikacji uzywajacych JMS/AMQP, protokolarna zgodnosc wymagana\n\nKonfiguracja:\n• Single-instance broker — dev/test, tanszy\n• Active/Standby broker — produkcja, automatic failover do standby w <30s\n• Siec brokerow — multiple brokers w mesh (ActiveMQ)\n\nBezpieczenstwo:\n• Broker w VPC — niedostepny publicznie\n• TLS — szyfrowanie w transit\n• Username/password lub LDAP\n\nCena: mq.m5.large Active/Standby = ok $0.576/h per broker (~$413/mies)',
+        when: 'Migracja on-premises aplikacji JMS/AMQP/MQTT do cloud, systemy legacy Java EE wymagajace JMS, IoT z MQTT, integracje B2B wymagajace standardowych protokolow message broker',
+        code: `# Utworz RabbitMQ broker (Active/Standby)
+aws mq create-broker \
+  --broker-name prod-rabbitmq \
+  --engine-type RABBITMQ \
+  --engine-version 3.13 \
+  --deployment-mode ACTIVE_STANDBY_MULTI_AZ \
+  --host-instance-type mq.m5.large \
+  --publicly-accessible false \
+  --subnet-ids subnet-1a subnet-1b \
+  --security-groups sg-xxx \
+  --users '[{"Username":"admin","Password":"SecureP@ss1","Groups":["administrators"]}]' \
+  --logs '{"General":true}'
+
+# Endpoint po created:
+# amqps://b-xxx.mq.eu-west-1.amazonaws.com:5671
+
+# RabbitMQ Python (pika)
+import pika, ssl
+
+ssl_context = ssl.create_default_context()
+credentials = pika.PlainCredentials('admin', 'SecureP@ss1')
+params = pika.ConnectionParameters(
+    host='b-xxx.mq.eu-west-1.amazonaws.com',
+    port=5671,
+    credentials=credentials,
+    ssl_options=pika.SSLOptions(ssl_context)
+)
+connection = pika.BlockingConnection(params)
+channel = connection.channel()
+channel.queue_declare(queue='orders', durable=True)
+
+# Publisher
+channel.basic_publish(
+    exchange='', routing_key='orders',
+    body='{"orderId":"123","total":199.99}',
+    properties=pika.BasicProperties(delivery_mode=2)
+)
+
+# Consumer
+def callback(ch, method, properties, body):
+    print(f"Order: {body.decode()}")
+    ch.basic_ack(delivery_tag=method.delivery_tag)
+
+channel.basic_qos(prefetch_count=1)
+channel.basic_consume(queue='orders', on_message_callback=callback)
+channel.start_consuming()`
+      },
+      {
+        name: 'Amazon Keyspaces — Managed Apache Cassandra',
+        desc: 'W pelni zarzadzany, serverless Cassandra-compatible database. Nie zarzadzasz wezlami, partycjami, replikacja — AWS to robi.\n\nCassandra idealny dla:\n• Write-heavy workloads (miliony writes/s)\n• Time-series data (IoT, metryki, logi zdarzen)\n• Dane z naturalnym partitionem (user_id, device_id)\n• Aplikacje wymagajace geo-redundancy\n\nZgodnosc:\n• CQL (Cassandra Query Language) — kompatybilny z Cassandra 3.11+\n• Cassandra drivers dzialaja bez modyfikacji kodu\n\nRoznice vs self-managed Cassandra:\n• Serverless — automatyczne skalowanie, brak wezlow do zarzadzania\n• 99.99% SLA — trzy repliki w roznych AZ\n• Backup automatyczny — point-in-time recovery do 35 dni\n• Encryption at-rest (KMS) i in-transit (TLS)\n• IAM authentication — zamiast Cassandra native auth\n\nKiedy Keyspaces vs DynamoDB:\n• Masz istniejacy kod Cassandra/CQL → Keyspaces (lift-and-shift)\n• Nowa aplikacja → DynamoDB (lepiej zintegrowany z AWS, tanszy dla malych workloadow)',
+        when: 'Lift-and-shift istniejacych aplikacji Cassandra, time-series IoT data, write-heavy workloads (telemetria, logi uzytkownika), aplikacje z geograficzna dystrybucja danych',
+        code: `# Keyspaces uzywa CQL — identycznie jak Cassandra
+from cassandra.cluster import Cluster
+from cassandra.auth import PlainTextAuthProvider
+import ssl
+
+ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+ssl_context.load_verify_locations('./sf-class2-root.crt')
+auth_provider = PlainTextAuthProvider(
+    username='my-iam-user',
+    password='my-service-specific-password'
+)
+cluster = Cluster(
+    ['cassandra.eu-west-1.amazonaws.com'],
+    ssl_context=ssl_context,
+    auth_provider=auth_provider,
+    port=9142
+)
+session = cluster.connect()
+
+# Utworz keyspace
+session.execute(
+    "CREATE KEYSPACE IF NOT EXISTS iot_data WITH replication = {'class': 'SingleRegionStrategy'}"
+)
+
+# Tabela time-series z TTL 90 dni
+session.execute(
+    """CREATE TABLE IF NOT EXISTS iot_data.sensor_readings (
+        device_id text,
+        timestamp timestamp,
+        temperature double,
+        humidity double,
+        PRIMARY KEY (device_id, timestamp)
+    ) WITH CLUSTERING ORDER BY (timestamp DESC)
+    AND default_time_to_live = 7776000"""
+)
+
+# Insert
+from datetime import datetime
+prepared = session.prepare(
+    "INSERT INTO iot_data.sensor_readings (device_id, timestamp, temperature, humidity) VALUES (?, ?, ?, ?)"
+)
+session.execute(prepared, ('device-001', datetime.now(), 22.5, 65.0))
+
+# Query ostatnich 100 odczytow
+rows = session.execute(
+    "SELECT * FROM iot_data.sensor_readings WHERE device_id = 'device-001' LIMIT 100"
+)`
+      },
+      {
+        name: 'Amazon SES — Simple Email Service',
+        desc: 'Managed email sending i receiving. Wysylaj transakcyjne emaile (potwierdzenia zamowien, reset hasla, faktury) i marketingowe z wysoka dostarczalnoscia.\n\nDwa tryby:\n• Wysylanie — SMTP endpoint lub API (boto3). Tanie: $0.10 per 1000 emaili.\n• Odbieranie — SES odbiera emaile na Twoja domene i przekazuje do Lambda/S3.\n\nKluczowe koncepcje:\n• Verified Identity — zweryfikuj domene (DNS TXT record) lub email\n• DKIM — DomainKeys Identified Mail. SES generuje klucze automatycznie.\n• SPF — Sender Policy Framework. Dodaj SES do DNS.\n• DMARC — polityka co z mailami bez SPF/DKIM.\n• Suppression list — automatycznie NIE wysylaj do adresow ktore zbouncoWaly lub oznaczyly jako spam.\n• Configuration Sets — loguj do CloudWatch/Kinesis (bounces, complaints, opens, clicks).\n\nSandbox vs Production:\n• Sandbox — mozesz wysylac tylko do zweryfikowanych emaili. Sandbox removal = wniosek przez Support.\n\nCena: $0.10 per 1000 emaili (via API), $0.11 per 1000 emaili (via SMTP)',
+        when: 'Transakcyjne emaile (reset hasla, potwierdzenia zamowien), bulk marketing emaile, email receiving (support inbox, inbound routing), wysoka dostarczalnosc i monitoring bounce/complaint rates',
+        code: `# === Wysylanie przez boto3 (API) ===
+import boto3
+from botocore.exceptions import ClientError
+
+ses = boto3.client('ses', region_name='eu-west-1')
+
+try:
+    response = ses.send_email(
+        Source='noreply@twoja-domena.pl',
+        Destination={'ToAddresses': ['jan.kowalski@example.com']},
+        Message={
+            'Subject': {'Data': 'Potwierdzenie zamowienia #12345'},
+            'Body': {
+                'Html': {'Data': '<h1>Dziekujemy!</h1><p>Zamowienie #12345 przyjete. Kwota: 199,99 PLN</p>'},
+                'Text': {'Data': 'Dziekujemy! Zamowienie #12345 przyjete. Kwota: 199,99 PLN'}
+            }
+        },
+        ConfigurationSetName='transactional-emails'
+    )
+    print(f"Email ID: {response['MessageId']}")
+except ClientError as e:
+    print(f"Blad: {e.response['Error']['Message']}")
+
+# === Email Receiving — MX record → inbound-smtp.eu-west-1.amazonaws.com ===
+aws ses create-receipt-rule \
+  --rule-set-name default-rule-set \
+  --rule '{
+    "Name": "forward-to-lambda",
+    "Enabled": true,
+    "Recipients": ["support@twoja-domena.pl"],
+    "Actions": [
+      {"LambdaAction": {"FunctionArn": "arn:aws:lambda:...:process-email", "InvocationType": "Event"}},
+      {"S3Action": {"BucketName": "email-archive", "ObjectKeyPrefix": "inbound/"}}
+    ]
+  }'
+
+# Lambda handler — parsuj przychodzacy email
+def handler(event, context):
+    message = event['Records'][0]['ses']['mail']
+    subject = message['commonHeaders']['subject']
+    from_addr = message['commonHeaders']['from'][0]
+    print(f"Email od: {from_addr}, temat: {subject}")
+
+# === SMTP (dla legacy apps) ===
+import smtplib
+from email.mime.text import MIMEText
+msg = MIMEText('Tresc emaila')
+msg['Subject'] = 'Temat'
+msg['From'] = 'noreply@twoja-domena.pl'
+msg['To'] = 'odbiorca@example.com'
+with smtplib.SMTP_SSL('email-smtp.eu-west-1.amazonaws.com', 465) as smtp:
+    smtp.login('SMTP_USER_FROM_IAM', 'SMTP_PASSWORD')
+    smtp.send_message(msg)`
       },
     ],
 
