@@ -1,0 +1,676 @@
+title: AI & Big Data — Zaawansowane serwisy AWS
+items:
+  - name: Amazon Bedrock — Generative AI
+    icon: "🤖"
+    desc: |
+      Managed generative AI — dostęp do top modeli LLM przez jeden API, bez zarządzania infrastrukturą.
+
+      Dostępne modele (2026):
+      • Anthropic Claude: Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku
+      • Amazon Titan: text, embeddings, images
+      • Meta Llama: Llama 3.1, Llama 3.2
+      • Mistral AI: Mistral Large, Mistral 7B
+      • Cohere: Command R+, embeddings
+      • Stability AI: Stable Diffusion (obrazy)
+
+      Funkcje:
+      • Knowledge Bases: RAG (Retrieval Augmented Generation) z S3 lub własnych danych
+      • Agents: multi-step reasoning, wywołuje Lambda/API tools automatycznie
+      • Guardrails: filtruj toxic content, PII, off-topic odpowiedzi
+      • Batch inference: przetwarzaj duże ilości dokumentów offline (taniej)
+      • Model fine-tuning: dostosuj model do Twoich danych (CustomizationJobs)
+
+      Cena: pay-per-token, np. Claude 3 Haiku: $0.00025/1K input, $0.00125/1K output
+    code: |
+      # Konversacja z Claude przez Bedrock
+      import boto3
+      import json
+
+      bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
+
+      response = bedrock.invoke_model(
+          modelId='anthropic.claude-3-5-sonnet-20241022-v2:0',
+          body=json.dumps({
+              "anthropic_version": "bedrock-2023-05-31",
+              "max_tokens": 1024,
+              "messages": [
+                  {"role": "user", "content": "Wyjaśnij czym jest VPC w AWS"}
+              ]
+          })
+      )
+
+      result = json.loads(response['body'].read())
+      print(result['content'][0]['text'])
+
+      # Streaming (dla UI real-time)
+      response = bedrock.invoke_model_with_response_stream(
+          modelId='anthropic.claude-3-haiku-20240307-v1:0',
+          body=json.dumps({
+              "anthropic_version": "bedrock-2023-05-31",
+              "max_tokens": 512,
+              "messages": [{"role": "user", "content": "Napisz funkcję Python sortowania"}]
+          })
+      )
+      for event in response['body']:
+          chunk = json.loads(event['chunk']['bytes'])
+          if chunk['type'] == 'content_block_delta':
+              print(chunk['delta']['text'], end='', flush=True)
+
+  - name: SageMaker — ML Training i Deployment
+    icon: "🧠"
+    desc: |
+      Kompleksowa platforma ML — od danych do modelu produkcyjnego.
+      Nie musisz zarządzać infrastrukturą GPU ani serwerami inference.
+
+      Główne komponenty:
+      • Studio: Jupyter-based IDE w chmurze, pełny ML workflow
+      • Training Jobs: managed training na EC2 GPU (p3, g4dn, Trn1 — własne chipy Trainium)
+      • Automatic Model Tuning (HPO): optymalizuj hiperparametry automatycznie
+      • Endpoints: deploy modelu jako REST API (auto-scaling, A/B testing)
+      • Batch Transform: predykcje na dużych zbiorach bez serwera
+      • Feature Store: centralne przechowywanie cech ML dla wielu modeli
+      • Pipelines: MLOps — automatyczny retrain gdy drift danych
+      • Canvas: no-code ML dla biznesu
+      • JumpStart: gotowe modele (Hugging Face, scikit-learn, XGBoost, LLMs)
+    code: |
+      import sagemaker
+      from sagemaker.pytorch import PyTorch
+
+      role = sagemaker.get_execution_role()
+      sess = sagemaker.Session()
+
+      # Training job na GPU
+      estimator = PyTorch(
+          entry_point='train.py',
+          role=role,
+          instance_type='ml.g4dn.xlarge',  # GPU
+          instance_count=1,
+          framework_version='2.0',
+          py_version='py310',
+          hyperparameters={'epochs': 10, 'batch-size': 32},
+          use_spot_instances=True,          # do 90% taniej!
+          max_wait=3600,
+      )
+
+      estimator.fit({'train': 's3://moj-bucket/data/train/'})
+
+      # Deploy jako endpoint REST
+      predictor = estimator.deploy(
+          initial_instance_count=1,
+          instance_type='ml.t2.medium',
+          endpoint_name='moj-model-v1',
+      )
+
+      # Predykcja
+      result = predictor.predict({"text": "Classify this document"})
+      print(result)
+
+  - name: Amazon Rekognition — Computer Vision
+    icon: "👁️"
+    desc: |
+      Managed Computer Vision — rozpoznawanie twarzy, obiektów, tekstu, scen.
+      Zero ML knowledge wymagane — wywołujesz API, dostajesz wyniki.
+
+      Funkcje:
+      • Detect Labels: zidentyfikuj obiekty na zdjęciu (Car, Dog, Person, Tree + confidence %)
+      • Detect Faces: lokalizuj twarze, emocje, wiek, punkty charakterystyczne
+      • Face Comparison: porównaj twarz ze zdjęcia z kolekcją (auth, surveillance)
+      • Text in Image (OCR): odczytaj tekst ze zdjęć, dokumentów, tablic
+      • Content Moderation: wykryj nieodpowiedni content (nudity, violence) dla UGC platform
+      • Celebrity Recognition: rozpoznaj znane osoby
+      • Video Analysis: te same funkcje dla wideo, frame-by-frame
+      • Custom Labels: trenuj własny model vision na Twoich danych (no code)
+    code: |
+      import boto3
+
+      rekognition = boto3.client('rekognition')
+
+      # Wykryj obiekty na zdjęciu
+      with open('zdjecie.jpg', 'rb') as f:
+          response = rekognition.detect_labels(
+              Image={'Bytes': f.read()},
+              MaxLabels=10,
+              MinConfidence=80
+          )
+
+      for label in response['Labels']:
+          print(f"{label['Name']}: {label['Confidence']:.1f}%")
+
+      # Wykryj twarze i emocje
+      response = rekognition.detect_faces(
+          Image={'S3Object': {'Bucket': 'moj-bucket', 'Name': 'portret.jpg'}},
+          Attributes=['ALL']
+      )
+      for face in response['FaceDetails']:
+          dominant_emotion = max(face['Emotions'], key=lambda e: e['Confidence'])
+          print(f"Emocja: {dominant_emotion['Type']} ({dominant_emotion['Confidence']:.0f}%)")
+          print(f"Wiek: {face['AgeRange']['Low']}-{face['AgeRange']['High']}")
+
+      # Moderacja contentu
+      response = rekognition.detect_moderation_labels(
+          Image={'S3Object': {'Bucket': 'ugc-bucket', 'Name': 'user_upload.jpg'}},
+          MinConfidence=70
+      )
+      if response['ModerationLabels']:
+          print("BLOCKED - inappropriate content:", [l['Name'] for l in response['ModerationLabels']])
+
+  - name: Amazon Kinesis — Streaming Data
+    icon: "🌊"
+    desc: |
+      Platforma do przetwarzania danych w czasie rzeczywistym (streaming).
+      Cztery serwisy:
+
+      Kinesis Data Streams (KDS):
+      • Surowy strumień — producenci piszą, konsumenci czytają. Retencja 1-365 dni.
+      • Shards: jednostka przepustowości (1MB/s write, 2MB/s read per shard)
+      • Kiedy: niskie latency (<1s), custom consumer logic, wiele konsumentów jednocześnie
+      • Cena: $0.015/shard/h
+
+      Kinesis Data Firehose:
+      • Delivery stream — automatycznie dostarcza do S3/Redshift/OpenSearch/Splunk/HTTP
+      • Transformacje przez Lambda (filter, enrich, convert format)
+      • Kiedy: chcesz dane w S3 bez pisania konsumenta. Latency: 60-900s (buffering)
+      • Cena: $0.029/GB
+
+      Kinesis Data Analytics (Managed Apache Flink):
+      • SQL lub Apache Flink na danych streaming
+      • Wykryj anomalie, agreguj, joinuj strumienie w czasie rzeczywistym
+
+      Alternatywy: MSK (Managed Kafka — dojrzalszy protokół, cross-cloud)
+    code: |
+      import boto3
+      import json
+
+      kinesis = boto3.client('kinesis')
+      STREAM = 'user-events'
+
+      # Producer — wysyłaj zdarzenia
+      def put_event(user_id: str, event: dict):
+          kinesis.put_record(
+              StreamName=STREAM,
+              Data=json.dumps(event),
+              PartitionKey=user_id  # events tego samego usera → ten sam shard (ordered)
+          )
+
+      put_event('user-123', {'action': 'purchase', 'amount': 49.99, 'ts': 1749500000})
+
+      # Batch write (efektywniej)
+      kinesis.put_records(
+          StreamName=STREAM,
+          Records=[
+              {'Data': json.dumps(e), 'PartitionKey': e['user_id']}
+              for e in events
+          ]
+      )
+
+      # Consumer — czytaj rekordy
+      shard_id = kinesis.list_shards(StreamName=STREAM)['Shards'][0]['ShardId']
+      iterator = kinesis.get_shard_iterator(
+          StreamName=STREAM, ShardId=shard_id,
+          ShardIteratorType='LATEST'
+      )['ShardIterator']
+
+      while True:
+          response = kinesis.get_records(ShardIterator=iterator, Limit=100)
+          for record in response['Records']:
+              event = json.loads(record['Data'])
+              process(event)
+          iterator = response['NextShardIterator']
+
+  - name: Amazon Athena — Serverless SQL na S3
+    icon: "🔎"
+    desc: |
+      Serverless query engine — pisz SQL, Athena skanuje dane w S3.
+      Zero infrastruktury, płacisz tylko za dane skanowane ($5 per TB).
+
+      Jak działa:
+      1. Dane w S3 (CSV, JSON, Parquet, ORC, Avro)
+      2. Zdefiniuj tabelę w Glue Data Catalog (schema on read)
+      3. `SELECT * FROM moja_tabela WHERE date = '2026-06-10'`
+      4. Athena używa Presto/Trino pod spodem
+
+      Optymalizacja (obowiązkowo!):
+      • Partycjonowanie: `WHERE year=2026 AND month=06` → skanuje 1/12 danych
+      • Parquet/ORC zamiast CSV: kompresja kolumnowa → 10-100x mniej skanowania
+      • Partition projection: eliminuje Glue catalog lookup dla dużych partycji
+      • Workgroups: limit danych per query, per user
+
+      Kiedy Athena zamiast Redshift:
+      • Nieregularne zapytania (raz dziennie/tydzień)
+      • Dane już są w S3 (VPC Flow Logs, CloudTrail, ALB Access Logs)
+      • Koszt: Athena ad-hoc jest tańsza; Redshift gdy robisz setki zapytań dziennie
+    code: |
+      import boto3
+      import time
+
+      athena = boto3.client('athena')
+
+      # Utwórz tabelę (DDL)
+      CREATE_TABLE = """
+      CREATE EXTERNAL TABLE IF NOT EXISTS vpc_flow_logs (
+        version INT, account_id STRING, interface_id STRING,
+        srcaddr STRING, dstaddr STRING, srcport INT, dstport INT,
+        protocol INT, packets BIGINT, bytes BIGINT,
+        start_time BIGINT, end_time BIGINT, action STRING, log_status STRING
+      )
+      PARTITIONED BY (year STRING, month STRING, day STRING)
+      STORED AS PARQUET
+      LOCATION 's3://moje-flow-logs/vpc/'
+      TBLPROPERTIES ('parquet.compression'='SNAPPY');
+      """
+
+      # Wykonaj zapytanie
+      def query(sql):
+          resp = athena.start_query_execution(
+              QueryString=sql,
+              QueryExecutionContext={'Database': 'checki_analytics'},
+              ResultConfiguration={'OutputLocation': 's3://athena-results/'}
+          )
+          qid = resp['QueryExecutionId']
+
+          while True:
+              status = athena.get_query_execution(QueryExecutionId=qid)['QueryExecution']['Status']['State']
+              if status in ('SUCCEEDED', 'FAILED', 'CANCELLED'):
+                  break
+              time.sleep(1)
+
+          results = athena.get_query_results(QueryExecutionId=qid)
+          return [[col['VarCharValue'] for col in row['Data']] for row in results['ResultSet']['Rows']]
+
+      rows = query("SELECT srcaddr, count(*) FROM vpc_flow_logs WHERE action='REJECT' GROUP BY srcaddr ORDER BY 2 DESC LIMIT 10")
+
+  - name: Amazon SQS — kolejki komunikatów
+    icon: "📬"
+    desc: |
+      Simple Queue Service — managed message queue. Odsprzęga producenta od konsumenta.
+      Producer nie musi czekać na przetworzenie — wysyła i zapomina.
+
+      Standard Queue vs FIFO Queue:
+      • Standard: nearly unlimited throughput, at-least-once delivery, best-effort ordering
+        → 1 wiadomość może przyjść 2x → konsument musi być idempotent
+      • FIFO: 300 TPS (3000 z batching), exactly-once, guaranteed order
+        → droższa ($0.50/1M vs $0.40/1M), nazwane *.fifo
+
+      Ważne parametry:
+      • Visibility Timeout: wiadomość "znika" na czas przetwarzania (default 30s)
+        Jeśli Lambda nie ukończy w tym czasie → wiadomość wraca na kolejkę
+      • Dead Letter Queue (DLQ): po N nieudanych próbach → wiadomość trafia tu
+        Monitoruj DLQ przez alarm CloudWatch!
+      • Long Polling: zamiast "czy są wiadomości?" (short poll, kosztowne) → czekaj 20s
+      • Message Retention: 1 min do 14 dni (default 4 dni)
+
+      Pattern: Producer → SQS → Lambda (batch 1-10000 wiadomości) → baza danych
+    code: |
+      import boto3
+      import json
+
+      sqs = boto3.client('sqs')
+
+      # Utwórz kolejkę
+      queue = sqs.create_queue(
+          QueueName='checki-tasks',
+          Attributes={
+              'VisibilityTimeout': '60',
+              'MessageRetentionPeriod': '86400',  # 1 dzień
+              'RedrivePolicy': json.dumps({
+                  'deadLetterTargetArn': 'arn:aws:sqs:...:checki-tasks-dlq',
+                  'maxReceiveCount': '3'
+              })
+          }
+      )
+
+      # Wysyłanie (producer)
+      sqs.send_message(
+          QueueUrl='https://sqs.eu-west-1.amazonaws.com/xxx/checki-tasks',
+          MessageBody=json.dumps({'userId': 'u-123', 'action': 'generate_report'}),
+          MessageGroupId='user-u-123',  # tylko FIFO
+      )
+
+      # Odbieranie (consumer)
+      messages = sqs.receive_message(
+          QueueUrl='https://sqs.eu-west-1.amazonaws.com/xxx/checki-tasks',
+          MaxNumberOfMessages=10,
+          WaitTimeSeconds=20,  # long polling
+      ).get('Messages', [])
+
+      for msg in messages:
+          task = json.loads(msg['Body'])
+          process(task)
+          sqs.delete_message(
+              QueueUrl='...',
+              ReceiptHandle=msg['ReceiptHandle']  # usuń po przetworzeniu!
+          )
+
+  - name: Amazon EventBridge — Event Bus
+    icon: "⚡"
+    desc: |
+      Serverless event bus — routing zdarzeń między serwisami AWS, SaaS i Twoimi aplikacjami.
+      Następca SNS dla event-driven architectures.
+
+      Koncepcje:
+      • Event Bus: kanał na zdarzenia (Default — zdarzenia AWS serwisów, Custom — Twoje, Partner — SaaS)
+      • Rule: wzorzec dopasowania zdarzenia → target (Lambda, SQS, SNS, Step Functions, ECS, API GW)
+      • Event Pattern: JSON pattern matching — filtruj zdarzenia po source, detail-type, polu w detail
+      • Schema Registry: autodiscovery schematów zdarzeń, generuj typy TypeScript/Java/Python
+      • Scheduler: cron/rate expressions (zastępuje CloudWatch Events)
+      • Pipes: połącz SQS/DynamoDB Streams/Kinesis → filter → enrich (Lambda/EventBridge API) → target
+
+      Event-driven patterns:
+      • Fan-out: S3 PutObject → EventBridge → 3 Lambdy (thumbnail, index, notify)
+      • CQRS: command → SQS → handler → EventBridge event → read-model updater
+      • Choreography: mikroser A emituje event → B, C, D reagują niezależnie
+    code: |
+      # Rule: gdy S3 upload → Lambda thumbnail generator
+      aws events put-rule \
+        --name s3-new-image-rule \
+        --event-pattern '{
+          "source": ["aws.s3"],
+          "detail-type": ["Object Created"],
+          "detail": {
+            "bucket": {"name": ["checki-uploads"]},
+            "object": {"key": [{"suffix": ".jpg"}, {"suffix": ".png"}]}
+          }
+        }' \
+        --state ENABLED
+
+      aws events put-targets \
+        --rule s3-new-image-rule \
+        --targets '[{
+          "Id": "thumbnail-lambda",
+          "Arn": "arn:aws:lambda:...:thumbnail-generator"
+        }]'
+
+      # Custom Event Bus — mikroser wysyła event
+      import boto3
+      events = boto3.client('events')
+      events.put_events(Entries=[{
+          'Source': 'checki.orders',
+          'DetailType': 'OrderPlaced',
+          'Detail': json.dumps({'orderId': 'o-123', 'amount': 99.99}),
+          'EventBusName': 'checki-bus'
+      }])
+
+      # Scheduler — cron task co dzień o 2:00 UTC
+      aws scheduler create-schedule \
+        --name daily-cleanup \
+        --schedule-expression 'cron(0 2 * * ? *)' \
+        --target '{"Arn":"arn:aws:lambda:...:cleanup","RoleArn":"arn:aws:iam::...:role/scheduler"}' \
+        --flexible-time-window '{"Mode":"OFF"}'
+
+  - name: AWS Step Functions — Orkiestracja Workflow
+    icon: "🔄"
+    desc: |
+      Serverless workflow engine — wizualny designer + JSON state machine.
+      Orkiestruj Lambdy, ECS tasks, SageMaker, Bedrock, DynamoDB bez pisania "glue code".
+
+      Typy workflow:
+      • Standard (Express: <5min, $0.00001/state; Standard: długotrwałe, $0.025/1k transitions):
+        Standard: długotrwałe workflow (dni), exactly-once, pełna historia wykonania
+        Express: high-volume, krótkokrótkie (IoT, streaming, API backend)
+
+      State Types:
+      • Task: wywołaj serwis (Lambda, ECS, Bedrock, HTTP API)
+      • Choice: if/else branching
+      • Parallel: wykonaj gałęzie równolegle, poczekaj na wszystkie
+      • Map: foreach — iteruj po tablicy (przetworz 1000 plików równolegle)
+      • Wait: poczekaj N sekund lub do konkretnej daty
+      • Pass, Succeed, Fail: flow control
+
+      Kiedy Step Functions zamiast Lambda chain:
+      • Workflow trwa >15 min (Lambda limit)
+      • Potrzebujesz retry z exponential backoff
+      • Chcesz wizualizację co poszło nie tak (execution history)
+      • Branching, parallel processing, human approval steps
+    code: |
+      # State machine (JSON/ASL) — order processing workflow
+      {
+        "Comment": "Order processing pipeline",
+        "StartAt": "ValidateOrder",
+        "States": {
+          "ValidateOrder": {
+            "Type": "Task",
+            "Resource": "arn:aws:lambda:...:validate-order",
+            "Retry": [{"ErrorEquals": ["Lambda.ServiceException"], "IntervalSeconds": 2, "MaxAttempts": 3, "BackoffRate": 2}],
+            "Next": "ProcessPayment",
+            "Catch": [{"ErrorEquals": ["ValidationError"], "Next": "OrderFailed"}]
+          },
+          "ProcessPayment": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
+            "Parameters": {
+              "FunctionName": "process-payment",
+              "Payload": {"taskToken.$": "$$.Task.Token", "order.$": "$"}
+            },
+            "HeartbeatSeconds": 3600,
+            "Next": "FulfillOrder"
+          },
+          "FulfillOrder": {
+            "Type": "Parallel",
+            "Branches": [
+              {"StartAt": "ShipItem", "States": {"ShipItem": {"Type": "Task", "Resource": "...", "End": true}}},
+              {"StartAt": "SendEmail", "States": {"SendEmail": {"Type": "Task", "Resource": "...", "End": true}}}
+            ],
+            "End": true
+          },
+          "OrderFailed": {
+            "Type": "Fail",
+            "Cause": "Validation failed"
+          }
+        }
+      }
+
+  - name: Amazon Comprehend — NLP
+    icon: "📝"
+    desc: |
+      Managed Natural Language Processing — analiza tekstu bez wiedzy o ML.
+
+      Funkcje:
+      • Sentiment Analysis: Positive/Negative/Neutral/Mixed dla tekstów (reviews, tweets, support tickets)
+      • Named Entity Recognition (NER): osoby, miejsca, organizacje, daty, kwoty
+      • Key Phrases: automatyczne wyciąganie kluczowych fraz
+      • Language Detection: 100 języków
+      • PII Detection: numery kart kredytowych, PESEL, emaile, telefony → compliance
+      • Topic Modeling: grupuj dokumenty po tematach (LDA)
+      • Custom Classification: trenuj własny classifier bez ML (wystarczy labelled examples)
+      • Custom NER: wykrywaj własne typy encji (numer produktu, kod błędu)
+
+      Comprehend Medical (osobny serwis):
+      HIPAA-eligible — wyciąga diagnozę, leki, procedury z tekstu medycznego.
+    code: |
+      import boto3
+
+      comprehend = boto3.client('comprehend')
+
+      text = "Zamówiłem laptop Lenovo ThinkPad za 4500 PLN. Dostawa była super szybka!"
+
+      # Sentiment
+      s = comprehend.detect_sentiment(Text=text, LanguageCode='pl')
+      print(f"Sentiment: {s['Sentiment']}")  # POSITIVE
+
+      # Encje
+      ner = comprehend.detect_entities(Text=text, LanguageCode='pl')
+      for ent in ner['Entities']:
+          print(f"{ent['Type']}: {ent['Text']} ({ent['Score']:.0%})")
+      # TITLE: ThinkPad (96%), QUANTITY: 4500 PLN (98%)
+
+      # PII — GDPR compliance
+      pii = comprehend.detect_pii_entities(
+          Text="Kontakt: jan.kowalski@email.com, tel. 500-600-700",
+          LanguageCode='en'
+      )
+      for p in pii['Entities']:
+          print(f"PII [{p['Type']}] pozycja {p['BeginOffset']}-{p['EndOffset']}")
+
+      # Batch analysis (tańsze dla dużych wolumenów)
+      response = comprehend.batch_detect_sentiment(
+          TextList=["Świetny produkt!", "Tragiczna obsługa", "Normalnie"],
+          LanguageCode='pl'
+      )
+
+  - name: Amazon Textract — Document AI
+    icon: "📄"
+    desc: |
+      Wyciągaj tekst, tabele i formularze z zeskanowanych dokumentów, PDF, zdjęć.
+      Idzie dalej niż OCR — rozumie strukturę dokumentu.
+
+      Funkcje:
+      • DetectDocumentText: podstawowe OCR — zwraca bloki tekstu z pozycją
+      • AnalyzeDocument: Forms (key-value pairs z formularzy), Tables (komórki z pozycją)
+      • AnalyzeExpense: faktury i paragony — vendor, total, data, pozycje
+      • AnalyzeID: dowody osobiste i paszporty — name, dob, id number
+      • Queries: "Co jest w polu Data urodzenia?" — Textract szuka w dokumencie
+
+      Typowe zastosowania:
+      • Automatyczne przetwarzanie faktur → AP automation
+      • KYC: weryfikacja tożsamości przy rejestracji
+      • Digitalizacja archiwów papierowych
+      • Wyciąganie danych z umów (w połączeniu z Comprehend)
+    code: |
+      import boto3
+
+      textract = boto3.client('textract')
+
+      # Async dla dużych PDF (wielostronicowe)
+      response = textract.start_document_analysis(
+          DocumentLocation={
+              'S3Object': {'Bucket': 'docs-bucket', 'Name': 'faktura.pdf'}
+          },
+          FeatureTypes=['TABLES', 'FORMS']
+      )
+      job_id = response['JobId']
+
+      # Poczekaj na wynik
+      import time
+      while True:
+          result = textract.get_document_analysis(JobId=job_id)
+          if result['JobStatus'] in ('SUCCEEDED', 'FAILED'):
+              break
+          time.sleep(2)
+
+      # Przetworz key-value pairs (formularz)
+      key_map, value_map, block_map = {}, {}, {}
+      for block in result['Blocks']:
+          block_map[block['Id']] = block
+          if block['BlockType'] == 'KEY_VALUE_SET':
+              if 'KEY' in block.get('EntityTypes', []):
+                  key_map[block['Id']] = block
+              else:
+                  value_map[block['Id']] = block
+
+      # Wyciągnij pary klucz-wartość
+      for key_block in key_map.values():
+          key_text = ' '.join(w['Text'] for w in ... if w['BlockType'] == 'WORD')
+          # → "Numer faktury:", "Data:", "Suma do zapłaty:"
+
+  - name: Amazon Bedrock Knowledge Bases — RAG
+    icon: "📚"
+    desc: |
+      Managed RAG (Retrieval Augmented Generation) — połącz LLM z Twoją wiedzą firmową.
+      Zero budowania pipeline wektorowego — upload dokumentów, gotowe.
+
+      Jak działa:
+      1. Upload: PDF, Word, TXT, HTML, CSV → S3
+      2. Ingestion: Bedrock chunking + embedding (Amazon Titan Embeddings lub Cohere)
+      3. Index: wektory w OpenSearch Serverless, Pinecone, Weaviate lub Aurora pgvector
+      4. Retrieve: zapytanie → embedding → similarity search → top-K chunks
+      5. Generate: chunks + pytanie → LLM → odpowiedź z cytowaniem źródeł
+
+      Customization:
+      • Chunking: fixed size, semantic, hierarchical
+      • Custom embedding model
+      • Filtry metadanych: przeszukuj tylko dokumenty z tag='legal'
+      • Guardrails: filtruj odpowiedzi Knowledge Base
+
+      Cena: $0.10/1k chunks ingestion + embedding cost + vector store cost
+    code: |
+      import boto3
+      import json
+
+      bedrock_agent = boto3.client('bedrock-agent-runtime')
+
+      # Retrieve + Generate (RAG query)
+      response = bedrock_agent.retrieve_and_generate(
+          input={'text': 'Jakie są zasady urlopu według polityki firmy?'},
+          retrieveAndGenerateConfiguration={
+              'type': 'KNOWLEDGE_BASE',
+              'knowledgeBaseConfiguration': {
+                  'knowledgeBaseId': 'KB12345',
+                  'modelArn': 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0',
+                  'retrievalConfiguration': {
+                      'vectorSearchConfiguration': {
+                          'numberOfResults': 5,
+                          'filter': {
+                              'equals': {'key': 'department', 'value': 'hr'}
+                          }
+                      }
+                  }
+              }
+          }
+      )
+
+      print(response['output']['text'])
+      print("\nŹródła:")
+      for ref in response['citations']:
+          for loc in ref['retrievedReferences']:
+              print(f"- {loc['location']['s3Location']['uri']}")
+
+  - name: Amazon Amplify — Full-stack bez DevOps
+    icon: "⚡"
+    desc: |
+      Platforma dla full-stack aplikacji webowych i mobilnych — zero konfiguracji infrastruktury.
+      Twórcy frontendu mogą dodać backend bez znajomości AWS.
+
+      Co oferuje:
+      • Hosting: CI/CD, globalny CDN, preview URLs per branch, custom domeny
+      • Auth: Cognito pod spodem, gotowy UI (email, social, SAML)
+      • Data (GraphQL API): AppSync + DynamoDB, generuje TypeScript types
+      • Storage: S3 z granularnym dostępem (public/protected/private per user)
+      • Functions: Lambda za API routes
+      • Push Notifications: Pinpoint pod spodem
+
+      Amplify Gen 2 (2024+):
+      TypeScript-first IaC — definiujesz backend w TS, Amplify deploy'uje CloudFormation.
+      ```typescript
+      // amplify/auth/resource.ts
+      export const auth = defineAuth({ loginWith: { email: true } });
+      ```
+
+      Framework integrations: React, Next.js, Vue, Angular, Flutter, React Native, Swift, Kotlin.
+
+      Kiedy NIE używać Amplify:
+      Kompleksowy backend z niestandardową logiką → użyj Lambda + API GW + CDK bezpośrednio.
+      Amplify ogranicza Cię do jego abstrakcji.
+    code: |
+      # Instalacja i init (Next.js)
+      npm create amplify@latest
+      cd moj-projekt && npx ampx sandbox  # lokalne środowisko dev
+
+      # amplify/data/resource.ts
+      import { a, defineData, ClientSchema } from '@aws-amplify/backend';
+
+      const schema = a.schema({
+        User: a.model({
+          name: a.string().required(),
+          email: a.email().required(),
+          posts: a.hasMany('Post', 'userId'),
+        }).authorization(allow => [allow.owner()]),
+
+        Post: a.model({
+          title: a.string().required(),
+          content: a.string(),
+          userId: a.id().required(),
+          author: a.belongsTo('User', 'userId'),
+        }).authorization(allow => [allow.owner(), allow.authenticated().to(['read'])]),
+      });
+
+      export type Schema = ClientSchema<typeof schema>;
+      export const data = defineData({ schema });
+
+      # Deploy
+      npx ampx pipeline-deploy --branch main --app-id AMPLIFY_APP_ID
+
+      # Frontend (React) — automatyczny TypeScript client
+      # import { generateClient } from 'aws-amplify/data';
+      # import type { Schema } from '@/amplify/data/resource';
+      # const client = generateClient<Schema>();
+      # const { data: posts } = await client.models.Post.list();

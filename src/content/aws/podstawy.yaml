@@ -1,0 +1,158 @@
+labels:
+  concepts: Kluczowe koncepcje AWS
+  whenToUse: Kiedy wybrać AWS?
+  firstComponent: Pierwsze kroki — konfiguracja CLI i pierwsze zasoby
+  firstComponentLang: bash
+
+intro:
+  title: Czym jest Amazon Web Services?
+  desc: |
+    AWS to największa platforma chmurowa na świecie — 33%+ rynku. Uruchomiona w 2006 przez Amazon,
+    dziś oferuje ponad 200 serwisów: compute, storage, bazy danych, AI/ML, IoT, blockchain, satelity.
+    Klienci to Netflix, NASA, Airbnb, Samsung, banki i tysiące startupów. Model pay-as-you-go: płacisz
+    za sekundy użycia maszyny, za gigabajty danych, za wywołania funkcji — zero kosztów stałych.
+    AWS ma 30+ regionów geograficznych i 450+ edge locations CDN. Znajomość AWS to jeden z najlepiej
+    płatnych skillów technicznych na rynku pracy.
+
+concepts:
+  - title: Regiony i Availability Zones
+    icon: "🌍"
+    desc: |
+      Region = geograficzna lokalizacja (eu-west-1 = Irlandia, eu-central-1 = Frankfurt, us-east-1 = Wirginia).
+      Każdy region ma 3-6 AZ (Availability Zones) = fizycznie oddzielne data centers w tej samej lokalizacji.
+      Deploy na 2+ AZ = odporność na awarię jednego DC. Dane nie opuszczają regionu bez Twojej zgody — ważne dla GDPR.
+
+  - title: IAM — Tożsamość i Dostęp
+    icon: "🔐"
+    desc: |
+      Identity and Access Management to fundament bezpieczeństwa AWS. Użytkownicy, Grupy, Role, Polityki.
+      Zasada: Principle of Least Privilege — dawaj MINIMUM uprawnień. Root account: tylko do konfiguracji konta,
+      nigdy do codziennej pracy. Role IAM > Access Keys dla serwisów.
+
+  - title: Model Odpowiedzialności (Shared Responsibility)
+    icon: "🤝"
+    desc: |
+      AWS odpowiada za bezpieczeństwo CHMURY (fizyczne DC, sprzęt, sieć, hypervisor).
+      Ty odpowiadasz za bezpieczeństwo W CHMURZE (OS patching, konfiguracja security groups,
+      szyfrowanie danych, zarządzanie uprawnieniami IAM, backup).
+
+  - title: ARN — Amazon Resource Name
+    icon: "🏷️"
+    desc: |
+      Unikalny identyfikator każdego zasobu AWS:
+      arn:aws:s3:::moj-bucket lub arn:aws:lambda:eu-west-1:123456789:function:moja-funkcja.
+      Zawiera: partition, service, region, account-id, resource.
+      Używany w politykach IAM do precyzyjnego wskazania zasobu.
+
+  - title: Free Tier — 12 miesięcy bezpłatnie
+    icon: "🆓"
+    desc: |
+      Nowe konto = 12 miesięcy Free Tier: 750h/mies EC2 t2.micro, 5GB S3, 1M wywołań Lambda, 25GB DynamoDB.
+      Część serwisów (Lambda do 1M/mies, DynamoDB 25GB) jest zawsze free.
+      Ustaw billing alerts — Free Tier można przekroczyć przez przypadek!
+
+  - title: Pay-as-you-go + Sposoby Oszczędzania
+    icon: "💰"
+    desc: |
+      On-Demand: płacisz za używanie, bez zobowiązań.
+      Reserved Instances: płacisz z góry na 1-3 lata, 40-75% taniej.
+      Savings Plans: elastyczny odpowiednik RI.
+      Spot Instances: wolne moce obliczeniowe, 60-90% taniej, ale mogą być przerwane z 2min ostrzeżeniem.
+
+  - title: "Dostęp: Console, CLI, SDK, IaC"
+    icon: "🖥️"
+    desc: |
+      AWS Console — interfejs webowy, dobry do nauki i eksploracji.
+      AWS CLI — terminal, skrypty, automatyzacja.
+      AWS SDK — Python (boto3), JavaScript, Java, Go, Ruby, .NET.
+      Infrastructure as Code: CloudFormation (YAML/JSON), CDK (TypeScript/Python), Terraform (multi-cloud).
+      Produkcja = zawsze IaC, nie console.
+
+  - title: Tags — Organizacja i Kontrola Kosztów
+    icon: "🏷️"
+    desc: |
+      Każdy zasób można otagować: klucz=wartość (Env=prod, Team=backend, Project=checki).
+      Bez tagów nie wiesz które zasoby za co kosztują.
+      Cost Allocation Tags → Cost Explorer → "backend kosztuje $1500/mies, frontend $200".
+      Obowiązkowe w każdej organizacji.
+
+  - title: Well-Architected Framework — 6 Filarów
+    icon: "🏛️"
+    desc: |
+      Framework AWS do projektowania solidnych systemów cloud. Narzędzie bezpłatne w Console.
+
+      1. Operational Excellence — automatyzacja, IaC, observability, continuous improvement
+      2. Security — IAM least privilege, szyfrowanie, WAF, GuardDuty, audit logs
+      3. Reliability — multi-AZ, auto-scaling, backup, DR, chaos engineering
+      4. Performance Efficiency — właściwy typ instancji, caching, CDN, database selection
+      5. Cost Optimization — reserved/spot, auto-scaling down, S3 lifecycle, rightsizing
+      6. Sustainability — energy efficiency, Graviton (ARM), serverless, shared infra
+
+  - title: Migracja do AWS — 7R
+    icon: "🚚"
+    desc: |
+      Strategia migracji aplikacji (Gartner 7R):
+      • Retire — wyłącz to co niepotrzebne (20-30% zasobów)
+      • Retain — zostaw on-premises to co nie może być migrowane
+      • Relocate — VMware Cloud on AWS, VM bez refactoru
+      • Rehost (Lift & Shift) — EC2, szybko, zero zmian w kodzie
+      • Replatform (Lift & Tinker) — RDS zamiast MySQL na EC2, Fargate zamiast EC2
+      • Repurchase — SaaS zamiast własnego (Salesforce zamiast CRM)
+      • Refactor (Re-architect) — mikroserwisy, serverless, cloud-native — max korzyści, max pracy
+
+  - title: Pricing Calculator & Cost Management
+    icon: "💸"
+    desc: |
+      • AWS Pricing Calculator — oszacuj koszty PRZED deployem
+      • Cost Explorer — analiza historycznych kosztów, forecastowanie, anomaly detection
+      • AWS Budgets — alerty gdy koszty/użycie przekraczają próg
+      • Cost Anomaly Detection — ML wykrywa nieoczekiwane wzrosty
+      • Compute Optimizer — AI rekomenduje rightsizing instancji
+      Zasada: koszty zawsze rosną gdy się nie patrzy. Ustaw budżet i alerty od pierwszego dnia.
+
+whenToUse:
+  - Startup potrzebuje skalować od 0 do milionów użytkowników bez zarządzania serwerami
+  - "Enterprise wymaga compliance: HIPAA, PCI-DSS, SOC 2, ISO 27001 — AWS ma certyfikacje"
+  - "Potrzebujesz ML/AI: SageMaker, Bedrock (Claude, Llama), Rekognition, Comprehend"
+  - Globalna aplikacja wymagająca niskiego latency na wszystkich kontynentach
+  - "Big Data: przetwarzaj terabajty dziennie przez Athena, Glue, EMR, Kinesis"
+  - "Disaster Recovery: backup w innym regionie, failover w minutach"
+  - "Infrastruktura jako kod: reproducible environments, no snowflake servers"
+  - "Serverless: Lambda + API Gateway + DynamoDB = zero zarządzania serwerami, płacisz za użycie"
+  - "Potrzebujesz serwisów których nie ma nigdzie indziej: Ground Station, Quantum, Wavelength"
+
+firstComponent: |
+  # 1. Zainstaluj AWS CLI v2
+  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+  unzip awscliv2.zip && sudo ./aws/install
+  aws --version  # aws-cli/2.x
+
+  # 2. Utwórz IAM User z programmatic access (nigdy nie używaj root!)
+  # AWS Console → IAM → Users → Create user
+  # Permissions: AdministratorAccess (na początku, potem zawęź)
+  # Security credentials → Create access key → CLI
+
+  # 3. Skonfiguruj CLI
+  aws configure
+  # AWS Access Key ID: AKIAIOSFODNN7EXAMPLE
+  # AWS Secret Access Key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+  # Default region name: eu-west-1
+  # Default output format: json
+
+  # 4. Sprawdź konfigurację
+  aws sts get-caller-identity
+  # { "Account": "123456789", "UserId": "AIDAIOSFODNN7EXAMPLE" }
+
+  # 5. Pierwsze polecenia
+  aws s3 ls                                # lista bucketów
+  aws ec2 describe-regions --output table  # dostępne regiony
+  aws iam list-users                       # lista użytkowników IAM
+
+  # 6. Profil dla projektu (nie mieszaj kont!)
+  aws configure --profile checki-dev
+  export AWS_PROFILE=checki-dev
+
+  # 7. Zawsze ustaw billing alert!
+  aws budgets create-budget --account-id 123456789 \
+    --budget '{"BudgetName":"monthly","BudgetLimit":{"Amount":"20","Unit":"USD"},"TimeUnit":"MONTHLY","BudgetType":"COST"}' \
+    --notifications-with-subscribers '[{"Notification":{"NotificationType":"ACTUAL","ComparisonOperator":"GREATER_THAN","Threshold":80},"Subscribers":[{"SubscriptionType":"EMAIL","Address":"twoj@email.com"}]}]'

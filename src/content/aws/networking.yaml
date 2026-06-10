@@ -1,0 +1,413 @@
+title: Networking — Sieć w AWS
+items:
+  - name: VPC — Virtual Private Cloud
+    desc: |
+      Twoja prywatna sieć w AWS. Izolowana, w pełni konfigurowalna przestrzeń sieciowa.
+      Każde konto ma domyślny VPC (172.31.0.0/16) gotowy do użycia.
+
+      Kluczowe komponenty:
+      • Subnets: Public (routing do Internet Gateway) i Private (brak dostępu z internetu)
+      • Internet Gateway (IGW): brama do internetu dla public subnets
+      • NAT Gateway: instancje w private subnet mogą wychodzić do internetu (update, API calls)
+        — nie pozwala na ruch przychodzący. $0.045/h + $0.045/GB.
+      • Route Tables: definiują routing. Każda subnet = jedna route table.
+      • Security Groups: stateful firewall per zasób (EC2, RDS, Lambda). Default: deny all in.
+      • NACLs: stateless firewall per subnet. Backup layer za Security Groups.
+      • VPC Peering: bezpośrednie połączenie dwóch VPC (nietranzytywne)
+      • Endpoints: dostęp do S3/DynamoDB bez NAT Gateway (oszczędność kosztów!)
+
+      CIDR design (przykład multi-tier):
+      VPC: 10.0.0.0/16 (65534 hostów)
+      Public:  10.0.1.0/24, 10.0.2.0/24 (ALB, NAT GW)
+      Private: 10.0.11.0/24, 10.0.12.0/24 (EC2, ECS)
+      DB:      10.0.21.0/24, 10.0.22.0/24 (RDS, ElastiCache)
+    code: |
+      # Utwórz VPC od zera
+      VPC_ID=$(aws ec2 create-vpc --cidr-block 10.0.0.0/16 \
+        --tag-specifications 'ResourceType=vpc,Tags=[{Key=Name,Value=prod-vpc}]' \
+        --query 'Vpc.VpcId' --output text)
+
+      # Internet Gateway
+      IGW=$(aws ec2 create-internet-gateway --query 'InternetGateway.InternetGatewayId' --output text)
+      aws ec2 attach-internet-gateway --vpc-id $VPC_ID --internet-gateway-id $IGW
+
+      # Subnets (2 AZ dla HA)
+      PUB_1A=$(aws ec2 create-subnet --vpc-id $VPC_ID \
+        --cidr-block 10.0.1.0/24 --availability-zone eu-west-1a \
+        --query 'Subnet.SubnetId' --output text)
+      PRIV_1A=$(aws ec2 create-subnet --vpc-id $VPC_ID \
+        --cidr-block 10.0.11.0/24 --availability-zone eu-west-1a \
+        --query 'Subnet.SubnetId' --output text)
+
+      # NAT Gateway (dla private subnet → internet)
+      EIP=$(aws ec2 allocate-address --domain vpc --query 'AllocationId' --output text)
+      NAT=$(aws ec2 create-nat-gateway \
+        --subnet-id $PUB_1A --allocation-id $EIP \
+        --query 'NatGateway.NatGatewayId' --output text)
+
+      # Route Tables
+      # Public RT: 0.0.0.0/0 → IGW
+      PUB_RT=$(aws ec2 create-route-table --vpc-id $VPC_ID --query 'RouteTable.RouteTableId' --output text)
+      aws ec2 create-route --route-table-id $PUB_RT \
+        --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW
+      aws ec2 associate-route-table --subnet-id $PUB_1A --route-table-id $PUB_RT
+
+      # VPC Endpoint (S3 bez NAT — gratis!)
+      aws ec2 create-vpc-endpoint \
+        --vpc-id $VPC_ID \
+        --service-name com.amazonaws.eu-west-1.s3 \
+        --route-table-ids $PUB_RT
+
+  - name: Route 53 — DNS i Traffic Routing
+    desc: |
+      Managed DNS + health checking + routing policies. 100% SLA.
+
+      Routing policies:
+      • Simple: jeden rekord → jeden cel
+      • Weighted: 70% → v2, 30% → v1 (A/B testing, canary deploy)
+      • Latency-based: użytkownik w EU → eu-west-1, US → us-east-1
+      • Failover: primary → secondary gdy health check wykryje problem
+      • Geolocation: PL → eu-central-1, US → us-east-1
+      • Geoproximity: routing oparty na odległości geograficznej + bias
+      • Multi-value: do 8 zdrowych IP (prosty load balancing)
+      • IP-based (2022+): routing po CIDR klienta
+
+      Alias Records:
+      Route 53-specific — wskazuj na ALB, CloudFront, S3, inne Route 53 records.
+      Zero TTL delay, free dla AWS endpoints, IPv6 support.
+    code: |
+      # Hosted Zone (domena)
+      aws route53 create-hosted-zone \
+        --name twoja-domena.pl \
+        --caller-reference $(date +%s)
+
+      # A record → ALB (Alias)
+      aws route53 change-resource-record-sets \
+        --hosted-zone-id ZXXXXX \
+        --change-batch '{
+          "Changes": [{
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+              "Name": "api.twoja-domena.pl",
+              "Type": "A",
+              "AliasTarget": {
+                "HostedZoneId": "Z32O12XQLNTSW2",
+                "DNSName": "prod-alb-xxx.eu-west-1.elb.amazonaws.com",
+                "EvaluateTargetHealth": true
+              }
+            }
+          }]
+        }'
+
+      # Weighted routing (canary deploy)
+      # 90% → v1, 10% → v2
+      aws route53 change-resource-record-sets \
+        --hosted-zone-id ZXXXXX \
+        --change-batch '{
+          "Changes": [
+            {"Action":"UPSERT","ResourceRecordSet":{"Name":"api.domena.pl","Type":"A","SetIdentifier":"v1","Weight":90,"AliasTarget":{"HostedZoneId":"Z32O12XQLNTSW2","DNSName":"alb-v1.eu-west-1.elb.amazonaws.com","EvaluateTargetHealth":true}}},
+            {"Action":"UPSERT","ResourceRecordSet":{"Name":"api.domena.pl","Type":"A","SetIdentifier":"v2","Weight":10,"AliasTarget":{"HostedZoneId":"Z32O12XQLNTSW2","DNSName":"alb-v2.eu-west-1.elb.amazonaws.com","EvaluateTargetHealth":true}}}
+          ]
+        }'
+
+  - name: CloudFront — CDN z 450+ lokalizacjami
+    desc: |
+      Content Delivery Network — cachuje treści blisko użytkowników.
+      450+ PoP (Points of Presence) na całym świecie.
+
+      Origins (skąd pobiera treść):
+      • S3 (static sites, assets) — Origin Access Control (OAC) = S3 prywatny
+      • ALB/EC2 — dynamiczne API
+      • Custom HTTP endpoint (on-premises, inne chmury)
+      • Lambda Function URL
+
+      Cache behaviors:
+      • Path patterns: /api/* → ALB (no cache), /assets/* → S3 (cache 1 rok)
+      • TTL: Default 24h, min 0s, max 1 rok
+      • Cache keys: URL, headers, cookies, query strings
+      • Compression: gzip/brotli automatycznie
+
+      Security:
+      • WAF integration — blokuj ataki na edge
+      • Signed URLs/Cookies — prywatny dostęp do zasobów (video streaming)
+      • Field-level encryption — szyfruj konkretne pola formularza przed origin
+      • HTTPS only + TLS 1.2 minimum
+
+      Cena: pierwsze 1TB/mies gratis, potem $0.0085/GB (Europa)
+    code: |
+      # Dystrybucja CloudFront dla S3 + ALB
+      aws cloudfront create-distribution --distribution-config '{
+        "Origins": {
+          "Quantity": 2,
+          "Items": [
+            {
+              "Id": "S3-static",
+              "DomainName": "moja-strona.s3.amazonaws.com",
+              "S3OriginConfig": {"OriginAccessIdentity": ""}
+            },
+            {
+              "Id": "ALB-api",
+              "DomainName": "prod-alb.eu-west-1.elb.amazonaws.com",
+              "CustomOriginConfig": {"HTTPSPort": 443, "OriginProtocolPolicy": "https-only"}
+            }
+          ]
+        },
+        "DefaultCacheBehavior": {
+          "TargetOriginId": "S3-static",
+          "ViewerProtocolPolicy": "redirect-to-https",
+          "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+          "Compress": true
+        },
+        "CacheBehaviors": {
+          "Quantity": 1,
+          "Items": [{
+            "PathPattern": "/api/*",
+            "TargetOriginId": "ALB-api",
+            "ViewerProtocolPolicy": "https-only",
+            "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+            "AllowedMethods": {"Quantity": 7, "Items": ["GET","HEAD","OPTIONS","PUT","PATCH","POST","DELETE"]}
+          }]
+        },
+        "Aliases": {"Quantity": 1, "Items": ["moja-strona.pl"]},
+        "ViewerCertificate": {"ACMCertificateArn": "arn:aws:acm:us-east-1:...", "SSLSupportMethod": "sni-only"},
+        "Enabled": true
+      }'
+
+      # Invalidacja po deploy
+      aws cloudfront create-invalidation \
+        --distribution-id EXXXXX \
+        --paths "/index.html" "/assets/*"
+
+  - name: ALB / NLB — Load Balancery
+    desc: |
+      Dwa typy load balancerów:
+
+      ALB (Application Load Balancer) — Layer 7 (HTTP/HTTPS/WebSocket/gRPC):
+      • Content-based routing: path (/api/* → service-api, /admin/* → service-admin)
+      • Header-based routing: X-Version: v2 → target group v2
+      • Host-based routing: api.domena.pl vs app.domena.pl → różne targety
+      • Sticky sessions, WebSocket support, gRPC
+      • Target types: EC2, IP, Lambda, ECS
+
+      NLB (Network Load Balancer) — Layer 4 (TCP/UDP/TLS):
+      • Ultra-low latency (millions of requests/second)
+      • Static IP per AZ (przydatne gdy klient allowlistuje IP)
+      • TLS termination lub TCP passthrough
+      • Target types: EC2, IP, ALB (multi-tier architecture)
+
+      Kiedy NLB zamiast ALB:
+      • Potrzebujesz static IP
+      • Non-HTTP (SMTP, FTP, gaming UDP)
+      • Bardzo niskie latency (gaming, trading)
+    code: |
+      # ALB — content-based routing
+      ALB=$(aws elbv2 create-load-balancer \
+        --name prod-alb \
+        --subnets subnet-1a subnet-1b \
+        --security-groups sg-alb \
+        --query 'LoadBalancers[0].LoadBalancerArn' --output text)
+
+      # Target Groups
+      TG_API=$(aws elbv2 create-target-group \
+        --name prod-api-tg --protocol HTTP --port 8000 \
+        --vpc-id vpc-xxx --target-type ip \
+        --health-check-path /health \
+        --query 'TargetGroups[0].TargetGroupArn' --output text)
+
+      # HTTPS Listener z routing rules
+      aws elbv2 create-listener \
+        --load-balancer-arn $ALB \
+        --protocol HTTPS --port 443 \
+        --certificates CertificateArn=arn:aws:acm:... \
+        --ssl-policy ELBSecurityPolicy-TLS13-1-2-2021-06 \
+        --default-actions Type=forward,TargetGroupArn=$TG_API
+
+      # Rule: /api/* → API, / → S3/static
+      aws elbv2 create-rule \
+        --listener-arn $LISTENER \
+        --conditions Field=path-pattern,Values='/api/*' \
+        --actions Type=forward,TargetGroupArn=$TG_API \
+        --priority 10
+
+  - name: API Gateway — REST, HTTP i WebSocket API
+    desc: |
+      Managed API Gateway — routing, auth, rate limiting, transformacje bez kodu.
+
+      Trzy typy:
+      • REST API — w pełni funkcjonalny, transformacje requestów, caching, API keys
+      • HTTP API — szybszy, 70% tańszy, prosty proxy do Lambda/HTTP. Polecany dla nowych projektów.
+      • WebSocket API — dwukierunkowa komunikacja (chat, real-time updates, gaming)
+
+      Integracje:
+      • Lambda (proxy) — najczęstszy, pełny event object
+      • HTTP Proxy — przekazuje do dowolnego HTTP endpoint
+      • AWS Service — bezpośrednio wywołaj SQS, DynamoDB, Step Functions bez Lambdy
+
+      Kluczowe funkcje:
+      • Authorizers: JWT (Cognito/auth0), Lambda Authorizer (custom auth)
+      • Throttling: burst + rate per stage, per method, per API key
+      • Stage Variables: różne configy per stage (dev/staging/prod)
+      • Canary deployments: X% ruchu na nową wersję
+
+      Cena HTTP API: $1 per 1M requestów (vs REST API: $3.50/M)
+    code: |
+      # HTTP API v2 z Lambda
+      API=$(aws apigatewayv2 create-api \
+        --name prod-api \
+        --protocol-type HTTP \
+        --cors-configuration AllowOrigins='*',AllowMethods='*',AllowHeaders='*' \
+        --query 'ApiId' --output text)
+
+      # Integracja z Lambda
+      INTEGRATION=$(aws apigatewayv2 create-integration \
+        --api-id $API \
+        --integration-type AWS_PROXY \
+        --integration-uri arn:aws:lambda:...:prod-handler \
+        --payload-format-version 2.0 \
+        --query 'IntegrationId' --output text)
+
+      # Route catch-all
+      aws apigatewayv2 create-route \
+        --api-id $API \
+        --route-key '$default' \
+        --target integrations/$INTEGRATION
+
+      # Auto-deploy stage
+      aws apigatewayv2 create-stage \
+        --api-id $API \
+        --stage-name prod \
+        --auto-deploy \
+        --default-route-settings ThrottlingBurstLimit=1000,ThrottlingRateLimit=500
+
+      # Lambda permission
+      aws lambda add-permission \
+        --function-name prod-handler \
+        --statement-id apigw-invoke \
+        --action lambda:InvokeFunction \
+        --principal apigateway.amazonaws.com
+
+  - name: AWS Transit Gateway — Centralny Hub Sieci
+    desc: |
+      Hub łączący wiele VPC i sieci on-premises w topologię hub-and-spoke.
+      Zastępuje skomplikowane VPC Peering meshes.
+
+      Porównanie:
+      • VPC Peering: punkt-do-punktu, nietranzytywne (A↔B, B↔C ≠ A↔C)
+      • Transit Gateway: tranzytywny routing, A↔TGW↔B↔TGW↔C = A może rozmawiać z C
+
+      Kluczowe koncepcje:
+      • Attachment: podpięcie VPC, VPN lub Direct Connect do TGW
+      • Route Tables TGW: kontrolujesz który attachment widzi który
+      • Segmentacja: prod-rt widzi tylko prod VPC + on-premises; dev-rt tylko dev VPC
+      • Shared Services VPC: centralne NAT, DNS, Firewall → reszta przez TGW
+      • Multi-account przez RAM (Resource Access Manager)
+
+      Cena: $0.05/h per attachment + $0.02/GB danych
+    code: |
+      # Utwórz Transit Gateway
+      TGW=$(aws ec2 create-transit-gateway \
+        --description "Central networking hub" \
+        --options AutoAcceptSharedAttachments=enable,DnsSupport=enable \
+        --query 'TransitGateway.TransitGatewayId' --output text)
+
+      # Podepnij VPC
+      aws ec2 create-transit-gateway-vpc-attachment \
+        --transit-gateway-id $TGW \
+        --vpc-id vpc-prod \
+        --subnet-ids subnet-tgw-1a subnet-tgw-1b \
+        --tag-specifications 'ResourceType=transit-gateway-attachment,Tags=[{Key=Name,Value=prod-vpc}]'
+
+      # Route table VPC → TGW (dla other CIDR)
+      aws ec2 create-route \
+        --route-table-id rtb-private-xxx \
+        --destination-cidr-block 10.0.0.0/8 \
+        --transit-gateway-id $TGW
+
+  - name: VPC Flow Logs — Monitoring Ruchu Sieciowego
+    desc: |
+      Przechwytuj metadane każdego pakietu w VPC — source IP, destination IP, port, protocol,
+      bytes, accept/reject. Nie przechwytuje treści pakietów.
+
+      Do czego służy:
+      • Diagnozowanie odrzuconych połączeń (Security Group/NACL blokuje)
+      • Analiza bezpieczeństwa: port scanning, lateral movement, nieoczekiwane połączenia
+      • Compliance: dowód że ruch był lub nie był dozwolony
+      • Capacity planning
+
+      Destynacje logów:
+      • CloudWatch Logs: przeszukiwalny, droższy
+      • S3: tani ($0.025/GB), Athena do analizy SQL
+      • Kinesis Data Firehose: real-time do OpenSearch/Splunk
+
+      Cena: $0.50/GB zebranych danych
+    code: |
+      # Flow Logs dla VPC → S3
+      aws ec2 create-flow-logs \
+        --resource-type VPC \
+        --resource-ids vpc-xxx \
+        --traffic-type ALL \
+        --log-destination-type s3 \
+        --log-destination arn:aws:s3:::moje-flow-logs/vpc-logs/
+
+      # Analiza przez Athena
+      # Utwórz tabelę na S3 z logami, potem:
+
+      SELECT srcaddr, dstaddr, dstport, count(*) as rejects
+      FROM vpc_flow_logs
+      WHERE action = 'REJECT'
+        AND srcaddr = '1.2.3.4'
+      GROUP BY srcaddr, dstaddr, dstport
+      ORDER BY rejects DESC;
+
+      -- Top 10 par IP po wolumenie danych
+      SELECT srcaddr, dstaddr, sum(bytes) as total_bytes
+      FROM vpc_flow_logs
+      WHERE action = 'ACCEPT'
+      GROUP BY srcaddr, dstaddr
+      ORDER BY total_bytes DESC LIMIT 10;
+
+  - name: Direct Connect & VPN Gateway
+    desc: |
+      Dwa sposoby podłączenia sieci on-premises do AWS:
+
+      Direct Connect (DX):
+      • Dedykowane łącze fizyczne (1Gbps, 10Gbps, 100Gbps)
+      • Stabilne latency, nie przez publiczny internet
+      • SLA dla produkcyjnych połączeń
+      • Droższe (konfiguracja $0-200/mies, transfer $0.02/GB)
+      • Czas provisioning: tygodnie (fizyczna instalacja)
+      • Hosted Connection (przez partnera AWS): już od 50Mbps
+
+      Site-to-Site VPN:
+      • IPsec VPN przez internet
+      • Setup w godzinach, tanie ($0.05/h = ~$36/mies)
+      • Latency zależna od internetu
+      • Max 1.25Gbps per tunel (dwa tunele dla HA)
+      • Dobre jako backup dla Direct Connect
+
+      Kiedy co:
+      • DX: produkcja z dużym transferem danych lub wymaganiami compliance
+      • VPN: dev/staging, DR, tymczasowe połączenie, backup dla DX
+    code: |
+      # Site-to-Site VPN (szybki setup)
+      # 1. Customer Gateway (Twój router on-premises)
+      aws ec2 create-customer-gateway \
+        --type ipsec.1 \
+        --public-ip 203.0.113.1 \
+        --bgp-asn 65000
+
+      # 2. Virtual Private Gateway (strona AWS)
+      VGW=$(aws ec2 create-vpn-gateway \
+        --type ipsec.1 --query 'VpnGateway.VpnGatewayId' --output text)
+      aws ec2 attach-vpn-gateway --vpn-gateway-id $VGW --vpc-id vpc-xxx
+
+      # 3. VPN Connection
+      aws ec2 create-vpn-connection \
+        --type ipsec.1 \
+        --customer-gateway-id cgw-xxx \
+        --vpn-gateway-id $VGW \
+        --options StaticRoutesOnly=false
+
+      # Pobierz konfigurację dla swojego routera (Cisco, Juniper, Palo Alto, pfSense)
+      aws ec2 describe-vpn-connections \
+        --query 'VpnConnections[0].CustomerGatewayConfiguration'

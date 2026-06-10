@@ -1,0 +1,227 @@
+title: AWS CLI — Komendy i automatyzacja
+groups:
+  - name: Konfiguracja CLI
+    icon: "⚙️"
+    commands:
+      - desc: Konfiguruj profil (klucze + region + format)
+        code: aws configure
+      - desc: Konfiguruj nazwany profil
+        code: aws configure --profile prod
+      - desc: Sprawdź tożsamość (konto + user/role)
+        code: aws sts get-caller-identity
+      - desc: Lista skonfigurowanych profili
+        code: aws configure list-profiles
+      - desc: Wyświetl bieżącą konfigurację
+        code: aws configure list
+      - desc: Ustaw profil na czas sesji
+        code: export AWS_PROFILE=prod
+      - desc: Wersja CLI
+        code: aws --version
+      - desc: Wymuś output w tabeli
+        code: aws ec2 describe-regions --output table
+      - desc: Wymuś output w tekście (skrypty)
+        code: aws sts get-caller-identity --output text --query Account
+
+  - name: EC2 — Instancje
+    icon: "🖥️"
+    commands:
+      - desc: Lista uruchomionych instancji (ID + nazwa + stan)
+        code: aws ec2 describe-instances --filters Name=instance-state-name,Values=running --query 'Reservations[].Instances[].[InstanceId,Tags[?Key==`Name`].Value|[0],State.Name]' --output table
+      - desc: Uruchom instancję EC2
+        code: aws ec2 run-instances --image-id ami-0c55b159cbfafe1f0 --instance-type t3.micro --key-name moj-klucz --subnet-id subnet-xxx --security-group-ids sg-xxx --count 1
+      - desc: Zatrzymaj instancję
+        code: aws ec2 stop-instances --instance-ids i-0abc123
+      - desc: Uruchom zatrzymaną instancję
+        code: aws ec2 start-instances --instance-ids i-0abc123
+      - desc: Zakończ (usuń) instancję
+        code: aws ec2 terminate-instances --instance-ids i-0abc123
+      - desc: Opisz Security Group
+        code: aws ec2 describe-security-groups --group-ids sg-xxx
+      - desc: Dodaj regułę Security Group (HTTPS in)
+        code: aws ec2 authorize-security-group-ingress --group-id sg-xxx --protocol tcp --port 443 --cidr 0.0.0.0/0
+      - desc: Pobierz publiczne IP instancji
+        code: aws ec2 describe-instances --instance-ids i-0abc123 --query 'Reservations[0].Instances[0].PublicIpAddress' --output text
+      - desc: Utwórz AMI (snapshot instancji)
+        code: aws ec2 create-image --instance-id i-0abc123 --name "prod-backup-$(date +%Y%m%d)"
+
+  - name: S3 — Przechowywanie
+    icon: "🪣"
+    commands:
+      - desc: Lista bucketów
+        code: aws s3 ls
+      - desc: Lista zawartości bucketa
+        code: aws s3 ls s3://moj-bucket/
+      - desc: Utwórz bucket
+        code: aws s3 mb s3://moj-nowy-bucket --region eu-west-1
+      - desc: Wgraj plik
+        code: aws s3 cp lokalny-plik.txt s3://moj-bucket/folder/
+      - desc: Pobierz plik
+        code: aws s3 cp s3://moj-bucket/folder/plik.txt .
+      - desc: Synchronizuj lokalny folder z S3
+        code: aws s3 sync ./dist s3://moj-bucket/
+      - desc: Synchronizuj tylko zmiany (delete pliki usuniętych lokalnie)
+        code: aws s3 sync ./dist s3://moj-bucket/ --delete
+      - desc: Usuń plik z S3
+        code: aws s3 rm s3://moj-bucket/stary-plik.txt
+      - desc: Usuń wszystko z folderu
+        code: aws s3 rm s3://moj-bucket/stary-folder/ --recursive
+      - desc: Presigned URL (dostęp na 1h bez auth)
+        code: aws s3 presign s3://moj-bucket/plik.pdf --expires-in 3600
+      - desc: Włącz static website hosting
+        code: aws s3 website s3://moj-bucket/ --index-document index.html --error-document 404.html
+      - desc: Rozmiar bucketa
+        code: aws s3 ls s3://moj-bucket --recursive --human-readable --summarize
+
+  - name: Lambda — Funkcje bezserwerowe
+    icon: "λ"
+    commands:
+      - desc: Lista funkcji Lambda
+        code: aws lambda list-functions --query 'Functions[].[FunctionName,Runtime,LastModified]' --output table
+      - desc: Utwórz funkcję Lambda (z pliku zip)
+        code: zip function.zip handler.py && aws lambda create-function --function-name moja-funkcja --runtime python3.12 --role arn:aws:iam::xxx:role/lambda-role --handler handler.lambda_handler --zip-file fileb://function.zip
+      - desc: Zaktualizuj kod funkcji
+        code: zip function.zip handler.py && aws lambda update-function-code --function-name moja-funkcja --zip-file fileb://function.zip
+      - desc: Wywołaj funkcję synchronicznie
+        code: aws lambda invoke --function-name moja-funkcja --payload '{"key":"value"}' response.json && cat response.json
+      - desc: Wywołaj funkcję asynchronicznie
+        code: aws lambda invoke --function-name moja-funkcja --invocation-type Event --payload '{"key":"value"}' /dev/null
+      - desc: Sprawdź logi ostatniego wywołania
+        code: aws lambda invoke --function-name moja-funkcja --log-type Tail output.json --query 'LogResult' --output text | base64 -d
+      - desc: Ustaw zmienną środowiskową
+        code: aws lambda update-function-configuration --function-name moja-funkcja --environment 'Variables={DB_URL=postgres://host/db,LOG_LEVEL=INFO}'
+      - desc: Opublikuj wersję (immutable snapshot)
+        code: aws lambda publish-version --function-name moja-funkcja --description "v1.2.0"
+      - desc: Usuń funkcję
+        code: aws lambda delete-function --function-name moja-funkcja
+
+  - name: ECS / ECR — Kontenery
+    icon: "🐳"
+    commands:
+      - desc: Zaloguj Docker do ECR
+        code: aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin 123456789.dkr.ecr.eu-west-1.amazonaws.com
+      - desc: Utwórz repozytorium ECR
+        code: aws ecr create-repository --repository-name moja-aplikacja --image-scanning-configuration scanOnPush=true
+      - desc: Zbuduj i wypchnij obraz do ECR
+        code: "docker build -t moja-aplikacja . && docker tag moja-aplikacja:latest 123456789.dkr.ecr.eu-west-1.amazonaws.com/moja-aplikacja:latest && docker push 123456789.dkr.ecr.eu-west-1.amazonaws.com/moja-aplikacja:latest"
+      - desc: Lista klastrów ECS
+        code: aws ecs list-clusters
+      - desc: Lista serwisów w klastrze
+        code: aws ecs list-services --cluster prod-cluster
+      - desc: Status serwisu ECS
+        code: aws ecs describe-services --cluster prod-cluster --services prod-api
+      - desc: Force new deployment (aktualizuj serwis)
+        code: aws ecs update-service --cluster prod-cluster --service prod-api --force-new-deployment
+      - desc: Lista tasków w serwisie
+        code: aws ecs list-tasks --cluster prod-cluster --service-name prod-api
+      - desc: Exec do uruchomionego kontenera (jak docker exec)
+        code: aws ecs execute-command --cluster prod-cluster --task arn:aws:ecs:... --container app --interactive --command "/bin/bash"
+
+  - name: RDS / DynamoDB — Bazy danych
+    icon: "🗄️"
+    commands:
+      - desc: Lista instancji RDS
+        code: aws rds describe-db-instances --query 'DBInstances[].[DBInstanceIdentifier,DBInstanceStatus,Endpoint.Address]' --output table
+      - desc: Utwórz instancję RDS PostgreSQL
+        code: aws rds create-db-instance --db-instance-identifier prod-db --db-instance-class db.t3.micro --engine postgres --engine-version 15 --master-username admin --manage-master-user-password --allocated-storage 20 --no-publicly-accessible
+      - desc: Snapshot RDS (backup ręczny)
+        code: aws rds create-db-snapshot --db-instance-identifier prod-db --db-snapshot-identifier prod-db-snap-$(date +%Y%m%d)
+      - desc: Uruchom zapytanie przez eksport (Data API)
+        code: aws rds-data execute-statement --resource-arn arn:aws:rds:... --secret-arn arn:aws:secretsmanager:... --database checki --sql "SELECT count(*) FROM users"
+      - desc: Utwórz tabelę DynamoDB
+        code: aws dynamodb create-table --table-name Users --attribute-definitions AttributeName=userId,AttributeType=S --key-schema AttributeName=userId,KeyType=HASH --billing-mode PAY_PER_REQUEST
+      - desc: Dodaj item do DynamoDB
+        code: |
+          aws dynamodb put-item --table-name Users \
+            --item '{"userId":{"S":"u-123"},"name":{"S":"Jan"},"email":{"S":"jan@example.com"}}'
+      - desc: Pobierz item z DynamoDB
+        code: |
+          aws dynamodb get-item --table-name Users \
+            --key '{"userId":{"S":"u-123"}}'
+      - desc: Zapytanie DynamoDB (query)
+        code: |
+          aws dynamodb query --table-name Users \
+            --key-condition-expression "userId = :uid" \
+            --expression-attribute-values '{":uid":{"S":"u-123"}}'
+      - desc: Scan tabeli DynamoDB
+        code: |
+          aws dynamodb scan --table-name Users \
+            --filter-expression "active = :true" \
+            --expression-attribute-values '{":true":{"BOOL":true}}'
+
+  - name: IAM — Tożsamość i dostęp
+    icon: "🔐"
+    commands:
+      - desc: Lista użytkowników IAM
+        code: aws iam list-users --query 'Users[].[UserName,CreateDate]' --output table
+      - desc: Utwórz użytkownika
+        code: aws iam create-user --user-name developer-jan
+      - desc: Dołącz politykę do użytkownika
+        code: aws iam attach-user-policy --user-name developer-jan --policy-arn arn:aws:iam::aws:policy/ReadOnlyAccess
+      - desc: Utwórz grupę i dołącz politykę
+        code: aws iam create-group --group-name developers && aws iam attach-group-policy --group-name developers --policy-arn arn:aws:iam::aws:policy/PowerUserAccess
+      - desc: Dodaj użytkownika do grupy
+        code: aws iam add-user-to-group --user-name developer-jan --group-name developers
+      - desc: Utwórz rolę (dla Lambda)
+        code: aws iam create-role --role-name lambda-exec --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
+      - desc: Klucz dostępu dla użytkownika
+        code: aws iam create-access-key --user-name developer-jan
+      - desc: Lista ról IAM
+        code: aws iam list-roles --query 'Roles[].[RoleName,Description]' --output table
+      - desc: Symuluj uprawnienia (czy mam dostęp?)
+        code: aws iam simulate-principal-policy --policy-source-arn arn:aws:iam::xxx:user/developer-jan --action-names s3:PutObject --resource-arns arn:aws:s3:::moj-bucket/*
+
+  - name: CloudWatch — Monitoring
+    icon: "📊"
+    commands:
+      - desc: Lista alarmów CloudWatch
+        code: aws cloudwatch describe-alarms --state-value ALARM --query 'MetricAlarms[].[AlarmName,StateValue,MetricName]' --output table
+      - desc: Metryki CPU dla instancji EC2
+        code: aws cloudwatch get-metric-statistics --metric-name CPUUtilization --namespace AWS/EC2 --dimensions Name=InstanceId,Value=i-0abc123 --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) --end-time $(date -u +%Y-%m-%dT%H:%M:%S) --period 300 --statistics Average
+      - desc: Pobierz logi z Log Group
+        code: aws logs get-log-events --log-group-name /aws/lambda/moja-funkcja --log-stream-name $(aws logs describe-log-streams --log-group-name /aws/lambda/moja-funkcja --order-by LastEventTime --descending --query 'logStreams[0].logStreamName' --output text)
+      - desc: Szukaj w logach (filter-log-events)
+        code: aws logs filter-log-events --log-group-name /aws/lambda/moja-funkcja --filter-pattern "ERROR" --start-time $(($(date +%s) - 3600))000
+      - desc: Tail logów na żywo (wymaga awslogs lub CloudWatch Live Tail)
+        code: aws logs tail /aws/lambda/moja-funkcja --follow
+      - desc: Utwórz alarm CPU
+        code: aws cloudwatch put-metric-alarm --alarm-name high-cpu --metric-name CPUUtilization --namespace AWS/EC2 --statistic Average --period 60 --evaluation-periods 5 --threshold 80 --comparison-operator GreaterThanThreshold --dimensions Name=InstanceId,Value=i-0abc123 --alarm-actions arn:aws:sns:eu-west-1:xxx:alerts
+
+  - name: CloudFormation — IaC
+    icon: "📋"
+    commands:
+      - desc: Deploy stack z pliku YAML
+        code: aws cloudformation deploy --stack-name moj-stack --template-file infra.yaml --capabilities CAPABILITY_IAM
+      - desc: Deploy z parametrami
+        code: aws cloudformation deploy --stack-name moj-stack --template-file infra.yaml --parameter-overrides Env=prod InstanceType=t3.small --capabilities CAPABILITY_IAM
+      - desc: Status stack
+        code: aws cloudformation describe-stacks --stack-name moj-stack --query 'Stacks[0].StackStatus'
+      - desc: Lista zasobów w stack
+        code: aws cloudformation list-stack-resources --stack-name moj-stack --query 'StackResourceSummaries[].[LogicalResourceId,ResourceType,ResourceStatus]' --output table
+      - desc: Outputy stack (np. endpoint URL)
+        code: aws cloudformation describe-stacks --stack-name moj-stack --query 'Stacks[0].Outputs'
+      - desc: Usuń stack
+        code: aws cloudformation delete-stack --stack-name moj-stack
+      - desc: Waliduj template
+        code: aws cloudformation validate-template --template-body file://infra.yaml
+      - desc: Drift detection (czy ktoś zmienił zasoby poza CF?)
+        code: aws cloudformation detect-stack-drift --stack-name moj-stack && aws cloudformation describe-stack-drift-detection-status --stack-drift-detection-id xxx
+
+  - name: Przydatne wzorce CLI
+    icon: "💡"
+    commands:
+      - desc: Wszystkie zasoby z tagiem Env=prod (Resource Groups Tagging API)
+        code: aws resourcegroupstaggingapi get-resources --tag-filters Key=Env,Values=prod --query 'ResourceTagMappingList[].[ResourceARN]' --output text
+      - desc: Koszt bieżącego miesiąca
+        code: aws ce get-cost-and-usage --time-period Start=$(date +%Y-%m-01),End=$(date +%Y-%m-%d) --granularity MONTHLY --metrics UnblendedCost --query 'ResultsByTime[0].Total.UnblendedCost'
+      - desc: Zmień region jednorazowo
+        code: aws ec2 describe-instances --region us-east-1
+      - desc: JMESPath — wyciągnij konkretne pole
+        code: aws ec2 describe-instances --query 'Reservations[].Instances[?State.Name==`running`].[InstanceId,PublicIpAddress]' --output table
+      - desc: Oczekuj na zakończenie operacji (waiter)
+        code: aws ec2 wait instance-running --instance-ids i-0abc123
+      - desc: Export zmiennych z Secrets Manager do env
+        code: export $(aws secretsmanager get-secret-value --secret-id prod/app/env --query SecretString --output text | python3 -c "import json,sys; [print(f'{k}={v}') for k,v in json.load(sys.stdin).items()]")
+      - desc: Assume Role i eksportuj credentials
+        code: "eval $(aws sts assume-role --role-arn arn:aws:iam::xxx:role/AdminRole --role-session-name sess --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' --output text | awk '{print \"export AWS_ACCESS_KEY_ID=\"$1\"\\nexport AWS_SECRET_ACCESS_KEY=\"$2\"\\nexport AWS_SESSION_TOKEN=\"$3}')"
+      - desc: Wyczyść stare AMI (starsze niż 30 dni)
+        code: aws ec2 describe-images --owners self --query 'Images[?CreationDate<=`2026-05-01`].[ImageId,Name]' --output text | awk '{print $1}' | xargs -I{} aws ec2 deregister-image --image-id {}

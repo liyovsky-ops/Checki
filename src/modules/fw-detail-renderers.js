@@ -124,17 +124,28 @@ export function renderPlugins(items) {
     ).join('') + '</div>';
 }
 
-export function renderCommands(groups) {
+export function renderCommands(data) {
+  const groups = Array.isArray(data) ? data : (data.groups || []);
   return groups.map(function(group, gi) {
+    const title = group.category || group.name || '';
+    const entries = group.items || group.commands || [];
     return '<div class="fwd-cmd-group">' +
-      '<div class="fwd-cmd-group-title"><span>' + group.icon + '</span>' + group.category + '</div>' +
+      '<div class="fwd-cmd-group-title"><span>' + group.icon + '</span>' + title + '</div>' +
       '<div class="fwd-terminal">' +
-      group.items.map(function(item, ii) {
+      entries.map(function(item, ii) {
+        const cmd  = item.cmd  || item.code || '';
+        const desc = item.desc || '';
         const hasDetail = !!item.detail;
+        const isMulti   = cmd.includes('\n');
+        if (isMulti) {
+          return '<div class="fwd-terminal-row fwd-terminal-row--block">' +
+            '<div class="fwd-terminal-desc fwd-terminal-desc--block">' + escFwd(desc) + '</div>' +
+            '<pre class="fwd-code" style="font-size:11px;margin:4px 0 0">' + escFwd(cmd.trim()) + '</pre></div>';
+        }
         return '<div class="fwd-terminal-row' + (hasDetail ? ' fwd-terminal-row--clickable' : '') + '"' +
           (hasDetail ? ' onclick="openCmdModal(' + gi + ',' + ii + ')"' : '') + '>' +
-          '<span class="fwd-terminal-cmd">' + escFwd(item.cmd) + '</span>' +
-          '<span class="fwd-terminal-desc">' + item.desc + '</span>' +
+          '<span class="fwd-terminal-cmd">' + escFwd(cmd) + '</span>' +
+          '<span class="fwd-terminal-desc">' + escFwd(desc) + '</span>' +
           (hasDetail ? '<span class="fwd-terminal-hint">→</span>' : '') +
           '</div>';
       }).join('') +

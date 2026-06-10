@@ -1,0 +1,585 @@
+- title: EC2 — Elastic Compute Cloud (Wirtualne Maszyny)
+  lang: bash
+  desc: |
+    Serce AWS compute — wirtualne maszyny ze wszystkimi zaletami chmury. Setki typów instancji:
+
+    • t3/t4g.micro/small/medium — Burstable (tańsze, burst CPU gdy potrzeba). T4g = ARM Graviton, 20% taniej
+    • m7g/m6i.large/xlarge — General Purpose (backend API, microservices)
+    • c7g/c6i.xlarge — Compute Optimized (web serwery, HPC, encoding)
+    • r7g/r6i.xlarge — Memory Optimized (bazy danych in-memory, Spark)
+    • p3.2xlarge / g4dn.xlarge — GPU (ML training/inference, rendering)
+    • i3/i4i.xlarge — Storage Optimized (OLTP, Elasticsearch, Redis cluster)
+
+    Główne koncepcje:
+    • AMI (Amazon Machine Image) — "snapshot" systemu z OS i software
+    • Security Groups — stateful firewall; domyślnie blokuje wszystko
+    • Key Pairs — SSH dostęp. Klucz prywatny pobierasz RAZ przy tworzeniu
+    • Elastic IP — stały publiczny adres IP ($0.005/h gdy nie przypisany)
+    • Auto Scaling Group — automatycznie dodaje/usuwa instancje na podstawie metryk
+    • Launch Template — szablon konfiguracji instancji (AMI, typ, SG, IAM role, user-data)
+  code: |
+    # Szybki start — Amazon Linux 2023 t3.micro
+    aws ec2 run-instances \
+      --image-id ami-0905a3c97561e0b69 \
+      --instance-type t3.micro \
+      --key-name moj-klucz \
+      --security-group-ids sg-xxx \
+      --subnet-id subnet-xxx \
+      --iam-instance-profile Name=EC2S3Role \
+      --user-data '#!/bin/bash
+        dnf update -y && dnf install -y python3 pip
+        pip3 install fastapi uvicorn
+        cd /home/ec2-user/app && uvicorn main:app --host 0.0.0.0 --port 8000 &' \
+      --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=api-prod}]'
+
+    # Auto Scaling Group — horizontal scaling
+    aws autoscaling create-auto-scaling-group \
+      --auto-scaling-group-name prod-api-asg \
+      --launch-template LaunchTemplateId=lt-xxx,Version='$Latest' \
+      --min-size 2 --max-size 10 --desired-capacity 3 \
+      --target-group-arns arn:aws:elasticloadbalancing:... \
+      --health-check-type ELB \
+      --vpc-zone-identifier "subnet-1a,subnet-1b,subnet-1c"
+
+- title: AWS Lambda — Serverless Functions (FaaS)
+  lang: python
+  desc: |
+    Uruchamiaj kod bez zarządzania serwerami. Płacisz za milisekundy wykonania.
+
+    Specyfikacja:
+    • Języki: Python 3.12, Node.js 20, Java 21, Go, Ruby 3.2, .NET 8, custom runtime
+    • Pamięć: 128MB – 10240MB (CPU proporcjonalnie do RAM)
+    • Timeout: max 15 minut (900 sekund)
+    • Concurrency: 1000 jednoczesnych wywołań per region (soft limit)
+    • Deployment: 50MB ZIP (250MB unzip) lub do 10GB Docker image
+
+    Triggery: API Gateway, ALB, S3, SQS, SNS, EventBridge, DynamoDB Streams, Kinesis, CloudFront
+
+    Cold Start:
+    • Pierwsze wywołanie po "uśpieniu" = dodatkowe 100ms–2s
+    • Provisioned Concurrency eliminuje cold start (płacisz za utrzymanie warm)
+    • Snap Start (Java) — redukuje cold start przy inicjalizacji klasy
+
+    Cena: $0.20 per 1M requestów + $0.0000166667 per GB-sekunda
+  code: |
+    import json, boto3, os
+
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table(os.environ['TABLE_NAME'])
+
+    def handler(event, context):
+        method  = event['requestContext']['http']['method']
+        user_id = event.get('pathParameters', {}).get('userId')
+
+        if method == 'GET' and user_id:
+            response = table.get_item(Key={'userId': user_id})
+            if 'Item' not in response:
+                return {'statusCode': 404, 'body': json.dumps({'error': 'not found'})}
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps(response['Item'])
+            }
+        return {'statusCode': 405, 'body': json.dumps({'error': 'method not allowed'})}
+
+    # Deploy
+    # zip function.zip lambda_function.py
+    # aws lambda update-function-code --function-name moja-funkcja --zip-file fileb://function.zip
+
+- title: Amazon ECS — Elastic Container Service
+  lang: bash
+  desc: |
+    Zarządzany orchestrator kontenerów Docker. Nie potrzebujesz Kubernetes.
+
+    Główne komponenty:
+    • Cluster — logiczna grupa EC2 lub Fargate zasobów
+    • Task Definition — "przepis": jaki image, ile CPU/RAM, env vars, secrets, volumes
+    • Service — utrzymuje N działających tasków, integruje z ALB, auto-healing
+    • Task — jeden uruchomiony kontener (lub grupa sidecar containers)
+
+    Launch Types:
+    • EC2 — Ty zarządzasz EC2 nodes (więcej kontroli, tańsze przy dużej skali)
+    • Fargate — serverless (AWS zarządza serwerami, płacisz per task CPU/RAM)
+
+    Best practices:
+    • TaskRole IAM — rola dla kontenera (dostęp do S3, Secrets Manager)
+    • ECR (Elastic Container Registry) — prywatny Docker Hub na AWS
+    • Blue/Green Deploy przez CodeDeploy — zero-downtime
+    • Container Insights — monitoring CPU/RAM per task
+  code: |
+    # task-definition.json
+    {
+      "family": "api-task",
+      "networkMode": "awsvpc",
+      "requiresCompatibilities": ["FARGATE"],
+      "cpu": "512", "memory": "1024",
+      "executionRoleArn": "arn:aws:iam::123:role/ecsTaskExecutionRole",
+      "taskRoleArn": "arn:aws:iam::123:role/ecsTaskRole",
+      "containerDefinitions": [{
+        "name": "api",
+        "image": "123.dkr.ecr.eu-west-1.amazonaws.com/api:latest",
+        "portMappings": [{"containerPort": 8000, "protocol": "tcp"}],
+        "environment": [{"name": "ENV", "value": "prod"}],
+        "secrets": [{"name": "DB_PASSWORD", "valueFrom": "arn:aws:secretsmanager:...:db-pass"}],
+        "logConfiguration": {
+          "logDriver": "awslogs",
+          "options": {"awslogs-group": "/ecs/api", "awslogs-region": "eu-west-1", "awslogs-stream-prefix": "ecs"}
+        }
+      }]
+    }
+
+    aws ecs register-task-definition --cli-input-json file://task-definition.json
+    aws ecs create-service \
+      --cluster prod-cluster --service-name api \
+      --task-definition api-task:1 --desired-count 3 \
+      --launch-type FARGATE \
+      --load-balancers targetGroupArn=arn:...,containerName=api,containerPort=8000
+
+- title: Amazon EKS — Elastic Kubernetes Service
+  lang: bash
+  desc: |
+    Managed Kubernetes — AWS zarządza control plane (etcd, API server, scheduler).
+    Ty zarządzasz worker nodes lub używasz Fargate (serverless nodes).
+
+    Kiedy EKS zamiast ECS:
+    • Masz existing Kubernetes manifests/Helm charts
+    • Potrzebujesz zaawansowanych K8s features (CRDs, operators, custom schedulers)
+    • Multi-cloud/hybrid (ten sam YAML na EKS i GKE/on-premises)
+    • Twój team zna Kubernetes
+
+    Add-ons zarządzane przez AWS:
+    • VPC CNI — networking (każdy pod dostaje IP z VPC subnet)
+    • CoreDNS — service discovery
+    • kube-proxy — network rules
+    • EBS CSI Driver — persistent volumes
+    • ALB Controller — automatyczne ALB z Ingress
+
+    Cena: $0.10/h per cluster (control plane) + worker nodes (EC2 lub Fargate)
+  code: |
+    # Utwórz klaster EKS
+    eksctl create cluster \
+      --name prod-cluster \
+      --region eu-west-1 \
+      --nodegroup-name standard-workers \
+      --node-type t3.medium \
+      --nodes 3 --nodes-min 1 --nodes-max 10 \
+      --managed
+
+    # Skonfiguruj kubectl
+    aws eks update-kubeconfig --name prod-cluster --region eu-west-1
+
+    # Deploy aplikacji
+    kubectl apply -f deployment.yaml
+    kubectl apply -f service.yaml
+
+    # Fargate profile (serverless nodes)
+    eksctl create fargateprofile \
+      --cluster prod-cluster \
+      --name api-profile \
+      --namespace production
+
+    # Horizontal Pod Autoscaler
+    kubectl autoscale deployment api --cpu-percent=70 --min=2 --max=20
+
+- title: AWS Fargate — Serverless Containers
+  lang: bash
+  desc: |
+    Serverless compute engine dla ECS i EKS — uruchamiasz kontenery bez zarządzania EC2.
+    AWS automatycznie provisionuje, skaluje i patchuje infrastrukturę.
+
+    Kiedy Fargate zamiast EC2:
+    • Nie chcesz zarządzać node pools, patching, scaling workers
+    • Workloady z irregular traffic (Fargate skaluje do zera)
+    • Bezpieczeństwo: każdy task ma własny kernel (izolacja lepsza niż shared EC2)
+
+    Kiedy EC2 launch type jest lepszy:
+    • Potrzebujesz GPU instances
+    • Bardzo wysoka gęstość kontenerów (oszczędność)
+    • Specjalne typy instancji (c7g Graviton, i3 NVMe storage)
+
+    Cena Fargate:
+    • $0.04048 per vCPU/h + $0.004445 per GB RAM/h
+    • Droższe niż EC2 per-unit, ale zero overhead zarządzania
+
+  code: |
+    # Service Fargate — skaluje do zera gdy brak ruchu
+    aws ecs create-service \
+      --cluster prod --service-name api \
+      --task-definition api:3 --desired-count 0 \
+      --launch-type FARGATE \
+      --network-configuration 'awsvpcConfiguration={
+        subnets=[subnet-1a,subnet-1b],
+        securityGroups=[sg-xxx],
+        assignPublicIp=DISABLED
+      }' \
+      --deployment-configuration minimumHealthyPercent=100,maximumPercent=200
+
+    # Application Auto Scaling na bazie SQS queue depth
+    aws application-autoscaling register-scalable-target \
+      --service-namespace ecs \
+      --resource-id service/prod/api \
+      --scalable-dimension ecs:service:DesiredCount \
+      --min-capacity 0 --max-capacity 50
+
+    # Scale-to-zero: gdy SQS pusta → 0 tasków. Wiadomość → Lambda uruchamia scaling policy
+
+- title: AWS Elastic Beanstalk — PaaS dla Developerów
+  lang: bash
+  desc: |
+    Platform-as-a-Service — wrzuć kod, Beanstalk sam konfiguruje EC2, Load Balancer, Auto Scaling, RDS.
+    Dobry dla team który chce deploy bez nauki infrastruktury.
+
+    Obsługuje: Python, Node.js, Java, .NET, PHP, Ruby, Go, Docker.
+
+    Co Beanstalk robi za Ciebie:
+    • Provisioning EC2 i Load Balancera
+    • Health monitoring i auto-healing
+    • Log aggregation do S3
+    • Rolling updates i blue/green deployments
+
+    Kiedy NIE używać Beanstalk:
+    • Potrzebujesz pełnej kontroli nad infrastrukturą → ECS/EKS
+    • Mikroserwisy → ECS lepszy
+    • Bardzo duże skale — overhead Beanstalk staje się problemem
+  code: |
+    # Zainstaluj EB CLI
+    pip install awsebcli
+
+    # Inicjalizacja aplikacji
+    eb init moja-aplikacja \
+      --platform python-3.11 \
+      --region eu-west-1
+
+    # Utwórz environment (prod)
+    eb create prod-env \
+      --instance-type t3.small \
+      --min-instances 2 \
+      --max-instances 10 \
+      --database \
+      --db.engine postgres
+
+    # Deploy
+    eb deploy prod-env
+
+    # Logi i monitoring
+    eb logs
+    eb health --refresh
+
+    # .ebextensions/env.config — konfiguracja środowiska
+    # option_settings:
+    #   aws:elasticbeanstalk:application:environment:
+    #     DATABASE_URL: postgres://...
+    #     SECRET_KEY: ...
+
+- title: AWS Batch — Obliczenia Wsadowe
+  lang: python
+  desc: |
+    Fully managed batch processing — uruchamiaj tysiące zadań obliczeniowych bez zarządzania klastrem.
+    AWS automatycznie provisionuje compute (EC2 lub Fargate) tylko gdy są zadania w kolejce.
+
+    Główne koncepcje:
+    • Job — jedno zadanie (Docker container + parametry)
+    • Job Queue — kolejka z priorytetem. Wiele kolejek → jedna Compute Environment
+    • Compute Environment — pulą EC2/Fargate. Managed (AWS skaluje) lub Unmanaged
+    • Job Definition — szablon: image, vCPU, memory, retry policy, timeout
+
+    Kiedy Batch zamiast Lambda:
+    • Task > 15 minut (Lambda limit)
+    • Potrzebujesz > 10GB RAM lub GPU
+    • Przetwarzanie tysięcy plików, ML training, genomika, rendering
+
+    Cena: płacisz tylko za czas działania EC2/Fargate — zero kosztów gdy kolejka pusta
+  code: |
+    import boto3
+
+    batch = boto3.client('batch', region_name='eu-west-1')
+
+    # Wyślij job
+    response = batch.submit_job(
+        jobName='process-dataset-2024-01',
+        jobQueue='prod-batch-queue',
+        jobDefinition='data-processor:5',
+        containerOverrides={
+            'environment': [
+                {'name': 'INPUT_S3', 'value': 's3://data/input/2024-01/'},
+                {'name': 'OUTPUT_S3', 'value': 's3://data/output/2024-01/'},
+                {'name': 'WORKERS', 'value': '8'}
+            ],
+            'resourceRequirements': [
+                {'type': 'VCPU', 'value': '4'},
+                {'type': 'MEMORY', 'value': '8192'}
+            ]
+        },
+        retryStrategy={'attempts': 3},
+        timeout={'attemptDurationSeconds': 3600}
+    )
+    job_id = response['jobId']
+
+    # Array Job — uruchom 1000 równoległych tasków
+    batch.submit_job(
+        jobName='parallel-ml-inference',
+        jobQueue='prod-batch-queue',
+        jobDefinition='ml-inference:2',
+        arrayProperties={'size': 1000},  # 1000 równoległych jobów!
+        containerOverrides={
+            'environment': [
+                {'name': 'BATCH_ARRAY_INDEX', 'value': 'AWS_BATCH_JOB_ARRAY_INDEX'}
+            ]
+        }
+    )
+
+- title: AWS App Runner — Najprostszy Deploy Kontenerów
+  lang: bash
+  desc: |
+    Fully managed service dla web apps i API — deploy z GitHub lub ECR w 2 minuty.
+    Zero konfiguracji VPC, Load Balancera, Auto Scaling — wszystko automagicznie.
+
+    Kiedy App Runner zamiast ECS/EKS:
+    • Prototyp lub MVP — chcesz deploy w 5 minut
+    • Małe/średnie API bez skomplikowanych wymagań sieciowych
+    • Brak ops team — chcesz "git push = live"
+
+    Kiedy NIE App Runner:
+    • Potrzebujesz VPC private networking (App Runner ma VPC connector ale ograniczony)
+    • Specyficzne instance types (GPU, dużo RAM)
+    • Złożony routing, service mesh
+
+    Cena: $0.064 per vCPU/h + $0.007 per GB RAM/h (tylko za czas działania requestów)
+  code: |
+    # Deploy z ECR (już masz image)
+    aws apprunner create-service \
+      --service-name prod-api \
+      --source-configuration '{
+        "ImageRepository": {
+          "ImageIdentifier": "123.dkr.ecr.eu-west-1.amazonaws.com/api:latest",
+          "ImageRepositoryType": "ECR",
+          "ImageConfiguration": {
+            "Port": "8000",
+            "RuntimeEnvironmentVariables": {"ENV": "prod"}
+          }
+        },
+        "AutoDeploymentsEnabled": true
+      }' \
+      --instance-configuration 'Cpu=1 vCPU,Memory=2 GB' \
+      --health-check-configuration 'Protocol=HTTP,Path=/health,Interval=20,Timeout=5'
+
+    # Deploy z GitHub (source code — App Runner builduje sam)
+    aws apprunner create-service \
+      --service-name prod-api \
+      --source-configuration '{
+        "CodeRepository": {
+          "RepositoryUrl": "https://github.com/user/repo",
+          "SourceCodeVersion": {"Type": "BRANCH", "Value": "main"},
+          "CodeConfiguration": {
+            "ConfigurationSource": "REPOSITORY",
+            "CodeConfigurationValues": {
+              "Runtime": "PYTHON_3",
+              "BuildCommand": "pip install -r requirements.txt",
+              "StartCommand": "uvicorn main:app --host 0.0.0.0 --port 8000"
+            }
+          }
+        },
+        "AutoDeploymentsEnabled": true
+      }'
+
+- title: Amazon Lightsail — VPS dla Małych Projektów
+  lang: bash
+  desc: |
+    Uproszczony VPS — jak DigitalOcean ale na AWS. Stała cena miesięczna, prosty panel.
+    Dobry dla: małe strony WordPress, staging environments, projekty side hobby.
+
+    Bundle'e od $3.50/mies (512MB RAM, 20GB SSD) do $160/mies (32GB RAM, 640GB SSD).
+    Wliczone: IP, bandwidth (1-10TB/mies), DNS, snapshots.
+
+    Kiedy Lightsail zamiast EC2:
+    • Potrzebujesz prostoty i przewidywalnych kosztów
+    • WordPress, small apps, dev environments
+    • Nie chcesz konfigurować VPC, Security Groups, IAM
+
+    Kiedy wrócić do EC2:
+    • Potrzebujesz Auto Scaling
+    • Skomplikowana architektura sieciowa
+    • Duże obciążenia produkcyjne
+  code: |
+    # Utwórz instancję Lightsail
+    aws lightsail create-instances \
+      --instance-names moja-strona \
+      --availability-zone eu-west-1a \
+      --blueprint-id wordpress \
+      --bundle-id small_3_0 \
+      --user-data "#!/bin/bash
+        apt-get update
+        apt-get install -y certbot python3-certbot-apache"
+
+    # Statyczny IP
+    aws lightsail allocate-static-ip --static-ip-name moja-strona-ip
+    aws lightsail attach-static-ip \
+      --static-ip-name moja-strona-ip \
+      --instance-name moja-strona
+
+    # Snapshot (backup)
+    aws lightsail create-instance-snapshot \
+      --instance-name moja-strona \
+      --instance-snapshot-name backup-2024-01-15
+
+- title: AWS Snow Family — Offline Data Transfer
+  lang: bash
+  desc: |
+    Fizyczne urządzenia do migracji petabajtów danych gdy internet jest zbyt wolny lub drogi.
+
+    Trzy urządzenia:
+    • Snowcone (8TB HDD / 14TB SSD) — najmniejszy, plecakowy, IoT edge
+    • Snowball Edge Storage Optimized (80TB) — standardowa migracja DC
+    • Snowball Edge Compute Optimized (80TB + GPU) — edge computing z ML inference
+    • Snowmobile — ciężarówka z 100PB pojemnością (serio)
+
+    Typowy flow:
+    1. Zamów urządzenie (kilka dni dostawy)
+    2. Podłącz do sieci lokalnej, skopiuj dane
+    3. Odeślij do AWS — dane lądują w S3
+    4. Weryfikacja integralności przez SHA-256
+
+    Kiedy Snow zamiast DataSync:
+    • > 100TB danych (upload 100TB przez 1Gbps = 9 dni)
+    • Słabe lub drogie łącze internetowe
+    • Dane pod regulacjami (nie można przez internet)
+  code: |
+    # Zamów Snowball Edge (przez Console lub CLI)
+    aws snowball create-job \
+      --job-type IMPORT \
+      --resources '{"S3Resources":[{"BucketArn":"arn:aws:s3:::moj-bucket"}]}' \
+      --address-id ADID1234... \
+      --kms-key-arn arn:aws:kms:... \
+      --role-arn arn:aws:iam::123:role/SnowballRole \
+      --snowball-type EDGE_STORAGE_OPTIMIZED \
+      --shipping-option SECOND_DAY
+
+    # Po otrzymaniu urządzenia — odblokuj przez CLI
+    snowballEdge unlock-device \
+      --endpoint https://192.168.1.50 \
+      --manifest-file manifest.bin \
+      --unlock-code XXXXX-XXXXX-XXXXX-XXXXX-XXXXX
+
+    # Kopiuj dane (S3-compatible API)
+    aws s3 sync /local/data/ s3://moj-bucket/migration/ \
+      --endpoint-url http://192.168.1.50:8080
+
+- title: AWS Wavelength — 5G Edge Computing
+  lang: bash
+  desc: |
+    Infrastruktura AWS wbudowana bezpośrednio w sieci 5G operatorów.
+    Ultra-niski latency: 1-10ms do urządzenia końcowego (vs 50-100ms przez internet).
+
+    Jak działa:
+    • Wavelength Zone = mini AWS Region w RAN (Radio Access Network) operatora
+    • Deploy EC2/ECS w Wavelength Zone → serwer fizycznie w stacji bazowej 5G
+    • Telefon 5G → stacja bazowa → Wavelength Zone (1ms!) → nie wychodzi do internetu
+
+    Zastosowania:
+    • Autonomous vehicles — real-time AI inference <10ms
+    • Smart manufacturing — industrial IoT, roboty, CNC machines
+    • Live video streaming — low-latency encoding na edge
+    • Cloud gaming — streaming 60fps bez lag
+    • AR/VR — motion sickness przy latency > 20ms
+
+    Dostępność: US (Verizon), UK/Germany (Vodafone), Japan (KDDI), Korea (SK Telecom)
+  code: |
+    # Opt-in do Wavelength Zone
+    aws ec2 modify-availability-zone-group \
+      --group-name eu-west-1-wl1-lon-wlz-1 \
+      --opt-in-status opted-in
+
+    # Subnet w Wavelength Zone
+    aws ec2 create-subnet \
+      --vpc-id vpc-xxx \
+      --cidr-block 10.0.100.0/24 \
+      --availability-zone-id euw1-wl1-lon-wlz1
+
+    # EC2 w Wavelength Zone (inference server)
+    aws ec2 run-instances \
+      --image-id ami-xxx \
+      --instance-type t3.medium \
+      --subnet-id subnet-wavelength \
+      --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=edge-inference}]'
+
+    # Carrier IP — dostępny przez sieć 5G operatora
+    aws ec2 allocate-address \
+      --network-border-group eu-west-1-wl1-lon-wlz-1
+    # Ruch: telefon 5G → Carrier IP → EC2 w Wavelength Zone = 1-5ms!
+
+- title: Amazon WorkSpaces — Wirtualne Pulpity (DaaS)
+  lang: bash
+  desc: |
+    Desktop-as-a-Service — wirtualne pulpity Windows/Linux w chmurze.
+    Użytkownicy łączą się z dowolnego urządzenia przez klienta lub przeglądarkę.
+
+    Bundle'e: Value (2vCPU 2GB), Standard (2vCPU 4GB), Performance (2vCPU 7.5GB),
+    Power (4vCPU 16GB), Graphics (8vCPU 15GB + GPU)
+
+    Kiedy WorkSpaces:
+    • Remote work — bezpieczny dostęp, dane nigdy nie opuszczają AWS
+    • Kontrahenci/konsultanci — dostęp bez instalowania czegokolwiek na ich urządzeniu
+    • Regulowane branże (finanse, zdrowie) — pełna kontrola środowiska
+    • BYOD — separacja korporacyjnych i prywatnych danych
+
+    Cena: od $21/mies (Value) do $88/mies (Power)
+  code: |
+    # Utwórz WorkSpaces Directory (Simple AD)
+    aws ds create-directory \
+      --name corp.example.com \
+      --password "SecureP@ss1" \
+      --size Small \
+      --vpc-settings VpcId=vpc-xxx,SubnetIds=subnet-1a,subnet-1b
+
+    # Zarejestruj z WorkSpaces
+    aws workspaces register-workspace-directory \
+      --directory-id d-xxx --enable-work-docs
+
+    # Utwórz WorkSpace
+    aws workspaces create-workspaces --workspaces '[{
+      "DirectoryId":"d-xxx",
+      "UserName":"jan.kowalski",
+      "BundleId":"wsb-bh8rsxt14",
+      "WorkspaceProperties":{"RunningMode":"ALWAYS_ON"}
+    }]'
+
+- title: Amazon GameLift — Serwery Multiplayer
+  lang: bash
+  desc: |
+    Zarządzana infrastruktura dla real-time multiplayer game servers.
+    Automatyczne skalowanie, matchmaking, low-latency na całym świecie.
+
+    Dwa tryby:
+    • Managed GameLift — pełne zarządzanie; wgraj binarkę, AWS zarządza flotą EC2
+    • Anywhere Fleet — uruchom game server na własnej infrastrukturze (dev/test)
+
+    Kluczowe koncepcje:
+    • Fleet — pula EC2 z uruchomionym game serverem
+    • Game Session — jedna sesja gry (serwer dla 1 meczu/room)
+    • FlexMatch — elastyczny matchmaking: skill-based, region-based, custom rules
+    • Spot Fleet — 70-80% taniej, ale z 2min ostrzeżeniem przed przerwaniem
+
+    Cena: On-Demand EC2 + $0.10/h per active game session (GameLift opłata)
+  code: |
+    # Deploy game server build
+    aws gamelift upload-build \
+      --name "MyGame-v1.2" \
+      --build-version "1.2.0" \
+      --build-root ./build/server/ \
+      --operating-system AMAZON_LINUX_2023
+
+    # Utwórz Fleet
+    aws gamelift create-fleet \
+      --name prod-game-fleet \
+      --build-id build-xxx \
+      --ec2-instance-type c6g.large \
+      --ec2-inbound-permissions '[
+        {"FromPort":7777,"ToPort":7777,"IpRange":"0.0.0.0/0","Protocol":"UDP"}
+      ]' \
+      --runtime-configuration '{
+        "ServerProcesses":[{
+          "LaunchPath":"/local/game/GameServer",
+          "Parameters":"-port 7777",
+          "ConcurrentExecutions":1
+        }]
+      }'

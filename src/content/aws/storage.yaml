@@ -1,0 +1,548 @@
+- name: S3 — Simple Storage Service
+  when: Backupy, logi, artefakty buildu, statyczne strony, CDN origin, data lake, media pliki
+  desc: |
+    Nieograniczone, trwałe przechowywanie obiektów. 99.999999999% durability (11 dziewiątek).
+    Nie jest dyskiem — nie ma prawdziwej hierarchii folderów (klucz to string ze /).
+
+    Klasy przechowywania:
+    • Standard:               $0.023/GB — dostęp w ms, 99.99% availability
+    • Standard-IA:            $0.0125/GB — rzadki dostęp, $0.01/GB retrieval
+    • One Zone-IA:            $0.01/GB  — jak IA, tylko 1 AZ
+    • Glacier Instant:        $0.004/GB — ms retrieval
+    • Glacier Flexible:       $0.0036/GB — 1-5min retrieval, free Bulk (5-12h)
+    • Glacier Deep Archive:   $0.00099/GB — 12h retrieval, najtańszy
+    • Intelligent-Tiering:    automatycznie przenosi między klasami ($0.0025/1k objects)
+  code: |
+    # Wersjonowanie — przechowuj wszystkie wersje obiektu
+    aws s3api put-bucket-versioning \
+      --bucket moj-bucket \
+      --versioning-configuration Status=Enabled
+
+    # Event → Lambda (trigger przy upload obrazka)
+    aws s3api put-bucket-notification-configuration \
+      --bucket moj-bucket \
+      --notification-configuration '{
+        "LambdaFunctionConfigurations": [{
+          "LambdaFunctionArn": "arn:aws:lambda:...:process-upload",
+          "Events": ["s3:ObjectCreated:*"],
+          "Filter": {"Key": {"FilterRules": [{"Name":"suffix","Value":".jpg"}]}}
+        }]
+      }'
+
+    # Lifecycle — automatycznie przenoś do Glacier po 90 dniach
+    aws s3api put-bucket-lifecycle-configuration \
+      --bucket moj-bucket \
+      --lifecycle-configuration file://lifecycle.json
+
+    # Static website hosting
+    aws s3 website s3://moja-strona.pl/ \
+      --index-document index.html \
+      --error-document 404.html
+
+    # Sync + deploy (invalidacja CloudFront po deploy)
+    aws s3 sync ./dist s3://moja-strona.pl/ --delete \
+      --cache-control "max-age=31536000" \
+      --exclude "*.html"
+    aws cloudfront create-invalidation \
+      --distribution-id EXXXXX --paths "/*.html"
+
+- name: Amazon EBS — Elastic Block Store
+  when: Dysk dla EC2, bazy danych na VM (PostgreSQL, MySQL), wysoki IOPS, persistent storage
+  desc: |
+    Sieciowy dysk blokowy podpinany do instancji EC2. Jak dysk twardy, ale przez sieć.
+    Jeden EBS = jeden EC2 (wyjątek: multi-attach dla io2 Block Express).
+
+    Typy wolumenów:
+    • gp3 — General Purpose SSD. 3000 IOPS baseline, do 16000 IOPS.
+      $0.08/GB/mies. Domyślny wybór dla większości.
+    • io2 Block Express — Provisioned IOPS SSD. Do 256000 IOPS.
+      $0.125/GB/mies + $0.065 per IOPS. Dla krytycznych baz danych.
+    • st1 — Throughput Optimized HDD. Tani, wysoki throughput, niski IOPS.
+      $0.045/GB/mies. Big data, Kafka, log processing.
+    • sc1 — Cold HDD. Najtańszy, rzadki dostęp. $0.015/GB/mies.
+
+    Snapshots: inkrementalne kopie do S3. $0.05/GB/mies.
+    Data Lifecycle Manager — automatyczne snapshots (codziennie, retencja 7 dni).
+  code: |
+    # Utwórz gp3 volume 100GB
+    aws ec2 create-volume \
+      --volume-type gp3 \
+      --size 100 \
+      --availability-zone eu-west-1a \
+      --iops 6000 \
+      --throughput 250 \
+      --encrypted \
+      --kms-key-id arn:aws:kms:...
+
+    # Podpnij do instancji
+    aws ec2 attach-volume \
+      --volume-id vol-xxx \
+      --instance-id i-xxx \
+      --device /dev/sdf
+
+    # Na EC2 — zamontuj
+    lsblk && sudo mkfs -t xfs /dev/nvme1n1
+    sudo mkdir /data && sudo mount /dev/nvme1n1 /data
+    echo '/dev/nvme1n1 /data xfs defaults 0 0' | sudo tee -a /etc/fstab
+
+    # Automatyczne snapshots (Data Lifecycle Manager)
+    aws dlm create-lifecycle-policy \
+      --description "Daily EBS snapshots" \
+      --state ENABLED \
+      --execution-role-arn arn:aws:iam::123:role/DLMRole \
+      --policy-details file://dlm-policy.json
+
+- name: Amazon EFS — Elastic File System
+  when: Współdzielony filesystem dla wielu EC2/ECS/Lambda, CMS, shared config, ML datasets
+  desc: |
+    Sieciowy filesystem NFS współdzielony przez wiele instancji jednocześnie.
+    Skalowalny automatycznie, płacisz za faktyczne zużycie (nie rezerwujesz pojemności).
+
+    Tryby wydajności:
+    • General Purpose — latency-sensitive (web serwery, CMS). Domyślny.
+    • Max I/O — dla setek instancji równocześnie (big data, media processing).
+
+    Klasy przechowywania:
+    • Standard: $0.30/GB/mies
+    • Standard-IA: $0.025/GB/mies (rzadki dostęp, $0.01/GB retrieval)
+    • One Zone: $0.16/GB/mies (jeden AZ, tańszy)
+
+    EFS vs EBS:
+    • EFS: wiele instancji jednocześnie, skalowalny, NFS protokół
+    • EBS: jedna instancja, szybszy, blokowy (nie plikowy)
+  code: |
+    # Utwórz EFS filesystem
+    aws efs create-file-system \
+      --performance-mode generalPurpose \
+      --throughput-mode elastic \
+      --encrypted \
+      --tags Key=Name,Value=prod-efs
+
+    # Mount Target w każdym AZ
+    aws efs create-mount-target \
+      --file-system-id fs-xxx \
+      --subnet-id subnet-1a \
+      --security-groups sg-efs
+
+    # Na EC2 — zamontuj NFS
+    sudo yum install -y amazon-efs-utils
+    sudo mount -t efs fs-xxx:/ /mnt/efs
+    # Lub w /etc/fstab:
+    # fs-xxx.efs.eu-west-1.amazonaws.com:/ /mnt/efs efs defaults,_netdev 0 0
+
+    # W ECS Task Definition (shared volume między kontenerami)
+    # "volumes": [{"efsVolumeConfiguration": {"fileSystemId": "fs-xxx"}}]
+
+- name: Amazon RDS — Relacyjne Bazy Danych
+  when: PostgreSQL/MySQL/MariaDB/Oracle/SQL Server w chmurze, managed patching i backup
+  desc: |
+    Fully managed relational database — AWS zarządza backupami, patching, failover, monitoring.
+    Obsługuje: PostgreSQL 16, MySQL 8, MariaDB, Oracle, SQL Server, Db2.
+
+    Kluczowe funkcje:
+    • Multi-AZ: synchroniczna replika standby w innym AZ. Automatic failover < 60s.
+    • Read Replicas: asynchroniczne repliki tylko do odczytu (skalowanie SELECT-ów).
+      Do 5 replik. Mogą być w innym regionie (cross-region replication).
+    • Automated Backups: codziennie do S3, retencja 1-35 dni, Point-in-Time Recovery.
+    • Enhanced Monitoring: metryki per-process, per-thread (50 metryk co 1s).
+    • Performance Insights: widzi które zapytania zjadają CPU/IO — darmowe przez 7 dni.
+    • Proxy: RDS Proxy zarządza connection pooling (ważne dla Lambda która tworzy tysiące połączeń).
+
+    Instancje: db.t3.micro (Free Tier, 2vCPU 1GB) → db.r8g.48xlarge (192 vCPU 1.5TB RAM)
+  code: |
+    # Utwórz PostgreSQL Multi-AZ
+    aws rds create-db-instance \
+      --db-instance-identifier prod-postgres \
+      --db-instance-class db.t3.medium \
+      --engine postgres \
+      --engine-version 16.2 \
+      --master-username admin \
+      --master-user-password "SecurePass123!" \
+      --allocated-storage 100 \
+      --storage-type gp3 \
+      --storage-encrypted \
+      --multi-az \
+      --db-subnet-group-name prod-subnet-group \
+      --vpc-security-group-ids sg-xxx \
+      --backup-retention-period 7 \
+      --enable-performance-insights \
+      --tags Key=Env,Value=prod
+
+    # Read Replica dla raportów
+    aws rds create-db-instance-read-replica \
+      --db-instance-identifier prod-postgres-replica \
+      --source-db-instance-identifier prod-postgres \
+      --db-instance-class db.t3.medium
+
+    # RDS Proxy (connection pooling dla Lambda)
+    aws rds create-db-proxy \
+      --db-proxy-name prod-proxy \
+      --engine-family POSTGRESQL \
+      --auth '[{"AuthScheme":"SECRETS","SecretArn":"arn:aws:secretsmanager:..."}]' \
+      --role-arn arn:aws:iam::123:role/RDSProxyRole \
+      --vpc-subnet-ids subnet-1a subnet-1b
+
+- name: Amazon Aurora — AWS-Native Database Engine
+  when: PostgreSQL/MySQL kompatybilna, 5x wydajność RDS, auto-scaling storage, Serverless v2
+  desc: |
+    Własny silnik AWS kompatybilny z PostgreSQL i MySQL.
+    5x wydajność PostgreSQL, 3x MySQL — przy niższych kosztach niż commercial DB.
+
+    Kluczowe różnice vs RDS:
+    • Storage: automatycznie rośnie od 10GB do 128TB (nie rezerwujesz)
+    • Replikacja: do 15 read replicas, < 10ms lag (vs RDS ~10s)
+    • Failover: < 30s (vs RDS ~60s)
+    • Storage architektura: 6 kopii danych w 3 AZ (2 na AZ)
+
+    Aurora Serverless v2:
+    • Skaluje CPU/RAM w frakcjach ACU (Aurora Capacity Units) w sekundach
+    • Idealne dla nieprzewidywalnych workloadów, dev/staging
+    • Skaluje do zera (cold start 5-30s) — płacisz za ACU/godzinę gdy aktywna
+
+    Aurora Global Database:
+    • Replikacja cross-region < 1 sekunda
+    • Disaster recovery: RPO < 5s, RTO < 1 min
+    • Możliwy write forwarding (write w secondary region)
+  code: |
+    # Aurora PostgreSQL Serverless v2
+    aws rds create-db-cluster \
+      --db-cluster-identifier prod-aurora \
+      --engine aurora-postgresql \
+      --engine-version 16.2 \
+      --serverless-v2-scaling-configuration MinCapacity=0.5,MaxCapacity=32 \
+      --master-username admin \
+      --master-user-password "SecurePass123!" \
+      --storage-encrypted \
+      --db-subnet-group-name prod-subnet-group \
+      --vpc-security-group-ids sg-xxx
+
+    # Dodaj writer instance
+    aws rds create-db-instance \
+      --db-instance-identifier prod-aurora-writer \
+      --db-cluster-identifier prod-aurora \
+      --db-instance-class db.serverless \
+      --engine aurora-postgresql
+
+    # Dodaj reader instance (read scaling)
+    aws rds create-db-instance \
+      --db-instance-identifier prod-aurora-reader-1 \
+      --db-cluster-identifier prod-aurora \
+      --db-instance-class db.serverless \
+      --engine aurora-postgresql
+
+    # Aurora Global Database (multi-region DR)
+    aws rds create-global-cluster \
+      --global-cluster-identifier prod-global \
+      --source-db-cluster-identifier arn:aws:rds:eu-west-1:123:cluster:prod-aurora
+
+- name: Amazon DynamoDB — NoSQL Serverless
+  when: Miliony requestów/s, key-value i document store, gaming, IoT, sesje, shopping cart
+  desc: |
+    Fully managed, serverless NoSQL — zero infrastruktury do zarządzania.
+    Single-digit millisecond latency w każdej skali.
+
+    Model danych:
+    • Table — zbiór items (rekordów)
+    • Item — rekord (max 400KB). Każdy item może mieć inne atrybuty.
+    • Primary Key: Partition Key (hash) LUB Partition Key + Sort Key (range)
+    • GSI (Global Secondary Index) — zapytania po innych atrybutach
+
+    Tryby pojemności:
+    • On-Demand: płacisz per request ($1.25/M writes, $0.25/M reads). Dla nieprzewidywalnych.
+    • Provisioned: rezerwujesz RCU/WCU. Tańsze przy stałym ruchu + Auto Scaling.
+
+    DynamoDB Streams + Lambda — event-driven architektura:
+    każda zmiana w tabeli → Lambda → real-time processing
+
+    DAX (DynamoDB Accelerator): in-memory cache, microsecond latency, API-compatible
+  code: |
+    import boto3
+    from boto3.dynamodb.conditions import Key, Attr
+
+    dynamodb = boto3.resource('dynamodb', region_name='eu-west-1')
+    table = dynamodb.Table('Orders')
+
+    # Put item
+    table.put_item(Item={
+        'userId': 'user-123',       # Partition Key
+        'orderId': 'ord-456',       # Sort Key
+        'status': 'pending',
+        'total': 199.99,
+        'items': [{'sku': 'ABC', 'qty': 2}],
+        'createdAt': '2024-01-15T10:30:00Z'
+    })
+
+    # Query wszystkich zamówień użytkownika
+    response = table.query(
+        KeyConditionExpression=Key('userId').eq('user-123'),
+        FilterExpression=Attr('status').eq('pending'),
+        ScanIndexForward=False,  # od najnowszych
+        Limit=20
+    )
+
+    # Update atomiczny (bezpieczne — nie wyścig)
+    table.update_item(
+        Key={'userId': 'user-123', 'orderId': 'ord-456'},
+        UpdateExpression='SET #s = :new, updatedAt = :now ADD version :inc',
+        ConditionExpression='#s = :old',  # optimistic locking!
+        ExpressionAttributeNames={'#s': 'status'},
+        ExpressionAttributeValues={
+            ':new': 'shipped', ':old': 'pending',
+            ':now': '2024-01-16T08:00:00Z', ':inc': 1
+        }
+    )
+
+    # Batch write (25 items naraz)
+    with table.batch_writer() as batch:
+        for i in range(100):
+            batch.put_item(Item={'userId': f'user-{i}', 'orderId': f'ord-{i}'})
+
+- name: Amazon ElastiCache — In-Memory Cache
+  when: Session store, cache bazy danych, rate limiting, pub/sub, leaderboardy
+  desc: |
+    Managed Redis (v7) i Memcached w chmurze. Zero patching, automatic failover, Multi-AZ.
+
+    Redis vs Memcached:
+    • Redis: persistence, struktury danych (sorted sets, streams, hashes), pub/sub, transactions
+    • Memcached: prosty cache, multi-thread, brak persistence — rzadko wybierany w 2024
+
+    Topologie Redis:
+    • Single Node — dev/test. Brak failover.
+    • Cluster Mode Disabled — primary + replica. Failover w 30-60s.
+    • Cluster Mode Enabled — horizontal sharding, do 500 shardów, petabajty danych.
+
+    Kiedy ElastiCache vs DynamoDB DAX:
+    • ElastiCache: ogólny cache, sesje, rate limiting, pub/sub
+    • DAX: tylko dla DynamoDB — drop-in replacement, API compatible
+
+    Cena: cache.r7g.large = $0.166/h (~$120/mies). Multi-AZ = 2× koszt.
+  code: |
+    import redis, json
+
+    r = redis.Redis(
+        host='prod-redis.xxx.ng.0001.euw1.cache.amazonaws.com',
+        port=6379,
+        decode_responses=True,
+        socket_connect_timeout=2
+    )
+
+    # Cache-aside pattern
+    def get_user(user_id: str) -> dict:
+        cached = r.get(f'user:{user_id}')
+        if cached:
+            return json.loads(cached)
+        # Cache miss — idź do bazy
+        user = db.query(f"SELECT * FROM users WHERE id = '{user_id}'")
+        r.setex(f'user:{user_id}', 3600, json.dumps(user))  # TTL 1h
+        return user
+
+    # Rate limiting (sliding window)
+    def is_rate_limited(user_id: str, limit: int = 100) -> bool:
+        import time
+        key = f'ratelimit:{user_id}'
+        pipe = r.pipeline()
+        now = time.time()
+        pipe.zremrangebyscore(key, 0, now - 60)  # usuń stare
+        pipe.zadd(key, {str(now): now})
+        pipe.zcard(key)
+        pipe.expire(key, 60)
+        _, _, count, _ = pipe.execute()
+        return count > limit
+
+    # Pub/Sub (real-time notifications)
+    pubsub = r.pubsub()
+    pubsub.subscribe('order-updates')
+    for message in pubsub.listen():
+        if message['type'] == 'message':
+            print(f"Update: {message['data']}")
+
+- name: Amazon Redshift — Data Warehouse
+  when: Analityka na petabajtach danych, BI dashboardy, SQL na danych historycznych
+  desc: |
+    Petabyte-scale data warehouse — SQL na ogromnych zbiorach danych.
+    Columnar storage + masowy parallel processing (MPP) = 10x szybszy niż tradycyjne OLTP.
+
+    Typy klastrów:
+    • Provisioned: dedykowane węzły (RA3: oddziela compute od storage przez S3)
+    • Serverless: automatyczne skalowanie, płacisz per RPU (Redshift Processing Unit)
+
+    Kluczowe koncepcje:
+    • Columnar storage — dane per kolumna (idealne dla SELECT count, SUM, AVG)
+    • Distribution styles: EVEN, KEY (join optimization), ALL (mała tabela)
+    • Sort keys: porządkuje dane na dysku — dramatycznie przyspiesza range queries
+    • COPY command — ładowanie danych z S3 (miliony wierszy w minutach)
+    • Redshift Spectrum — zapytania bezpośrednio na S3 (bez ładowania do Redshift)
+    • Data Sharing — współdziel dane między klastrami bez kopiowania
+  code: |
+    -- Utwórz tabelę z optymalną konfiguracją
+    CREATE TABLE sales (
+        sale_id     BIGINT IDENTITY(1,1),
+        user_id     INT NOT NULL,
+        product_id  INT NOT NULL,
+        amount      DECIMAL(10,2),
+        sale_date   DATE NOT NULL,
+        region      VARCHAR(50)
+    )
+    DISTSTYLE KEY
+    DISTKEY (user_id)
+    SORTKEY (sale_date, region);
+
+    -- Załaduj dane z S3 (masowy import)
+    COPY sales
+    FROM 's3://data-bucket/sales/2024/'
+    IAM_ROLE 'arn:aws:iam::123:role/RedshiftS3Role'
+    FORMAT AS PARQUET;
+
+    -- Analityczne zapytanie (miliardy wierszy w sekundy)
+    SELECT
+        region,
+        DATE_TRUNC('month', sale_date) AS month,
+        COUNT(*)                        AS transactions,
+        SUM(amount)                     AS revenue,
+        AVG(amount)                     AS avg_order
+    FROM sales
+    WHERE sale_date BETWEEN '2024-01-01' AND '2024-12-31'
+    GROUP BY region, month
+    ORDER BY month, revenue DESC;
+
+    -- Redshift Spectrum — SQL bezpośrednio na S3 (bez importu!)
+    CREATE EXTERNAL SCHEMA s3_logs
+    FROM DATA CATALOG DATABASE 'analytics'
+    IAM_ROLE 'arn:aws:iam::123:role/RedshiftSpectrumRole'
+    CREATE EXTERNAL DATABASE IF NOT EXISTS;
+
+- name: Amazon DynamoDB Streams + EventBridge Pipes
+  when: Real-time reakcja na zmiany w DynamoDB, CDC (Change Data Capture), event-driven
+  desc: |
+    DynamoDB Streams przechwytuje każdą zmianę (INSERT/MODIFY/REMOVE) w tabeli.
+    EventBridge Pipes łączy Streams z dowolnym targtem bez kodu glue.
+
+    Zastosowania:
+    • Search indexing: zmiana w DynamoDB → Lambda → OpenSearch (real-time index)
+    • Cache invalidation: zmiana → Lambda → Redis.delete(key)
+    • Audit log: każda zmiana → S3/CloudWatch trwały zapis
+    • Cross-region replication: zmiana w eu-west-1 → Lambda → DynamoDB us-east-1
+    • Analytics: zmiana → Kinesis → Redshift/S3 (data pipeline)
+
+    EventBridge Pipes (2023+) — deklaratywny, bez kodu:
+    Source → Filter → Enrich (Lambda/Step Functions) → Target
+  code: |
+    import boto3, json
+
+    # Lambda handler dla DynamoDB Stream
+    def handler(event, context):
+        for record in event['Records']:
+            event_name = record['eventName']  # INSERT, MODIFY, REMOVE
+            new_image = record.get('dynamodb', {}).get('NewImage', {})
+            old_image = record.get('dynamodb', {}).get('OldImage', {})
+
+            if event_name == 'MODIFY':
+                user_id = new_image.get('userId', {}).get('S')
+                new_status = new_image.get('status', {}).get('S')
+                old_status = old_image.get('status', {}).get('S')
+
+                if old_status != new_status:
+                    # Invaliduj cache
+                    redis_client.delete(f'user:{user_id}')
+                    # Wyślij notyfikację
+                    sns.publish(
+                        TopicArn='arn:aws:sns:...:order-updates',
+                        Message=json.dumps({'userId': user_id, 'status': new_status})
+                    )
+
+    # Włącz Streams na tabeli
+    # aws dynamodb update-table --table-name Orders \
+    #   --stream-specification StreamEnabled=true,StreamViewType=NEW_AND_OLD_IMAGES
+
+- name: Amazon S3 Glacier — Archiwizacja
+  when: Dane trzymane 7+ lat (compliance, backup historyczny), rzadki lub zerowy dostęp
+  desc: |
+    Najtańsze przechowywanie w AWS — od $0.00099/GB/mies (Deep Archive).
+    Ceną za niski koszt jest czas retrieval: minuty do godzin.
+
+    Klasy (porównanie retrieval):
+    • Glacier Instant Retrieval: milliseconds. $0.004/GB. Min 90 dni.
+    • Glacier Flexible Retrieval: Expedited 1-5min ($0.03/GB), Standard 3-5h (free), Bulk 5-12h (free)
+    • Glacier Deep Archive: Standard 12h (free), Bulk 48h (free). Min 180 dni.
+
+    Vault Lock — WORM (Write Once Read Many):
+    • Compliance mode: NIKT (nawet root/AWS) nie może usunąć danych przez X lat
+    • GDPR/HIPAA/SEC 17a-4 wymagają WORM dla audit logów
+
+    Kiedy używać:
+    • Logi aplikacji po 1 roku — Glacier Flexible
+    • Medical records, financial records — Deep Archive + Vault Lock
+    • Backup tapes zastąpione przez Deep Archive (10× tańsze niż tape infrastructure)
+  code: |
+    # Lifecycle rule: S3 → Glacier po 1 roku
+    # lifecycle.json:
+    {
+      "Rules": [{
+        "ID": "archive-old-logs",
+        "Filter": {"Prefix": "logs/"},
+        "Status": "Enabled",
+        "Transitions": [
+          {"Days": 30, "StorageClass": "STANDARD_IA"},
+          {"Days": 90, "StorageClass": "GLACIER"},
+          {"Days": 365, "StorageClass": "DEEP_ARCHIVE"}
+        ],
+        "Expiration": {"Days": 2555}
+      }]
+    }
+
+    aws s3api put-bucket-lifecycle-configuration \
+      --bucket moj-bucket \
+      --lifecycle-configuration file://lifecycle.json
+
+    # Vault Lock (compliance) — NIEODWRACALNE po locku!
+    aws glacier initiate-vault-lock \
+      --account-id - \
+      --vault-name compliance-archive \
+      --policy '{"Policy":"{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Deny\",\"Principal\":\"*\",\"Action\":[\"glacier:DeleteArchive\"],\"Resource\":\"arn:aws:glacier:eu-west-1:123:vaults/compliance-archive\"}]}"}'
+
+- name: Amazon SES — Simple Email Service
+  when: Transakcyjne emaile, reset hasła, powiadomienia, bulk marketing, email receiving
+  desc: |
+    Managed email sending i receiving. $0.10 per 1000 emaili.
+
+    Dwa tryby:
+    • Wysyłanie — SMTP lub API (boto3)
+    • Odbieranie — SES odbiera emaile i przekazuje do Lambda/S3
+
+    Ważne koncepcje:
+    • Verified Identity — zweryfikuj domenę (DNS TXT) lub adres email
+    • DKIM/SPF/DMARC — autentykacja emaila, wysoka dostarczalność
+    • Suppression list — automatycznie nie wysyłaj do adresów które bounceowały
+    • Configuration Sets — śledzenie bounces/complaints/opens/clicks
+    • Sandbox mode — nowe konto może wysyłać tylko do zweryfikowanych adresów
+
+    Bounce rate > 10% = ryzyko zawieszenia konta. Monitoruj!
+  code: |
+    import boto3
+    from botocore.exceptions import ClientError
+
+    ses = boto3.client('ses', region_name='eu-west-1')
+
+    # Wyślij email HTML
+    try:
+        ses.send_email(
+            Source='noreply@twoja-domena.pl',
+            Destination={'ToAddresses': ['user@example.com']},
+            Message={
+                'Subject': {'Data': 'Potwierdzenie zamówienia #12345'},
+                'Body': {
+                    'Html': {'Data': '<h1>Dzięki!</h1><p>Kwota: <b>199,99 PLN</b></p>'},
+                    'Text': {'Data': 'Dzięki! Zamówienie #12345 przyjęte. Kwota: 199,99 PLN'}
+                }
+            },
+            ConfigurationSetName='transactional-emails'
+        )
+    except ClientError as e:
+        print(e.response['Error']['Message'])
+
+    # Zweryfikuj domenę (DNS)
+    # aws ses verify-domain-identity --domain twoja-domena.pl
+    # Dodaj TXT record: _amazonses.domena.pl = <token>
+
+    # Email Receiving — MX record → inbound-smtp.eu-west-1.amazonaws.com
+    # Receipt Rule: odbierz na support@domena.pl → Lambda + S3

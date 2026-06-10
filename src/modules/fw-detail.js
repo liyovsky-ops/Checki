@@ -107,8 +107,8 @@ function renderTabContent(tabId, data) {
     case 'hooki':      el.innerHTML = isGeneric(data.content.hooki)      ? renderGenericSection(data.content.hooki, meta)      : renderHooks(data.content.hooki); break;
     case 'routing':    el.innerHTML = isGeneric(data.content.routing)    ? renderGenericSection(data.content.routing, meta)    : renderRouting(data.content.routing, meta); break;
     case 'state':      el.innerHTML = isGeneric(data.content.state)      ? renderGenericSection(data.content.state, meta)      : renderState(data.content.state); break;
-    case 'rywale':     el.innerHTML = renderRivals(data.content.rywale);  break;
-    case 'pluginy':    el.innerHTML = renderPlugins(data.content.pluginy); break;
+    case 'rywale':     el.innerHTML = isGeneric(data.content.rywale)  ? renderGenericSection(data.content.rywale, meta)  : renderRivals(data.content.rywale);  break;
+    case 'pluginy':    el.innerHTML = isGeneric(data.content.pluginy) ? renderGenericSection(data.content.pluginy, meta) : renderPlugins(data.content.pluginy); break;
     case 'komendy':    el.innerHTML = renderCommands(data.content.komendy); break;
     default: el.innerHTML = '<div class="fwd-coming-soon"><div>Wkrótce...</div></div>';
   }

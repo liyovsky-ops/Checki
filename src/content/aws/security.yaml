@@ -1,0 +1,739 @@
+title: Security & DevOps — Bezpieczeństwo i automatyzacja AWS
+items:
+  - name: IAM — Identity and Access Management
+    icon: "🔐"
+    color: "#FF9900"
+    bundle: core
+    complexity: medium
+    when: zawsze, każdy zasób w AWS
+    desc: |
+      Fundament bezpieczeństwa całego AWS. Kontroluje KTO może robić CO z KTÓRYMI zasobami.
+
+      Kluczowe koncepcje:
+      • Users: tożsamości dla ludzi — nie twórz Access Keys dla roota, używaj MFA
+      • Groups: zbiory uprawnień — dodajesz użytkownika do grupy, nie przypisujesz polityk indywidualnie
+      • Roles: tożsamości dla serwisów — EC2 zakłada rolę żeby czytać z S3 (nie przechowuje credentials)
+      • Policies: JSON dokumenty definiujące uprawnienia (Effect Allow/Deny + Action + Resource)
+
+      Zasady:
+      • Least Privilege: dawaj MINIMUM potrzebnych uprawnień, rozszerzaj gdy potrzeba
+      • Never use root: root tylko do billing, support, initial setup
+      • Roles > Access Keys: EC2/Lambda powinny używać IAM Roles, nie zakodowanych kluczy
+      • MFA everywhere: obligatoryjnie dla wszystkich kont z dostępem do Console
+
+      Permission boundaries: "ceiling" na uprawnienia — nawet jeśli polityka daje AdministratorAccess,
+      boundary może ograniczyć do konkretnych serwisów. Używane przy delegowaniu tworzenia ról.
+    code: |
+      # Polityka least-privilege (S3 read-only dla konkretnego bucketa)
+      aws iam create-policy \
+        --policy-name ReadCheckiBucket \
+        --policy-document '{
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:GetObject", "s3:ListBucket"],
+            "Resource": [
+              "arn:aws:s3:::checki-assets",
+              "arn:aws:s3:::checki-assets/*"
+            ]
+          }]
+        }'
+
+      # Rola dla EC2 (zakłada rolę, zero Access Keys)
+      aws iam create-role \
+        --role-name ec2-s3-reader \
+        --assume-role-policy-document '{
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": {"Service": "ec2.amazonaws.com"},
+            "Action": "sts:AssumeRole"
+          }]
+        }'
+
+      aws iam attach-role-policy \
+        --role-name ec2-s3-reader \
+        --policy-arn arn:aws:iam::ACCOUNT:policy/ReadCheckiBucket
+
+      # Wymuszanie MFA na użytkownikach
+      aws iam create-policy --policy-name ForceMFA \
+        --policy-document '{
+          "Version": "2012-10-17",
+          "Statement": [
+            {"Effect": "Allow", "Action": "iam:CreateVirtualMFADevice", "Resource": "*"},
+            {"Effect": "Deny", "NotAction": ["iam:CreateVirtualMFADevice","iam:EnableMFADevice","sts:GetSessionToken"],
+             "Resource": "*",
+             "Condition": {"BoolIfExists": {"aws:MultiFactorAuthPresent": "false"}}}
+          ]
+        }'
+
+  - name: Cognito — Auth dla Aplikacji
+    icon: "👤"
+    color: "#DD344C"
+    bundle: auth
+    complexity: medium
+    when: aplikacje web/mobile wymagające rejestracji użytkowników
+    desc: |
+      Managed Identity dla aplikacji — rejestracja, logowanie, OAuth, JWT.
+      Zero implementacji auth od zera.
+
+      User Pools:
+      • Katalog użytkowników — email/hasło, MFA, email verification
+      • Social login: Google, Facebook, Apple, SAML/OIDC enterprise
+      • Customization: Lambda triggers (pre-signup, post-authentication, custom messages)
+      • JWT tokens: ID token, Access token, Refresh token
+      • Cena: pierwsze 50k MAU gratis, potem $0.0055/MAU
+
+      Identity Pools (Federated Identities):
+      • Zamień token (Cognito/Google/Facebook/SAML) → tymczasowe AWS credentials
+      • Użytkownik loguje się przez Cognito User Pool → dostaje IAM credentials → odczytuje S3
+      • Oddzielne role dla zalogowanych i niezalogowanych (guest access)
+    code: |
+      # User Pool z email verification
+      POOL=$(aws cognito-idp create-user-pool \
+        --pool-name checki-users \
+        --policies '{"PasswordPolicy":{"MinimumLength":8,"RequireUppercase":true,"RequireNumbers":true}}' \
+        --auto-verified-attributes email \
+        --username-attributes email \
+        --query 'UserPool.Id' --output text)
+
+      # App Client (dla web/mobile)
+      CLIENT=$(aws cognito-idp create-user-pool-client \
+        --user-pool-id $POOL \
+        --client-name checki-web \
+        --no-generate-secret \
+        --explicit-auth-flows ALLOW_USER_PASSWORD_AUTH ALLOW_REFRESH_TOKEN_AUTH \
+        --query 'UserPoolClient.ClientId' --output text)
+
+      # Rejestracja użytkownika
+      aws cognito-idp sign-up \
+        --client-id $CLIENT \
+        --username user@example.com \
+        --password SecurePass123!
+
+      # Potwierdzenie emailem
+      aws cognito-idp confirm-sign-up \
+        --client-id $CLIENT \
+        --username user@example.com \
+        --confirmation-code 123456
+
+      # Logowanie → JWT
+      aws cognito-idp initiate-auth \
+        --client-id $CLIENT \
+        --auth-flow USER_PASSWORD_AUTH \
+        --auth-parameters USERNAME=user@example.com,PASSWORD=SecurePass123!
+
+  - name: WAF — Web Application Firewall
+    icon: "🛡️"
+    color: "#FF4F8B"
+    bundle: security
+    complexity: medium
+    when: ochrona ALB, API Gateway, CloudFront przed atakami webowymi
+    desc: |
+      Layer 7 firewall — blokuj ataki zanim dotrą do aplikacji.
+      Działa na: ALB, API Gateway, CloudFront, AppSync, App Runner.
+
+      Rule Groups:
+      • AWS Managed Rules: gotowe reguły od AWS (OWASP Top 10, Common, Bad Inputs, Known Bad Inputs)
+      • AWS Marketplace Rules: Imperva, F5, Fortinet (płatne, ale zaawansowane)
+      • Custom Rules: Twoje własne — IP allowlist/blocklist, rate limiting, geo-blocking
+
+      Typy reguł:
+      • IP Set: blokuj konkretne IP lub zakresy CIDR
+      • Geo Match: blokuj kraje, z których nie oczekujesz ruchu
+      • Rate Based: max 1000 req/5min z jednego IP → block
+      • String Match: blokuj requestu zawierające SQL injection patterns, XSS
+      • Regex: zaawansowane pattern matching
+
+      Cena: $5/mies per WebACL + $1 per 1M requestów + $1 per rule (najtańszy jest Managed Rules)
+    code: |
+      # Web ACL z AWS Managed Rules + rate limiting
+      aws wafv2 create-web-acl \
+        --name checki-waf \
+        --scope REGIONAL \
+        --default-action Allow={} \
+        --rules '
+        [
+          {
+            "Name": "AWSManagedRulesCommonRuleSet",
+            "Priority": 0,
+            "Statement": {"ManagedRuleGroupStatement": {"VendorName": "AWS", "Name": "AWSManagedRulesCommonRuleSet"}},
+            "OverrideAction": {"None": {}},
+            "VisibilityConfig": {"SampledRequestsEnabled": true, "CloudWatchMetricsEnabled": true, "MetricName": "CommonRules"}
+          },
+          {
+            "Name": "RateLimit1000",
+            "Priority": 1,
+            "Statement": {"RateBasedStatement": {"Limit": 1000, "AggregateKeyType": "IP"}},
+            "Action": {"Block": {}},
+            "VisibilityConfig": {"SampledRequestsEnabled": true, "CloudWatchMetricsEnabled": true, "MetricName": "RateLimit"}
+          }
+        ]
+        ' \
+        --visibility-config SampledRequestsEnabled=true,CloudWatchMetricsEnabled=true,MetricName=checki-waf
+
+      # Podepnij do ALB
+      aws wafv2 associate-web-acl \
+        --web-acl-arn arn:aws:wafv2:... \
+        --resource-arn arn:aws:elasticloadbalancing:...
+
+  - name: KMS — Key Management Service
+    icon: "🔑"
+    color: "#FF9900"
+    bundle: encryption
+    complexity: medium
+    when: szyfrowanie danych w spoczynku i w tranzycie
+    desc: |
+      Managed service do tworzenia i zarządzania kluczami kryptograficznymi.
+      Każde wywołanie KMS jest logowane w CloudTrail — audit trail dla compliance.
+
+      Typy kluczy:
+      • AWS Managed Keys: automatycznie tworzone dla serwisów (aws/s3, aws/rds), rotacja co rok
+      • Customer Managed Keys (CMK): Twój klucz, Twoja kontrola, $1/mies + $0.03 per 10k wywołań
+      • Customer Provided Keys (SSE-C): dostarczasz własny klucz przy każdym API call
+      • CloudHSM: dedykowany sprzęt HSM — banki, regulowane branże
+
+      Envelope Encryption:
+      KMS nie szyfruje danych bezpośrednio (max 4KB). Zamiast:
+      1. KMS generuje Data Key (plaintext + encrypted copy)
+      2. Szyfruj dane plaintext Data Key → encrypted data
+      3. Trzymaj encrypted data + encrypted Data Key (plaintext wyrzuć)
+      4. Odszyfrowanie: KMS decrypt → plaintext key → decrypt data
+
+      Integracje: S3, RDS, EBS, DynamoDB, Secrets Manager, CloudTrail, Lambda, SQS...
+    code: |
+      # Utwórz CMK
+      KEY=$(aws kms create-key \
+        --description "Checki production CMK" \
+        --key-usage ENCRYPT_DECRYPT \
+        --key-spec SYMMETRIC_DEFAULT \
+        --query 'KeyMetadata.KeyId' --output text)
+
+      # Alias dla czytelności
+      aws kms create-alias \
+        --alias-name alias/checki-prod \
+        --target-key-id $KEY
+
+      # Szyfrowanie
+      aws kms encrypt \
+        --key-id alias/checki-prod \
+        --plaintext "SecretApiKey123" \
+        --query 'CiphertextBlob' --output text > encrypted.b64
+
+      # Deszyfrowanie
+      aws kms decrypt \
+        --ciphertext-blob fileb://encrypted.b64 \
+        --query 'Plaintext' --output text | base64 --decode
+
+      # Automatyczna rotacja klucza co rok
+      aws kms enable-key-rotation --key-id $KEY
+
+      # S3 z CMK
+      aws s3api create-bucket --bucket moj-zaszyfrowany-bucket
+      aws s3api put-bucket-encryption \
+        --bucket moj-zaszyfrowany-bucket \
+        --server-side-encryption-configuration '{
+          "Rules": [{"ApplyServerSideEncryptionByDefault": {
+            "SSEAlgorithm": "aws:kms",
+            "KMSMasterKeyID": "alias/checki-prod"
+          }}]
+        }'
+
+  - name: Secrets Manager — Zarządzanie Sekretami
+    icon: "🗝️"
+    color: "#FF4F8B"
+    bundle: security
+    complexity: low
+    when: przechowywanie haseł DB, API keys, certyfikatów
+    desc: |
+      Bezpieczne przechowywanie i automatyczna rotacja sekretów — koniec z hardkodowanymi hasłami.
+
+      Co przechowuje:
+      • Database credentials (RDS, Aurora, Redshift, DocumentDB)
+      • API keys (Stripe, Twilio, OpenAI)
+      • OAuth tokens, SSH keys, X.509 certyfikaty
+      • Dowolny JSON lub string
+
+      Kluczowe funkcje:
+      • Automatyczna rotacja: Lambda aktualizuje hasło w DB + sekret jednocześnie
+      • Versioning: AWSCURRENT, AWSPENDING, AWSPREVIOUS — zero downtime przy rotacji
+      • Cross-account access: udostępniaj sekrety innym kontom przez IAM policies
+      • Replication: replikuj do innych regionów dla DR
+      • Audit: każde odczytanie sekretu ląduje w CloudTrail
+
+      Integracje natywne: RDS, Aurora, Redshift, DocumentDB — kliknij checkbox i gotowe.
+      Cena: $0.40/sekret/mies + $0.05 per 10k API calls
+    code: |
+      # Utwórz sekret
+      aws secretsmanager create-secret \
+        --name prod/checki/database \
+        --description "PostgreSQL credentials" \
+        --secret-string '{"username":"checki_app","password":"SuperSecure123!","host":"db.example.com","port":5432,"dbname":"checki"}'
+
+      # Odczyt sekretu w Python (Lambda, EC2)
+      # import boto3, json
+      # client = boto3.client('secretsmanager')
+      # secret = client.get_secret_value(SecretId='prod/checki/database')
+      # creds = json.loads(secret['SecretString'])
+      # conn = psycopg2.connect(host=creds['host'], database=creds['dbname'], ...)
+
+      # Rotacja automatyczna (RDS)
+      aws secretsmanager rotate-secret \
+        --secret-id prod/checki/database \
+        --rotation-rules AutomaticallyAfterDays=30
+
+      # Odczyt przez CLI (np. w skryptach CI/CD)
+      aws secretsmanager get-secret-value \
+        --secret-id prod/checki/database \
+        --query 'SecretString' --output text | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['password'])"
+
+  - name: CloudFormation — Infrastructure as Code
+    icon: "📋"
+    color: "#FF9900"
+    bundle: iac
+    complexity: high
+    when: definiowanie i zarządzanie infrastrukturą AWS jako kod
+    desc: |
+      Oficjalne IaC AWS — opisujesz infrastrukturę w YAML/JSON, CloudFormation tworzy ją.
+      Stack = zestaw zasobów zarządzanych jako jednostka (utwórz/aktualizuj/usuń razem).
+
+      Kluczowe koncepcje:
+      • Template: YAML/JSON opis zasobów
+      • Stack: konkretna instancja template (prod-stack, dev-stack)
+      • Change Sets: preview zmian PRZED zastosowaniem — jak `terraform plan`
+      • Nested Stacks: podziel duże template na moduły
+      • StackSets: deploy do wielu kont/regionów jednocześnie (multi-account orgs)
+      • Drift Detection: wykryj zasoby zmodyfikowane poza CloudFormation
+      • cfn-init/cfn-signal: bootstrapping EC2
+
+      Sekcje template:
+      Parameters, Mappings, Conditions, Resources (wymagane), Outputs, Metadata
+
+      Alternatywy:
+      • CDK — TypeScript/Python/Java generuje CloudFormation, dużo przyjemniejszy DX
+      • Terraform — multi-cloud, state w S3+DynamoDB, ogromna społeczność
+      • SAM — nakładka na CloudFormation dla serverless (Lambda, API GW, DynamoDB)
+    code: |
+      # Template YAML — VPC + EC2 + Security Group
+      cat > infra.yaml << 'EOF'
+      AWSTemplateFormatVersion: '2010-09-09'
+      Description: Checki App Infrastructure
+
+      Parameters:
+        Env:
+          Type: String
+          Default: dev
+          AllowedValues: [dev, staging, prod]
+
+      Resources:
+        AppVPC:
+          Type: AWS::EC2::VPC
+          Properties:
+            CidrBlock: 10.0.0.0/16
+            EnableDnsHostnames: true
+            Tags:
+              - Key: Name
+                Value: !Sub "checki-${Env}-vpc"
+
+        AppSecurityGroup:
+          Type: AWS::EC2::SecurityGroup
+          Properties:
+            GroupDescription: Allow HTTPS
+            VpcId: !Ref AppVPC
+            SecurityGroupIngress:
+              - IpProtocol: tcp
+                FromPort: 443
+                ToPort: 443
+                CidrIp: 0.0.0.0/0
+
+        AppDatabase:
+          Type: AWS::RDS::DBInstance
+          Properties:
+            DBInstanceClass: db.t3.micro
+            Engine: postgres
+            EngineVersion: "15"
+            MasterUsername: admin
+            ManageMasterUserPassword: true  # Secrets Manager automatycznie!
+            AllocatedStorage: 20
+            VPCSecurityGroups:
+              - !Ref AppSecurityGroup
+
+      Outputs:
+        VPCID:
+          Value: !Ref AppVPC
+          Export:
+            Name: !Sub "${Env}-vpc-id"
+      EOF
+
+      # Deploy
+      aws cloudformation create-stack \
+        --stack-name checki-dev \
+        --template-body file://infra.yaml \
+        --parameters ParameterKey=Env,ParameterValue=dev \
+        --capabilities CAPABILITY_IAM
+
+      # Update z preview
+      aws cloudformation create-change-set \
+        --stack-name checki-dev --change-set-name update-1 \
+        --template-body file://infra.yaml
+
+      aws cloudformation execute-change-set \
+        --stack-name checki-dev --change-set-name update-1
+
+  - name: CodePipeline & CodeBuild — CI/CD
+    icon: "🚀"
+    color: "#3F8624"
+    bundle: cicd
+    complexity: medium
+    when: automatyzacja buildu, testów i deployu aplikacji
+    desc: |
+      Kompletny CI/CD stack w obrębie AWS:
+
+      CodeCommit (Git hosting) → CodeBuild (build/test) → CodeDeploy (deploy) → CodePipeline (orkiestrator)
+
+      CodePipeline:
+      • Orkiestrator całego pipeline — łączy etapy
+      • Source: GitHub, CodeCommit, S3, ECR (nowy obraz → trigger)
+      • Build: CodeBuild
+      • Test: CodeBuild lub zewnętrzne narzędzia
+      • Deploy: CodeDeploy, ECS, Lambda, CloudFormation, Elastic Beanstalk
+      • Manual Approval: zatwierdź ręcznie przed deployem na prod
+
+      CodeBuild:
+      • Managed build servers — płacisz za minuty (brak idle)
+      • buildspec.yml w repozytorium
+      • Cache warstwy Docker dla szybszych buildów
+      • Środowiska: Ubuntu, Amazon Linux 2, custom Docker image
+      • $0.005/min dla small ($0.01 medium, $0.02 large)
+
+      CodeDeploy:
+      • EC2/ECS/Lambda — zero-downtime deploy
+      • Blue/Green: nowe środowisko → test → przełącz ruch
+      • Canary: 10% ruchu na nową wersję przez 10 min → sprawdź alarmy → 100%
+      • Rollback automatyczny gdy CloudWatch Alarms wykryje problem
+    code: |
+      # buildspec.yml (w root repo)
+      cat > buildspec.yml << 'EOF'
+      version: 0.2
+
+      phases:
+        install:
+          runtime-versions:
+            python: 3.11
+          commands:
+            - pip install -r requirements.txt
+
+        pre_build:
+          commands:
+            - pytest tests/ --tb=short
+            - aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+        build:
+          commands:
+            - docker build -t $IMAGE_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION .
+            - docker push $IMAGE_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
+
+        post_build:
+          commands:
+            - printf '[{"name":"app","imageUri":"%s"}]' $IMAGE_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION > imagedefinitions.json
+
+      artifacts:
+        files:
+          - imagedefinitions.json
+      EOF
+
+      # Pipeline jako CloudFormation
+      # Source (GitHub) → Build (CodeBuild) → Deploy (ECS)
+      aws codepipeline create-pipeline --pipeline '{
+        "name": "checki-prod",
+        "roleArn": "arn:aws:iam::...role/CodePipeline",
+        "stages": [
+          {"name":"Source","actions":[{"name":"GitHub","actionTypeId":{"category":"Source","owner":"ThirdParty","provider":"GitHub","version":"1"},"configuration":{"Owner":"liyo","Repo":"checki","Branch":"main","OAuthToken":"TOKEN"}}]},
+          {"name":"Build","actions":[{"name":"CodeBuild","actionTypeId":{"category":"Build","owner":"AWS","provider":"CodeBuild","version":"1"},"configuration":{"ProjectName":"checki-build"},"inputArtifacts":[{"name":"SourceArtifact"}],"outputArtifacts":[{"name":"BuildArtifact"}]}]},
+          {"name":"Deploy","actions":[{"name":"ECS","actionTypeId":{"category":"Deploy","owner":"AWS","provider":"ECS","version":"1"},"configuration":{"ClusterName":"prod","ServiceName":"checki-app"},"inputArtifacts":[{"name":"BuildArtifact"}]}]}
+        ]
+      }'
+
+  - name: CloudWatch — Monitoring, Logi, Alarmy
+    icon: "📊"
+    color: "#FF9900"
+    bundle: observability
+    complexity: medium
+    when: monitoring infrastruktury i aplikacji, alerty, logi
+    desc: |
+      Centralny monitoring AWS. Zbiera metryki, logi, tracesy — i reaguje na problemy.
+
+      Komponenty:
+      • Metrics: dane numeryczne w czasie (CPU, RequestCount, Latency, custom)
+        Retencja: 15 mies dla 1-min granularity, wieczyste dla zagregowanych
+      • Alarms: progowe alerty → SNS/Lambda/AutoScaling/EC2 action
+      • Logs: logi z Lambda, EC2, ECS, API GW, CloudTrail, VPC Flow
+        Log Groups → Log Streams → Events
+      • Log Insights: SQL-podobne zapytania do analizy logów
+      • Container Insights: CPU/Memory per container, task, service
+      • Application Insights: wykrywanie problemów .NET, Java, Node.js aplikacji
+      • Synthetics Canaries: scheduled tests endpointów (jak Pingdom)
+      • ServiceLens: end-to-end tracing przez X-Ray integrację
+
+      CloudWatch Agent:
+      Instalujesz na EC2 → zbiera custom metryki (RAM, dysk — domyślnie ich nie ma!),
+      przesyła logi z dowolnych plików, niestandardowe metryki z aplikacji.
+    code: |
+      # Custom metryki z aplikacji (Python)
+      # import boto3
+      # cw = boto3.client('cloudwatch')
+      # cw.put_metric_data(
+      #   Namespace='Checki/App',
+      #   MetricData=[{
+      #     'MetricName': 'UserRegistrations',
+      #     'Value': 42,
+      #     'Unit': 'Count',
+      #     'Dimensions': [{'Name': 'Environment', 'Value': 'prod'}]
+      #   }]
+      # )
+
+      # Alarm: CPU > 80% przez 5 min → SNS notification
+      aws cloudwatch put-metric-alarm \
+        --alarm-name high-cpu-prod \
+        --alarm-description "CPU > 80% for 5 min" \
+        --metric-name CPUUtilization \
+        --namespace AWS/EC2 \
+        --statistic Average \
+        --period 60 \
+        --evaluation-periods 5 \
+        --threshold 80 \
+        --comparison-operator GreaterThanThreshold \
+        --dimensions Name=AutoScalingGroupName,Value=prod-asg \
+        --alarm-actions arn:aws:sns:eu-west-1:xxx:ops-alerts \
+        --ok-actions arn:aws:sns:eu-west-1:xxx:ops-alerts
+
+      # Log Insights: 100 najwolniejszych requestów API
+      aws logs start-query \
+        --log-group-name /aws/lambda/prod-api \
+        --start-time $(date -d '1 hour ago' +%s) \
+        --end-time $(date +%s) \
+        --query-string 'fields @timestamp, @message
+          | filter @message like /REPORT/
+          | parse @message "Duration: * ms" as duration
+          | sort duration desc
+          | limit 100'
+
+      # Dashboard
+      aws cloudwatch put-dashboard \
+        --dashboard-name checki-prod \
+        --dashboard-body file://dashboard.json
+
+  - name: CloudTrail — Audit Log AWS
+    icon: "📜"
+    color: "#FF9900"
+    bundle: compliance
+    complexity: low
+    when: compliance, auditing, forensics po incydentach bezpieczeństwa
+    desc: |
+      Niezmienialny zapis każdej akcji w Twoim koncie AWS — kto, co, kiedy, skąd.
+
+      Rejestruje:
+      • Management Events: tworzenie/usuwanie zasobów, zmiany IAM, konfiguracja serwisów
+      • Data Events: operacje na danych — GetObject S3, Invoke Lambda, PutItem DynamoDB
+        (domyślnie wyłączone — drogie, ale ważne dla compliance)
+      • Insight Events: wykrywa anomalie — nagły wzrost API calls, unusually high errors
+
+      Przechowywanie:
+      • 90 dni za darmo w CloudTrail Event History
+      • S3 + CloudWatch Logs dla długoterminowego przechowywania
+      • Athena do analizy SQL na dużych ilościach logów
+
+      CloudTrail Lake (2022+):
+      • Managed query engine — nie potrzebujesz S3+Athena setup
+      • SQL bezpośrednio na logach, retencja do 7 lat
+      • Droższe niż S3+Athena ale prostsze
+
+      Multi-region trail: jeden trail w Management Account → logi ze wszystkich kont i regionów.
+    code: |
+      # Włącz trail → S3
+      aws cloudtrail create-trail \
+        --name org-trail \
+        --s3-bucket-name audit-logs-bucket \
+        --include-global-service-events \
+        --is-multi-region-trail \
+        --enable-log-file-validation
+
+      aws cloudtrail start-logging --name org-trail
+
+      # Szukaj w Event History: kto usunął bucket S3 w ciągu ostatnich 24h?
+      aws cloudtrail lookup-events \
+        --lookup-attributes AttributeKey=EventName,AttributeValue=DeleteBucket \
+        --start-time "2026-06-01T00:00:00Z" \
+        --end-time "2026-06-10T00:00:00Z" \
+        --query 'Events[].{Time:EventTime,User:Username,Source:SourceIPAddress}'
+
+      # Analiza przez Athena — kto zakładał nowe IAM Users?
+      SELECT eventtime, useridentity.username, requestparameters
+      FROM cloudtrail_logs
+      WHERE eventname = 'CreateUser'
+        AND eventtime >= '2026-06-01'
+      ORDER BY eventtime DESC;
+
+  - name: GuardDuty — Threat Detection
+    icon: "🔍"
+    color: "#FF4F8B"
+    bundle: security
+    complexity: low
+    when: detekcja zagrożeń — włącz i zapomnij w każdym koncie
+    desc: |
+      Inteligentny IDS (Intrusion Detection System) dla AWS — ML + threat intelligence.
+      Analizuje CloudTrail, VPC Flow Logs, DNS Logs bez instalowania agentów.
+
+      Co wykrywa:
+      • Cryptocurrency mining: EC2 komunikuje się z mining pools
+      • Compromised credentials: logowanie z nieoczekiwanych IP/krajów
+      • Reconnaissance: port scanning Twojego VPC
+      • Privilege escalation: IAM actions z Tor/anonymizer
+      • Data exfiltration: S3 wysyła dane do nieznanych IP
+      • Malicious domains: EC2 odpytuje domeny z listy C&C
+
+      Typy findings:
+      • Severity: Low (1-3.9), Medium (4-6.9), High (7-8.9), Critical (9-10)
+      • Format: ThreatPurpose:ResourceType/ThreatFamilyName (np. CryptoCurrency:EC2/BitcoinTool.B)
+
+      Integracje:
+      • EventBridge: finding → Lambda → Slack notification, auto-remediation
+      • Security Hub: centralne aggregowanie z wielu kont
+      • Detective: deep dive forensics na podejrzanych IP i użytkownikach
+
+      Cena: $4/1M CloudTrail events + $1/GB Flow Logs
+    code: |
+      # Włącz GuardDuty (to jedyne co musisz zrobić!)
+      DETECTOR=$(aws guardduty create-detector \
+        --enable \
+        --features '[{"Name":"S3_DATA_EVENTS","Status":"ENABLED"},{"Name":"EKS_AUDIT_LOGS","Status":"ENABLED"}]' \
+        --query 'DetectorId' --output text)
+
+      # Lista findings (posortowane po severity)
+      aws guardduty list-findings \
+        --detector-id $DETECTOR \
+        --finding-criteria '{"Criterion":{"severity":{"Gte":7}}}' \
+        --sort-criteria '{"AttributeName":"severity","OrderBy":"DESC"}'
+
+      # Auto-remediation przez EventBridge (CloudFormation snippet)
+      # EventBridge rule: GuardDuty High finding → Lambda
+      # Lambda: izoluj instancję (zmień Security Group na deny-all), snapshot EBS, notify Slack
+
+      # Archiwizuj false-positive
+      aws guardduty archive-findings \
+        --detector-id $DETECTOR \
+        --finding-ids finding-id-1
+
+  - name: SSM Parameter Store & Session Manager
+    icon: "⚙️"
+    color: "#FF9900"
+    bundle: ops
+    complexity: low
+    when: konfiguracja aplikacji, SSH do EC2 bez klucza i bastionu
+    desc: |
+      Systems Manager to zestaw narzędzi ops. Dwa najważniejsze:
+
+      Parameter Store:
+      • Hierarchiczne przechowywanie konfiguracji: /prod/database/host, /prod/api/key
+      • Standard (bezpłatny): do 10k parametrów, 4KB, no rotation
+      • Advanced ($0.05/param/mies): do 8KB, historyzacja wersji, TTL (wygasające hasła tymczasowe)
+      • SecureString: zaszyfrowany przez KMS
+      • Integruje się z CloudFormation, ECS, Lambda (env vars z SSM)
+
+      Session Manager (SSM Agent):
+      • SSH do EC2 BEZ otwartego portu 22, BEZ klucza SSH, BEZ bastionu
+      • Przez HTTPS (port 443) — przechodzi przez corporate firewalle
+      • Sesja logowana w CloudTrail, logi do S3/CloudWatch
+      • Port forwarding: `aws ssm start-session` → tunel do prywatnego RDS
+    code: |
+      # Parameter Store — config aplikacji
+      aws ssm put-parameter \
+        --name /prod/checki/database/url \
+        --value "postgresql://host:5432/checki" \
+        --type SecureString \
+        --key-id alias/checki-prod
+
+      aws ssm put-parameter \
+        --name /prod/checki/app/debug \
+        --value "false" \
+        --type String
+
+      # Odczyt w aplikacji (Python)
+      # ssm = boto3.client('ssm')
+      # val = ssm.get_parameter(Name='/prod/checki/database/url', WithDecryption=True)
+      # db_url = val['Parameter']['Value']
+
+      # Session Manager — SSH bez klucza
+      # Wymagania: SSM Agent na EC2, rola IAM z AmazonSSMManagedInstanceCore
+      aws ssm start-session --target i-0abc123def456
+
+      # Port forwarding: lokalny :5433 → prywatny RDS :5432
+      aws ssm start-session \
+        --target i-0abc123def456 \
+        --document-name AWS-StartPortForwardingSessionToRemoteHost \
+        --parameters '{"portNumber":["5432"],"localPortNumber":["5433"],"host":["db.cluster.eu-west-1.rds.amazonaws.com"]}'
+      # Teraz: psql -h localhost -p 5433 checki_db
+
+  - name: AWS Organizations — Multi-Account
+    icon: "🏢"
+    color: "#FF9900"
+    bundle: governance
+    complexity: high
+    when: zarządzanie wieloma kontami AWS w organizacji
+    desc: |
+      Centralny hub do zarządzania wieloma kontami AWS z jednego Management Account.
+
+      Struktura:
+      • Management Account (root): tworzy i zarządza organizacją, master billing
+      • Organizational Units (OU): grupy kont (Prod OU, Dev OU, Sandbox OU, Security OU)
+      • Member Accounts: indywidualne konta (prod, staging, dev, security, logging)
+
+      Service Control Policies (SCP):
+      Guardrails na poziomie OU lub konta — nadpisują nawet AdministratorAccess.
+      Przykład: "deny any action outside eu-west-1" = żaden użytkownik w tym OU nie może
+      deploy'ować do us-east-1, nawet root konta!
+
+      Dobre praktyki multi-account:
+      • Security Account: CloudTrail, GuardDuty, Security Hub z agregacją ze wszystkich kont
+      • Logging Account: centralny S3 na logi (S3 Object Lock = immutable)
+      • Shared Services Account: VPC, DNS, Active Directory
+      • Sandbox OU: konta dla developerów bez SCPs — eksperymentuj bez ryzyka dla prod
+
+      AWS Control Tower: managed multi-account setup z gotowymi guardrails, SSO, logging.
+    code: |
+      # SCP: zabroń tworzenia zasobów poza regionem EU
+      aws organizations create-policy \
+        --name "EnforcEURegionOnly" \
+        --type SERVICE_CONTROL_POLICY \
+        --description "Deny all actions outside EU regions" \
+        --content '{
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Deny",
+            "Action": "*",
+            "Resource": "*",
+            "Condition": {
+              "StringNotLike": {
+                "aws:RequestedRegion": ["eu-west-1", "eu-central-1", "eu-west-2"]
+              },
+              "ArnNotLike": {
+                "aws:PrincipalARN": "arn:aws:iam::*:role/InfraAdmin"
+              }
+            }
+          }]
+        }'
+
+      # Przypisz SCP do OU
+      aws organizations attach-policy \
+        --policy-id p-xxxx \
+        --target-id ou-xxxx
+
+      # Utwórz nowe konto w organizacji
+      aws organizations create-account \
+        --email dev-team@firma.pl \
+        --account-name "Checki Dev Environment"
+
+      # Assume Role w innym koncie (cross-account)
+      aws sts assume-role \
+        --role-arn "arn:aws:iam::DEV_ACCOUNT:role/OrganizationAccountAccessRole" \
+        --role-session-name deploy-session
