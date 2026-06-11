@@ -1,0 +1,222 @@
+title: Zapytania SQL — kompletny przewodnik
+
+items:
+  - name: SELECT — filtrowanie i sortowanie
+    icon: "🔍"
+    desc: Pobieranie danych z tabel — filtrowanie WHERE, sortowanie ORDER BY, limitowanie LIMIT/OFFSET.
+    code: |
+      -- Podstawowy SELECT
+      SELECT id, name, email FROM users;
+
+      -- Wszystkie kolumny
+      SELECT * FROM products WHERE active = TRUE;
+
+      -- Filtrowanie wielokrotne
+      SELECT * FROM orders
+      WHERE status = 'pending'
+        AND total > 100
+        AND created_at >= '2024-01-01';
+
+      -- Wzorce tekstowe
+      SELECT * FROM users WHERE email LIKE '%@gmail.com';
+      SELECT * FROM users WHERE name ILIKE 'alice%';   -- case-insensitive
+
+      -- IN i NOT IN
+      SELECT * FROM products WHERE category IN ('electronics', 'books');
+      SELECT * FROM users WHERE id NOT IN (1, 2, 3);
+
+      -- BETWEEN
+      SELECT * FROM orders WHERE total BETWEEN 50 AND 500;
+
+      -- IS NULL / IS NOT NULL
+      SELECT * FROM users WHERE phone IS NULL;
+
+      -- Sortowanie
+      SELECT * FROM products ORDER BY price DESC, name ASC;
+
+      -- Paginacja
+      SELECT * FROM products
+      ORDER BY id
+      LIMIT 20 OFFSET 40;   -- strona 3 po 20 rekordów
+
+  - name: SELECT — agregacje i grupowanie
+    icon: "📊"
+    desc: COUNT, SUM, AVG, MIN, MAX, GROUP BY, HAVING — statystyki i grupowanie danych.
+    code: |
+      -- Liczenie rekordów
+      SELECT COUNT(*) FROM users;
+      SELECT COUNT(DISTINCT email) FROM users;   -- unikalne
+
+      -- Agregacje liczbowe
+      SELECT
+          MIN(price)  AS najtanszy,
+          MAX(price)  AS najdrozszy,
+          AVG(price)  AS srednia,
+          SUM(total)  AS suma_sprzedazy
+      FROM orders WHERE status = 'completed';
+
+      -- Grupowanie
+      SELECT category, COUNT(*) AS ilosc, AVG(price) AS srednia_cena
+      FROM products
+      GROUP BY category
+      ORDER BY ilosc DESC;
+
+      -- HAVING — filtrowanie po agregacji
+      SELECT customer_id, COUNT(*) AS liczba_zamowien, SUM(total) AS suma
+      FROM orders
+      GROUP BY customer_id
+      HAVING COUNT(*) >= 5        -- tylko klienci z 5+ zamówieniami
+      ORDER BY suma DESC;
+
+      -- ROLLUP — sumy pośrednie
+      SELECT category, subcategory, SUM(price) AS total
+      FROM products
+      GROUP BY ROLLUP(category, subcategory);
+
+  - name: INSERT — wstawianie danych
+    icon: "➕"
+    desc: Wstawianie pojedynczych rekordów, wielu rekordów naraz i upsert z ON CONFLICT.
+    code: |
+      -- Pojedynczy rekord
+      INSERT INTO users (email, name) VALUES ('jan@example.com', 'Jan Kowalski');
+
+      -- Wiele rekordów naraz
+      INSERT INTO products (name, price, category) VALUES
+          ('Laptop', 2999.99, 'electronics'),
+          ('Myszka', 89.99,   'electronics'),
+          ('Książka SQL', 49.99, 'books');
+
+      -- RETURNING — pobierz wstawiony rekord
+      INSERT INTO users (email, name)
+      VALUES ('new@example.com', 'Nowy User')
+      RETURNING id, created_at;
+
+      -- INSERT z SELECT
+      INSERT INTO archive_orders
+      SELECT * FROM orders WHERE created_at < '2023-01-01';
+
+      -- UPSERT — wstaw lub zaktualizuj (ON CONFLICT)
+      INSERT INTO users (email, name) VALUES ('jan@example.com', 'Jan Zmieniony')
+      ON CONFLICT (email) DO UPDATE
+          SET name = EXCLUDED.name,
+              updated_at = NOW();
+
+      -- Ignoruj konflikt (nic nie rób)
+      INSERT INTO users (email, name) VALUES ('jan@example.com', 'Jan')
+      ON CONFLICT (email) DO NOTHING;
+
+  - name: UPDATE — aktualizacja danych
+    icon: "✏️"
+    desc: Aktualizacja pojedynczych kolumn, wielu rekordów, z podzapytaniami i RETURNING.
+    code: |
+      -- Podstawowy UPDATE
+      UPDATE users SET name = 'Jan Nowak' WHERE id = 1;
+
+      -- Wiele kolumn naraz
+      UPDATE products
+      SET price = price * 1.10,   -- podnieś cenę o 10%
+          updated_at = NOW()
+      WHERE category = 'electronics';
+
+      -- UPDATE z podzapytaniem
+      UPDATE orders
+      SET status = 'shipped'
+      WHERE customer_id IN (
+          SELECT id FROM users WHERE role = 'premium'
+      );
+
+      -- UPDATE z JOIN (FROM)
+      UPDATE products p
+      SET price = p.price * 0.9
+      FROM categories c
+      WHERE p.category_id = c.id
+        AND c.name = 'sale';
+
+      -- RETURNING — co zostało zmienione
+      UPDATE users SET role = 'admin' WHERE email = 'jan@example.com'
+      RETURNING id, name, role, updated_at;
+
+      -- Warunkowy UPDATE
+      UPDATE products
+      SET stock = CASE
+          WHEN stock > 10 THEN stock - 10
+          ELSE 0
+      END
+      WHERE id = 5;
+
+  - name: DELETE i TRUNCATE
+    icon: "🗑️"
+    desc: Usuwanie rekordów z WHERE, RETURNING, kaskadowe oraz szybkie czyszczenie tabel.
+    code: |
+      -- Usuń jeden rekord
+      DELETE FROM users WHERE id = 5;
+
+      -- Usuń wiele z warunkiem
+      DELETE FROM sessions WHERE expires_at < NOW();
+
+      -- DELETE z podzapytaniem
+      DELETE FROM orders
+      WHERE customer_id IN (
+          SELECT id FROM users WHERE deleted_at IS NOT NULL
+      );
+
+      -- RETURNING — co zostało usunięte
+      DELETE FROM users WHERE email = 'spam@example.com'
+      RETURNING id, name, email;
+
+      -- TRUNCATE — szybkie usunięcie wszystkich wierszy
+      TRUNCATE TABLE sessions;
+
+      -- TRUNCATE z resetem sekwencji
+      TRUNCATE TABLE products RESTART IDENTITY;
+
+      -- TRUNCATE kaskadowe (też usuwa z powiązanych tabel)
+      TRUNCATE TABLE users CASCADE;
+
+  - name: Podzapytania i CTE
+    icon: "🔗"
+    desc: Zagnieżdżone zapytania (subquery) i Common Table Expressions — czystszy kod złożonych zapytań.
+    code: |
+      -- Podzapytanie w WHERE
+      SELECT * FROM orders
+      WHERE customer_id = (
+          SELECT id FROM users WHERE email = 'vip@example.com'
+      );
+
+      -- Podzapytanie w FROM (derived table)
+      SELECT avg_data.category, avg_data.srednia
+      FROM (
+          SELECT category, AVG(price) AS srednia
+          FROM products GROUP BY category
+      ) AS avg_data
+      WHERE avg_data.srednia > 100;
+
+      -- EXISTS
+      SELECT * FROM users u
+      WHERE EXISTS (
+          SELECT 1 FROM orders o WHERE o.customer_id = u.id
+      );
+
+      -- CTE (Common Table Expression) — WITH
+      WITH aktywni AS (
+          SELECT id, name FROM users WHERE active = TRUE
+      ),
+      ostatnie_zamowienia AS (
+          SELECT customer_id, MAX(created_at) AS ostatnie
+          FROM orders GROUP BY customer_id
+      )
+      SELECT a.name, o.ostatnie
+      FROM aktywni a
+      JOIN ostatnie_zamowienia o ON a.id = o.customer_id
+      ORDER BY o.ostatnie DESC;
+
+      -- Rekurencyjne CTE (hierarchia)
+      WITH RECURSIVE hierarchy AS (
+          SELECT id, name, parent_id, 0 AS poziom
+          FROM categories WHERE parent_id IS NULL
+          UNION ALL
+          SELECT c.id, c.name, c.parent_id, h.poziom + 1
+          FROM categories c
+          JOIN hierarchy h ON c.parent_id = h.id
+      )
+      SELECT * FROM hierarchy ORDER BY poziom, name;

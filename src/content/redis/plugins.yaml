@@ -1,0 +1,285 @@
+title: Ekosystem Redis
+
+items:
+  - name: redis-py — synchroniczny klient Python
+    desc: Oficjalny klient Redis dla Pythona. Sync i async w jednej paczce. Connection pooling, pipelining, Sentinel, Cluster.
+    icon: "🐍"
+    code: |
+      pip install redis
+
+      import redis
+
+      # Połączenie (connection pool domyślnie)
+      r = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+
+      # Podstawowe operacje
+      r.set("user:1:name", "Jan Kowalski")
+      r.setex("session:abc", 3600, "user:42")    # z TTL
+      name = r.get("user:1:name")                 # "Jan Kowalski"
+
+      # Hash (obiekt)
+      r.hset("user:42", mapping={"name": "Jan", "email": "jan@example.com", "role": "admin"})
+      user = r.hgetall("user:42")                 # {"name": "Jan", ...}
+
+      # List (kolejka)
+      r.rpush("jobs", "job1", "job2")
+      job = r.blpop("jobs", timeout=30)           # blokujące pobieranie
+
+      # Sorted Set (ranking)
+      r.zadd("leaderboard", {"alice": 1500, "bob": 2300})
+      top = r.zrevrange("leaderboard", 0, 9, withscores=True)
+
+      # Pipeline — wyślij wiele komend naraz
+      pipe = r.pipeline()
+      pipe.set("a", 1)
+      pipe.set("b", 2)
+      pipe.incr("a")
+      results = pipe.execute()                    # [True, True, 2]
+
+      # Transakcja
+      with r.pipeline() as pipe:
+          while True:
+              try:
+                  pipe.watch("account:42:balance")
+                  balance = int(pipe.get("account:42:balance") or 0)
+                  pipe.multi()
+                  pipe.set("account:42:balance", balance + 100)
+                  pipe.execute()
+                  break
+              except redis.WatchError:
+                  continue
+
+  - name: redis-py async — asyncio
+    desc: Async klient Redis wbudowany w redis-py. Idealne do FastAPI i asyncio. Ta sama składnia co sync.
+    icon: "⚡"
+    code: |
+      pip install redis
+
+      import redis.asyncio as aioredis
+      import asyncio
+
+      async def main():
+          # Połączenie
+          r = aioredis.Redis(host="localhost", port=6379, decode_responses=True)
+
+          # Wszystkie operacje z await
+          await r.set("klucz", "wartość")
+          val = await r.get("klucz")
+
+          # Connection Pool (dla FastAPI)
+          pool = aioredis.ConnectionPool.from_url(
+              "redis://localhost:6379",
+              max_connections=20,
+              decode_responses=True
+          )
+          r = aioredis.Redis(connection_pool=pool)
+
+          # Async pipeline
+          async with r.pipeline(transaction=True) as pipe:
+              await pipe.set("a", 1)
+              await pipe.incr("a")
+              result = await pipe.execute()
+
+          await r.aclose()
+
+      # FastAPI + Redis przykład
+      from contextlib import asynccontextmanager
+      from fastapi import FastAPI, Depends
+
+      redis_client = None
+
+      @asynccontextmanager
+      async def lifespan(app):
+          global redis_client
+          redis_client = aioredis.Redis.from_url("redis://localhost", decode_responses=True)
+          yield
+          await redis_client.aclose()
+
+      app = FastAPI(lifespan=lifespan)
+
+      async def get_redis():
+          return redis_client
+
+      @app.get("/cached/{key}")
+      async def get_cached(key: str, r = Depends(get_redis)):
+          return {"value": await r.get(key)}
+
+  - name: Celery + Redis — kolejka zadań
+    desc: Celery używa Redis jako broker i result backend. Uruchamiaj długie zadania (email, PDF, scraping) asynchronicznie poza requestem HTTP.
+    icon: "🌿"
+    code: |
+      pip install celery redis
+
+      # celery_app.py
+      from celery import Celery
+
+      app = Celery(
+          "tasks",
+          broker="redis://localhost:6379/0",
+          backend="redis://localhost:6379/1",
+      )
+
+      app.conf.update(
+          task_serializer="json",
+          result_expires=3600,         # wyniki trzymaj 1h
+          worker_max_tasks_per_child=1000,
+      )
+
+      @app.task(bind=True, max_retries=3)
+      def send_email(self, user_id: int, subject: str):
+          try:
+              # długa operacja
+              send_smtp_email(user_id, subject)
+          except Exception as exc:
+              raise self.retry(exc=exc, countdown=60)   # retry za 60s
+
+      @app.task
+      def generate_report(report_id: int):
+          data = fetch_data_from_db(report_id)
+          pdf = render_pdf(data)
+          save_to_s3(pdf)
+          return {"status": "done", "url": f"s3://bucket/{report_id}.pdf"}
+
+      # W FastAPI / endpoint:
+      from tasks import send_email, generate_report
+
+      @router.post("/users/{id}/welcome-email")
+      async def trigger_welcome(id: int):
+          task = send_email.delay(id, "Witaj w serwisie!")
+          return {"task_id": task.id}
+
+      @router.get("/tasks/{task_id}")
+      async def task_status(task_id: str):
+          result = send_email.AsyncResult(task_id)
+          return {"status": result.status, "result": result.result}
+
+      # Uruchom workera
+      # celery -A celery_app worker --loglevel=info
+      # celery -A celery_app worker -c 4  # 4 workery
+
+  - name: django-redis — cache dla Django
+    desc: Backend cache dla Django przez Redis. Działa z Django ORM session store, cache framework i message broker.
+    icon: "🎸"
+    code: |
+      pip install django-redis
+
+      # settings.py
+      CACHES = {
+          "default": {
+              "BACKEND": "django_redis.cache.RedisCache",
+              "LOCATION": "redis://localhost:6379/1",
+              "OPTIONS": {
+                  "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                  "CONNECTION_POOL_KWARGS": {"max_connections": 50},
+                  "SOCKET_CONNECT_TIMEOUT": 5,
+                  "SOCKET_TIMEOUT": 5,
+              },
+              "KEY_PREFIX": "myapp",
+              "TIMEOUT": 3600,
+          }
+      }
+
+      # Session store przez Redis
+      SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+      SESSION_CACHE_ALIAS = "default"
+
+      # W widoku Django
+      from django.core.cache import cache
+
+      # Pobierz / ustaw
+      cache.set("user:42:profile", profile_data, timeout=3600)
+      profile = cache.get("user:42:profile")
+      if profile is None:
+          profile = User.objects.get(id=42)
+          cache.set("user:42:profile", profile, timeout=3600)
+
+      # Dekorator
+      from django.views.decorators.cache import cache_page
+
+      @cache_page(60 * 15)   # cache na 15 minut
+      def product_list(request):
+          return render(request, "products.html", {"products": Product.objects.all()})
+
+      # Inwalidacja cache
+      cache.delete("user:42:profile")
+      cache.delete_pattern("user:*:profile")   # usuń wzorzec (django-redis)
+
+  - name: RedisJSON — natywny JSON
+    desc: Moduł Redis do przechowywania i manipulowania JSON w bazie bez serializacji. JSONPath queries, atomowe operacje na polach JSON.
+    icon: "📦"
+    code: |
+      # Zainstaluj Redis z modułem (Redis Stack)
+      docker run -d -p 6379:6379 redis/redis-stack-server:latest
+
+      # pip install redis
+
+      import redis
+      r = redis.Redis(decode_responses=True)
+
+      # JSON.SET — zapisz JSON
+      r.json().set("user:42", "$", {
+          "name": "Jan Kowalski",
+          "email": "jan@example.com",
+          "orders": [{"id": 1, "total": 99.99}],
+          "settings": {"notifications": True}
+      })
+
+      # JSON.GET — pobierz cały obiekt lub pole
+      user = r.json().get("user:42")
+      name = r.json().get("user:42", "$.name")             # ["Jan Kowalski"]
+      total = r.json().get("user:42", "$.orders[0].total") # [99.99]
+
+      # JSON.SET — zaktualizuj pole
+      r.json().set("user:42", "$.name", "Jan Nowak")
+      r.json().set("user:42", "$.settings.notifications", False)
+
+      # JSON.NUMINCRBY — inkrementuj liczbę
+      r.json().numincrby("user:42", "$.orders[0].total", 10)
+
+      # JSON.ARRAPPEND — dodaj do tablicy
+      r.json().arrappend("user:42", "$.orders", {"id": 2, "total": 49.99})
+
+      # JSON.DEL — usuń pole
+      r.json().delete("user:42", "$.settings")
+
+      # Redis CLI
+      # JSON.SET user:42 $ '{"name":"Jan"}'
+      # JSON.GET user:42 $.name
+
+  - name: RediSearch — pełnotekstowe wyszukiwanie
+    desc: Moduł do full-text search w Redis. Twórz indeksy na dowolnych polach Hasha lub JSON. Szybszy niż ElasticSearch dla prostych przypadków.
+    icon: "🔍"
+    code: |
+      # pip install redis (Redis Stack wymagany)
+
+      from redis.commands.search.field import TextField, NumericField, TagField
+      from redis.commands.search.indexDefinition import IndexDefinition, IndexType
+      from redis.commands.search.query import Query
+
+      # Utwórz indeks na Hashach
+      r.ft("products_idx").create_index(
+          fields=[
+              TextField("name", weight=2.0),    # weight = ważność w rankingu
+              TextField("description"),
+              NumericField("price", sortable=True),
+              TagField("category"),              # dokładne tagi (nie FTS)
+          ],
+          definition=IndexDefinition(prefix=["product:"], index_type=IndexType.HASH)
+      )
+
+      # Wstaw dane
+      r.hset("product:1", mapping={"name": "Laptop Dell", "description": "Szybki laptop do pracy", "price": 2999, "category": "electronics"})
+      r.hset("product:2", mapping={"name": "Myszka Logitech", "description": "Ergonomiczna myszka", "price": 89, "category": "electronics"})
+
+      # Wyszukaj
+      results = r.ft("products_idx").search("laptop")
+      for doc in results.docs:
+          print(doc.name, doc.price)
+
+      # Zaawansowane zapytanie
+      q = Query("@name:(laptop) @price:[100 5000]").sort_by("price").paging(0, 10)
+      results = r.ft("products_idx").search(q)
+
+      # Autocomplete (SUGADD/SUGGET)
+      r.ft().sugadd("autocomplete", "laptop dell", 1.0)
+      r.ft().sugget("autocomplete", "lap", num=5, fuzzy=True)

@@ -1,0 +1,73 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać PostgreSQL?
+  firstComponent: Pierwsze zapytania
+  firstComponentLang: SQL
+
+intro:
+  title: Czym jest PostgreSQL?
+  desc: >
+    PostgreSQL to zaawansowana, open-source baza danych relacyjna (RDBMS) z ponad 35-letnią historią.
+    Obsługuje ACID, transakcje, klucze obce, widoki, triggery, procedury składowane i typy użytkownika.
+    Uznawany za najbardziej rozszerzalną i zaawansowaną bazę open-source — używany przez Spotify, Instagram, GitHub, NASA, Twitch.
+    Wyróżnia się obsługą JSONB, window functions, full-text search, PostGIS i setkami rozszerzeń.
+
+concepts:
+  - title: ACID
+    desc: >
+      Atomicity, Consistency, Isolation, Durability — każda transakcja albo w całości się powiedzie, albo nie pozostawia żadnego śladu.
+      Gwarantuje integralność danych nawet przy awarii serwera w połowie zapisu.
+    icon: "🔒"
+  - title: Schemat i tabele
+    desc: >
+      Dane zorganizowane w schematy (domyślnie public) i tabele z wierszami i kolumnami.
+      Każda kolumna ma ściśle określony typ — INT, TEXT, TIMESTAMPTZ, JSONB, UUID itd.
+    icon: "📋"
+  - title: Transakcje
+    desc: >
+      BEGIN / COMMIT / ROLLBACK — grupuj wiele operacji SQL w jedną atomową całość.
+      SAVEPOINT pozwala cofnąć część transakcji bez anulowania całości.
+    icon: "🔄"
+  - title: Rozszerzenia
+    desc: >
+      PostGIS (geo), pg_trgm (fuzzy search), uuid-ossp, pgcrypto, pg_stat_statements, TimescaleDB — setki rozszerzeń rozszerzają możliwości poza standardowy SQL.
+    icon: "🧩"
+
+whenToUse:
+  - Aplikacje wymagające integralności danych — e-commerce, finanse, medycyna
+  - JSON + SQL w jednej bazie (JSONB — szybsze niż MongoDB przy złożonych zapytaniach)
+  - Analiza danych z window functions, CTEs i agregacjami
+  - Geolokalizacja i dane przestrzenne z PostGIS
+  - Backend dla Django, FastAPI, Rails, Spring, Laravel
+
+firstComponent: |
+  -- Utwórz tabelę użytkowników
+  CREATE TABLE users (
+      id         SERIAL PRIMARY KEY,
+      email      TEXT         NOT NULL UNIQUE,
+      name       TEXT         NOT NULL,
+      role       TEXT         NOT NULL DEFAULT 'user',
+      created_at TIMESTAMPTZ  DEFAULT NOW()
+  );
+
+  -- Wstaw rekordy
+  INSERT INTO users (email, name) VALUES
+      ('alice@example.com', 'Alice Kowalski'),
+      ('bob@example.com',   'Bob Nowak'),
+      ('carol@example.com', 'Carol Wiśniewska');
+
+  -- Podstawowy SELECT
+  SELECT id, name, email FROM users ORDER BY name;
+
+  -- Filtrowanie
+  SELECT * FROM users WHERE role = 'user' AND created_at > NOW() - INTERVAL '7 days';
+
+  -- Aktualizacja
+  UPDATE users SET role = 'admin' WHERE email = 'alice@example.com'
+  RETURNING id, name, role;
+
+  -- Usunięcie z potwierdzeniem
+  DELETE FROM users WHERE id = 3 RETURNING *;
+
+  -- Zliczanie
+  SELECT COUNT(*) AS total, role FROM users GROUP BY role;

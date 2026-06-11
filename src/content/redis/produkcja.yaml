@@ -1,0 +1,200 @@
+title: Redis w produkcji
+
+items:
+  - name: Replikacja — Master/Replica
+    icon: "🔄"
+    desc: Automatyczna kopia danych na slave nodach. Master — zapisy, Repliki — odczyty. Read scaling i failover.
+    code: |
+      # Replica konfiguracja (replica łączy się do mastera)
+      # replica redis.conf:
+      replicaof 192.168.1.10 6379
+
+      # Replica z hasłem mastera
+      replicaof 192.168.1.10 6379
+      masterauth "hasło_mastera"
+
+      # Hasło na replica
+      requirepass "hasło_repliki"
+
+      # Replica tylko do odczytu (domyślne)
+      replica-read-only yes
+
+      # Sprawdź stan replikacji
+      INFO replication
+      # role:master          (lub replica)
+      # connected_slaves:2
+      # slave0:ip=192.168.1.11,port=6379,state=online,offset=12345,lag=0
+
+      # Na masterze — wymuś sync z repliką
+      WAIT 1 1000     # czekaj na 1 replikę max 1000ms
+
+      # Promuj replikę na mastera (przy awarii mastera)
+      REPLICAOF NO ONE    # na replice — staje się masterem
+
+      # Asynchroniczna replikacja — możliwa utrata ostatnich zapisów!
+      # Dla pewności: WAIT <liczba_replik> <timeout_ms>
+
+  - name: Redis Sentinel — automatyczny failover
+    icon: "🏰"
+    desc: Sentinel monitoruje master i repliki, automatycznie promuje replikę przy awarii mastera. HA bez Cluster.
+    code: |
+      # sentinel.conf (uruchamia się: redis-sentinel /etc/redis/sentinel.conf)
+      sentinel monitor mymaster 192.168.1.10 6379 2
+      # mymaster = nazwa grupy
+      # 192.168.1.10 6379 = adres mastera
+      # 2 = quorum (ile Sentineli musi zgodzić się na failover)
+
+      sentinel auth-pass mymaster "hasło_mastera"
+      sentinel down-after-milliseconds mymaster 5000   # 5s bez odpowiedzi = down
+      sentinel failover-timeout mymaster 60000         # max 60s na failover
+      sentinel parallel-syncs mymaster 1               # ile replik sync naraz
+
+      # Uruchom Sentinel
+      redis-sentinel /etc/redis/sentinel.conf
+      # lub
+      redis-server /etc/redis/sentinel.conf --sentinel
+
+      # Połącz do Sentinela
+      redis-cli -p 26379
+
+      # Sentinel komendy
+      SENTINEL masters                    # lista monitorowanych masterów
+      SENTINEL slaves mymaster            # lista replik
+      SENTINEL sentinels mymaster         # lista Sentineli
+      SENTINEL get-master-addr-by-name mymaster  # aktualny adres mastera
+
+      # Python — Sentinel w redis-py
+      # from redis.sentinel import Sentinel
+      # sentinel = Sentinel([('192.168.1.10', 26379), ('192.168.1.11', 26379)])
+      # master = sentinel.master_for('mymaster', socket_timeout=0.1)
+      # replica = sentinel.slave_for('mymaster', socket_timeout=0.1)
+      # master.set('klucz', 'wartość')
+      # replica.get('klucz')
+
+  - name: Redis Cluster — sharding
+    icon: "🌐"
+    desc: Automatyczny sharding danych na wiele nodów. 16384 hashy (slots) rozłożone na nody. Skaluje zapisy i pamięć.
+    code: |
+      # Konfiguracja węzła klastra (redis.conf)
+      cluster-enabled yes
+      cluster-config-file nodes.conf
+      cluster-node-timeout 5000
+      appendonly yes
+
+      # Utwórz klaster (min 3 mastery + opcjonalnie repliki)
+      redis-cli --cluster create \
+          192.168.1.10:6379 \
+          192.168.1.11:6379 \
+          192.168.1.12:6379 \
+          --cluster-replicas 1   # 1 replica na master → 6 nodów
+
+      # Sprawdź stan klastra
+      redis-cli -c -h 192.168.1.10 CLUSTER INFO
+      redis-cli -c -h 192.168.1.10 CLUSTER NODES
+
+      # Połącz z klastrem (-c = cluster mode)
+      redis-cli -c -h 192.168.1.10 -p 6379
+      # Automatycznie przekieruje do właściwego noda
+
+      # Klucze muszą być na tym samym nodzie dla MULTI-key ops
+      # Hash tags: {user:42}:name i {user:42}:email → ten sam slot
+      SET {user:42}:name "Jan"
+      SET {user:42}:email "jan@example.com"
+      MGET {user:42}:name {user:42}:email   # OK — ten sam slot
+
+      # Python — ClusterRedis
+      # from redis.cluster import RedisCluster
+      # rc = RedisCluster(host="192.168.1.10", port=6379)
+      # rc.set("key", "value")
+
+  - name: Performance tuning
+    icon: "🚀"
+    desc: Konfiguracja dla maksymalnej wydajności — tcp-backlog, no-appendfsync-on-rewrite, lazy-freeing, pipeline.
+    code: |
+      # Kluczowe ustawienia wydajności w redis.conf
+
+      # TCP backlog (więcej pending connections)
+      tcp-backlog 511
+
+      # Nie fsync podczas AOF rewrite (szybsze rewrite)
+      no-appendfsync-on-rewrite yes
+
+      # Lazy freeing — usuń duże klucze w tle (DEL nie blokuje)
+      lazyfree-lazy-eviction yes
+      lazyfree-lazy-expire yes
+      lazyfree-lazy-server-del yes
+      lazyfree-lazy-user-del yes
+
+      # Wyłącz THP (Transparent Huge Pages) — na poziomie OS
+      # echo never > /sys/kernel/mm/transparent_hugepage/enabled
+
+      # Linux kernel TCP settings (w /etc/sysctl.conf)
+      # net.core.somaxconn = 65535
+      # vm.overcommit_memory = 1
+
+      # Sprawdź wolne operacje (> 10ms)
+      CONFIG SET slowlog-log-slower-than 10000   # 10000 microsekund = 10ms
+      CONFIG SET slowlog-max-len 128
+
+      SLOWLOG GET 10         # ostatnie 10 wolnych zapytań
+      SLOWLOG LEN            # ile wpisów w slowlogu
+      SLOWLOG RESET
+
+      # Latencja
+      LATENCY LATEST         # ostatnie peak latencies
+      LATENCY HISTORY event  # historia latencji
+      LATENCY RESET
+
+      # Benchmark wydajności
+      redis-benchmark -h localhost -p 6379 -n 100000 -c 50
+      # -n = liczba requestów, -c = concurrent connections
+
+  - name: Monitoring i diagnostyka
+    icon: "📊"
+    desc: INFO, MONITOR, DEBUG SLEEP, CLIENT LIST — narzędzia do obserwacji Redis w produkcji.
+    code: |
+      # INFO — pełne informacje o serwerze
+      INFO                    # wszystko
+      INFO server             # wersja, OS, uptime
+      INFO clients            # połączenia
+      INFO memory             # użycie RAM
+      INFO stats              # statystyki (hits/misses, connections)
+      INFO replication        # replikacja
+      INFO persistence        # RDB/AOF
+      INFO cpu                # użycie CPU
+      INFO keyspace           # info o bazach (DB 0, 1, ...)
+
+      # Kluczowe metryki do monitorowania
+      INFO stats | grep hit_rate
+      # keyspace_hits:1234567
+      # keyspace_misses:12345
+      # Hit rate = hits / (hits + misses) → cel > 90%
+
+      # Aktywne połączenia
+      CLIENT LIST             # wszystkie połączenia ze szczegółami
+      CLIENT INFO             # info o aktualnym połączeniu
+      CLIENT SETNAME worker1  # nadaj nazwę połączeniu
+      CLIENT KILL ID 42       # zabij połączenie
+
+      # MONITOR — podejrzyj WSZYSTKIE komendy na żywo
+      MONITOR
+      # UWAGA: Drastycznie spowalnia Redis — tylko debug!
+
+      # DEBUG — narzędzia deweloperskie
+      DEBUG SLEEP 2           # uśpij Redis na 2s (test timeout)
+      DEBUG RELOAD            # przeładuj bazę z dysku
+
+      # Konfiguracja na żywo (bez restartu)
+      CONFIG GET maxmemory
+      CONFIG SET maxmemory 1gb
+      CONFIG REWRITE          # zapisz zmiany do redis.conf
+
+      # Statystyki DB
+      DBSIZE                  # liczba kluczy w aktualnej DB
+      INFO keyspace           # liczba kluczy per DB
+
+      # Flushowanie
+      FLUSHDB                 # usuń wszystkie klucze z aktualnej DB
+      FLUSHDB ASYNC           # w tle (non-blocking)
+      FLUSHALL                # usuń wszystko (UWAGA!)
+      FLUSHALL ASYNC          # w tle

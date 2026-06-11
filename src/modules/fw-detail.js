@@ -10,7 +10,9 @@ import { FW_GIT_DATA }       from '../data/fw_git.js';
 import { FW_DOCKER_DATA }    from '../data/fw_docker.js';
 import { FW_PYAUTOGUI_DATA } from '../data/fw_pyautogui.js';
 import { FW_MCP_DATA }       from '../data/fw_mcp.js';
-import { FW_AWS_DATA }       from '../data/fw_aws.js';
+import { FW_AWS_DATA }        from '../data/fw_aws.js';
+import { FW_POSTGRESQL_DATA } from '../data/fw_postgresql.js';
+import { FW_REDIS_DATA }      from '../data/fw_redis.js';
 
 let activeTab = 'podstawy';
 let activeFw  = 'react';
@@ -19,7 +21,7 @@ const FW_DATA_MAP = {
   react: FW_REACT_DATA, fastapi: FW_FASTAPI_DATA, pytest: FW_PYTEST_DATA,
   requests: FW_REQUESTS_DATA, beautifulsoup: FW_BS4_DATA, asyncio: FW_ASYNCIO_DATA,
   git: FW_GIT_DATA, docker: FW_DOCKER_DATA, pyautogui: FW_PYAUTOGUI_DATA, mcp: FW_MCP_DATA,
-  aws: FW_AWS_DATA,
+  aws: FW_AWS_DATA, postgresql: FW_POSTGRESQL_DATA, redis: FW_REDIS_DATA,
 };
 
 export function openFramework(fw) {

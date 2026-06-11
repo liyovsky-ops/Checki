@@ -1,0 +1,285 @@
+title: Typy danych, Constrainty i Indeksy
+
+items:
+  - name: Typy liczbowe
+    icon: "🔢"
+    desc: INTEGER, BIGINT, NUMERIC, FLOAT, SERIAL — typy dla liczb całkowitych, dziesiętnych i sekwencji.
+    code: |
+      CREATE TABLE przykłady_liczbowe (
+          -- Liczby całkowite
+          maly      SMALLINT,          -- 2 bajty, -32768 do 32767
+          normalny  INTEGER,           -- 4 bajty, -2.1B do 2.1B  (najczęstszy)
+          duzy      BIGINT,            -- 8 bajty, -9.2E18 do 9.2E18
+
+          -- Auto-inkrementacja (SERIAL = INTEGER + sekwencja)
+          id        SERIAL PRIMARY KEY,     -- 4 bajty
+          id_big    BIGSERIAL,             -- 8 bajty (dla dużych tabel)
+
+          -- UUID jako klucz główny (zalecane dla rozproszonych systemów)
+          uuid_id   UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+
+          -- Precyzyjne (pieniądze, wagi)
+          cena      NUMERIC(10, 2),    -- 10 cyfr total, 2 po przecinku
+          waga      DECIMAL(8, 3),     -- alias NUMERIC
+
+          -- Przybliżone (rzadziej — brak dokładności)
+          prog      REAL,             -- 4 bajty, ~6 cyfr znaczących
+          dokladny  DOUBLE PRECISION  -- 8 bajtów, ~15 cyfr
+      );
+
+      -- Konwersja typów
+      SELECT 42::FLOAT;
+      SELECT '3.14'::NUMERIC;
+      SELECT CAST('100' AS INTEGER);
+
+  - name: Typy tekstowe
+    icon: "📝"
+    desc: TEXT, VARCHAR, CHAR — przechowywanie tekstu. W PostgreSQL TEXT jest zalecany zamiast VARCHAR.
+    code: |
+      CREATE TABLE teksty (
+          -- TEXT — nieograniczona długość (zalecany!)
+          opis      TEXT,
+
+          -- VARCHAR(n) — max n znaków (nie szybszy niż TEXT!)
+          skrot     VARCHAR(10),
+          email     VARCHAR(255),
+
+          -- CHAR(n) — stała długość, dopełniana spacjami (unikaj)
+          kod_kraju CHAR(2),
+
+          -- Funkcje tekstowe
+          -- Lower/upper case
+          -- LENGTH(text), SUBSTR(text, start, len)
+          -- TRIM, LTRIM, RTRIM
+          -- CONCAT, ||
+          -- LIKE, ILIKE (case-insensitive)
+          -- REGEXP_MATCH, REGEXP_REPLACE
+          placeholder TEXT
+      );
+
+      -- Przydatne operacje tekstowe
+      SELECT UPPER(name),
+             LOWER(email),
+             LENGTH(name)                AS dlugosc,
+             LEFT(name, 3)               AS pierwsze_3,
+             TRIM(BOTH ' ' FROM name)    AS bez_spacji,
+             REPLACE(email, '@', '_AT_') AS zamieniony,
+             SPLIT_PART(email, '@', 2)   AS domena
+      FROM users;
+
+      -- Konkatenacja
+      SELECT first_name || ' ' || last_name AS pelne_imie FROM profiles;
+      SELECT CONCAT(first_name, ' ', last_name) AS pelne_imie FROM profiles;
+
+      -- Wyszukiwanie wzorców
+      SELECT * FROM products WHERE name ILIKE '%laptop%';
+      SELECT * FROM users WHERE email ~ '^[a-z]+@gmail\.com$';  -- regex
+
+  - name: Typy dat i czasu
+    icon: "📅"
+    desc: DATE, TIME, TIMESTAMP, TIMESTAMPTZ, INTERVAL — obsługa dat, czasu i stref czasowych.
+    code: |
+      CREATE TABLE zdarzenia (
+          id          SERIAL PRIMARY KEY,
+          nazwa       TEXT,
+          data        DATE,                        -- tylko data: 2024-06-15
+          czas        TIME,                        -- tylko czas: 14:30:00
+          ts          TIMESTAMP,                   -- bez strefy: 2024-06-15 14:30:00
+          ts_tz       TIMESTAMPTZ DEFAULT NOW(),   -- z strefą (ZALECANY!)
+          czas_trwania INTERVAL                    -- np. '2 hours 30 minutes'
+      );
+
+      -- NOW() i funkcje czasowe
+      SELECT
+          NOW()                           AS teraz,
+          CURRENT_DATE                    AS dzisiaj,
+          CURRENT_TIME                    AS aktualny_czas,
+          NOW() - INTERVAL '7 days'       AS tydzien_temu,
+          NOW() + INTERVAL '1 month'      AS za_miesiac,
+          DATE_TRUNC('month', NOW())      AS poczatek_miesiaca,
+          EXTRACT(YEAR FROM NOW())        AS rok,
+          EXTRACT(DOW FROM NOW())         AS dzien_tygodnia,  -- 0=Sun
+          AGE(created_at, NOW())          AS wiek;
+
+      -- Filtrowanie po datach
+      SELECT * FROM orders
+      WHERE created_at >= DATE_TRUNC('month', NOW())  -- ten miesiąc
+        AND created_at <  DATE_TRUNC('month', NOW()) + INTERVAL '1 month';
+
+      -- Różnica dat
+      SELECT
+          order_date,
+          delivery_date,
+          delivery_date - order_date AS dni_dostawy
+      FROM shipments;
+
+  - name: BOOLEAN, UUID, ARRAY
+    icon: "🧮"
+    desc: Typy logiczne, UUID do unikalnych identyfikatorów i tablice PostgreSQL jako natywny typ kolumny.
+    code: |
+      CREATE TABLE uzytkownicy (
+          -- Boolean
+          aktywny       BOOLEAN DEFAULT TRUE,
+          premium       BOOL    DEFAULT FALSE,
+
+          -- UUID (universally unique identifier)
+          id            UUID    DEFAULT gen_random_uuid() PRIMARY KEY,
+          -- alternatywa: uuid-ossp: uuid_generate_v4()
+
+          -- Tablica (ARRAY)
+          tagi          TEXT[],
+          wyniki        INTEGER[],
+          dozwolone_ip  INET[]
+      );
+
+      -- Praca z BOOLEAN
+      SELECT * FROM users WHERE aktywny = TRUE;
+      SELECT * FROM users WHERE NOT premium;
+
+      -- Praca z UUID
+      INSERT INTO uzytkownicy (aktywny, tagi)
+      VALUES (TRUE, ARRAY['admin', 'moderator']);
+
+      -- Operacje na tablicach
+      SELECT * FROM users WHERE 'admin' = ANY(tagi);   -- zawiera element
+      SELECT * FROM users WHERE tagi @> ARRAY['admin'];  -- zawiera tablicę
+      SELECT * FROM users WHERE tagi && ARRAY['admin', 'moderator'];  -- przecięcie
+
+      SELECT
+          tagi[1]                     AS pierwszy_tag,
+          ARRAY_LENGTH(tagi, 1)       AS liczba_tagow,
+          ARRAY_APPEND(tagi, 'nowy')  AS z_nowym,
+          ARRAY_REMOVE(tagi, 'stary') AS bez_starego,
+          UNNEST(tagi)                AS rozwiniety  -- każdy element jako wiersz
+      FROM uzytkownicy;
+
+  - name: JSONB — JSON w bazie
+    icon: "📦"
+    desc: Wydajne przechowywanie i przeszukiwanie JSON. Szybsze niż JSON (binarny), z indeksowaniem GIN.
+    code: |
+      CREATE TABLE produkty (
+          id      SERIAL PRIMARY KEY,
+          nazwa   TEXT NOT NULL,
+          meta    JSONB          -- binarny, indeksowalny JSON
+      );
+
+      -- Wstaw JSON
+      INSERT INTO produkty (nazwa, meta) VALUES
+      ('Laptop', '{"brand":"Dell","specs":{"ram":16,"ssd":512},"tags":["electronics","sale"]}'),
+      ('Myszka', '{"brand":"Logitech","specs":{"dpi":1600},"tags":["electronics"]}');
+
+      -- Odczyt pól (operator ->)
+      SELECT meta -> 'brand' AS marka FROM produkty;              -- zwraca JSON
+      SELECT meta ->> 'brand' AS marka FROM produkty;             -- zwraca TEXT
+
+      -- Zagnieżdżone pola
+      SELECT meta -> 'specs' ->> 'ram' AS ram FROM produkty;
+      SELECT meta #>> '{specs,ram}' AS ram FROM produkty;         -- shorthand
+
+      -- Filtrowanie po JSONB
+      SELECT * FROM produkty WHERE meta @> '{"brand":"Dell"}';    -- zawiera
+      SELECT * FROM produkty WHERE meta ? 'brand';                 -- klucz istnieje
+      SELECT * FROM produkty WHERE meta ->> 'brand' = 'Dell';
+
+      -- Aktualizacja JSONB
+      UPDATE produkty
+      SET meta = meta || '{"discount": 0.1}'      -- merge
+      WHERE id = 1;
+
+      UPDATE produkty
+      SET meta = meta - 'discount'                 -- usuń klucz
+      WHERE id = 1;
+
+      -- GIN index na JSONB (szybkie przeszukiwanie)
+      CREATE INDEX idx_produkty_meta ON produkty USING GIN(meta);
+
+      -- Elementy tablicy JSON
+      SELECT * FROM produkty WHERE meta->'tags' ? 'sale';
+
+  - name: Constrainty — ograniczenia
+    icon: "🛡️"
+    desc: NOT NULL, UNIQUE, CHECK, DEFAULT, PRIMARY KEY — definicja zasad integralności danych.
+    code: |
+      CREATE TABLE produkty (
+          id          SERIAL PRIMARY KEY,
+
+          -- NOT NULL — wartość wymagana
+          nazwa       TEXT        NOT NULL,
+
+          -- UNIQUE — unikalna wartość w kolumnie
+          sku         TEXT        NOT NULL UNIQUE,
+
+          -- DEFAULT — wartość domyślna
+          aktywny     BOOLEAN     NOT NULL DEFAULT TRUE,
+          created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+          -- CHECK — własna reguła
+          cena        NUMERIC(10,2) NOT NULL CHECK (cena >= 0),
+          rabat       NUMERIC(5,2)  NOT NULL DEFAULT 0 CHECK (rabat BETWEEN 0 AND 100),
+
+          -- Złożone UNIQUE (para kolumn musi być unikalna)
+          kategoria   TEXT,
+          podkategoria TEXT,
+          UNIQUE (kategoria, podkategoria)
+      );
+
+      -- Constraint z nazwą (łatwiejszy do usunięcia)
+      ALTER TABLE produkty
+      ADD CONSTRAINT chk_cena_dodatnia CHECK (cena > 0);
+
+      -- Dodaj NOT NULL do istniejącej kolumny
+      ALTER TABLE produkty ALTER COLUMN sku SET NOT NULL;
+
+      -- Usuń constraint
+      ALTER TABLE produkty DROP CONSTRAINT chk_cena_dodatnia;
+
+      -- Sprawdź constrainty tabeli
+      SELECT conname, contype, pg_get_constraintdef(oid)
+      FROM pg_constraint
+      WHERE conrelid = 'produkty'::regclass;
+
+  - name: Indeksy — wydajność zapytań
+    icon: "⚡"
+    desc: B-tree, Hash, GIN, GiST, BRIN — tworzenie indeksów, kiedy używać, jak sprawdzać ich działanie.
+    code: |
+      -- Podstawowy indeks B-tree (domyślny)
+      CREATE INDEX idx_users_email   ON users(email);
+      CREATE INDEX idx_orders_status ON orders(status);
+
+      -- Indeks wielokolumnowy
+      CREATE INDEX idx_orders_customer_date
+          ON orders(customer_id, created_at DESC);
+
+      -- Partial index — tylko część rekordów (mniejszy, szybszy)
+      CREATE INDEX idx_active_users
+          ON users(email) WHERE aktywny = TRUE;
+
+      -- UNIQUE index
+      CREATE UNIQUE INDEX idx_users_email_unique ON users(email);
+
+      -- GIN — dla JSONB, tablice, full-text search
+      CREATE INDEX idx_products_meta    ON products USING GIN(meta);
+      CREATE INDEX idx_products_tags    ON products USING GIN(tags);
+      CREATE INDEX idx_articles_fts     ON articles USING GIN(to_tsvector('polish', content));
+
+      -- GiST — dla PostGIS, geometric types, ranges
+      CREATE INDEX idx_lokalizacje_geo ON lokalizacje USING GIST(geolokalizacja);
+
+      -- BRIN — dla bardzo dużych tabel z sortowanymi danymi (timestamps)
+      CREATE INDEX idx_logs_created ON logs USING BRIN(created_at);
+
+      -- Hash — tylko dla równości (=), szybszy niż B-tree dla tego przypadku
+      CREATE INDEX idx_sessions_token ON sessions USING HASH(token);
+
+      -- Sprawdź czy indeks jest używany
+      EXPLAIN ANALYZE SELECT * FROM users WHERE email = 'test@example.com';
+
+      -- Lista indeksów tabeli
+      \d users   -- w psql
+      SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'users';
+
+      -- Usuń indeks
+      DROP INDEX idx_users_email;
+
+      -- Konkruentne tworzenie indeksu (nie blokuje zapisów)
+      CREATE INDEX CONCURRENTLY idx_big_table_col ON big_table(col);

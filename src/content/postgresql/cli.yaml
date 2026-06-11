@@ -1,0 +1,160 @@
+title: Komendy PostgreSQL / psql
+
+groups:
+  - name: Instalacja i uruchamianie
+    icon: "📦"
+    commands:
+      - desc: Zainstaluj PostgreSQL (Ubuntu/Debian)
+        code: sudo apt install postgresql postgresql-contrib
+      - desc: Uruchom / zatrzymaj / sprawdź status (systemd)
+        code: sudo systemctl start postgresql && sudo systemctl status postgresql
+      - desc: Zainstaluj PostgreSQL przez Docker
+        code: docker run -d --name postgres -e POSTGRES_PASSWORD=secret -e POSTGRES_DB=mydb -p 5432:5432 postgres:16
+      - desc: Uruchom PostgreSQL z Docker Compose
+        code: "docker compose up -d postgres"
+      - desc: Zainstaluj klienta psql (bez serwera)
+        code: sudo apt install postgresql-client
+      - desc: Sprawdź wersję PostgreSQL
+        code: psql --version
+
+  - name: Połączenie z bazą (psql)
+    icon: "🔌"
+    commands:
+      - desc: Połącz się z lokalną bazą
+        code: psql -U postgres -d mydb
+      - desc: Połącz przez URL
+        code: "psql postgresql://postgres:secret@localhost:5432/mydb"
+      - desc: Połącz z hosta zdalnego
+        code: psql -h db.example.com -U postgres -d production
+      - desc: Połącz przez Docker
+        code: docker exec -it postgres psql -U postgres -d mydb
+      - desc: Wykonaj jedno polecenie i wyjdź
+        code: psql -U postgres -d mydb -c "SELECT COUNT(*) FROM users"
+      - desc: Wykonaj plik SQL
+        code: psql -U postgres -d mydb -f schema.sql
+      - desc: Zapisz hasło w pliku .pgpass (żeby nie pytało)
+        code: "echo 'localhost:5432:mydb:postgres:secret' >> ~/.pgpass && chmod 600 ~/.pgpass"
+
+  - name: psql — meta-komendy
+    icon: "💻"
+    commands:
+      - desc: Wylistuj wszystkie bazy
+        code: \l
+      - desc: Połącz z inną bazą
+        code: \c mydb
+      - desc: Wylistuj wszystkie tabele
+        code: \dt
+      - desc: Opisz tabelę (kolumny, typy, constrainty, indeksy)
+        code: \d users
+      - desc: Wylistuj widoki
+        code: \dv
+      - desc: Wylistuj indeksy
+        code: \di
+      - desc: Wylistuj użytkowników / role
+        code: \du
+      - desc: Wylistuj funkcje
+        code: \df
+      - desc: Wylistuj rozszerzenia
+        code: \dx
+      - desc: Historia zapytań
+        code: \s
+      - desc: Timing zapytań (pokaż czas wykonania)
+        code: \timing
+      - desc: Formatowanie wyników — rozszerzony widok
+        code: \x
+      - desc: Wyłącz pager (mniej | more)
+        code: \pset pager off
+      - desc: Wyjdź z psql
+        code: \q
+
+  - name: Zarządzanie bazami
+    icon: "🗄️"
+    commands:
+      - desc: Utwórz nową bazę
+        code: createdb -U postgres mydb
+      - desc: Utwórz bazę (w psql)
+        code: CREATE DATABASE mydb OWNER postgres ENCODING 'UTF8';
+      - desc: Usuń bazę
+        code: dropdb -U postgres mydb
+      - desc: Sklonuj bazę (template)
+        code: "CREATE DATABASE mydb_test TEMPLATE mydb;"
+      - desc: Lista baz i rozmiary
+        code: SELECT datname, pg_size_pretty(pg_database_size(datname)) FROM pg_database;
+      - desc: Rozmiar tabeli
+        code: SELECT pg_size_pretty(pg_total_relation_size('users'));
+
+  - name: Zarządzanie użytkownikami
+    icon: "👤"
+    commands:
+      - desc: Utwórz użytkownika z hasłem
+        code: "CREATE USER appuser WITH PASSWORD 'secret';"
+      - desc: Daj wszystkie uprawnienia do bazy
+        code: GRANT ALL PRIVILEGES ON DATABASE mydb TO appuser;
+      - desc: Daj uprawnienia do tabel
+        code: GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO appuser;
+      - desc: Daj uprawnienia do sekwencji (SERIAL)
+        code: GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO appuser;
+      - desc: Zmień hasło użytkownika
+        code: "ALTER USER postgres WITH PASSWORD 'newpassword';"
+      - desc: Utwórz superusera
+        code: CREATE USER admin WITH SUPERUSER PASSWORD 'secret';
+      - desc: Usuń użytkownika
+        code: DROP USER appuser;
+
+  - name: Backup i restore
+    icon: "💾"
+    commands:
+      - desc: Backup bazy do pliku SQL
+        code: pg_dump -U postgres mydb > backup.sql
+      - desc: Backup do formatu custom (kompresja)
+        code: pg_dump -U postgres -F c -f backup.dump mydb
+      - desc: Backup tylko struktury
+        code: pg_dump -U postgres --schema-only mydb > schema.sql
+      - desc: Restore z pliku SQL
+        code: psql -U postgres -d mydb < backup.sql
+      - desc: Restore z formatu custom
+        code: pg_restore -U postgres -d mydb backup.dump
+      - desc: Backup przez Docker
+        code: docker exec postgres pg_dump -U postgres mydb > backup.sql
+      - desc: Backup wszystkich baz
+        code: pg_dumpall -U postgres > all.sql
+
+  - name: Administracja i diagnostyka
+    icon: "🔧"
+    commands:
+      - desc: Aktywne połączenia
+        code: SELECT pid, usename, application_name, state, query FROM pg_stat_activity;
+      - desc: Zabij wiszące połączenie (podaj pid)
+        code: SELECT pg_terminate_backend(12345);
+      - desc: Zabij wszystkie połączenia do bazy
+        code: SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='mydb' AND pid <> pg_backend_pid();
+      - desc: Najwolniejsze zapytania (wymaga pg_stat_statements)
+        code: SELECT query, mean_exec_time, calls FROM pg_stat_statements ORDER BY mean_exec_time DESC LIMIT 10;
+      - desc: Blokady w bazie
+        code: SELECT pid, relation::regclass, mode, granted FROM pg_locks WHERE NOT granted;
+      - desc: VACUUM — wyczyść nieużywane wiersze
+        code: VACUUM ANALYZE users;
+      - desc: REINDEX — przebuduj indeks
+        code: REINDEX TABLE users;
+      - desc: Plik konfiguracyjny postgresql.conf
+        code: SHOW config_file;
+      - desc: Załaduj nową konfigurację bez restartu
+        code: SELECT pg_reload_conf();
+      - desc: Ścieżka do pliku log
+        code: SHOW log_directory;
+
+  - name: Rozszerzenia
+    icon: "🧩"
+    commands:
+      - desc: Lista dostępnych rozszerzeń
+        code: SELECT name, default_version FROM pg_available_extensions ORDER BY name;
+      - desc: Zainstaluj rozszerzenie uuid-ossp
+        code: CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+      - desc: Zainstaluj pg_trgm (fuzzy search)
+        code: CREATE EXTENSION IF NOT EXISTS pg_trgm;
+      - desc: Zainstaluj pg_stat_statements (monitoring zapytań)
+        code: CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+      - desc: Zainstaluj PostGIS
+        code: CREATE EXTENSION IF NOT EXISTS postgis;
+      - desc: Usuń rozszerzenie
+        code: DROP EXTENSION pg_trgm;

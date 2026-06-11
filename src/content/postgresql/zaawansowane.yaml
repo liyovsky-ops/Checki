@@ -1,0 +1,292 @@
+title: Zaawansowane funkcje PostgreSQL
+
+items:
+  - name: Window Functions — analityka
+    icon: "📈"
+    desc: ROW_NUMBER, RANK, LAG, LEAD, SUM OVER — obliczenia przez okna bez GROUP BY. Najważniejsza zaawansowana funkcja SQL.
+    code: |
+      -- ROW_NUMBER — numer wiersza w grupie
+      SELECT
+          name,
+          department,
+          salary,
+          ROW_NUMBER() OVER (PARTITION BY department ORDER BY salary DESC) AS rank_w_dziale
+      FROM employees;
+
+      -- RANK vs DENSE_RANK (różnica przy remisach)
+      SELECT name, salary,
+          RANK()        OVER (ORDER BY salary DESC) AS rank,       -- 1,2,2,4
+          DENSE_RANK()  OVER (ORDER BY salary DESC) AS dense_rank  -- 1,2,2,3
+      FROM employees;
+
+      -- LAG i LEAD — poprzedni/następny wiersz
+      SELECT
+          order_date,
+          total,
+          LAG(total)  OVER (ORDER BY order_date) AS poprzedni,
+          LEAD(total) OVER (ORDER BY order_date) AS nastepny,
+          total - LAG(total) OVER (ORDER BY order_date) AS zmiana
+      FROM orders
+      WHERE customer_id = 1;
+
+      -- Kumulatywna suma i średnia krocząca
+      SELECT
+          created_at::DATE AS dzien,
+          SUM(total)  AS sprzedaz_dzienna,
+          SUM(SUM(total))  OVER (ORDER BY created_at::DATE) AS suma_kumulatywna,
+          AVG(total)  OVER (ORDER BY created_at::DATE ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS srednia_7dni
+      FROM orders
+      GROUP BY created_at::DATE
+      ORDER BY dzien;
+
+      -- NTILE — podział na kwantyle
+      SELECT name, salary,
+          NTILE(4) OVER (ORDER BY salary) AS kwartal  -- 1=dolne 25%, 4=górne 25%
+      FROM employees;
+
+      -- FIRST_VALUE, LAST_VALUE
+      SELECT department, name, salary,
+          FIRST_VALUE(name) OVER (PARTITION BY department ORDER BY salary DESC) AS najlepiej_platny
+      FROM employees;
+
+  - name: Widoki (Views) i Materialized Views
+    icon: "👁️"
+    desc: Zapisane zapytania jako wirtualne tabele. Materialized views — cache wyników dla drogich zapytań.
+    code: |
+      -- VIEW — wirtualna tabela (zapytanie wykonuje się za każdym razem)
+      CREATE VIEW v_active_users AS
+      SELECT u.id, u.email, u.name, COUNT(o.id) AS orders_count
+      FROM users u
+      LEFT JOIN orders o ON u.id = o.customer_id
+      WHERE u.active = TRUE
+      GROUP BY u.id, u.email, u.name;
+
+      -- Używasz jak tabeli
+      SELECT * FROM v_active_users WHERE orders_count > 5;
+
+      -- Zmień definicję widoku
+      CREATE OR REPLACE VIEW v_active_users AS
+      SELECT u.id, u.email, u.name, u.role, COUNT(o.id) AS orders_count
+      FROM users u
+      LEFT JOIN orders o ON u.id = o.customer_id
+      WHERE u.active = TRUE
+      GROUP BY u.id, u.email, u.name, u.role;
+
+      -- MATERIALIZED VIEW — fizycznie zapisuje wynik (cache)
+      CREATE MATERIALIZED VIEW mv_monthly_stats AS
+      SELECT
+          DATE_TRUNC('month', created_at) AS miesiac,
+          COUNT(*)                         AS liczba_zamowien,
+          SUM(total)                       AS przychod,
+          AVG(total)                       AS srednia
+      FROM orders
+      WHERE status = 'completed'
+      GROUP BY 1
+      ORDER BY 1;
+
+      -- Odśwież dane (wykonuje zapytanie ponownie)
+      REFRESH MATERIALIZED VIEW mv_monthly_stats;
+
+      -- Odśwież bez blokowania czytania
+      REFRESH MATERIALIZED VIEW CONCURRENTLY mv_monthly_stats;
+      -- (wymaga UNIQUE index na widoku)
+
+      CREATE UNIQUE INDEX ON mv_monthly_stats(miesiac);
+
+      -- Usuń widok
+      DROP VIEW v_active_users;
+      DROP MATERIALIZED VIEW mv_monthly_stats;
+
+  - name: Transakcje i Savepoints
+    icon: "🔄"
+    desc: Atomowe operacje, poziomy izolacji, SAVEPOINT do częściowego cofnięcia transakcji.
+    code: |
+      -- Podstawowa transakcja
+      BEGIN;
+          UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+          UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+          -- jeśli oba UPDATE ok:
+      COMMIT;
+      -- jeśli coś poszło nie tak:
+      -- ROLLBACK;
+
+      -- Transakcja z obsługą błędu (PL/pgSQL)
+      DO $$
+      BEGIN
+          BEGIN;
+              UPDATE accounts SET balance = balance - 500 WHERE id = 1;
+              IF (SELECT balance FROM accounts WHERE id = 1) < 0 THEN
+                  RAISE EXCEPTION 'Insufficient funds';
+              END IF;
+              UPDATE accounts SET balance = balance + 500 WHERE id = 2;
+          COMMIT;
+      EXCEPTION WHEN OTHERS THEN
+          ROLLBACK;
+          RAISE;
+      END;
+      $$;
+
+      -- SAVEPOINT — zapisz punkt w transakcji
+      BEGIN;
+          INSERT INTO orders (customer_id, total) VALUES (1, 100);
+          SAVEPOINT sp1;
+
+          INSERT INTO order_items (order_id, product_id) VALUES (1, 999);
+          -- błąd: produkt 999 nie istnieje — cofnij tylko do sp1
+          ROLLBACK TO SAVEPOINT sp1;
+
+          INSERT INTO order_items (order_id, product_id) VALUES (1, 1);  -- ok
+      COMMIT;
+
+      -- Poziomy izolacji transakcji
+      BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;   -- domyślny
+      BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;  -- brak phantom reads
+      BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE;     -- najsilniejszy
+
+  - name: Triggery i funkcje PL/pgSQL
+    icon: "⚡"
+    desc: Automatyczne akcje przy INSERT/UPDATE/DELETE. Procedury składowane w PL/pgSQL — logika biznesowa w bazie.
+    code: |
+      -- Funkcja PL/pgSQL — aktualizuj updated_at automatycznie
+      CREATE OR REPLACE FUNCTION update_updated_at()
+      RETURNS TRIGGER AS $$
+      BEGIN
+          NEW.updated_at = NOW();
+          RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      -- Trigger wywołujący funkcję przed każdym UPDATE
+      CREATE TRIGGER trg_users_updated_at
+          BEFORE UPDATE ON users
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+      -- Funkcja logowania zmian
+      CREATE TABLE audit_log (
+          id         SERIAL PRIMARY KEY,
+          table_name TEXT,
+          operation  TEXT,
+          old_data   JSONB,
+          new_data   JSONB,
+          changed_at TIMESTAMPTZ DEFAULT NOW(),
+          changed_by TEXT DEFAULT CURRENT_USER
+      );
+
+      CREATE OR REPLACE FUNCTION log_changes()
+      RETURNS TRIGGER AS $$
+      BEGIN
+          INSERT INTO audit_log (table_name, operation, old_data, new_data)
+          VALUES (
+              TG_TABLE_NAME,
+              TG_OP,
+              CASE WHEN TG_OP = 'DELETE' THEN row_to_json(OLD)::JSONB ELSE NULL END,
+              CASE WHEN TG_OP != 'DELETE' THEN row_to_json(NEW)::JSONB ELSE NULL END
+          );
+          RETURN COALESCE(NEW, OLD);
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE TRIGGER trg_users_audit
+          AFTER INSERT OR UPDATE OR DELETE ON users
+          FOR EACH ROW EXECUTE FUNCTION log_changes();
+
+      -- Prosta funkcja zwracająca wartość
+      CREATE OR REPLACE FUNCTION get_user_orders_total(p_user_id INT)
+      RETURNS NUMERIC AS $$
+      DECLARE
+          v_total NUMERIC;
+      BEGIN
+          SELECT COALESCE(SUM(total), 0)
+          INTO v_total
+          FROM orders
+          WHERE customer_id = p_user_id AND status = 'completed';
+          RETURN v_total;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      SELECT get_user_orders_total(42);
+
+  - name: Full-Text Search — wyszukiwanie tekstowe
+    icon: "🔍"
+    desc: Wbudowany silnik wyszukiwania — tsvector, tsquery, ts_rank. Szybszy niż LIKE dla dużych tabel.
+    code: |
+      -- Podstawowe FTS
+      SELECT * FROM articles
+      WHERE to_tsvector('polish', title || ' ' || content) @@ to_tsquery('polish', 'PostgreSQL & wyszukiwanie');
+
+      -- GIN index na wyszukiwanie (10-100x szybsze)
+      ALTER TABLE articles ADD COLUMN fts_vector TSVECTOR;
+
+      UPDATE articles
+      SET fts_vector = to_tsvector('polish', COALESCE(title, '') || ' ' || COALESCE(content, ''));
+
+      CREATE INDEX idx_articles_fts ON articles USING GIN(fts_vector);
+
+      -- Trigger do automatycznej aktualizacji wektora
+      CREATE OR REPLACE FUNCTION update_fts_vector()
+      RETURNS TRIGGER AS $$
+      BEGIN
+          NEW.fts_vector = to_tsvector('polish',
+              COALESCE(NEW.title, '') || ' ' || COALESCE(NEW.content, ''));
+          RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE TRIGGER trg_articles_fts
+          BEFORE INSERT OR UPDATE ON articles
+          FOR EACH ROW EXECUTE FUNCTION update_fts_vector();
+
+      -- Wyszukiwanie z rankingiem
+      SELECT title,
+             ts_rank(fts_vector, query)     AS rank,
+             ts_headline('polish', content, query, 'MaxWords=20,MinWords=5') AS snippet
+      FROM articles,
+           to_tsquery('polish', 'baza & danych') query
+      WHERE fts_vector @@ query
+      ORDER BY rank DESC
+      LIMIT 10;
+
+      -- Operatory tsquery
+      -- 'baza & danych'     — oba słowa
+      -- 'baza | mysql'      — jedno z dwóch
+      -- '!mysql'            — bez słowa
+      -- 'baz:*'             — prefix (baza, bazowy itd.)
+
+  - name: EXPLAIN i optymalizacja
+    icon: "🔬"
+    desc: EXPLAIN ANALYZE — zrozumienie planów zapytań, wykrywanie problemów wydajnościowych, N+1.
+    code: |
+      -- EXPLAIN — pokaż plan bez wykonywania
+      EXPLAIN SELECT * FROM users WHERE email = 'test@example.com';
+
+      -- EXPLAIN ANALYZE — wykonaj i pokaż rzeczywiste czasy
+      EXPLAIN ANALYZE SELECT * FROM orders WHERE status = 'pending';
+
+      -- EXPLAIN BUFFERS — pokaż cache hits/misses
+      EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
+      SELECT u.name, COUNT(o.id)
+      FROM users u JOIN orders o ON u.id = o.customer_id
+      GROUP BY u.id;
+
+      -- Co szukać w EXPLAIN:
+      -- "Seq Scan"       — skanuje całą tabelę (brak indeksu lub mała tabela)
+      -- "Index Scan"     — używa indeksu (dobrze)
+      -- "Bitmap Heap Scan" — używa indeksu dla wielu wierszy (ok)
+      -- "Hash Join"      — łączenie przez hash (ok dla dużych zbiorów)
+      -- "Nested Loop"    — łączenie przez pętlę (ok gdy wewnętrzna mała)
+      -- "cost=X..Y"      — szacowany koszt (X=start, Y=total)
+      -- "actual time"    — rzeczywisty czas w ms
+      -- "rows=X"         — liczba zwróconych wierszy
+
+      -- Najczęstsze optymalizacje:
+      -- 1. Dodaj indeks na kolumnie w WHERE / JOIN
+      -- 2. Użyj LIMIT gdy potrzebujesz tylko kilka wierszy
+      -- 3. Zamień SELECT * na konkretne kolumny
+      -- 4. Użyj EXISTS zamiast IN z podzapytaniem
+      -- 5. VACUUM ANALYZE tbl — odśwież statystyki planera
+
+      -- Podejrzane zapytania (pg_stat_statements)
+      SELECT query, calls, total_exec_time, mean_exec_time, rows
+      FROM pg_stat_statements
+      ORDER BY mean_exec_time DESC
+      LIMIT 10;

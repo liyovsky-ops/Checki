@@ -1,0 +1,188 @@
+title: Komendy Redis / redis-cli
+
+groups:
+  - name: Instalacja i uruchamianie
+    icon: "📦"
+    commands:
+      - desc: Zainstaluj Redis (Ubuntu/Debian)
+        code: sudo apt install redis-server
+      - desc: Zainstaluj Redis przez Docker
+        code: docker run -d --name redis -p 6379:6379 redis:7
+      - desc: Redis Stack (z modułami JSON, Search)
+        code: docker run -d --name redis-stack -p 6379:6379 redis/redis-stack-server:latest
+      - desc: Redis z persistencją przez Docker
+        code: "docker run -d --name redis -p 6379:6379 -v redis_data:/data redis:7 redis-server --appendonly yes"
+      - desc: Uruchom / zatrzymaj Redis (systemd)
+        code: sudo systemctl start redis-server && sudo systemctl status redis-server
+      - desc: Uruchom Redis z konfiguracją
+        code: redis-server /etc/redis/redis.conf
+      - desc: Sprawdź wersję
+        code: redis-server --version
+
+  - name: Połączenie (redis-cli)
+    icon: "🔌"
+    commands:
+      - desc: Połącz lokalnie
+        code: redis-cli
+      - desc: Połącz przez URL
+        code: "redis-cli -u redis://localhost:6379"
+      - desc: Połącz z hasłem
+        code: "redis-cli -a hasło"
+      - desc: Połącz z innym hostem i portem
+        code: redis-cli -h db.example.com -p 6380
+      - desc: Połącz przez Docker
+        code: docker exec -it redis redis-cli
+      - desc: Wykonaj jedną komendę i wyjdź
+        code: redis-cli GET user:1:name
+      - desc: Połącz z klastrem
+        code: redis-cli -c -h 192.168.1.10
+
+  - name: Kluczowe operacje
+    icon: "🔑"
+    commands:
+      - desc: Ustaw klucz
+        code: SET klucz wartość
+      - desc: Ustaw z TTL (sekundy)
+        code: SET session:abc "user:42" EX 3600
+      - desc: Pobierz wartość
+        code: GET klucz
+      - desc: Usuń klucz
+        code: DEL klucz1 klucz2
+      - desc: Sprawdź czy klucz istnieje
+        code: EXISTS klucz
+      - desc: Ustaw TTL na istniejący klucz (sekundy)
+        code: EXPIRE klucz 3600
+      - desc: Sprawdź pozostały TTL
+        code: TTL klucz
+      - desc: Usuń TTL (klucz trwały)
+        code: PERSIST klucz
+      - desc: Zmień nazwę klucza
+        code: RENAME stary_klucz nowy_klucz
+      - desc: Typ wartości klucza
+        code: TYPE klucz
+      - desc: Znajdź klucze wzorcem (unikaj na produkcji!)
+        code: KEYS user:*
+      - desc: Iteracja kluczy (bezpieczna alternatywa KEYS)
+        code: SCAN 0 MATCH user:* COUNT 100
+
+  - name: Strings i liczniki
+    icon: "🔢"
+    commands:
+      - desc: Inkrementuj licznik
+        code: INCR page:views
+      - desc: Inkrementuj o wartość
+        code: INCRBY counter 10
+      - desc: Dekrementuj
+        code: DECR counter
+      - desc: Ustaw wiele kluczy naraz
+        code: "MSET a 1 b 2 c 3"
+      - desc: Pobierz wiele kluczy naraz
+        code: MGET a b c
+      - desc: Ustaw tylko jeśli nie istnieje
+        code: SET lock:job NX EX 30
+      - desc: Pobierz i usuń
+        code: GETDEL klucz
+
+  - name: Hash
+    icon: "🗂️"
+    commands:
+      - desc: Ustaw pola hashu
+        code: "HSET user:42 name \"Jan\" email \"jan@example.com\""
+      - desc: Pobierz jedno pole
+        code: HGET user:42 name
+      - desc: Pobierz wszystkie pola
+        code: HGETALL user:42
+      - desc: Pobierz wiele pól
+        code: HMGET user:42 name email role
+      - desc: Sprawdź czy pole istnieje
+        code: HEXISTS user:42 phone
+      - desc: Inkrementuj pole liczbowe
+        code: HINCRBY user:42 login_count 1
+      - desc: Usuń pole
+        code: HDEL user:42 phone
+      - desc: Liczba pól w hashu
+        code: HLEN user:42
+
+  - name: List
+    icon: "📋"
+    commands:
+      - desc: Dodaj do końca listy (tail)
+        code: RPUSH kolejka "zadanie1" "zadanie2"
+      - desc: Dodaj do początku listy (head)
+        code: LPUSH stos "element"
+      - desc: Pobierz wszystkie elementy
+        code: LRANGE lista 0 -1
+      - desc: Zdejmij z początku (consumer)
+        code: LPOP kolejka
+      - desc: Zdejmij z końca
+        code: RPOP kolejka
+      - desc: Blokujące pobranie (czekaj na element)
+        code: BLPOP kolejka 30
+      - desc: Długość listy
+        code: LLEN kolejka
+      - desc: Przytnij do N elementów
+        code: LTRIM lista 0 999
+
+  - name: Set
+    icon: "🎯"
+    commands:
+      - desc: Dodaj elementy do setu
+        code: "SADD tagi \"electronics\" \"sale\" \"new\""
+      - desc: Wszystkie elementy setu
+        code: SMEMBERS tagi
+      - desc: Sprawdź czy element w secie
+        code: SISMEMBER tagi "sale"
+      - desc: Liczba elementów
+        code: SCARD tagi
+      - desc: Usuń element
+        code: SREM tagi "old"
+      - desc: Suma dwóch setów
+        code: SUNION set1 set2
+      - desc: Część wspólna
+        code: SINTER set1 set2
+      - desc: Różnica
+        code: SDIFF set1 set2
+
+  - name: Sorted Set
+    icon: "🏆"
+    commands:
+      - desc: Dodaj z wynikiem
+        code: "ZADD leaderboard 2300 \"alice\" 1800 \"bob\""
+      - desc: TOP 10 (malejąco z punktami)
+        code: ZRANGE leaderboard 0 9 REV WITHSCORES
+      - desc: Pozycja gracza (malejąco)
+        code: ZREVRANK leaderboard "alice"
+      - desc: Punkty gracza
+        code: ZSCORE leaderboard "alice"
+      - desc: Dodaj do punktów
+        code: ZINCRBY leaderboard 100 "alice"
+      - desc: Liczba graczy
+        code: ZCARD leaderboard
+      - desc: Usuń gracza
+        code: ZREM leaderboard "alice"
+      - desc: Zdejmij najwyżej punktującego
+        code: ZPOPMAX leaderboard
+
+  - name: Administracja
+    icon: "🔧"
+    commands:
+      - desc: Informacje o serwerze
+        code: INFO
+      - desc: Użycie pamięci
+        code: INFO memory
+      - desc: Liczba kluczy w aktualnej DB
+        code: DBSIZE
+      - desc: Wybierz bazę (domyślnie 0)
+        code: SELECT 1
+      - desc: Konfiguracja na żywo
+        code: CONFIG SET maxmemory 512mb
+      - desc: Sprawdź konfigurację
+        code: CONFIG GET maxmemory
+      - desc: Podejrzyj wszystkie komendy (debug tylko!)
+        code: MONITOR
+      - desc: Wolne zapytania
+        code: SLOWLOG GET 10
+      - desc: Wyczyść aktualną bazę (UWAGA!)
+        code: FLUSHDB ASYNC
+      - desc: Benchmark wydajności
+        code: redis-benchmark -n 100000 -c 50 -q

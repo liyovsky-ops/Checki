@@ -1,0 +1,231 @@
+title: Struktury danych Redis
+
+items:
+  - name: String — podstawowy typ
+    icon: "📝"
+    desc: Ciągi znaków, liczby, binarne dane. Operacje atomowe — INCR, APPEND, GETSET. Maks 512 MB na wartość.
+    code: |
+      # Ustawianie i pobieranie
+      SET   klucz "wartość"
+      GET   klucz
+
+      # SET z opcjami
+      SET session:abc "user:42" EX 3600   # wygaśnie za 3600s
+      SET session:abc "user:42" PX 60000  # wygaśnie za 60000ms
+      SET session:abc "user:42" NX        # tylko gdy klucz NIE istnieje
+      SET session:abc "user:42" XX        # tylko gdy klucz istnieje
+
+      # Liczniki (atomowe!)
+      SET page:views 100
+      INCR  page:views         # 101
+      INCRBY page:views 10     # 111
+      DECR  page:views         # 110
+      DECRBY page:views 5      # 105
+      INCRBYFLOAT temp 1.5     # dla float
+
+      # Wiele na raz
+      MSET user:1:name "Alice" user:2:name "Bob" user:3:name "Carol"
+      MGET user:1:name user:2:name user:3:name
+      # 1) "Alice"  2) "Bob"  3) "Carol"
+
+      # Dołącz do stringa
+      APPEND log:today "2024-01-15 login\n"
+      STRLEN log:today
+
+      # Pobierz i ustaw nową wartość atomowo
+      GETSET counter 0          # zwraca starą wartość, ustawia 0
+      GETDEL klucz              # pobierz i usuń
+
+  - name: List — lista (stos lub kolejka)
+    icon: "📋"
+    desc: Lista elementów z obu końców — LPUSH/RPUSH/LPOP/RPOP. Używana jako kolejka (FIFO) lub stos (LIFO). Baza dla Celery.
+    code: |
+      # Dodaj elementy
+      LPUSH kolejka "zadanie1"     # dodaj z lewej (head)
+      LPUSH kolejka "zadanie2"     # ["zadanie2", "zadanie1"]
+      RPUSH kolejka "zadanie3"     # dodaj z prawej (tail) → ["zadanie2","zadanie1","zadanie3"]
+
+      # Pobierz elementy
+      LRANGE kolejka 0 -1          # pobierz wszystkie (0 do końca)
+      LRANGE kolejka 0 4           # pierwsze 5
+      LINDEX kolejka 0             # element na pozycji 0
+      LLEN   kolejka               # długość listy
+
+      # Zdejmij z końców
+      LPOP  kolejka                # zdejmij z lewej
+      RPOP  kolejka                # zdejmij z prawej
+      LPOP  kolejka 3              # zdejmij 3 z lewej naraz
+
+      # Blokujące POP — czekaj aż coś pojawi się w kolejce
+      BLPOP kolejka 30             # czekaj max 30s (używane w worker procesach)
+      BRPOP kolejka 0              # czekaj bez limitu
+
+      # Kolejka FIFO (producer/consumer)
+      # Producer:
+      RPUSH jobs "{'type':'email','to':'jan@example.com'}"
+      # Consumer (Celery robi to automatycznie):
+      BLPOP jobs 0
+
+      # Stos LIFO
+      LPUSH stos "a"
+      LPUSH stos "b"
+      LPOP  stos    # "b" — ostatnio dodany
+
+      # Przytnij listę do max długości
+      LTRIM kolejka 0 999          # zachowaj max 1000 elementów
+
+  - name: Set — zbiór unikalnych elementów
+    icon: "🎯"
+    desc: Nieuporządkowany zbiór unikalnych wartości. Operacje zbiorów — UNION, INTERSECT, DIFF. Używany do tagów, śledzenia unikalnych wizyt.
+    code: |
+      # Dodaj elementy (duplikaty ignorowane)
+      SADD tagi:produkt:1  "electronics" "sale" "new"
+      SADD tagi:produkt:2  "electronics" "refurbished"
+
+      # Pobierz wszystkie
+      SMEMBERS tagi:produkt:1
+      # 1) "electronics"  2) "sale"  3) "new"
+
+      # Sprawdź czy element istnieje
+      SISMEMBER tagi:produkt:1 "sale"     # 1 (istnieje)
+      SISMEMBER tagi:produkt:1 "brak"     # 0 (nie istnieje)
+
+      # Liczba elementów
+      SCARD tagi:produkt:1                # 3
+
+      # Usuń element
+      SREM tagi:produkt:1 "sale"
+
+      # Operacje zbiorów
+      SUNION tagi:produkt:1 tagi:produkt:2      # suma (unikalne)
+      SINTER tagi:produkt:1 tagi:produkt:2      # część wspólna
+      SDIFF  tagi:produkt:1 tagi:produkt:2      # różnica (co jest w 1 a nie w 2)
+
+      # Zapisz wynik operacji do nowego klucza
+      SUNIONSTORE wspolne tagi:produkt:1 tagi:produkt:2
+
+      # Losowy element (np. lucky draw)
+      SRANDMEMBER users:online 5          # 5 losowych, bez usuwania
+      SPOP        users:online            # 1 losowy i usuwa
+
+      # Śledzenie unikalnych IP (unikalne odwiedziny)
+      SADD page:home:visitors:2024-01-15 "192.168.1.1" "10.0.0.1"
+      SCARD page:home:visitors:2024-01-15    # liczba unikalnych IP
+
+  - name: Sorted Set — ranking z punktacją
+    icon: "🏆"
+    desc: Elementy z wynikiem (score) — automatycznie posortowane. Idealne dla leaderboardów, kolejek priorytetowych, delayed jobs.
+    code: |
+      # Dodaj z wynikiem (score)
+      ZADD leaderboard 1500 "alice"
+      ZADD leaderboard 2300 "bob"
+      ZADD leaderboard 1800 "carol"
+      ZADD leaderboard NX 1200 "dave"    # tylko gdy nie istnieje
+
+      # Pobierz ranking (0=najniższy score)
+      ZRANGE leaderboard 0 -1 WITHSCORES    # rosnąco z punktami
+      ZREVRANGE leaderboard 0 9 WITHSCORES  # TOP 10 malejąco (przestarzałe)
+      ZRANGE leaderboard 0 9 REV WITHSCORES # TOP 10 malejąco (Redis 6.2+)
+
+      # Pozycja gracza
+      ZRANK    leaderboard "alice"      # pozycja (0-indexed) rosnąco
+      ZREVRANK leaderboard "alice"      # pozycja malejąco (lepiej dla rankingu)
+
+      # Punkty gracza
+      ZSCORE leaderboard "alice"        # "1500"
+
+      # Dodaj do punktów
+      ZINCRBY leaderboard 100 "alice"   # alice: 1600
+
+      # Pobierz w zakresie wyników
+      ZRANGEBYSCORE leaderboard 1500 2000 WITHSCORES
+
+      # Liczba elementów
+      ZCARD leaderboard                 # ile graczy
+      ZCOUNT leaderboard 1000 2000      # ile w przedziale score
+
+      # Usuń
+      ZREM leaderboard "dave"
+      ZPOPMIN leaderboard              # usuń i zwróć najniższy
+      ZPOPMAX leaderboard              # usuń i zwróć najwyższy
+
+      # Delayed job queue (zaplanowane zadania)
+      ZADD jobs:scheduled 1706000000 "task:send_email:42"    # Unix timestamp jako score
+      # Worker pobiera zadania których czas nadszedł:
+      ZRANGEBYSCORE jobs:scheduled 0 1706000100 LIMIT 0 10
+
+  - name: Hash — obiekt / słownik
+    icon: "🗂️"
+    desc: Słownik pól klucz-wartość. Idealny do przechowywania obiektów (user session, product data). Oszczędniejszy niż wiele oddzielnych kluczy.
+    code: |
+      # Ustaw pola
+      HSET user:42  name "Jan Kowalski"  email "jan@example.com"  role "admin"
+      HSET user:42  login_count 0
+
+      # Pobierz jedno pole
+      HGET user:42 name           # "Jan Kowalski"
+
+      # Pobierz wiele pól
+      HMGET user:42 name email role
+
+      # Pobierz wszystkie pola i wartości
+      HGETALL user:42
+      # 1) "name"  2) "Jan Kowalski"  3) "email"  4) "jan@example.com"  ...
+
+      # Sprawdź czy pole istnieje
+      HEXISTS user:42 phone       # 0 (nie istnieje)
+
+      # Lista pól / wartości
+      HKEYS user:42               # tylko klucze
+      HVALS user:42               # tylko wartości
+      HLEN  user:42               # liczba pól
+
+      # Inkrementacja pola numerycznego
+      HINCRBY user:42 login_count 1
+      HINCRBYFLOAT user:42 balance 9.99
+
+      # Usuń pole
+      HDEL user:42 phone
+
+      # Cache sesji użytkownika (efektywny wzorzec)
+      HSET session:abc123  user_id 42  role admin  ip "127.0.0.1"
+      EXPIRE session:abc123 3600       # wygaśnie za godzinę
+      HGETALL session:abc123           # pobierz całą sesję
+
+  - name: Stream — dziennik zdarzeń
+    icon: "🌊"
+    desc: Append-only log zdarzeń — jak Apache Kafka ale wbudowany. Consumer groups, ACK, historia. Idealne do event sourcing, audit log, real-time analytics.
+    code: |
+      # Dodaj zdarzenie do strumienia (ID generowane automatycznie)
+      XADD events * action "login" user_id "42" ip "127.0.0.1"
+      XADD events * action "purchase" user_id "42" product_id "99" amount "129.99"
+      # Zwraca ID: 1706001234567-0
+
+      # Dodaj z własnym ID (timestamp-sequence)
+      XADD events 1706001234567-1 action "logout" user_id "42"
+
+      # Pobierz zdarzenia
+      XRANGE events - +              # wszystkie (- = początek, + = koniec)
+      XRANGE events - + COUNT 10     # pierwsze 10
+      XREVRANGE events + - COUNT 5   # ostatnie 5
+
+      # Pobierz od ID
+      XRANGE events 1706001234567-0 +
+
+      # Długość strumienia
+      XLEN events                    # ile zdarzeń
+
+      # Consumer Groups — przetwarzaj zdarzenia przez wielu workerów
+      XGROUP CREATE events workers $ MKSTREAM   # utwórz grupę od "teraz"
+      XGROUP CREATE events workers 0            # od początku
+
+      # Worker pobiera zdarzenia
+      XREADGROUP GROUP workers worker1 COUNT 10 BLOCK 0 STREAMS events >
+      # > = pobierz nieprzeczytane przez tę grupę
+
+      # Potwierdź przetworzenie (ACK)
+      XACK events workers "1706001234567-0"
+
+      # Przytnij do max długości
+      XADD events MAXLEN 10000 * action "nowe" user_id "1"
+      XTRIM events MAXLEN 10000

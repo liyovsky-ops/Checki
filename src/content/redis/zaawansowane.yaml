@@ -1,0 +1,239 @@
+title: Zaawansowane funkcje Redis
+
+items:
+  - name: Pub/Sub — wiadomości w czasie rzeczywistym
+    icon: "📡"
+    desc: Publisher/Subscriber — kanały wiadomości. Używane do powiadomień, live chat, WebSocket broadcasting, invalidacji cache.
+    code: |
+      # SUBSCRIBER — subskrybuj kanał (terminal 1)
+      SUBSCRIBE notifications
+      SUBSCRIBE chat:room:42
+      # Czeka na wiadomości...
+
+      # Subskrypcja wzorcowa
+      PSUBSCRIBE user:*:events     # wszystkie zdarzenia dowolnego usera
+      PSUBSCRIBE chat:*            # wszystkie kanały chat
+
+      # PUBLISHER — wyślij wiadomość (terminal 2)
+      PUBLISH notifications "Nowe zamówienie #1234"
+      PUBLISH chat:room:42 '{"user":"Jan","msg":"Cześć!"}'
+      PUBLISH user:42:events "login"
+
+      # Sprawdź aktywne kanały
+      PUBSUB CHANNELS *            # wszystkie aktywne kanały
+      PUBSUB CHANNELS user:*       # kanały pasujące do wzorca
+      PUBSUB NUMSUB notifications  # ile subskrybentów na kanale
+
+      # Python — redis-py pub/sub
+      # import redis
+      # r = redis.Redis()
+      # pubsub = r.pubsub()
+      # pubsub.subscribe('notifications')
+      # for message in pubsub.listen():
+      #     if message['type'] == 'message':
+      #         print(message['data'])
+
+      # Uwaga: Pub/Sub NIE ma persistencji.
+      # Jeśli subscriber jest offline — wiadomość przepada.
+      # Dla niezawodnych kolejek użyj Streams (XADD/XREADGROUP).
+
+  - name: Transakcje — MULTI/EXEC
+    icon: "🔄"
+    desc: Grupowanie komend w atomową transakcję. WATCH do optimistic locking — wykrywanie zmian przed wykonaniem.
+    code: |
+      # Podstawowa transakcja
+      MULTI                        # zacznij transakcję
+      SET counter 100
+      INCR counter
+      LPUSH log "zmiana"
+      EXEC                         # wykonaj wszystkie atomowo
+
+      # DISCARD — anuluj transakcję
+      MULTI
+      SET counter 0
+      DISCARD                      # anuluj — nic nie zmienione
+
+      # WATCH — optimistic locking
+      # Scenariusz: pobierz saldo, dodaj 100, zapisz
+      # Ale ktoś inny może zmienić saldo w międzyczasie!
+
+      WATCH account:42:balance
+      # Pobierz aktualną wartość
+      GET account:42:balance       # "500"
+
+      MULTI
+      SET account:42:balance 600   # 500 + 100
+      EXEC
+      # Jeśli ktoś zmienił account:42:balance po WATCH:
+      # EXEC zwróci nil — transakcja anulowana → spróbuj ponownie
+
+      # Pipelining — wyślij wiele komend bez czekania na odpowiedź
+      # (nie jest transakcją, ale redukuje round-trips sieciowe)
+      # W redis-py:
+      # pipe = r.pipeline()
+      # pipe.set("a", 1)
+      # pipe.set("b", 2)
+      # pipe.incr("a")
+      # results = pipe.execute()  # wyślij wszystko naraz
+
+  - name: Lua Scripting — atomowe skrypty
+    icon: "🌙"
+    desc: Wykonaj dowolny skrypt Lua atomowo po stronie serwera. Zero race conditions. EVALSHA dla powtarzalnych skryptów.
+    code: |
+      # EVAL — wykonaj skrypt Lua
+      # EVAL skrypt liczba_kluczy klucz1 ... arg1 ...
+      EVAL "return redis.call('GET', KEYS[1])" 1 mykey
+
+      # Rate limiting w Lua (atomowy!)
+      EVAL "
+          local key = KEYS[1]
+          local limit = tonumber(ARGV[1])
+          local ttl = tonumber(ARGV[2])
+          local current = redis.call('INCR', key)
+          if current == 1 then
+              redis.call('EXPIRE', key, ttl)
+          end
+          if current > limit then
+              return 0
+          end
+          return 1
+      " 1 rate:192.168.1.1 100 3600
+      # 1 = ok, 0 = przekroczono limit
+
+      # CAS (Compare-And-Swap) atomowo
+      EVAL "
+          local current = redis.call('GET', KEYS[1])
+          if current == ARGV[1] then
+              redis.call('SET', KEYS[1], ARGV[2])
+              return 1
+          end
+          return 0
+      " 1 status "pending" "processing"
+
+      # Załaduj skrypt i pobierz SHA (dla wydajności)
+      SCRIPT LOAD "return redis.call('GET', KEYS[1])"
+      # "e0e1f9fabfa9d353e4a66282db91b21847b3ef4e"
+
+      # Wywołaj przez SHA (bez przesyłania kodu)
+      EVALSHA e0e1f9fabfa9d353e4a66282db91b21847b3ef4e 1 mykey
+
+      # Wyczyść cache skryptów
+      SCRIPT FLUSH
+
+  - name: Distributed Lock — mutex
+    icon: "🔐"
+    desc: Redlock — rozproszony lock. Jeden proces na raz wykonuje krytyczną sekcję. Używany przy płatnościach, wysyłce emaili, cron-jobach.
+    code: |
+      # Prosty lock przez SET NX EX
+      SET lock:payment:42 "worker-1" NX EX 30
+      # NX = tylko gdy nie istnieje
+      # EX 30 = wygaśnie za 30s (dead-lock prevention)
+      # Zwraca OK = lock zdobyty, nil = ktoś inny ma lock
+
+      # Zwolnij lock TYLKO jeśli to twój (atomowy Lua!)
+      EVAL "
+          if redis.call('GET', KEYS[1]) == ARGV[1] then
+              return redis.call('DEL', KEYS[1])
+          else
+              return 0
+          end
+      " 1 lock:payment:42 "worker-1"
+
+      # Przedłuż lock jeśli potrzebujesz więcej czasu
+      EVAL "
+          if redis.call('GET', KEYS[1]) == ARGV[1] then
+              return redis.call('EXPIRE', KEYS[1], ARGV[2])
+          else
+              return 0
+          end
+      " 1 lock:payment:42 "worker-1" 30
+
+      # Biblioteka Redlock (Python)
+      # pip install redis redlock-py
+      # from redlock import Redlock
+      # dlm = Redlock([{"host": "localhost", "port": 6379}])
+      # lock = dlm.lock("payment:42", 10000)  # 10s
+      # if lock:
+      #     try:
+      #         process_payment()
+      #     finally:
+      #         dlm.unlock(lock)
+
+  - name: Cache patterns — wzorce cache
+    icon: "⚡"
+    desc: Cache-aside, write-through, cache invalidation — sprawdzone wzorce używania Redis jako cache przed bazą danych.
+    code: |
+      # Cache-Aside (lazy loading) — najczęstszy wzorzec
+      # 1. Sprawdź cache → 2. Jeśli miss — pobierz z DB → 3. Zapisz do cache
+
+      # Pseudo-kod (Python)
+      # def get_product(product_id):
+      #     cache_key = f"product:{product_id}"
+      #     cached = r.get(cache_key)
+      #     if cached:
+      #         return json.loads(cached)     # cache HIT
+      #     product = db.get_product(product_id)  # cache MISS
+      #     r.setex(cache_key, 3600, json.dumps(product))  # cache na 1h
+      #     return product
+
+      # Write-Through — zapisz do cache i DB jednocześnie
+      # def update_product(product_id, data):
+      #     db.update_product(product_id, data)   # najpierw DB
+      #     r.setex(f"product:{product_id}", 3600, json.dumps(data))
+
+      # Cache invalidation — usuń cache po zmianie
+      # def update_product(product_id, data):
+      #     db.update_product(product_id, data)
+      #     r.delete(f"product:{product_id}")     # usuń stary cache
+      #     r.delete("products:list:*")           # usuń listy (pattern delete)
+
+      # Wzorzec: Cache ze stemplem czasu (stale-while-revalidate)
+      SET product:42 '{"name":"Laptop","price":2999}' EX 3600
+
+      # Batch cache (wiele produktów naraz)
+      MSET product:1 "{...}" product:2 "{...}" product:3 "{...}"
+      MGET product:1 product:2 product:3
+
+      # Rate limiting z Redis
+      INCR  rate:192.168.1.1
+      EXPIRE rate:192.168.1.1 60   # reset co minutę
+      # Jeśli INCR > 100 → odrzuć request
+
+      # Lepsza atomowość rate limiting (SET jeśli nie istnieje):
+      SET rate:192.168.1.1 1 NX EX 60
+      # Jeśli OK → pierwszy request, ustaw TTL
+      INCR rate:192.168.1.1
+      # Sprawdź wynik → jeśli > limit → reject
+
+  - name: Keyspace Notifications — reagowanie na zdarzenia
+    icon: "🔔"
+    desc: Subskrybuj zdarzenia Redis — wygasanie kluczy (TTL=0), zapis, usunięcie. Używane do automatycznych akcji po zdarzeniach w cache.
+    code: |
+      # Włącz powiadomienia w redis.conf lub przez CONFIG SET
+      CONFIG SET notify-keyspace-events KEA
+      # K = Keyspace events (klucze)
+      # E = Keyevent events (komendy)
+      # A = alias dla g$lzxetd (wszystkie)
+      # x = tylko expired events
+      # g = generic (DEL, EXPIRE, RENAME)
+      # l = list commands
+
+      # Subskrybuj wygasające klucze
+      SUBSCRIBE __keyevent@0__:expired
+      # Teraz gdy jakikolwiek klucz wygaśnie w DB 0 → dostaniesz powiadomienie
+
+      # Subskrybuj operacje na konkretnym kluczu
+      SUBSCRIBE __keyspace@0__:session:abc123
+      # Dostaniesz powiadomienie przy każdej operacji na tym kluczu
+
+      # Praktyczne zastosowanie — Python
+      # import redis
+      # r = redis.Redis()
+      # r.config_set('notify-keyspace-events', 'Ex')  # tylko expired
+      # p = r.pubsub()
+      # p.psubscribe('__keyevent@0__:expired')
+      # for message in p.listen():
+      #     if message['type'] == 'pmessage':
+      #         expired_key = message['data'].decode()
+      #         # expired_key = "session:abc123" → cleanup akcja
+      #         print(f"Klucz wygasł: {expired_key}")

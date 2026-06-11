@@ -1,0 +1,317 @@
+title: Ekosystem PostgreSQL
+
+items:
+  - name: psycopg2 — synchroniczny klient
+    desc: Najpopularniejszy sterownik PostgreSQL dla Pythona. Szybki, dojrzały, synchroniczny. Standard w Django, Flask, CLI skryptach.
+    icon: "🐍"
+    code: |
+      pip install psycopg2-binary
+
+      import psycopg2
+
+      # Połączenie
+      conn = psycopg2.connect(
+          host="localhost", port=5432,
+          dbname="mydb", user="postgres", password="secret"
+      )
+      cur = conn.cursor()
+
+      # SELECT
+      cur.execute("SELECT id, name FROM users WHERE active = %s", (True,))
+      users = cur.fetchall()        # lista tupli
+      user  = cur.fetchone()        # jeden rekord
+      cur.fetchmany(10)             # n rekordów
+
+      # INSERT z RETURNING
+      cur.execute(
+          "INSERT INTO users (email, name) VALUES (%s, %s) RETURNING id",
+          ("jan@example.com", "Jan")
+      )
+      new_id = cur.fetchone()[0]
+      conn.commit()
+
+      # Transakcja
+      try:
+          cur.execute("UPDATE accounts SET balance = balance - %s WHERE id = %s", (100, 1))
+          cur.execute("UPDATE accounts SET balance = balance + %s WHERE id = %s", (100, 2))
+          conn.commit()
+      except Exception:
+          conn.rollback()
+          raise
+      finally:
+          cur.close()
+          conn.close()
+
+  - name: asyncpg — async klient (FastAPI/asyncio)
+    desc: Szybki async sterownik PostgreSQL. Brak ORM — czyste SQL. Idealne do FastAPI i aplikacji z asyncio.
+    icon: "⚡"
+    code: |
+      pip install asyncpg
+
+      import asyncpg
+      import asyncio
+
+      # Połączenie jednokrotne
+      async def main():
+          conn = await asyncpg.connect(
+              "postgresql://postgres:secret@localhost/mydb"
+          )
+          rows = await conn.fetch("SELECT id, name FROM users LIMIT 10")
+          for row in rows:
+              print(row['id'], row['name'])
+          await conn.close()
+
+      # Connection Pool (zalecane w FastAPI)
+      pool = await asyncpg.create_pool(
+          "postgresql://postgres:secret@localhost/mydb",
+          min_size=5, max_size=20
+      )
+
+      async with pool.acquire() as conn:
+          # Parametry przez $1, $2 (nie %s!)
+          user = await conn.fetchrow(
+              "SELECT * FROM users WHERE email = $1", "jan@example.com"
+          )
+          print(user['name'])
+
+          # INSERT wiele naraz (bulk)
+          await conn.executemany(
+              "INSERT INTO logs (user_id, action) VALUES ($1, $2)",
+              [(1, "login"), (2, "logout"), (3, "purchase")]
+          )
+
+          # Transakcja
+          async with conn.transaction():
+              await conn.execute("UPDATE accounts SET balance = balance - $1 WHERE id = $2", 100, 1)
+              await conn.execute("UPDATE accounts SET balance = balance + $1 WHERE id = $2", 100, 2)
+
+  - name: SQLAlchemy — ORM i Core
+    desc: Najpotężniejszy Python ORM. Definiujesz modele jako klasy, SQLAlchemy generuje SQL. Działa z PostgreSQL, MySQL, SQLite.
+    icon: "🏗️"
+    code: |
+      pip install sqlalchemy psycopg2-binary
+
+      from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey
+      from sqlalchemy.orm import DeclarativeBase, relationship, Session
+      from datetime import datetime
+
+      engine = create_engine("postgresql://postgres:secret@localhost/mydb")
+
+      class Base(DeclarativeBase):
+          pass
+
+      class User(Base):
+          __tablename__ = "users"
+          id         = Column(Integer, primary_key=True)
+          email      = Column(String, unique=True, nullable=False)
+          name       = Column(String, nullable=False)
+          active     = Column(Boolean, default=True)
+          created_at = Column(DateTime, default=datetime.utcnow)
+          orders     = relationship("Order", back_populates="customer")
+
+      class Order(Base):
+          __tablename__ = "orders"
+          id          = Column(Integer, primary_key=True)
+          customer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+          total       = Column(Integer, default=0)
+          customer    = relationship("User", back_populates="orders")
+
+      Base.metadata.create_all(engine)
+
+      # CRUD
+      with Session(engine) as session:
+          # CREATE
+          user = User(email="jan@example.com", name="Jan")
+          session.add(user)
+          session.commit()
+
+          # READ
+          user = session.get(User, 1)
+          users = session.query(User).filter(User.active == True).all()
+
+          # UPDATE
+          user.name = "Jan Kowalski"
+          session.commit()
+
+          # DELETE
+          session.delete(user)
+          session.commit()
+
+  - name: SQLAlchemy 2.x async (FastAPI)
+    desc: Nowoczesne async SQLAlchemy 2.0 z FastAPI — bez blokowania event loop. Użyj z asyncpg jako driverem.
+    icon: "🚀"
+    code: |
+      pip install sqlalchemy[asyncio] asyncpg
+
+      from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+      from sqlalchemy.orm import DeclarativeBase
+      from sqlalchemy import select
+
+      DATABASE_URL = "postgresql+asyncpg://postgres:secret@localhost/mydb"
+      engine = create_async_engine(DATABASE_URL, pool_size=10, max_overflow=20)
+      AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+
+      # FastAPI dependency
+      async def get_db():
+          async with AsyncSessionLocal() as session:
+              yield session
+
+      # Zapytanie
+      async def get_users(db: AsyncSession):
+          result = await db.execute(
+              select(User).where(User.active == True).order_by(User.name)
+          )
+          return result.scalars().all()
+
+      # INSERT
+      async def create_user(db: AsyncSession, email: str, name: str):
+          user = User(email=email, name=name)
+          db.add(user)
+          await db.commit()
+          await db.refresh(user)
+          return user
+
+  - name: Alembic — migracje schematu
+    desc: Wersjonowanie i migracje bazy danych dla SQLAlchemy. Odpowiednik Django migrations — historia zmian schematu.
+    icon: "🔀"
+    code: |
+      pip install alembic
+
+      # Inicjalizacja
+      alembic init alembic
+
+      # alembic/env.py — wskaż modele i URL bazy
+      from app.database import Base, DATABASE_URL
+      target_metadata = Base.metadata
+      config.set_main_option("sqlalchemy.url", DATABASE_URL)
+
+      # Wygeneruj migrację na podstawie zmian modeli
+      alembic revision --autogenerate -m "add phone to users"
+      # Tworzy: alembic/versions/xxxx_add_phone_to_users.py
+
+      # Zastosuj wszystkie migracje
+      alembic upgrade head
+
+      # Sprawdź aktualną wersję bazy
+      alembic current
+
+      # Historia migracji
+      alembic history --verbose
+
+      # Cofnij ostatnią migrację
+      alembic downgrade -1
+
+      # Cofnij do konkretnej wersji
+      alembic downgrade abc123def456
+
+      # Wygenerowana migracja wygląda tak:
+      def upgrade() -> None:
+          op.add_column('users', sa.Column('phone', sa.String(), nullable=True))
+
+      def downgrade() -> None:
+          op.drop_column('users', 'phone')
+
+  - name: psycopg3 (psycopg) — nowa generacja
+    desc: Następca psycopg2 — obsługuje async natively, lepszy interfejs, binarny protokół, COPY streaming.
+    icon: "🆕"
+    code: |
+      pip install psycopg[binary]
+      # lub async:
+      pip install psycopg[binary,pool]
+
+      import psycopg
+
+      # Sync
+      with psycopg.connect("postgresql://postgres:secret@localhost/mydb") as conn:
+          with conn.cursor() as cur:
+              cur.execute("SELECT id, name FROM users WHERE id = %s", (1,))
+              user = cur.fetchone()
+
+      # Async
+      import asyncio
+      import psycopg
+
+      async def main():
+          async with await psycopg.AsyncConnection.connect(
+              "postgresql://postgres:secret@localhost/mydb"
+          ) as conn:
+              async with conn.cursor() as cur:
+                  await cur.execute("SELECT * FROM users LIMIT 5")
+                  async for row in cur:
+                      print(row)
+
+      # Connection Pool
+      from psycopg_pool import AsyncConnectionPool
+
+      pool = AsyncConnectionPool("postgresql://postgres:secret@localhost/mydb")
+      async with pool.connection() as conn:
+          await conn.execute("SELECT 1")
+
+  - name: PostGIS — dane geograficzne
+    desc: Rozszerzenie PostgreSQL do danych przestrzennych. Przechowuj i pytaj o punkty GPS, poligony, trasy. Używany w każdej mapie.
+    icon: "🗺️"
+    code: |
+      -- Zainstaluj rozszerzenie w bazie
+      CREATE EXTENSION IF NOT EXISTS postgis;
+
+      -- Tabela z lokalizacjami
+      CREATE TABLE restaurants (
+          id       SERIAL PRIMARY KEY,
+          name     TEXT NOT NULL,
+          location GEOMETRY(POINT, 4326)   -- 4326 = WGS84 (GPS)
+      );
+
+      -- Wstaw punkt GPS (lon, lat)
+      INSERT INTO restaurants (name, location)
+      VALUES ('Restauracja pod Lipą', ST_SetSRID(ST_MakePoint(21.0122, 52.2297), 4326));
+
+      -- Znajdź restauracje w promieniu 5km od punktu
+      SELECT name,
+             ST_Distance(
+                 location::geography,
+                 ST_MakePoint(21.0122, 52.2297)::geography
+             ) AS odleglosc_m
+      FROM restaurants
+      WHERE ST_DWithin(
+          location::geography,
+          ST_MakePoint(21.0122, 52.2297)::geography,
+          5000   -- 5000 metrów
+      )
+      ORDER BY odleglosc_m;
+
+      -- Indeks GiST dla szybkich zapytań geo
+      CREATE INDEX idx_restaurants_location ON restaurants USING GIST(location);
+
+  - name: pg_dump — backup i restore
+    desc: Tworzenie kopii zapasowych bazy danych, migracja między serwerami, klonowanie bazy.
+    icon: "💾"
+    code: |
+      # Backup całej bazy do pliku SQL
+      pg_dump -U postgres -d mydb > backup.sql
+
+      # Backup do formatu custom (kompresja, przydatny do pg_restore)
+      pg_dump -U postgres -d mydb -F c -f backup.dump
+
+      # Backup tylko struktury (bez danych)
+      pg_dump -U postgres -d mydb --schema-only > schema.sql
+
+      # Backup tylko danych (bez struktury)
+      pg_dump -U postgres -d mydb --data-only > data.sql
+
+      # Backup konkretnej tabeli
+      pg_dump -U postgres -d mydb -t users > users.sql
+
+      # Backup przez Docker
+      docker exec -t postgres_container pg_dump -U postgres mydb > backup.sql
+
+      # RESTORE z pliku SQL
+      psql -U postgres -d newdb < backup.sql
+
+      # RESTORE z formatu custom
+      pg_restore -U postgres -d newdb backup.dump
+
+      # Restore z Drop (nadpisz istniejącą bazę)
+      pg_restore -U postgres -d mydb --clean backup.dump
+
+      # Backup wszystkich baz
+      pg_dumpall -U postgres > all_databases.sql

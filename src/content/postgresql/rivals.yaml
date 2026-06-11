@@ -1,0 +1,98 @@
+title: PostgreSQL vs inne bazy danych
+
+items:
+  - name: MySQL / MariaDB
+    icon: "🐬"
+    color: "#00758f"
+    tagline: Najpopularniejsza baza open-source — prosta, szybka, wszechobecna
+    pros:
+      - Największa popularność — więcej hostingów, narzędzi, dev-ów zna MySQL
+      - Nieco szybszy na prostych SELECT przy bardzo dużym ruchu read-only
+      - Lepsze wsparcie dla replikacji i shardingu w dużych systemach
+      - MariaDB jako drop-in replacement z dodatkami
+    cons:
+      - Brak window functions do MySQL 8.0 (i dalej ograniczone)
+      - Brak natywnego JSONB (JSON istnieje ale wolniejszy bez GIN)
+      - Brak CTE (WITH) w starszych wersjach
+      - Słabsze wsparcie dla złożonych typów danych
+      - Brak wbudowanego full-text search klasy PostgreSQL
+    vs: MySQL dla prostego CRUD z dużym wolumenem read. PostgreSQL gdy potrzebujesz złożonych zapytań, JSONB, window functions, full-text search lub PostGIS. Dla nowych projektów wybierz PostgreSQL.
+
+  - name: SQLite
+    icon: "📁"
+    color: "#0f7ec0"
+    tagline: Baza bez serwera — jeden plik, zero konfiguracji
+    pros:
+      - Zero konfiguracji — plik .db, gotowe do działania w 5 sekund
+      - Wbudowane w Python (sqlite3) — zero instalacji
+      - Idealne do testów, prototypów, desktopowych aplikacji
+      - Serverless — działa bez żadnego serwera
+    cons:
+      - Brak konkurencji przy zapisach (jeden writer na raz)
+      - Brak obsługi wielu połączeń sieciowych
+      - Brak zaawansowanych typów i rozszerzeń
+      - Nie skaluje powyżej kilkudziesięciu GB
+    vs: SQLite dla testów, development, desktopowych apek i małych projektów. PostgreSQL gdy masz wielu użytkowników, potrzebujesz transakcji współbieżnych lub skalowania. Tę samą SQLAlchemy możesz użyć z oboma.
+
+  - name: MongoDB
+    icon: "🍃"
+    color: "#47a248"
+    tagline: Dokumentowa baza NoSQL — elastyczny schemat, JSON natywnie
+    pros:
+      - Elastyczny schemat — nie musisz definiować kolumn z góry
+      - Poziomy skalowania przez sharding wbudowany natywnie
+      - Naturalny dla JavaScript / Node.js (JSON wszędzie)
+      - Dobry dla danych hierarchicznych bez relacji
+    cons:
+      - Brak transakcji ACID przez długi czas (dodano w 4.0, ale wolniejsze)
+      - Brak JOIN — musisz denormalizować lub używać lookup
+      - Wyższe zużycie pamięci niż PostgreSQL
+      - PostgreSQL JSONB często szybszy niż MongoDB dla złożonych zapytań
+    vs: MongoDB gdy schemat jest bardzo zmienny lub gdy skalujesz horyzontalnie od dnia 0. PostgreSQL gdy potrzebujesz relacji, transakcji i złożonych zapytań — a JSONB daje ci elastyczność JSON bez rezygnacji z SQL.
+
+  - name: Redis
+    icon: "🔴"
+    color: "#dc382d"
+    tagline: Baza in-memory — microsekuntowe operacje, cache, kolejki
+    pros:
+      - Sub-milisekundowy czas odpowiedzi — dane w RAM
+      - Pub/Sub, Streams, Sorted Sets — struktury bez SQL
+      - Idealny jako cache przed PostgreSQL
+      - TTL na kluczach — automatyczne wygasanie danych
+    cons:
+      - Dane w RAM — drogie przy dużych danych
+      - Brak relacji, JOIN, zapytań analitycznych
+      - Trwałość opcjonalna — przy awarii możliwa utrata danych
+      - Nie zastępuje bazy relacyjnej
+    vs: Redis i PostgreSQL to nie konkurencja — to uzupełnienie. PostgreSQL jako główna baza, Redis jako cache (session store, rate limiting, kolejka zadań). Razem tworzą standardowy stack produkcyjny.
+
+  - name: CockroachDB
+    icon: "🪳"
+    color: "#6933ff"
+    tagline: Rozproszony PostgreSQL — automatyczna replikacja i geo-sharding
+    pros:
+      - Kompatybilny z PostgreSQL — ten sam SQL i sterowniki
+      - Automatyczne replikacja i failover
+      - Geo-sharding — dane fizycznie blisko użytkownika
+      - ACID transakcje w klastrze rozproszonym
+    cons:
+      - Wolniejszy niż PostgreSQL na single-node
+      - Ograniczona kompatybilność z zaawansowanymi funkcjami PG
+      - Drogi w cloud-hosted wersji
+      - Overkill dla 99% projektów
+    vs: PostgreSQL dla zdecydowanej większości projektów. CockroachDB gdy potrzebujesz globalnego rozproszenia, geo-shardingu i automatycznego failover w skali Stripe/Netflix.
+
+  - name: TimescaleDB
+    icon: "📊"
+    color: "#fdb515"
+    tagline: PostgreSQL rozszerzony o time-series — metryki, logi, IoT
+    pros:
+      - Rozszerzenie PostgreSQL — ten sam SQL, te same narzędzia
+      - Hypertable — automatyczny podział danych po czasie
+      - Kompresja kolumnowa — 10-20x mniej miejsca dla danych czasowych
+      - Continuous aggregates — automatyczne pre-obliczenia statystyk
+    cons:
+      - Tylko PostgreSQL — nie standalone baza
+      - Overkill dla danych bez wymiaru czasowego
+      - Dodatkowa warstwa abstrakcji
+    vs: PostgreSQL dla ogólnych danych relacyjnych. TimescaleDB gdy zbierasz metryki, logi, dane IoT lub inne time-series — to PostgreSQL z supermocami dla tego use-case.

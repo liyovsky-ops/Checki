@@ -1,0 +1,226 @@
+title: Relacje i JOINy
+
+items:
+  - name: JOIN — łączenie tabel
+    icon: "🔗"
+    desc: INNER JOIN, LEFT JOIN, RIGHT JOIN, FULL OUTER JOIN — łączenie danych z wielu tabel.
+    code: |
+      -- Tabele przykładowe
+      -- users(id, name, email)
+      -- orders(id, customer_id, total, status)
+      -- products(id, name, price, category_id)
+      -- categories(id, name)
+
+      -- INNER JOIN — tylko pasujące rekordy po obu stronach
+      SELECT u.name, o.id AS order_id, o.total
+      FROM users u
+      INNER JOIN orders o ON u.id = o.customer_id;
+
+      -- LEFT JOIN — wszyscy users, nawet bez zamówień
+      SELECT u.name, COUNT(o.id) AS liczba_zamowien
+      FROM users u
+      LEFT JOIN orders o ON u.id = o.customer_id
+      GROUP BY u.id, u.name
+      ORDER BY liczba_zamowien DESC;
+
+      -- RIGHT JOIN — wszystkie orders, nawet bez usera (rzadko używane)
+      SELECT u.name, o.total
+      FROM users u
+      RIGHT JOIN orders o ON u.id = o.customer_id;
+
+      -- FULL OUTER JOIN — wszystkie z obu stron
+      SELECT u.name, o.total
+      FROM users u
+      FULL OUTER JOIN orders o ON u.id = o.customer_id;
+
+      -- Multiple JOINy
+      SELECT u.name, p.name AS produkt, oi.quantity, oi.price
+      FROM users u
+      JOIN orders o    ON u.id = o.customer_id
+      JOIN order_items oi ON o.id = oi.order_id
+      JOIN products p  ON oi.product_id = p.id
+      WHERE o.status = 'completed';
+
+  - name: Self JOIN i CROSS JOIN
+    icon: "🔄"
+    desc: Łączenie tabeli z samą sobą (hierarchia pracowników, polecenia) oraz iloczyn kartezjański.
+    code: |
+      -- Self JOIN — pracownicy i ich menedżerowie
+      -- employees(id, name, manager_id)
+      SELECT
+          e.name  AS pracownik,
+          m.name  AS menedzer
+      FROM employees e
+      LEFT JOIN employees m ON e.manager_id = m.id;
+
+      -- Self JOIN — znajdź duplikaty emaili
+      SELECT a.id, a.email
+      FROM users a
+      JOIN users b ON a.email = b.email AND a.id < b.id;
+
+      -- CROSS JOIN — każdy z każdym (iloczyn kartezjański)
+      SELECT colors.name, sizes.name
+      FROM colors CROSS JOIN sizes;
+      -- Przydatne do generowania kombinacji (np. warianty produktu)
+
+      -- NATURAL JOIN — automatycznie łączy po kolumnach o tej samej nazwie
+      -- (ostrożnie — podatne na błędy przy zmianach schematu)
+      SELECT * FROM orders NATURAL JOIN users;
+
+  - name: Klucze obce (FOREIGN KEY)
+    icon: "🔑"
+    desc: Integralność referencyjna — ON DELETE CASCADE, SET NULL, RESTRICT. Definiowanie relacji między tabelami.
+    code: |
+      -- Tabela nadrzędna
+      CREATE TABLE categories (
+          id   SERIAL PRIMARY KEY,
+          name TEXT NOT NULL UNIQUE
+      );
+
+      -- Tabela podrzędna z kluczem obcym
+      CREATE TABLE products (
+          id          SERIAL PRIMARY KEY,
+          name        TEXT    NOT NULL,
+          price       NUMERIC(10, 2) NOT NULL,
+          category_id INT REFERENCES categories(id) ON DELETE SET NULL
+      );
+
+      -- ON DELETE CASCADE — usuwa produkty gdy usuwasz kategorię
+      CREATE TABLE order_items (
+          id         SERIAL PRIMARY KEY,
+          order_id   INT NOT NULL REFERENCES orders(id)   ON DELETE CASCADE,
+          product_id INT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+          quantity   INT NOT NULL DEFAULT 1,
+          price      NUMERIC(10, 2) NOT NULL
+      );
+
+      -- Opcje ON DELETE:
+      -- CASCADE      — usuwa powiązane wiersze
+      -- SET NULL     — ustawia NULL w kluczu obcym
+      -- SET DEFAULT  — ustawia wartość domyślną
+      -- RESTRICT     — blokuje usunięcie (błąd) — domyślne zachowanie
+      -- NO ACTION    — jak RESTRICT ale sprawdzane na końcu transakcji
+
+      -- Dodaj klucz obcy do istniejącej tabeli
+      ALTER TABLE products
+      ADD CONSTRAINT fk_category
+          FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL;
+
+      -- Usuń constraint
+      ALTER TABLE products DROP CONSTRAINT fk_category;
+
+  - name: Relacja 1:N (jeden do wielu)
+    icon: "1️⃣"
+    desc: Najczęstszy typ relacji — jeden user ma wiele orders, jedna kategoria ma wiele produktów.
+    code: |
+      -- User → Orders (jeden user, wiele zamówień)
+      CREATE TABLE users (
+          id    SERIAL PRIMARY KEY,
+          email TEXT NOT NULL UNIQUE,
+          name  TEXT NOT NULL
+      );
+
+      CREATE TABLE orders (
+          id          SERIAL PRIMARY KEY,
+          customer_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          total       NUMERIC(10,2) NOT NULL DEFAULT 0,
+          status      TEXT NOT NULL DEFAULT 'pending',
+          created_at  TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Pobierz usera z jego zamówieniami
+      SELECT
+          u.id,
+          u.name,
+          u.email,
+          COUNT(o.id)    AS liczba_zamowien,
+          SUM(o.total)   AS suma_zamowien,
+          MAX(o.created_at) AS ostatnie_zamowienie
+      FROM users u
+      LEFT JOIN orders o ON u.id = o.customer_id
+      GROUP BY u.id, u.name, u.email;
+
+      -- Zamówienia konkretnego usera
+      SELECT o.id, o.total, o.status, o.created_at
+      FROM orders o
+      WHERE o.customer_id = 42
+      ORDER BY o.created_at DESC;
+
+  - name: Relacja M:N (wiele do wielu)
+    icon: "🔀"
+    desc: Tabela pośrednicząca (pivot/junction table) — produkty mogą mieć wiele tagów, user może należeć do wielu grup.
+    code: |
+      -- Product ↔ Tags (M:N przez pivot)
+      CREATE TABLE products (
+          id   SERIAL PRIMARY KEY,
+          name TEXT NOT NULL
+      );
+
+      CREATE TABLE tags (
+          id   SERIAL PRIMARY KEY,
+          name TEXT NOT NULL UNIQUE
+      );
+
+      CREATE TABLE product_tags (
+          product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+          tag_id     INT NOT NULL REFERENCES tags(id)     ON DELETE CASCADE,
+          PRIMARY KEY (product_id, tag_id)   -- złożony klucz główny zapobiega duplikatom
+      );
+
+      -- Dodaj tag do produktu
+      INSERT INTO product_tags (product_id, tag_id) VALUES (1, 3);
+
+      -- Pobierz tagi produktu
+      SELECT t.name
+      FROM tags t
+      JOIN product_tags pt ON t.id = pt.tag_id
+      WHERE pt.product_id = 1;
+
+      -- Pobierz produkty z konkretnym tagiem
+      SELECT p.name
+      FROM products p
+      JOIN product_tags pt ON p.id = pt.product_id
+      JOIN tags t           ON pt.tag_id = t.id
+      WHERE t.name = 'sale';
+
+      -- Produkty zgrupowane z tagami jako tablica
+      SELECT p.name, ARRAY_AGG(t.name ORDER BY t.name) AS tagi
+      FROM products p
+      LEFT JOIN product_tags pt ON p.id = pt.product_id
+      LEFT JOIN tags t          ON pt.tag_id = t.id
+      GROUP BY p.id, p.name;
+
+  - name: Relacja 1:1
+    icon: "💑"
+    desc: Rozszerzenie tabeli — profil użytkownika, dane adresowe, ustawienia. UNIQUE constraint na kluczu obcym.
+    code: |
+      -- User → Profile (1:1)
+      CREATE TABLE users (
+          id    SERIAL PRIMARY KEY,
+          email TEXT NOT NULL UNIQUE
+      );
+
+      CREATE TABLE user_profiles (
+          id         SERIAL PRIMARY KEY,
+          user_id    INT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+          -- UNIQUE wymusza 1:1
+          first_name TEXT,
+          last_name  TEXT,
+          phone      TEXT,
+          avatar_url TEXT,
+          bio        TEXT
+      );
+
+      -- Pobierz usera z profilem
+      SELECT u.email, p.first_name, p.last_name, p.phone
+      FROM users u
+      LEFT JOIN user_profiles p ON u.id = p.user_id
+      WHERE u.id = 1;
+
+      -- Upsert profilu (utwórz lub zaktualizuj)
+      INSERT INTO user_profiles (user_id, first_name, last_name, phone)
+      VALUES (1, 'Jan', 'Kowalski', '+48 123 456 789')
+      ON CONFLICT (user_id) DO UPDATE
+          SET first_name = EXCLUDED.first_name,
+              last_name  = EXCLUDED.last_name,
+              phone      = EXCLUDED.phone;

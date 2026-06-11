@@ -1,0 +1,151 @@
+title: Persistencja danych Redis
+
+items:
+  - name: RDB — snapshots (domyślne)
+    icon: "📸"
+    desc: Periodic snapshots bazy do pliku dump.rdb. Szybki restart, mniejszy plik. Możliwa utrata danych od ostatniego snapshotu.
+    code: |
+      # Konfiguracja RDB w redis.conf
+      # save <sekundy> <minimalna_liczba_zmian>
+      save 3600 1      # co godzinę jeśli min 1 zmiana
+      save 300 100     # co 5 min jeśli min 100 zmian
+      save 60 10000    # co minutę jeśli min 10000 zmian
+
+      # Wyłącz RDB całkowicie
+      # save ""
+
+      # Plik dump
+      dbfilename dump.rdb
+      dir /var/lib/redis
+
+      # Kompresja (domyślnie on)
+      rdbcompression yes
+      rdbchecksum yes
+
+      # Ręczny snapshot (blokuje Redis na chwilę!)
+      SAVE
+
+      # Tle snapshot (nie blokuje — fork procesu)
+      BGSAVE
+
+      # Sprawdź ostatni udany snapshot
+      LASTSAVE          # zwraca Unix timestamp
+
+      # Sprawdź status trwającego BGSAVE
+      INFO persistence
+      # rdb_bgsave_in_progress:0  (1 = trwa)
+      # rdb_last_save_time:1706001234
+
+      # Plusy RDB:
+      # - Kompaktowy plik — łatwy do backupu i przeniesienia
+      # - Szybki restart serwera (jeden plik do załadowania)
+      # - Minimalny wpływ na wydajność (fork w tle)
+      # Minusy:
+      # - Możliwa utrata danych (ostatnie minuty/sekundy)
+      # - Fork może być drogi przy bardzo dużej bazie w RAM
+
+  - name: AOF — Append Only File
+    icon: "📜"
+    desc: Log każdej operacji zapisu. Lepsza trwałość danych niż RDB — opcja fsync co sekundę lub po każdym zapisie.
+    code: |
+      # Włącz AOF w redis.conf
+      appendonly yes
+      appendfilename "appendonly.aof"
+
+      # Polityka fsync — kiedy zapisywać do dysku
+      appendfsync always     # po KAŻDYM zapisie — najwolniej, bezpieczny
+      appendfsync everysec   # co sekundę — ZALECANE (max 1s utrata)
+      appendfsync no         # gdy OS zdecyduje — najszybszy, ryzykowny
+
+      # AOF Rewrite — skompresuj AOF (usuń redundantne operacje)
+      # Zamiast: SET x 1, SET x 2, SET x 3 → zostaje: SET x 3
+      BGREWRITEAOF          # uruchom ręcznie w tle
+
+      # Automatyczny rewrite
+      auto-aof-rewrite-percentage 100    # gdy AOF rośnie 2x od ostatniego rewrite
+      auto-aof-rewrite-min-size 64mb     # ale min 64MB
+
+      # Sprawdź stan AOF
+      INFO persistence
+      # aof_enabled:1
+      # aof_rewrite_in_progress:0
+      # aof_current_size:1234567
+      # aof_base_size:987654
+
+      # Plusy AOF:
+      # - Lepsza trwałość (max 1 sekunda straty z everysec)
+      # - Czytelny plik — możesz edytować i usunąć błędne komendy
+      # - Automatyczny rewrite w tle
+      # Minusy:
+      # - Większy plik niż RDB
+      # - Wolniejszy restart serwera
+
+  - name: Hybrid — RDB + AOF (zalecane w produkcji)
+    icon: "🛡️"
+    desc: Używaj obu jednocześnie — RDB dla szybkich snapshotów i backupów, AOF dla minimalnej utraty danych.
+    code: |
+      # redis.conf — włącz oba
+      save 3600 1
+      save 300 100
+      save 60 10000
+
+      appendonly yes
+      appendfsync everysec
+      auto-aof-rewrite-percentage 100
+      auto-aof-rewrite-min-size 64mb
+
+      # AOF-rewrite z RDB preamble (Redis 4.0+)
+      # Skraca czas rewrite — używa RDB jako bazy + AOF dla zmian
+      aof-use-rdb-preamble yes
+
+      # Zachowanie przy starcie:
+      # 1. Jeśli AOF włączony → ładuj AOF (dokładniejszy)
+      # 2. Jeśli tylko RDB → ładuj dump.rdb
+
+      # Backup Redis
+      # Skopiuj dump.rdb:
+      BGSAVE
+      # poczekaj na LASTSAVE, potem:
+      # cp /var/lib/redis/dump.rdb /backup/redis-$(date +%Y%m%d).rdb
+
+      # Docker — volumes dla persistencji
+      # docker run -d redis:7 redis-server --appendonly yes --save 60 1000
+      # lub docker-compose.yml:
+      # volumes:
+      #   - redis_data:/data
+      # command: redis-server --appendonly yes
+
+  - name: Konfiguracja pamięci
+    icon: "💾"
+    desc: Limity pamięci, polityki eksmisji (eviction) — co usunąć gdy pamięć jest pełna. Kluczowe dla cache.
+    code: |
+      # Limit pamięci
+      maxmemory 512mb
+      maxmemory 2gb
+
+      # Co robić gdy pamięć pełna (eviction policy)
+      maxmemory-policy noeviction      # domyślne — błąd przy zapisie (nie dla cache!)
+      maxmemory-policy allkeys-lru     # usuń LRU z wszystkich kluczy (ZALECANE dla cache)
+      maxmemory-policy volatile-lru    # usuń LRU tylko z kluczy z TTL
+      maxmemory-policy allkeys-lfu     # usuń najrzadziej używane (Redis 4.0+)
+      maxmemory-policy volatile-ttl    # usuń klucze z najkrótszym TTL
+      maxmemory-policy allkeys-random  # losowo z wszystkich
+      maxmemory-policy volatile-random # losowo z kluczy z TTL
+
+      # Dla czystego cache:
+      maxmemory-policy allkeys-lru
+
+      # Sprawdź użycie pamięci
+      INFO memory
+      # used_memory_human:245.50M
+      # used_memory_peak_human:512.00M
+      # maxmemory_human:512.00M
+      # mem_fragmentation_ratio:1.23   (idealnie bliskie 1.0)
+
+      # Sprawdź rozmiar konkretnego klucza
+      MEMORY USAGE klucz              # w bajtach
+      MEMORY USAGE klucz SAMPLES 5    # lepsze przybliżenie
+
+      # Zoptymalizuj pamięć
+      MEMORY DOCTOR               # diagnoza problemów z pamięcią
+      MEMORY PURGE                # zwolnij fragmenty do OS

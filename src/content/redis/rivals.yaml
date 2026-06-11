@@ -1,0 +1,81 @@
+title: Redis vs alternatywy
+
+items:
+  - name: Memcached
+    icon: "🐘"
+    color: "#00a95c"
+    tagline: Prosty cache in-memory — tylko strings, brak persistencji
+    pros:
+      - Prostszy i lżejszy niż Redis
+      - Multi-threaded — lepsze wykorzystanie wielu rdzeni CPU
+      - Sprawdzony w produkcji od 2003
+      - Niższe zużycie pamięci dla prostego cache
+    cons:
+      - Tylko string — brak list, setów, sorted setów, hashów
+      - Brak persistencji — restart = utrata wszystkich danych
+      - Brak replikacji i clustering
+      - Brak Pub/Sub, Streams, Scripting
+    vs: Memcached tylko dla prostego cache string → string gdzie multi-threading ma znaczenie. Redis wszędzie indziej — bogatsze struktury, persistencja, pub/sub, clustering. Dla nowych projektów zawsze wybierz Redis.
+
+  - name: Apache Kafka
+    icon: "📨"
+    color: "#231f20"
+    tagline: Rozproszony log zdarzeń — wysokiej przepustowości streaming
+    pros:
+      - Retencja wiadomości na dysku — wiadomości nie giną po odczytaniu
+      - Consumer groups z replay — odtwórz historię od początku
+      - Miliony wiadomości na sekundę — skala Netflix, LinkedIn
+      - Ordered partitions — gwarantowana kolejność per partycja
+    cons:
+      - Złożona konfiguracja i operacje (ZooKeeper/KRaft)
+      - Overkill dla < 10k wiadomości/sekundę
+      - Duże zasoby — JVM, dysk, pamięć
+      - Redis Streams często wystarczy
+    vs: Redis Streams dla małych/średnich systemów (< 100k msg/s), gdzie prostota ważna. Kafka dla systemów krytycznych z wymogiem replay, długiej retencji i milionów zdarzeń. Redis Pub/Sub dla ephemeral real-time (chat, notifications).
+
+  - name: PostgreSQL
+    icon: "🐘"
+    color: "#336791"
+    tagline: Baza relacyjna — ACID, złożone zapytania, trwałe dane
+    pros:
+      - ACID transakcje — niezawodna trwałość danych
+      - Złożone zapytania SQL — JOIN, window functions, agregacje
+      - Dane na dysku — nie limituje wielkość RAMu
+      - Pełna integralność referencyjna
+    cons:
+      - 10-100x wolniejszy niż Redis dla prostych operacji
+      - Brak TTL na rekordach (trzeba czyścić ręcznie)
+      - Brak Pub/Sub i Streams natywnie
+      - Nie nadaje się do real-time cache
+    vs: PostgreSQL i Redis to uzupełnienie, nie konkurencja. PostgreSQL jako główna baza trwałych danych, Redis jako cache przed nią i broker zadań. Standard produkcyjny — oba jednocześnie.
+
+  - name: DragonflyDB
+    icon: "🐉"
+    color: "#7b3fe4"
+    tagline: Drop-in replacement Redis — 25x szybszy, multi-threaded
+    pros:
+      - Kompatybilny z Redis API — zero zmian w kodzie
+      - Multi-threaded — pełne wykorzystanie wielu rdzeni CPU
+      - 25x wyższy throughput w benchmarkach
+      - Efektywniejsze wykorzystanie pamięci
+    cons:
+      - Nowe oprogramowanie — mniej sprawdzone w produkcji
+      - Nie wszystkie moduły Redis są dostępne
+      - Mniejsza społeczność i ekosystem
+      - Enterprise licencja dla dużych deploymentów
+    vs: Redis dla sprawdzonej stabilności i ekosystemu. DragonflyDB jeśli Redis staje się bottleneckiem na CPU i potrzebujesz drop-in replacement. Warto monitorować — może zastąpić Redis w przyszłości.
+
+  - name: Valkey
+    icon: "🔑"
+    color: "#1a6b3a"
+    tagline: Fork Redisa po zmianie licencji — open-source, Linux Foundation
+    pros:
+      - W pełni kompatybilny z Redis 7.2
+      - True open-source (BSD licencja) — bez ograniczeń komercyjnych
+      - Wspierany przez AWS, Google, Oracle, Ericsson
+      - Aktywny development przez Linux Foundation
+    cons:
+      - Nowy projekt — mniej historii produkcyjnej niż Redis
+      - Mniejszy ekosystem narzędzi i zarządzanych serwisów
+      - Różnice mogą narastać z czasem
+    vs: Redis dla istniejących projektów i managed serwisów (ElastiCache, Redis Cloud). Valkey dla nowych projektów gdzie licencja open-source jest kluczowa lub chcesz uniknąć vendor lock-in Redisa.

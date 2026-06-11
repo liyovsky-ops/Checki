@@ -1,0 +1,74 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Redis?
+  firstComponent: Pierwsze komendy
+  firstComponentLang: bash
+
+intro:
+  title: Czym jest Redis?
+  desc: >
+    Redis (Remote Dictionary Server) to baza danych in-memory — przechowuje dane w RAM, więc operacje trwają mikrosekundy, nie milisekundy.
+    Obsługuje bogate struktury danych — strings, lists, sets, sorted sets, hashes, streams.
+    Używany jako cache, kolejka zadań (Celery), session store, pub/sub, rate limiter i leaderboard.
+    Standardowy element stacku produkcyjnego obok PostgreSQL — Instagram, Twitter, GitHub, Stack Overflow.
+
+concepts:
+  - title: In-memory
+    desc: >
+      Wszystkie dane w RAM — dlatego GET/SET zajmuje < 1ms.
+      Opcjonalna persistencja (RDB snapshots, AOF log) zabezpiecza przed utratą danych przy restarcie.
+    icon: "⚡"
+  - title: Klucz-wartość
+    desc: >
+      Podstawowy model — każda wartość ma unikalny klucz tekstowy.
+      Klucz może być dowolnym stringiem, konwencja to "namespace:id" np. user:42:session.
+    icon: "🔑"
+  - title: Struktury danych
+    desc: >
+      Nie tylko string — Redis ma listy, sety, sorted sety, hashe, streamy, hyperloglog.
+      Każda struktura ma atomowe operacje — LPUSH, ZADD, HSET — bez race conditions.
+    icon: "📚"
+  - title: TTL — wygasanie kluczy
+    desc: >
+      EXPIRE key 3600 — klucz automatycznie znika po podanym czasie (sekundy).
+      Idealne dla cache, sesji, OTP kodów, rate limiting.
+    icon: "⏳"
+
+whenToUse:
+  - Cache warstwy nad PostgreSQL — wyniki drogich zapytań, dane produktów, konfiguracja
+  - Session store — przechowuj JWT tokeny, dane sesji użytkownika
+  - Kolejki zadań — Celery używa Redis jako broker (lista LPUSH/RPOP)
+  - Rate limiting — zliczaj requesty per IP z TTL
+  - Pub/Sub — real-time notyfikacje, live chat, WebSocket broadcasting
+  - Leaderboard — ranking graczy/użytkowników przez Sorted Set
+
+firstComponent: |
+  # Połącz z Redis
+  redis-cli
+
+  # Podstawowe operacje
+  SET user:1:name "Jan Kowalski"
+  GET user:1:name
+  # "Jan Kowalski"
+
+  # Z TTL (wygaśnie po 3600 sekundach)
+  SET session:abc123 "user_id:42" EX 3600
+  TTL session:abc123
+  # 3600
+
+  # Licznik
+  SET page:views 0
+  INCR page:views
+  INCR page:views
+  GET page:views
+  # "2"
+
+  # Sprawdź czy klucz istnieje
+  EXISTS user:1:name
+  # (integer) 1
+
+  # Usuń klucz
+  DEL user:1:name
+
+  # Wzorzec kluczy
+  KEYS user:*
