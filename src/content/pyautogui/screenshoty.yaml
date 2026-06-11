@@ -1,0 +1,118 @@
+title: Screenshoty i szukanie elementów
+items:
+  - name: screenshot — zrzut ekranu
+    desc: |
+      Robi zrzut ekranu i zwraca obiekt PIL Image.
+      Możesz zrobić screenshot całości lub wybranego regionu.
+      Przydatny do tworzenia obrazków referencyjnych dla locateOnScreen.
+    code: |
+      import pyautogui
+
+      # Screenshot całego ekranu
+      img = pyautogui.screenshot()
+      img.save("screen.png")
+
+      # Screenshot fragmentu ekranu (region)
+      # region = (left, top, width, height)
+      img = pyautogui.screenshot(region=(0, 0, 800, 600))
+      img.save("fragment.png")
+
+      # Zapisz bezpośrednio do pliku
+      pyautogui.screenshot("screen.png")
+
+      # Kolor piksela na ekranie
+      color = pyautogui.pixel(100, 200)
+      print(color)  # (255, 128, 0) — RGB
+
+      # Sprawdź czy piksel ma konkretny kolor
+      if pyautogui.pixelMatchesColor(100, 200, (255, 128, 0)):
+          print("Kolor się zgadza!")
+
+  - name: locateOnScreen — szukanie obrazka
+    desc: |
+      Szuka podanego obrazka na ekranie. Zwraca Box(left, top, width, height) lub None.
+      Z parametrem confidence (wymaga opencv) toleruje drobne różnice — skalowanie, AA.
+      Podstawa odpornych skryptów — nie hardkodujesz współrzędnych.
+    code: |
+      import pyautogui
+
+      # Szukaj przycisku (100% dopasowanie)
+      location = pyautogui.locateOnScreen("button.png")
+      if location:
+          # Kliknij środek znalezionego elementu
+          center = pyautogui.center(location)
+          pyautogui.click(center)
+      else:
+          print("Nie znaleziono przycisku!")
+
+      # Z tolerancją (wymaga: pip install opencv-python)
+      location = pyautogui.locateOnScreen("button.png", confidence=0.9)
+
+      # Szukaj tylko w regionie (szybsze!)
+      location = pyautogui.locateOnScreen(
+          "button.png",
+          region=(0, 0, 800, 600),
+          confidence=0.85
+      )
+
+      # Znajdź wszystkie wystąpienia (np. wiele ikon)
+      for loc in pyautogui.locateAllOnScreen("icon.png", confidence=0.9):
+          pyautogui.click(pyautogui.center(loc))
+
+  - name: Czekanie na element
+    desc: |
+      Skrypt czeka aż element pojawi się na ekranie — wzorzec niezbędny
+      przy automatyzacji gdzie czas ładowania jest nieprzewidywalny.
+    code: |
+      import pyautogui
+      import time
+
+      def wait_for_element(image_path, timeout=10, confidence=0.9):
+          """Czekaj aż obrazek pojawi się na ekranie."""
+          start = time.time()
+          while time.time() - start < timeout:
+              try:
+                  location = pyautogui.locateOnScreen(
+                      image_path,
+                      confidence=confidence
+                  )
+                  if location:
+                      return pyautogui.center(location)
+              except pyautogui.ImageNotFoundException:
+                  pass
+              time.sleep(0.5)
+          raise TimeoutError(f"Nie znaleziono {image_path} po {timeout}s")
+
+      def wait_and_click(image_path, timeout=10):
+          """Poczekaj na element i kliknij."""
+          center = wait_for_element(image_path, timeout)
+          pyautogui.click(center)
+          return True
+
+      # Użycie
+      wait_and_click("ok_button.png", timeout=15)
+      wait_and_click("next_button.png", timeout=5)
+
+  - name: pixelMatchesColor — oczekiwanie na zmianę
+    desc: |
+      Czekaj na zmianę koloru piksela — np. wskaźnik postępu, zmiana stanu przycisku.
+      Tańszy alternatywa dla locateOnScreen gdy wystarczy kolor.
+    code: |
+      import pyautogui
+      import time
+
+      def wait_for_color(x, y, color, timeout=30):
+          """Czekaj aż piksel (x, y) przyjmie dany kolor."""
+          start = time.time()
+          while time.time() - start < timeout:
+              if pyautogui.pixelMatchesColor(x, y, color, tolerance=10):
+                  return True
+              time.sleep(0.2)
+          return False
+
+      # Czekaj aż progress bar stanie się zielony (0, 200, 0)
+      if wait_for_color(500, 300, (0, 200, 0), timeout=60):
+          print("Operacja zakończona!")
+          pyautogui.click(600, 400)  # kliknij OK
+      else:
+          print("Timeout — coś poszło nie tak")

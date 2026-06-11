@@ -1,0 +1,111 @@
+title: Komendy BeautifulSoup
+groups:
+  - name: Instalacja
+    icon: "📦"
+    commands:
+      - desc: Zainstaluj BeautifulSoup4
+        code: pip install beautifulsoup4
+      - desc: Pełny zestaw scrapingowy
+        code: pip install beautifulsoup4 requests lxml html5lib
+      - desc: Z pandas do tabel HTML
+        code: pip install beautifulsoup4 requests lxml pandas openpyxl
+      - desc: Sprawdź wersję
+        code: python -c "import bs4; print(bs4.__version__)"
+
+  - name: Szybkie parsowanie
+    icon: "⚡"
+    commands:
+      - desc: Parsuj stronę online i wydrukuj tytuł
+        code: |
+          python -c "
+          import requests
+          from bs4 import BeautifulSoup
+          r = requests.get('https://example.com', headers={'User-Agent':'demo/1.0'})
+          s = BeautifulSoup(r.text, 'html.parser')
+          print(s.title.text)
+          "
+      - desc: Wyciągnij wszystkie linki z URL
+        code: |
+          python -c "
+          import requests
+          from bs4 import BeautifulSoup
+          r = requests.get('https://example.com')
+          s = BeautifulSoup(r.text, 'html.parser')
+          links = [a['href'] for a in s.find_all('a', href=True)]
+          print('\n'.join(links[:20]))
+          "
+      - desc: Parsuj lokalny plik HTML
+        code: |
+          python -c "
+          from bs4 import BeautifulSoup
+          with open('strona.html', encoding='utf-8') as f:
+              soup = BeautifulSoup(f, 'html.parser')
+          print(soup.title.text)
+          "
+      - desc: Wyciągnij tekst ze strony (bez tagów)
+        code: |
+          python -c "
+          import requests
+          from bs4 import BeautifulSoup
+          r = requests.get('https://example.com')
+          s = BeautifulSoup(r.text, 'html.parser')
+          print(s.get_text(separator='\n', strip=True)[:500])
+          "
+
+  - name: Scraping one-linery
+    icon: "🎯"
+    commands:
+      - desc: Znajdź elementy po klasie CSS
+        code: |
+          python -c "
+          import requests; from bs4 import BeautifulSoup
+          s = BeautifulSoup(requests.get('https://books.toscrape.com').text, 'html.parser')
+          books = s.find_all('article', class_='product_pod')
+          [print(b.h3.a['title'], b.find('p', class_='price_color').text) for b in books[:5]]
+          "
+      - desc: Parsuj tabele HTML do CSV
+        code: |
+          python -c "
+          import pandas as pd
+          tables = pd.read_html('https://pl.wikipedia.org/wiki/Polska')
+          tables[0].to_csv('tabela.csv', index=False)
+          print('Zapisano tabela.csv')
+          "
+      - desc: Pobierz wszystkie obrazki z strony
+        code: |
+          python -c "
+          import requests; from bs4 import BeautifulSoup
+          s = BeautifulSoup(requests.get('https://example.com').text, 'html.parser')
+          imgs = [img.get('src', '') for img in s.find_all('img') if img.get('src')]
+          print('\n'.join(imgs[:10]))
+          "
+
+  - name: Testowanie i debugowanie
+    icon: "🔍"
+    commands:
+      - desc: Sprawdź dostępne parsery
+        code: |
+          python -c "
+          for p in ['html.parser','lxml','html5lib']:
+              try:
+                  from bs4 import BeautifulSoup
+                  BeautifulSoup('<p>test</p>', p)
+                  print(f'{p}: OK')
+              except:
+                  print(f'{p}: brak (pip install {p})')
+          "
+      - desc: Interaktywne testowanie BS4 (Python REPL)
+        code: |
+          python -c "
+          import requests; from bs4 import BeautifulSoup
+          html = requests.get('https://example.com').text
+          soup = BeautifulSoup(html, 'html.parser')
+          import code; code.interact(local=locals())
+          "
+      - desc: Prettify HTML (sformatuj czytelnie)
+        code: |
+          python -c "
+          from bs4 import BeautifulSoup
+          html = open('strona.html').read()
+          print(BeautifulSoup(html, 'html.parser').prettify()[:1000])
+          "

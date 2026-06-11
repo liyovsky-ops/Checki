@@ -1,0 +1,122 @@
+title: Kontrola myszy
+items:
+  - name: moveTo / moveRel — ruch myszy
+    desc: |
+      Przesuń mysz do pozycji absolutnej (moveTo) lub relatywnej (moveRel).
+      duration kontroluje czas animacji — 0 to ruch natychmiastowy.
+      Animacja wygląda bardziej "ludzko" i daje GUI czas na reakcję.
+    code: |
+      import pyautogui
+
+      # Przesuń do pozycji (500, 300) w 0.5 sekundy
+      pyautogui.moveTo(500, 300, duration=0.5)
+
+      # Przesuń o 100px w prawo i 50px w dół (relatywnie)
+      pyautogui.moveRel(100, 50, duration=0.3)
+
+      # Natychmiastowy ruch (bez animacji)
+      pyautogui.moveTo(0, 0)
+
+      # Sprawdź aktualną pozycję
+      pos = pyautogui.position()
+      print(f"Mysz: {pos.x}, {pos.y}")
+
+      # Rozdzielczość ekranu
+      w, h = pyautogui.size()
+      print(f"Ekran: {w}x{h}")
+
+  - name: click / doubleClick / rightClick
+    desc: |
+      Klikanie — lewy, prawy, środkowy, podwójny klik. Możesz podać pozycję
+      lub kliknąć w aktualnej pozycji myszy. interval dodaje opóźnienie po kliknięciu.
+    code: |
+      import pyautogui
+
+      # Lewy klik w pozycji
+      pyautogui.click(500, 300)
+
+      # Klik na aktualnej pozycji (bez argumentów)
+      pyautogui.click()
+
+      # Podwójny klik (otwiera plik, zaznacza słowo)
+      pyautogui.doubleClick(500, 300)
+
+      # Prawy klik — menu kontekstowe
+      pyautogui.rightClick(500, 300)
+
+      # Środkowy klik (otwiera link w nowej karcie)
+      pyautogui.middleClick(500, 300)
+
+      # Klik z opóźnieniem po kliknięciu
+      pyautogui.click(500, 300, interval=0.3)
+
+      # Wiele kliknięć
+      pyautogui.click(500, 300, clicks=3, interval=0.2)
+
+  - name: drag / dragTo — przeciąganie
+    desc: |
+      Drag and drop — przeciągnij element z jednej pozycji do drugiej.
+      dragTo: przeciągnij DO pozycji absolutnej.
+      dragRel: przeciągnij O relatywne przesunięcie.
+    code: |
+      import pyautogui
+
+      # Przeciągnij DO pozycji (400, 200) w 1 sekundę
+      pyautogui.dragTo(400, 200, duration=1.0, button='left')
+
+      # Przeciągnij relatywnie — 300px w prawo
+      pyautogui.dragRel(300, 0, duration=1.0)
+
+      # Ręczny drag & drop (pełna kontrola)
+      pyautogui.moveTo(100, 200, duration=0.5)  # jedź do elementu
+      pyautogui.mouseDown()                      # wciśnij przycisk
+      pyautogui.moveTo(400, 200, duration=1.0)  # przeciągnij
+      pyautogui.mouseUp()                        # puść
+
+      # Drag z prawym przyciskiem
+      pyautogui.dragTo(400, 200, duration=0.5, button='right')
+
+  - name: scroll — kółko myszy
+    desc: |
+      Scrollowanie kółkiem myszy. Wartość dodatnia = w górę, ujemna = w dół.
+      Możesz scrollować w konkretnej pozycji ekranu.
+    code: |
+      import pyautogui
+
+      # Scroll w górę (3 kliknięcia)
+      pyautogui.scroll(3)
+
+      # Scroll w dół (5 kliknięć)
+      pyautogui.scroll(-5)
+
+      # Scroll w konkretnej pozycji (np. w środku listy)
+      pyautogui.scroll(3, x=500, y=300)
+
+      # Horizontal scroll (Mac i niektóre aplikacje Windows)
+      pyautogui.hscroll(3)    # w prawo
+      pyautogui.hscroll(-3)   # w lewo
+
+      # Scroll do końca strony
+      for _ in range(10):
+          pyautogui.scroll(-10)
+          import time; time.sleep(0.1)
+
+  - name: mouseDown / mouseUp — precyzyjna kontrola
+    desc: |
+      Rozdziel wciśnięcie i puszczenie przycisku myszy. Przydatne do
+      zaznaczania tekstu, przeciągania, gier.
+    code: |
+      import pyautogui
+
+      # Zaznacz tekst: wciśnij w punkcie A, puść w punkcie B
+      pyautogui.moveTo(100, 200)
+      pyautogui.mouseDown()
+      pyautogui.moveTo(400, 200, duration=0.5)
+      pyautogui.mouseUp()
+
+      # Wciśnij prawy przycisk
+      pyautogui.mouseDown(button='right')
+      pyautogui.mouseUp(button='right')
+
+      # Sprawdź czy wciśnięty (pynput bardziej zaawansowany)
+      # pyautogui nie ma isButtonDown() — użyj pynput do monitorowania

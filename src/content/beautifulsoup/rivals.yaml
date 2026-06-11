@@ -1,0 +1,74 @@
+title: Rywale — alternatywy dla BeautifulSoup
+items:
+  - name: lxml — szybki parser XML/HTML
+    icon: "⚡"
+    desc: |
+      lxml to biblioteka C do parsowania XML i HTML — 10-50x szybsza niż html.parser.
+      Ma własne API (ElementTree) ale też działa jako parser dla BeautifulSoup.
+
+      Kiedy lxml zamiast BS4:
+      • Duże pliki XML/HTML (>1MB) — lxml jest znacząco szybszy
+      • XPath — lxml obsługuje pełne XPath 1.0, BS4 nie
+      • XML Schematy (XSD) i XSLT — tylko lxml
+      • cssselect z lxml działa wydajniej niż BS4.select()
+
+      Kiedy BS4 wygrywa:
+      BS4 jest bardziej tolerancyjny na "brudny" HTML, ma prostsze API,
+      obsługuje wiele parserów. lxml jest surowy — rzuca błędy przy niepoprawnym HTML.
+
+      pip install lxml
+
+  - name: Scrapy — framework do scrapingu
+    icon: "🕷️"
+    desc: |
+      Kompletny framework do web scrapingu — nie tylko parser, ale cały pipeline.
+      Asynchroniczny, szybki, produkcyjny. Standard w profesjonalnym scrapingu.
+
+      Co ma Scrapy czego nie ma BS4:
+      • Asynchroniczne pobieranie wielu stron jednocześnie (Twisted)
+      • Automatyczna paginacja i queue requestów
+      • Middleware: proxy, retry, rate limiting, cookies
+      • Pipelines: walidacja, zapis do DB, eksport do CSV/JSON
+      • Scrapy Shell do interaktywnego testowania
+      • Scrapy Cloud do deploy'u
+
+      Kiedy BS4+requests wystarczy:
+      Małe projekty scraping (< 1000 stron), proste struktury, jednorazowe zadania.
+      Scrapy = overkill dla skryptu który uruchamiasz raz.
+
+      pip install scrapy
+
+  - name: Playwright / Selenium — dynamiczne strony
+    icon: "🎭"
+    desc: |
+      Strony renderowane przez JavaScript (React, Vue, Next.js SSR) mogą być puste
+      gdy pobierasz przez requests. Playwright/Selenium uruchamia prawdziwą przeglądarkę.
+
+      Kiedy potrzebujesz przeglądarki:
+      • Strona wymaga wykonania JS żeby pokazać dane
+      • Login przez formularz z CSRF/captcha
+      • Infinite scroll (nowe dane ładowane przy scrollowaniu)
+      • WebSocket / real-time data
+
+      Workflow hybrydowy:
+      Playwright pobiera stronę po wykonaniu JS → response.text() → BeautifulSoup do parsowania.
+      Playwright do obsługi dynamiki, BS4 do wygodnego wyciągania danych ze statycznego HTML.
+
+  - name: httpx — nowoczesny HTTP client
+    icon: "🌐"
+    desc: |
+      httpx to nowoczesna alternatywa dla requests — obsługuje async/await.
+      BS4 parsuje HTML niezależnie od tego jak go pobierzesz.
+
+      Kiedy httpx zamiast requests:
+      • Asynchroniczne pobieranie wielu stron jednocześnie (async/await)
+      • HTTP/2 support
+      • Connection pooling domyślnie
+      • Kompatybilny API z requests — łatwa migracja
+
+      pip install httpx
+
+      Przykład async scraping:
+      async with httpx.AsyncClient() as client:
+          responses = await asyncio.gather(*[client.get(url) for url in urls])
+          soups = [BeautifulSoup(r.text, "html.parser") for r in responses]

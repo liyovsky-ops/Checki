@@ -1,0 +1,134 @@
+title: Selektory — wyszukiwanie elementów
+items:
+  - name: find / find_all — podstawowe wyszukiwanie
+    desc: |
+      find() zwraca pierwszy pasujący element. find_all() zwraca listę wszystkich.
+      Możesz filtrować po nazwie tagu, klasie CSS, ID, atrybutach i tekście.
+    code: |
+      from bs4 import BeautifulSoup
+
+      html = """
+      <div class="container">
+        <h1 id="title">Tytuł strony</h1>
+        <p class="intro">Pierwszy paragraf</p>
+        <p class="content">Drugi paragraf</p>
+        <a href="/page1">Link 1</a>
+        <a href="/page2" class="external">Link 2</a>
+      </div>
+      """
+      soup = BeautifulSoup(html, "html.parser")
+
+      # Znajdź pierwszy tag
+      h1 = soup.find("h1")
+      print(h1.text)  # Tytuł strony
+
+      # Znajdź po klasie CSS
+      intro = soup.find("p", class_="intro")
+      print(intro.text)
+
+      # Znajdź po ID
+      title = soup.find(id="title")
+
+      # Wszystkie linki
+      links = soup.find_all("a")
+      for link in links:
+          print(link["href"], link.text)
+
+      # Wszystkie tagi określonego rodzaju
+      paragraphs = soup.find_all("p")
+      print(f"Paragrafów: {len(paragraphs)}")
+
+  - name: select() — selektory CSS
+    desc: |
+      select() używa składni CSS — ta sama co w przeglądarce.
+      select_one() zwraca pierwszy element (odpowiednik find()).
+    code: |
+      from bs4 import BeautifulSoup
+
+      soup = BeautifulSoup(html, "html.parser")
+
+      # Klasa CSS
+      soup.select(".product_pod")           # elementy z klasą
+      soup.select("p.intro")               # p z klasą intro
+
+      # ID
+      soup.select("#title")                # element z ID
+      soup.select_one("#main-nav")         # tylko pierwszy
+
+      # Zagnieżdżenie
+      soup.select("div p")                 # p wewnątrz div
+      soup.select("div > p")              # bezpośrednie dziecko
+
+      # Atrybuty
+      soup.select("a[href]")              # a z atrybutem href
+      soup.select('a[href="/contact"]')   # konkretna wartość
+      soup.select('a[href^="https"]')     # zaczyna się od https
+      soup.select('a[href$=".pdf"]')      # kończy się .pdf
+      soup.select('a[href*="page"]')      # zawiera "page"
+
+      # Kombinacje
+      soup.select("table.data-table tr td:nth-of-type(2)")
+
+  - name: Filtrowanie zaawansowane
+    desc: |
+      find_all przyjmuje: string (regex), listę tagów, słownik atrybutów,
+      wartość True, lub funkcję filtrującą.
+    code: |
+      import re
+      from bs4 import BeautifulSoup
+
+      soup = BeautifulSoup(html, "html.parser")
+
+      # Regex w nazwie tagu
+      headings = soup.find_all(re.compile("^h[1-6]$"))  # h1-h6
+
+      # Regex w atrybucie
+      internal = soup.find_all("a", href=re.compile("^/"))
+
+      # Lista tagów
+      tags = soup.find_all(["p", "span", "div"])
+
+      # Dowolny tag z konkretnym atrybutem
+      data = soup.find_all(True, attrs={"data-id": True})
+
+      # Funkcja filtrująca
+      def has_class_and_href(tag):
+          return tag.has_attr("href") and tag.has_attr("class")
+
+      tagged_links = soup.find_all(has_class_and_href)
+
+      # Filtruj po tekście
+      soup.find_all("p", string="dokładny tekst")
+      soup.find_all("p", string=re.compile("fragment"))
+
+      # Ogranicz liczbę wyników
+      soup.find_all("a", limit=5)
+
+  - name: Atrybuty elementów
+    desc: |
+      Atrybuty HTML dostępne jak słownik. get() bezpieczne dla brakujących atrybutów.
+      Klasy CSS zwracane jako lista (bo element może mieć wiele klas).
+    code: |
+      from bs4 import BeautifulSoup
+
+      soup = BeautifulSoup('<a href="/path" class="btn primary" data-id="42">Kliknij</a>', "html.parser")
+      tag = soup.find("a")
+
+      # Dostęp do atrybutu
+      print(tag["href"])          # /path
+      print(tag.get("href"))      # /path (bezpieczniejsze — None jeśli brak)
+      print(tag.get("title", "")) # "" jeśli brak atrybutu
+
+      # Klasy — lista!
+      print(tag["class"])         # ["btn", "primary"]
+      print("btn" in tag["class"])  # True
+
+      # Niestandardowe atrybuty
+      print(tag["data-id"])       # 42
+
+      # Wszystkie atrybuty
+      print(tag.attrs)  # {"href": "/path", "class": ["btn","primary"], "data-id":"42"}
+
+      # Sprawdź czy atrybut istnieje
+      if tag.has_attr("href"):
+          print("Ma href")

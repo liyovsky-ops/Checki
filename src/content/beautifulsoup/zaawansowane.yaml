@@ -1,0 +1,165 @@
+title: Zaawansowane wzorce scrapingu
+items:
+  - name: Kompletny scraper z obsługą błędów
+    desc: |
+      Produkcyjny wzorzec scrapera: retry, timeouty, User-Agent, obsługa błędów HTTP,
+      rate limiting. Grzeczny scraper nie przeciąża serwerów.
+    code: |
+      import requests
+      from bs4 import BeautifulSoup
+      import time
+      import logging
+      from dataclasses import dataclass
+
+      logging.basicConfig(level=logging.INFO)
+
+      @dataclass
+      class Product:
+          name: str
+          price: str
+          rating: str
+          url: str
+
+      def get_page(url: str, retries=3) -> BeautifulSoup | None:
+          headers = {"User-Agent": "Mozilla/5.0 (research-bot/1.0; contact: you@email.com)"}
+          for attempt in range(retries):
+              try:
+                  resp = requests.get(url, headers=headers, timeout=10)
+                  resp.raise_for_status()
+                  return BeautifulSoup(resp.text, "html.parser")
+              except requests.RequestException as e:
+                  logging.warning(f"Próba {attempt+1}: {e}")
+                  time.sleep(2 ** attempt)  # exponential backoff
+          return None
+
+      def scrape_products(base_url: str) -> list[Product]:
+          products = []
+          page = 1
+          while True:
+              url = f"{base_url}/catalogue/page-{page}.html"
+              soup = get_page(url)
+              if not soup:
+                  break
+
+              articles = soup.find_all("article", class_="product_pod")
+              if not articles:
+                  break
+
+              for art in articles:
+                  products.append(Product(
+                      name=art.h3.a["title"],
+                      price=art.find("p", class_="price_color").text.strip(),
+                      rating=art.p["class"][1],
+                      url=base_url + "/catalogue/" + art.h3.a["href"].lstrip("../")
+                  ))
+              logging.info(f"Strona {page}: {len(articles)} produktów")
+              page += 1
+              time.sleep(0.5)  # rate limiting — bądź grzeczny
+          return products
+
+  - name: Parsowanie tabel HTML
+    desc: |
+      Tabele HTML to częsty target scrapingu — kursy walut, tabele statystyk, rankingi.
+      Wyciągnij nagłówki i wiersze do listy słowników lub pandas DataFrame.
+    code: |
+      from bs4 import BeautifulSoup
+      import pandas as pd
+
+      html = """
+      <table class="data">
+        <thead><tr><th>Waluta</th><th>Kupno</th><th>Sprzedaż</th></tr></thead>
+        <tbody>
+          <tr><td>EUR</td><td>4.20</td><td>4.30</td></tr>
+          <tr><td>USD</td><td>3.90</td><td>3.99</td></tr>
+          <tr><td>GBP</td><td>4.90</td><td>5.05</td></tr>
+        </tbody>
+      </table>
+      """
+      soup = BeautifulSoup(html, "html.parser")
+      table = soup.find("table", class_="data")
+
+      # Nagłówki
+      headers = [th.text.strip() for th in table.thead.find_all("th")]
+      print(headers)  # ["Waluta", "Kupno", "Sprzedaż"]
+
+      # Wiersze
+      rows = []
+      for tr in table.tbody.find_all("tr"):
+          cells = [td.text.strip() for td in tr.find_all("td")]
+          rows.append(dict(zip(headers, cells)))
+
+      print(rows)
+      # [{"Waluta": "EUR", "Kupno": "4.20", "Sprzedaż": "4.30"}, ...]
+
+      # Szybko przez pandas (czyta tabele HTML automatycznie)
+      df = pd.read_html(str(table))[0]
+      print(df)
+
+  - name: Scraping ze paginacją
+    desc: |
+      Większość stron ma paginację. Wzorzec: znajdź link "Następna strona",
+      scrape, przejdź dalej, aż nie będzie następnej strony.
+    code: |
+      import requests
+      from bs4 import BeautifulSoup
+      import time
+
+      BASE = "https://books.toscrape.com/catalogue"
+
+      def scrape_all_pages():
+          url = f"{BASE}/page-1.html"
+          all_books = []
+
+          while url:
+              resp = requests.get(url, headers={"User-Agent": "demo/1.0"})
+              soup = BeautifulSoup(resp.text, "html.parser")
+
+              # Scrape bieżącej strony
+              for book in soup.find_all("article", class_="product_pod"):
+                  all_books.append({
+                      "title": book.h3.a["title"],
+                      "price": book.find("p", class_="price_color").text.strip(),
+                  })
+
+              # Znajdź link "next"
+              next_btn = soup.find("li", class_="next")
+              if next_btn:
+                  next_url = next_btn.a["href"]
+                  url = f"{BASE}/{next_url}"
+                  time.sleep(0.3)
+              else:
+                  url = None  # ostatnia strona
+
+          return all_books
+
+      books = scrape_all_pages()
+      print(f"Łącznie: {len(books)} książek")
+
+  - name: Parsowanie JSONu w HTML
+    desc: |
+      Wiele nowoczesnych stron osadza dane w tagach <script type="application/ld+json">
+      lub JavaScript. Wyciągnij JSON bez Selenium.
+    code: |
+      import json
+      import requests
+      from bs4 import BeautifulSoup
+
+      resp = requests.get("https://example-shop.com/product/123")
+      soup = BeautifulSoup(resp.text, "html.parser")
+
+      # JSON-LD (schema.org — częsty w sklepach i blogach)
+      ld_json = soup.find("script", type="application/ld+json")
+      if ld_json:
+          data = json.loads(ld_json.string)
+          print(data.get("name"))
+          print(data.get("price"))
+
+      # Dane w window.__INITIAL_STATE__ = {...}
+      for script in soup.find_all("script"):
+          if script.string and "window.__DATA__" in (script.string or ""):
+              # Wyciągnij JSON przez regex
+              import re
+              match = re.search(r"window\.__DATA__\s*=\s*(\{.*?\});", script.string, re.DOTALL)
+              if match:
+                  data = json.loads(match.group(1))
+                  print(data)

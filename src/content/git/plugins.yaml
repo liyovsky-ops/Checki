@@ -1,0 +1,136 @@
+title: Narzędzia Git
+items:
+  - name: GitHub CLI (gh) — GitHub z terminala
+    icon: "🐙"
+    desc: |
+      Oficjalne CLI GitHub — twórz PR, zarządzaj issues, przeglądaj repo bez opuszczania terminala.
+      Integruje się z git workflow — po pushu od razu utwórz PR.
+
+      Instalacja: https://cli.github.com lub brew install gh / winget install GitHub.cli
+    code: |
+      # Logowanie
+      gh auth login
+
+      # Utwórz PR
+      gh pr create --title "feat: add login" --body "Adds JWT auth"
+
+      # Lista PR
+      gh pr list
+      gh pr view 42
+
+      # Checkout PR (do review)
+      gh pr checkout 42
+
+      # Utwórz issue
+      gh issue create --title "Bug: login crashes" --label bug
+
+      # Klonuj repo
+      gh repo clone user/repo
+
+      # Przeglądaj repo w przeglądarce
+      gh repo view --web
+
+  - name: Git hooks — automatyzacja przed commitem
+    icon: "🪝"
+    desc: |
+      Hooks to skrypty uruchamiane przez Git automatycznie przy konkretnych zdarzeniach.
+      pre-commit to najważniejszy — uruchamia się przed każdym commitem.
+      Użyj do: lintowania, formatowania, testów, sprawdzania wiadomości commita.
+
+      Instalacja pre-commit: pip install pre-commit
+    code: |
+      # .pre-commit-config.yaml w root projektu
+      repos:
+        - repo: https://github.com/psf/black
+          rev: 23.9.1
+          hooks:
+            - id: black
+        - repo: https://github.com/PyCQA/flake8
+          rev: 6.1.0
+          hooks:
+            - id: flake8
+        - repo: https://github.com/pre-commit/pre-commit-hooks
+          rev: v4.5.0
+          hooks:
+            - id: trailing-whitespace
+            - id: end-of-file-fixer
+            - id: check-yaml
+            - id: check-merge-conflict
+            - id: detect-private-key   # blokuje commity z kluczami!
+
+      # Zainstaluj hooki
+      pre-commit install
+
+      # Uruchom ręcznie na wszystkich plikach
+      pre-commit run --all-files
+
+  - name: git-delta — piękniejszy diff
+    icon: "✨"
+    desc: |
+      delta to pager dla git diff / git log z syntax highlighting, numerami linii
+      i side-by-side view. Znacząco poprawia czytelność diffów.
+
+      Instalacja: cargo install git-delta lub brew install git-delta
+    code: |
+      # ~/.gitconfig — skonfiguruj delta jako pager
+      [core]
+          pager = delta
+
+      [delta]
+          navigate = true
+          light = false
+          side-by-side = true
+          line-numbers = true
+          syntax-theme = Dracula
+
+      [interactive]
+          diffFilter = delta --color-only
+
+      # Teraz git diff, git log -p, git show wyglądają pięknie
+
+  - name: lazygit — terminal UI dla Git
+    icon: "💤"
+    desc: |
+      Interaktywny terminal UI dla Git — wszystkie operacje bez zapamiętywania komend.
+      Staging, commiting, rebasing, resolving conflicts — wszystko wizualnie.
+
+      Instalacja: brew install lazygit / winget install lazygit
+    code: |
+      # Uruchom w repozytorium
+      lazygit
+
+      # Nawigacja (wszystkie klawisze pokazane w UI):
+      # Tab — przełącz między panelami (Files, Branches, Commits, Stash)
+      # Space — toggle staging pliku / linii
+      # c — commit
+      # P/p — push/pull
+      # b — nowy branch
+      # r — rebase interaktywny
+      # z — undo (git reset)
+      # ? — pomoc
+
+  - name: git-crypt — szyfrowanie secretów w repo
+    icon: "🔒"
+    desc: |
+      Przezroczyste szyfrowanie wybranych plików w repozytorium.
+      Pliki są szyfrowane gdy pushowane, odszyfrowane lokalnie dla uprawnionych.
+      Alternatywa dla .env poza repo.
+
+      Instalacja: brew install git-crypt / apt install git-crypt
+    code: |
+      # Inicjalizuj w repo
+      git-crypt init
+
+      # .gitattributes — definiuj które pliki szyfrować
+      secrets/** filter=git-crypt diff=git-crypt
+      .env filter=git-crypt diff=git-crypt
+      *.key filter=git-crypt diff=git-crypt
+
+      # Eksportuj klucz (dla innych developerów)
+      git-crypt export-key ~/git-crypt-key
+
+      # Inni developerzy: odblokuj repo
+      git-crypt unlock ~/git-crypt-key
+
+      # Sprawdź status szyfrowania
+      git-crypt status

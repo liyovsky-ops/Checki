@@ -1,0 +1,129 @@
+title: Modyfikacja drzewa DOM
+items:
+  - name: Zmiana zawartości elementów
+    desc: |
+      Zmieniaj tekst, atrybuty i zawartość HTML elementów.
+      BS4 pozwala modyfikować sparsowany dokument i serializować z powrotem do HTML.
+    code: |
+      from bs4 import BeautifulSoup
+
+      html = '<p class="old">Stary tekst</p>'
+      soup = BeautifulSoup(html, "html.parser")
+      p = soup.find("p")
+
+      # Zmień tekst
+      p.string = "Nowy tekst"
+      print(soup)  # <p class="old">Nowy tekst</p>
+
+      # Zmień atrybut
+      p["class"] = "new"
+      p["id"] = "main-para"
+
+      # Usuń atrybut
+      del p["class"]
+
+      # Zmień wiele atrybutów
+      p.attrs.update({"class": "updated", "data-version": "2"})
+
+      # Zawartość HTML
+      p.clear()  # usuń całą zawartość
+      from bs4 import NavigableString
+      p.append(NavigableString("Nowy "))
+      new_strong = soup.new_tag("strong")
+      new_strong.string = "ważny"
+      p.append(new_strong)
+      p.append(" tekst")
+      print(p)  # <p>Nowy <strong>ważny</strong> tekst</p>
+
+  - name: Dodawanie i usuwanie elementów
+    desc: |
+      Twórz nowe tagi (new_tag), wstawiaj je (insert, append, insert_before),
+      przenoś i usuwaj (extract, decompose).
+    code: |
+      from bs4 import BeautifulSoup
+
+      soup = BeautifulSoup("<ul><li>A</li><li>C</li></ul>", "html.parser")
+      ul = soup.find("ul")
+
+      # Utwórz nowy tag
+      new_li = soup.new_tag("li")
+      new_li.string = "B"
+
+      # Wstaw między A i C (indeks 1)
+      ul.insert(1, new_li)
+      print(ul)  # <ul><li>A</li><li>B</li><li>C</li></ul>
+
+      # Dodaj na koniec
+      last_li = soup.new_tag("li")
+      last_li.string = "D"
+      ul.append(last_li)
+
+      # Wstaw przed/po elemencie
+      extra = soup.new_tag("li")
+      extra.string = "A0"
+      ul.li.insert_before(extra)
+
+      # Usuń element (wyciągnij z drzewa, zwróć)
+      removed = ul.find("li", string="A0").extract()
+
+      # Usuń całkowicie (niszczy element)
+      ul.find("li", string="D").decompose()
+
+      print(ul)
+
+  - name: Opakowywanie i zastępowanie
+    desc: |
+      wrap() opakowuje element w nowy tag. replace_with() zastępuje element innym.
+      unwrap() usuwa tag ale zostawia zawartość.
+    code: |
+      from bs4 import BeautifulSoup
+
+      soup = BeautifulSoup("<p>Tekst <em>kursywa</em> koniec</p>", "html.parser")
+
+      # Opakuj em w span
+      em = soup.find("em")
+      em.wrap(soup.new_tag("span", attrs={"class": "highlight"}))
+      print(soup)
+      # <p>Tekst <span class="highlight"><em>kursywa</em></span> koniec</p>
+
+      # Usuń span ale zostaw em (unwrap)
+      soup.find("span").unwrap()
+      print(soup)
+      # <p>Tekst <em>kursywa</em> koniec</p>
+
+      # Zastąp element innym
+      new_strong = soup.new_tag("strong")
+      new_strong.string = "WAŻNE"
+      soup.find("em").replace_with(new_strong)
+      print(soup)
+      # <p>Tekst <strong>WAŻNE</strong> koniec</p>
+
+  - name: Serializacja — z powrotem do HTML/tekstu
+    desc: |
+      Zapisz zmodyfikowane drzewo z powrotem do stringa.
+      str(soup) / soup.prettify() / element.decode().
+    code: |
+      from bs4 import BeautifulSoup
+
+      soup = BeautifulSoup("<div><p>Tekst</p></div>", "html.parser")
+
+      # Kompaktowy HTML (zachowuje strukturę)
+      print(str(soup))
+      # <div><p>Tekst</p></div>
+
+      # Czytelny HTML z wcięciami
+      print(soup.prettify())
+      # <div>
+      #  <p>
+      #   Tekst
+      #  </p>
+      # </div>
+
+      # Tylko zewnętrzny HTML elementu
+      div = soup.find("div")
+      print(div.decode())         # <div><p>Tekst</p></div>
+      print(div.decode_contents())  # <p>Tekst</p>
+
+      # Zapisz do pliku
+      with open("output.html", "w", encoding="utf-8") as f:
+          f.write(str(soup))

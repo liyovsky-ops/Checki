@@ -1,0 +1,94 @@
+title: Komendy PyAutoGUI
+groups:
+  - name: Instalacja i setup
+    icon: "📦"
+    commands:
+      - desc: Zainstaluj PyAutoGUI
+        code: pip install pyautogui
+      - desc: Pełny zestaw automatyzacji GUI
+        code: pip install pyautogui pyperclip opencv-python pytesseract
+      - desc: Dodatkowe dla Linux (wymagane)
+        code: sudo apt-get install scrot python3-tk python3-dev python3-xlib
+      - desc: Dodatkowe dla Mac (wymagane)
+        code: pip install pyobjc-framework-Quartz pyobjc-core pyobjc
+      - desc: Sprawdź czy działa poprawnie
+        code: python -c "import pyautogui; print(pyautogui.size())"
+      - desc: Interaktywny debugger pozycji myszy
+        code: pip install mouseinfo && python -m mouseinfo
+
+  - name: Diagnostyka i pozycja myszy
+    icon: "🖱️"
+    commands:
+      - desc: Śledź pozycję myszy co 1 sekundę
+        code: |
+          python -c "
+          import pyautogui, time
+          for _ in range(10):
+              print(pyautogui.position())
+              time.sleep(1)
+          "
+      - desc: Pokaż rozdzielczość ekranu
+        code: python -c "import pyautogui; print(pyautogui.size())"
+      - desc: Kolor piksela na ekranie
+        code: python -c "import pyautogui; print(pyautogui.pixel(500, 300))"
+      - desc: Interaktywny debugger (mouseinfo)
+        code: python -m mouseinfo
+
+  - name: Screenshoty i obrazki
+    icon: "📸"
+    commands:
+      - desc: Screenshot całego ekranu
+        code: python -c "import pyautogui; pyautogui.screenshot('screen.png')"
+      - desc: Screenshot fragmentu ekranu
+        code: |
+          python -c "
+          import pyautogui
+          img = pyautogui.screenshot(region=(0,0,800,600))
+          img.save('fragment.png')
+          "
+      - desc: Sprawdź czy obrazek jest na ekranie
+        code: python -c "import pyautogui; print(pyautogui.locateOnScreen('button.png', confidence=0.9))"
+
+  - name: Szybkie testy
+    icon: "⚡"
+    commands:
+      - desc: Pokaż pulpit (Win+D)
+        code: python -c "import pyautogui; pyautogui.hotkey('win', 'd')"
+      - desc: Wpisz tekst w aktywnym polu
+        code: python -c "import pyautogui; pyautogui.typewrite('hello', interval=0.05)"
+      - desc: Przesuń mysz do środka ekranu
+        code: |
+          python -c "
+          import pyautogui
+          w,h = pyautogui.size()
+          pyautogui.moveTo(w//2, h//2, duration=0.5)
+          "
+      - desc: Kliknij w podanej pozycji
+        code: python -c "import pyautogui; pyautogui.click(500, 300)"
+      - desc: Zrób screenshot i znajdź element
+        code: python -c "import pyautogui; print(pyautogui.locateOnScreen('icon.png'))"
+
+  - name: Skrypty pomocnicze
+    icon: "🛠️"
+    commands:
+      - desc: Znajdź współrzędne klikając na element
+        code: |
+          python -c "
+          import pyautogui, time
+          print('Przesuń mysz na element w ciągu 5 sekund...')
+          time.sleep(5)
+          print(f'Pozycja: {pyautogui.position()}')
+          "
+      - desc: Zrób screenshot przycisku do locateOnScreen
+        code: |
+          python -c "
+          import pyautogui, time
+          print('Zaznacz element myszą — screenshot za 3s')
+          time.sleep(3)
+          x, y = pyautogui.position()
+          img = pyautogui.screenshot(region=(x-50, y-20, 100, 40))
+          img.save('element.png')
+          print('Zapisano element.png')
+          "
+      - desc: Lista wszystkich klawiszy specjalnych
+        code: python -c "import pyautogui; print(pyautogui.KEYBOARD_KEYS)"

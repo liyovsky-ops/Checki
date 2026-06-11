@@ -1,0 +1,113 @@
+title: Historia i analiza zmian
+items:
+  - name: git log — przeglądanie historii
+    desc: |
+      log pokazuje historię commitów z wieloma opcjami formatowania i filtrowania.
+      Od prostego --oneline po graficzne drzewo branchy.
+    code: |
+      # Podstawowe
+      git log                           # pełna historia
+      git log --oneline                 # jedna linia per commit
+      git log --oneline --graph         # drzewo branchy ASCII
+      git log --oneline --graph --all   # wszystkie branche
+
+      # Filtrowanie
+      git log --author="Łukasz"         # commity autora
+      git log --since="2024-01-01"      # od daty
+      git log --until="2024-12-31"      # do daty
+      git log --since="1 week ago"      # od tygodnia
+      git log -- plik.py                # commity dotyczące pliku
+      git log -S "nazwa_funkcji"        # commity zawierające tekst (pickaxe)
+      git log --grep="fix:"             # commity z tekstem w wiadomości
+
+      # Formatowanie
+      git log --format="%h %an %ar %s"  # hash autor czas_rel temat
+      git log --format="%ad %s" --date=short  # data temat
+
+      # Liczba commitów
+      git log --oneline | wc -l
+
+  - name: git diff — co się zmieniło
+    desc: |
+      diff pokazuje dokładne różnice między wersjami plików.
+      Kilka trybów: working dir vs staging, staging vs commit, między commitami.
+    code: |
+      # Working directory vs staging (co jeszcze nie jest w staging)
+      git diff
+
+      # Staging vs ostatni commit (co trafi do commita)
+      git diff --staged
+      git diff --cached           # to samo
+
+      # Między commitami
+      git diff HEAD~2 HEAD        # dwa commity wstecz do teraz
+      git diff a1b2c3d e4f5g6h    # między konkretami
+
+      # Konkretny plik
+      git diff HEAD -- plik.py
+
+      # Tylko lista zmienionych plików
+      git diff --name-only
+      git diff --stat             # pliki + liczba linii +/-
+
+      # Między branchami
+      git diff main..feature/login
+      git diff main...feature/login  # od rozejścia się branchy
+
+  - name: git blame — kto napisał tę linię
+    desc: |
+      blame pokazuje kto i kiedy napisał każdą linię pliku.
+      Nieoceniony przy debugowaniu — znajdź autora problematycznej linii.
+    code: |
+      # Pokaż autora każdej linii
+      git blame plik.py
+
+      # Konkretny zakres linii
+      git blame -L 10,25 plik.py
+
+      # Ignoruj whitespace przy blame
+      git blame -w plik.py
+
+      # Pokaż hash i datę
+      git blame -l plik.py
+
+      # Wynik wygląda tak:
+      # a1b2c3d (Łukasz 2024-01-15 14:30:00 +0100 10) def funkcja():
+      # hash     autor   data               numer  treść
+
+      # Śledź przeniesienia kodu między plikami
+      git blame -C plik.py
+
+  - name: git stash — odkładanie zmian
+    desc: |
+      stash odkłada niezacommitowane zmiany do stosu. Przydatne gdy musisz
+      szybko przełączyć branch bez commitowania niedokończonej pracy.
+    code: |
+      # Odłóż bieżące zmiany
+      git stash
+      git stash push -m "wip: nowa funkcja login"
+
+      # Odłóż z untracked plikami (np. nowe pliki)
+      git stash -u
+      git stash --include-untracked
+
+      # Lista stashy
+      git stash list
+      # stash@{0}: wip: nowa funkcja login
+      # stash@{1}: On main: poprawki CSS
+
+      # Przywróć ostatni stash (zostaje na liście)
+      git stash apply
+
+      # Przywróć i usuń z listy
+      git stash pop
+
+      # Konkretny stash
+      git stash apply stash@{1}
+
+      # Usuń stash
+      git stash drop stash@{0}
+      git stash clear             # usuń wszystkie
+
+      # Utwórz branch ze stasha
+      git stash branch feature/kontynuacja stash@{0}

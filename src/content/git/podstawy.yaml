@@ -1,0 +1,105 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Git?
+  firstComponent: Pierwsze repozytorium
+  firstComponentLang: bash
+
+intro:
+  title: Czym jest Git?
+  desc: |
+    Git to rozproszony system kontroli wersji stworzony przez Linusa Torvaldsa w 2005 roku
+    do zarządzania kodem jądra Linux. Każdy developer ma pełną kopię historii projektu
+    na swoim komputerze — zero single point of failure.
+    Git śledzi zmiany, umożliwia pracę równoległą przez branche i pozwala cofać się do
+    dowolnego momentu historii. Używają go Google, Microsoft, Netflix, Facebook i prawie
+    każdy projekt open source na świecie. Bez Gita nie ma profesjonalnego programowania.
+
+concepts:
+  - title: Commit — snapshot projektu
+    icon: "📸"
+    desc: |
+      Commit = niezmienialny snapshot stanu projektu w danej chwili.
+      Każdy commit ma: unikalny hash SHA-1 (np. a1b2c3d), autora, datę, wiadomość
+      i wskaźnik na rodzica (poprzedni commit). Commity tworzą niezmienialny łańcuch historii.
+      Dobry commit = jedna logiczna zmiana + opisowa wiadomość.
+
+  - title: Branch — równoległa praca
+    icon: "🌿"
+    desc: |
+      Branch to lekki wskaźnik na commit — nie kopiuje plików.
+      Tworzenie brancha to najtańsza operacja w Git (milisekundy).
+      HEAD to wskaźnik na aktualny branch (lub commit w "detached HEAD").
+      main/master to konwencjonalna nazwa domyślnego brancha.
+      Workflow: feature branch → kod → merge do main.
+
+  - title: Staging Area (Index)
+    icon: "📋"
+    desc: |
+      Trzy obszary Git: Working Directory (edytowane pliki), Staging Area (zaindeksowane),
+      Repository (historia). git add przenosi z Working Dir do Staging.
+      git commit zapisuje Staging jako nowy commit.
+      Staging pozwala commitować wybrane zmiany z wielu edytowanych plików.
+
+  - title: Merge vs Rebase
+    icon: "🔀"
+    desc: |
+      Merge łączy branche tworząc merge commit — zachowuje pełną historię (kiedy co się działo).
+      Rebase przepisuje historię — "przykłada" commity feature brancha na wierzch main.
+      Merge = prawdziwa historia. Rebase = czysta linia.
+      Złota zasada: nigdy nie rób rebase publicznych (pushniętych) branchy.
+
+  - title: Remote — zdalne repozytoria
+    icon: "☁️"
+    desc: |
+      Remote = zdalna kopia repozytorium (GitHub, GitLab, Bitbucket).
+      origin = domyślna nazwa pierwszego remote.
+      git fetch pobiera zmiany ale nie merguje. git pull = fetch + merge.
+      git push wysyła lokalne commity do remote.
+
+  - title: .gitignore — co ignorować
+    icon: "🚫"
+    desc: |
+      .gitignore definiuje pliki i foldery które Git ignoruje — nie śledzi ich zmian.
+      Zawsze ignoruj: venv/, __pycache__/, .env, node_modules/, .DS_Store, *.pyc.
+      Plik .env z sekretami NIGDY nie powinien trafić do repozytorium.
+      git check-ignore -v plik sprawdza czy plik jest ignorowany i dlaczego.
+
+whenToUse:
+  - Każdy projekt z kodem — od jednoplikowego skryptu po aplikację enterprise
+  - Praca zespołowa — każdy na swoim branchu, merge/PR do main po review
+  - Eksperymenty — branch na nowy pomysł, usuń gdy nie wyszło (zero kosztów)
+  - Backup — remote repo (GitHub) = automatyczna kopia zapasowa
+  - Code review — Pull Request przed mergem, komentarze do konkretnych linii
+  - Wersjonowanie — tagi na releasach (v1.0, v2.3.1)
+  - Rollback — coś poszło źle? git revert lub git reset do poprzedniego commita
+
+firstComponent: |
+  # === Nowe repozytorium ===
+  git init
+  git add .
+  git commit -m "feat: initial commit"
+
+  # === Lub sklonuj istniejące ===
+  git clone https://github.com/user/repo.git
+  cd repo
+
+  # === Podstawowy codziennyworkflow ===
+  git status                          # co jest zmienione?
+  git diff                            # jakie zmiany w plikach?
+
+  git add plik.py                     # dodaj konkretny plik
+  git add src/                        # dodaj folder
+  git add .                           # dodaj wszystko
+
+  git commit -m "fix: napraw walidację emaila"
+
+  git log --oneline                   # historia commitów
+  git push origin main                # wyślij na GitHub
+
+  # === Praca z branchem ===
+  git switch -c feature/nowa-funkcja  # nowy branch
+  # ... kod ...
+  git add . && git commit -m "feat: dodaj nową funkcję"
+  git switch main
+  git merge feature/nowa-funkcja
+  git push origin main

@@ -1,0 +1,129 @@
+title: Nawigacja po drzewie DOM
+items:
+  - name: Nawigacja w dół — dzieci i potomkowie
+    desc: |
+      Dostęp do dzieci elementu: .children (generator), .contents (lista),
+      .descendants (wszyscy potomkowie rekurencyjnie).
+    code: |
+      from bs4 import BeautifulSoup
+
+      html = """
+      <ul id="menu">
+        <li class="item"><a href="/home">Home</a></li>
+        <li class="item"><a href="/about">O nas</a></li>
+        <li class="item active"><a href="/contact">Kontakt</a></li>
+      </ul>
+      """
+      soup = BeautifulSoup(html, "html.parser")
+      menu = soup.find("ul")
+
+      # Bezpośrednie dzieci (generator)
+      for child in menu.children:
+          if child.name:  # pomiń NavigableString (whitespace)
+              print(child.text.strip())
+
+      # Lista dzieci
+      items = menu.contents
+      print(f"Elementów: {len([i for i in items if i.name])}")
+
+      # Wszyscy potomkowie (rekurencyjnie)
+      for desc in menu.descendants:
+          if hasattr(desc, "name") and desc.name == "a":
+              print(desc["href"])
+
+      # Skrót — bezpośredni dostęp po tagu
+      first_li = menu.li           # pierwszy <li>
+      first_a  = menu.li.a        # pierwszy <a> w pierwszym <li>
+      print(first_a.text)          # Home
+
+  - name: Nawigacja w górę — rodzice
+    desc: |
+      parent — bezpośredni rodzic elementu.
+      parents — generator wszystkich rodziców aż do BeautifulSoup.
+    code: |
+      from bs4 import BeautifulSoup
+
+      soup = BeautifulSoup(html, "html.parser")
+      link = soup.find("a", href="/contact")
+
+      # Bezpośredni rodzic
+      li = link.parent
+      print(li.name)           # li
+      print(li["class"])       # ["item", "active"]
+
+      # Wszyscy rodzice
+      for parent in link.parents:
+          if parent.name:
+              print(parent.name)  # li → ul → [document]
+
+      # Sprawdź czy element ma rodzica z klasą
+      if "active" in link.parent.get("class", []):
+          print("Link jest aktywny")
+
+  - name: Nawigacja w bok — rodzeństwo
+    desc: |
+      next_sibling / previous_sibling — sąsiedni element (uwaga: może być whitespace!).
+      next_siblings / previous_siblings — generatory wszystkich rodzeństw.
+    code: |
+      from bs4 import BeautifulSoup
+
+      html = "<ul><li>A</li><li>B</li><li>C</li></ul>"
+      soup = BeautifulSoup(html, "html.parser")
+      items = soup.find_all("li")
+
+      first = items[0]
+
+      # Następne rodzeństwo (może być NavigableString = whitespace!)
+      next_el = first.next_sibling
+      # Pomiń whitespace:
+      while next_el and not next_el.name:
+          next_el = next_el.next_sibling
+      print(next_el.text)   # B
+
+      # Poprzednie rodzeństwo
+      last = items[-1]
+      prev = last.previous_sibling
+      while prev and not prev.name:
+          prev = prev.previous_sibling
+      print(prev.text)   # B
+
+      # Wszystkie następne rodzeństwa
+      for sibling in first.next_siblings:
+          if sibling.name:
+              print(sibling.text)  # B, C
+
+  - name: Wyciąganie tekstu
+    desc: |
+      .text / .get_text() zwraca tekst elementu. get_text() ma opcje:
+      separator dla łączenia, strip dla usunięcia białych znaków.
+    code: |
+      from bs4 import BeautifulSoup
+
+      html = """
+      <div>
+        <h2>  Tytuł  </h2>
+        <p>Pierwszy <strong>ważny</strong> paragraf.</p>
+        <p>Drugi paragraf.</p>
+      </div>
+      """
+      soup = BeautifulSoup(html, "html.parser")
+      div = soup.find("div")
+
+      # .text — wszystko razem
+      print(div.text)
+      # "\n  Tytuł  \nPierwszy ważny paragraf.\nDrugi paragraf.\n"
+
+      # get_text() z opcjami
+      print(div.get_text(strip=True))
+      # "TytułPierwszy ważny paragraf.Drugi paragraf."
+
+      print(div.get_text(separator="\n", strip=True))
+      # "Tytuł\nPierwszy\nważny\nparagraf.\nDrugi paragraf."
+
+      # .string — tylko gdy JEDEN bezpośredni tekst
+      p = soup.find("p")
+      print(p.string)   # None (bo ma <strong> w środku)
+
+      h2 = soup.find("h2")
+      print(h2.string)  # "  Tytuł  "
+      print(h2.string.strip())  # "Tytuł"

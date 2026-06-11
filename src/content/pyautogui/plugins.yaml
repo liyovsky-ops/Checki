@@ -1,0 +1,155 @@
+title: Ekosystem PyAutoGUI
+items:
+  - name: pyperclip — schowek systemowy
+    icon: "📋"
+    desc: |
+      Kopiowanie i wklejanie przez schowek systemowy. Obowiązkowe do wpisywania
+      polskich znaków i emoji — typewrite ich nie obsługuje.
+
+      Instalacja: pip install pyperclip
+    code: |
+      import pyperclip
+      import pyautogui
+
+      # Kopiuj do schowka
+      pyperclip.copy("Zażółć gęślą jaźń 🐍")
+
+      # Wklej w aktywnym polu
+      pyautogui.hotkey("ctrl", "v")
+
+      # Pobierz zawartość schowka
+      text = pyperclip.paste()
+      print(text)
+
+      # Kopiuj i wklej wartość zmiennej
+      data = f"Wynik: {42 * 3.14:.2f}"
+      pyperclip.copy(data)
+      pyautogui.hotkey("ctrl", "v")
+
+  - name: opencv-python — szukanie z tolerancją
+    icon: "👁️"
+    desc: |
+      PyAutoGUI używa OpenCV do parametru confidence w locateOnScreen.
+      Bez OpenCV — tylko 100% dopasowanie. Z OpenCV — szukaj z tolerancją 0.8–0.95.
+
+      Instalacja: pip install opencv-python
+    code: |
+      import pyautogui
+
+      # confidence wymaga opencv-python
+      location = pyautogui.locateOnScreen(
+          "button.png",
+          confidence=0.9   # 90% podobieństwa
+      )
+      if location:
+          pyautogui.click(pyautogui.center(location))
+
+      # Dla szybkości — ogranicz region
+      loc = pyautogui.locateOnScreen(
+          "icon.png",
+          region=(0, 0, 400, 300),
+          confidence=0.85
+      )
+
+  - name: Pillow (PIL) — przetwarzanie screenshotów
+    icon: "🖼️"
+    desc: |
+      PyAutoGUI zwraca screenshoty jako PIL Image. Pillow pozwala je przetwarzać —
+      przycinać, analizować kolory, konwertować. Instaluje się automatycznie z PyAutoGUI.
+
+      Instalacja: pip install Pillow (zwykle już jest)
+    code: |
+      import pyautogui
+      from PIL import Image, ImageFilter
+
+      # Screenshot → PIL Image
+      img = pyautogui.screenshot()
+
+      # Przytnij do regionu
+      cropped = img.crop((100, 100, 400, 300))
+      cropped.save("region.png")
+
+      # Sprawdź kolor piksela
+      pixel = img.getpixel((500, 300))
+      print(f"Kolor: {pixel}")  # (R, G, B)
+
+      # Zmień rozmiar przed locateOnScreen (szybsze)
+      small = img.resize((960, 540))
+
+  - name: pytesseract — OCR
+    icon: "📝"
+    desc: |
+      Odczytywanie tekstu ze screenshotów przez Tesseract OCR.
+      Pobierz wartości z okien aplikacji bez API — saldo, status, etykiety.
+
+      Instalacja: pip install pytesseract + Tesseract w systemie
+    code: |
+      import pyautogui
+      import pytesseract
+
+      # Windows: ustaw ścieżkę do Tesseract
+      # pytesseract.pytesseract.tesseract_cmd = r"C:\Tesseract-OCR\tesseract.exe"
+
+      # Screenshot fragmentu z tekstem
+      img = pyautogui.screenshot(region=(100, 200, 300, 50))
+
+      # Odczytaj tekst
+      text = pytesseract.image_to_string(img, lang="pol")
+      print(f"Odczytano: {text.strip()}")
+
+      # Tylko cyfry (np. odczytaj cenę)
+      config = "--psm 8 -c tessedit_char_whitelist=0123456789.,"
+      number = pytesseract.image_to_string(img, config=config)
+      print(f"Liczba: {number.strip()}")
+
+  - name: pynput — zaawansowany input
+    icon: "🎮"
+    desc: |
+      Bardziej zaawansowana kontrola klawiatury i myszy + nasłuchiwanie zdarzeń.
+      Obsługuje Unicode (polskie znaki!), globalne hotkeys, monitoring inputu.
+
+      Instalacja: pip install pynput
+    code: |
+      from pynput import keyboard, mouse
+      from pynput.keyboard import Key, Controller
+
+      kb = Controller()
+
+      # Wpisz tekst z Unicode (polskie znaki!)
+      kb.type("Zażółć gęślą jaźń 🐍")
+
+      # Globalny listener — reaguj na Ctrl+F9 w tle
+      def on_press(key):
+          if key == Key.f9:
+              print("F9 wciśnięte!")
+              return False  # zatrzymaj listener
+
+      with keyboard.Listener(on_press=on_press) as listener:
+          listener.join()
+
+  - name: schedule — cron w Pythonie
+    icon: "⏰"
+    desc: |
+      Uruchamia funkcje automatyzacji o zaplanowanych porach.
+      Prosty zamiennik cron — działa w Pythonie, zero konfiguracji systemu.
+
+      Instalacja: pip install schedule
+    code: |
+      import schedule
+      import time
+      import pyautogui
+
+      def backup_task():
+          pyautogui.hotkey("ctrl", "s")
+
+      def daily_report():
+          print("Generuję raport...")
+
+      # Harmonogram
+      schedule.every().day.at("09:00").do(daily_report)
+      schedule.every(30).minutes.do(backup_task)
+      schedule.every().monday.at("08:00").do(daily_report)
+
+      while True:
+          schedule.run_pending()
+          time.sleep(60)

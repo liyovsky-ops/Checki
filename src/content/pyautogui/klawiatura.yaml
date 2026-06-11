@@ -1,0 +1,108 @@
+title: Kontrola klawiatury
+items:
+  - name: typewrite — pisanie tekstu
+    desc: |
+      Wpisuje tekst znak po znaku jak człowiek.
+      interval = opóźnienie między znakami (bardziej "ludzkie").
+      UWAGA: nie obsługuje polskich znaków ani emoji — używaj pyperclip dla Unicode.
+    code: |
+      import pyautogui
+      import pyperclip
+
+      # ASCII tekst
+      pyautogui.typewrite("Hello World", interval=0.05)
+
+      # Szybko (bez opóźnienia)
+      pyautogui.typewrite("Quick text")
+
+      # PROBLEM: polskie znaki są ignorowane!
+      pyautogui.typewrite("Zażółć")  # wypisze tylko "Za"
+
+      # ROZWIĄZANIE: schowek systemowy
+      pyperclip.copy("Zażółć gęślą jaźń 🐍")
+      pyautogui.hotkey("ctrl", "v")
+
+  - name: hotkey — skróty klawiszowe
+    desc: |
+      Wysyła kombinację klawiszy jednocześnie (wszystkie wciśnięte razem).
+      Obsługuje dowolną liczbę klawiszy.
+    code: |
+      import pyautogui
+
+      # Podstawowe skróty
+      pyautogui.hotkey("ctrl", "s")          # zapisz
+      pyautogui.hotkey("ctrl", "z")          # cofnij
+      pyautogui.hotkey("ctrl", "y")          # ponów
+      pyautogui.hotkey("ctrl", "a")          # zaznacz wszystko
+      pyautogui.hotkey("ctrl", "c")          # kopiuj
+      pyautogui.hotkey("ctrl", "v")          # wklej
+
+      # Okna i system
+      pyautogui.hotkey("alt", "f4")          # zamknij okno
+      pyautogui.hotkey("win", "d")           # pokaż pulpit
+      pyautogui.hotkey("win", "l")           # zablokuj ekran
+      pyautogui.hotkey("alt", "tab")         # przełącz okno
+
+      # Trzy klawisze
+      pyautogui.hotkey("ctrl", "shift", "n")  # nowe okno incognito
+
+  - name: press — pojedyncze klawisze
+    desc: |
+      Wciśnij i zwolnij jeden klawisz. Obsługuje klawisze specjalne:
+      enter, tab, space, backspace, delete, escape, strzałki, F1-F12.
+    code: |
+      import pyautogui
+
+      # Klawisze specjalne
+      pyautogui.press("enter")
+      pyautogui.press("tab")
+      pyautogui.press("escape")
+      pyautogui.press("space")
+      pyautogui.press("backspace")
+      pyautogui.press("delete")
+
+      # Nawigacja
+      pyautogui.press("up")
+      pyautogui.press("down")
+      pyautogui.press("left")
+      pyautogui.press("right")
+      pyautogui.press("home")
+      pyautogui.press("end")
+      pyautogui.press("pageup")
+      pyautogui.press("pagedown")
+
+      # Wielokrotne wciśnięcie
+      pyautogui.press("right", presses=5)         # 5x strzałka w prawo
+      pyautogui.press("backspace", presses=10)    # usuń 10 znaków
+      pyautogui.press("tab", presses=3)           # 3x tab
+
+      # Funkcyjne
+      pyautogui.press("f5")    # odśwież
+      pyautogui.press("f11")   # fullscreen
+
+  - name: keyDown / keyUp — trzymanie klawisza
+    desc: |
+      Rozdziel wciśnięcie i zwolnienie klawisza. Przydatne do zaznaczania
+      (Shift+strzałki), skrótów wymagających trzymania klawisza, gier.
+    code: |
+      import pyautogui
+
+      # Shift+Home = zaznacz do początku linii
+      pyautogui.keyDown("shift")
+      pyautogui.press("home")
+      pyautogui.keyUp("shift")
+
+      # Shift+strzałki = zaznaczaj tekst
+      pyautogui.keyDown("shift")
+      pyautogui.press("right", presses=10)  # zaznacz 10 znaków
+      pyautogui.keyUp("shift")
+
+      # Ctrl+klik (zaznacz wiele elementów)
+      pyautogui.keyDown("ctrl")
+      pyautogui.click(100, 200)
+      pyautogui.click(300, 400)
+      pyautogui.click(500, 600)
+      pyautogui.keyUp("ctrl")
+
+      # Pełna lista klawiszy
+      print(pyautogui.KEYBOARD_KEYS)

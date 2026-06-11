@@ -1,0 +1,84 @@
+title: Rywale — alternatywy dla PyAutoGUI
+items:
+  - name: Selenium — automatyzacja przeglądarek
+    icon: "🔬"
+    desc: |
+      Dedykowana biblioteka do automatyzacji przeglądarek webowych (Chrome, Firefox, Edge).
+      Działa przez WebDriver API — bezpośredni dostęp do DOM, nie pikselami.
+
+      Kiedy Selenium wygrywa z PyAutoGUI:
+      • Aplikacje webowe — stabilniejszy, czeka na elementy DOM automatycznie
+      • XPath i CSS selectors — precyzyjne wyszukiwanie elementów
+      • Headless mode — działa bez okna (serwer, CI/CD)
+      • JavaScript wykonanie bezpośrednio w przeglądarce
+
+      Kiedy PyAutoGUI wygrywa:
+      • Aplikacje desktopowe (.exe, native GUI)
+      • Strony blokujące WebDriver (wykrywają Selenium)
+      • Każde GUI — nie tylko przeglądarka
+      • Prostszy setup (brak WebDrivera)
+
+  - name: Playwright — nowoczesna automatyzacja web
+    icon: "🎭"
+    desc: |
+      Nowoczesna ewolucja Selenium — szybszy, bardziej niezawodny, lepsze API.
+      Stworzony przez Microsoft. Obsługuje Chromium, Firefox, WebKit.
+
+      Przewaga nad Selenium:
+      • Auto-wait — czeka automatycznie na elementy, animacje, requesty
+      • Wbudowane screenshoty i nagrywanie video
+      • Network interception — modyfikuj requesty/response
+      • Tracing i debugging tools
+      • TypeScript + Python + Java + C#
+
+      Kiedy PyAutoGUI zamiast Playwright:
+      Playwright = tylko przeglądarki. PyAutoGUI = dowolne GUI, w tym desktopowe.
+      Wybierz Playwright do testów E2E webowych, PyAutoGUI gdy wychodzisz poza browser.
+
+  - name: pywinauto — natywne Windows GUI
+    icon: "🪟"
+    desc: |
+      Automatyzacja aplikacji Windows przez accessibility API (UIA/MSAA).
+      Nie działa na pikselach — szuka elementów po kontrolkach Windows.
+
+      Kiedy pywinauto wygrywa:
+      • Aplikacje natywne Windows (.exe, WinForms, MFC, WPF)
+      • Działa nawet gdy okno jest minimalizowane lub za innymi
+      • Nie zależy od rozdzielczości ekranu
+      • Bardziej stabilny niż image-based
+
+      Kiedy PyAutoGUI wygrywa:
+      • Cross-platform (Mac, Linux, Windows)
+      • Prostszy setup i API
+      • Aplikacje które nie eksponują accessibility API
+      • Gry i aplikacje OpenGL/DirectX
+
+  - name: pynput — monitoring inputu
+    icon: "🎮"
+    desc: |
+      Bardziej zaawansowana biblioteka do kontroli i monitorowania klawiatury/myszy.
+      Unikalny feature: nasłuchiwanie zdarzeń w tle (co wciśnięto, gdzie kliknięto).
+
+      Co ma pynput czego nie ma PyAutoGUI:
+      • Listeners — przechwytuj klawisze i kliknięcia asynchronicznie
+      • Globalne hotkeys — reaguj na Ctrl+F9 nawet gdy aplikacja w tle
+      • Obsługa Unicode (polskie znaki!)
+      • Bardziej precyzyjne typy przycisków
+
+      Użyj razem: pynput do nasłuchiwania/monitorowania, PyAutoGUI do screenshotów i locate.
+
+  - name: AutoHotkey — skrypty Windows
+    icon: "⌨️"
+    desc: |
+      Dedykowany język skryptowy do automatyzacji Windows. Kompiluje skrypty do .exe.
+      Standardowe narzędzie dla zaawansowanych użytkowników Windows.
+
+      Mocne strony AHK:
+      • Hotkeys na poziomie systemu — działają zawsze, w każdej aplikacji
+      • Kompilacja do standalone .exe — zero instalacji dla użytkownika końcowego
+      • Remap klawiszy systemowo (np. CapsLock → Ctrl)
+      • Szybki i lekki
+
+      Kiedy PyAutoGUI zamiast AHK:
+      AHK = tylko Windows, własny język. PyAutoGUI = Python, cross-platform,
+      łatwa integracja z resztą kodu. Wybierz PyAutoGUI jeśli masz projekt w Pythonie.

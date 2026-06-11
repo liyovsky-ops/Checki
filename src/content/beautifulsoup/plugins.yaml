@@ -1,0 +1,122 @@
+title: Ekosystem BeautifulSoup
+items:
+  - name: requests — pobieranie stron
+    icon: "🌐"
+    desc: |
+      Standardowy HTTP client do pobierania stron. Najpopularniejsza para z BS4.
+      Zawsze ustaw User-Agent i timeout. raise_for_status() przy błędach HTTP.
+
+      Instalacja: pip install requests
+    code: |
+      import requests
+      from bs4 import BeautifulSoup
+
+      headers = {
+          "User-Agent": "Mozilla/5.0 (scraper/1.0; +https://twoja-strona.pl)",
+          "Accept-Language": "pl-PL,pl;q=0.9",
+      }
+
+      # Pobierz stronę
+      resp = requests.get("https://example.com", headers=headers, timeout=10)
+      resp.raise_for_status()      # wyjątek przy 4xx/5xx
+      resp.encoding = "utf-8"      # wymuś kodowanie jeśli źle wykrywa
+
+      soup = BeautifulSoup(resp.text, "html.parser")
+
+      # Session (cookies, auth)
+      session = requests.Session()
+      session.headers.update(headers)
+      resp = session.get("https://example.com/private")
+
+  - name: lxml — szybki parser
+    icon: "⚡"
+    desc: |
+      Najszybszy parser dla BS4 — napisany w C. Dla dużych plików HTML/XML
+      nawet 10-50x szybszy niż html.parser.
+
+      Instalacja: pip install lxml
+    code: |
+      from bs4 import BeautifulSoup
+
+      # Użyj lxml jako parsera (szybciej!)
+      soup = BeautifulSoup(html_content, "lxml")
+
+      # Dla XML (nie HTML)
+      soup = BeautifulSoup(xml_content, "lxml-xml")
+
+      # Własne API lxml (bez BS4) — z XPath
+      from lxml import etree, html
+      tree = html.fromstring(html_content)
+
+      # XPath — potężniejszy niż CSS selectors
+      prices = tree.xpath("//span[@class='price']/text()")
+      links  = tree.xpath("//a[@href]/@href")
+
+  - name: pandas — tabele HTML → DataFrame
+    icon: "🐼"
+    desc: |
+      pandas.read_html() parsuje tabele HTML bez ręcznego BS4 kodu.
+      Zwraca listę DataFrames — jeden per tabela na stronie.
+
+      Instalacja: pip install pandas lxml
+    code: |
+      import pandas as pd
+      import requests
+
+      url = "https://pl.wikipedia.org/wiki/Lista_pa%C5%84stw_%C5%9Bwiata"
+      resp = requests.get(url, headers={"User-Agent": "demo/1.0"})
+
+      # Automatyczne parsowanie wszystkich tabel na stronie
+      tables = pd.read_html(resp.text, encoding="utf-8")
+      print(f"Znaleziono {len(tables)} tabel")
+
+      df = tables[0]  # pierwsza tabela
+      print(df.head())
+      print(df.columns.tolist())
+
+      # Filtruj i eksportuj
+      df.to_csv("dane.csv", index=False)
+      df.to_excel("dane.xlsx", index=False)
+
+  - name: cloudscraper — omijanie Cloudflare
+    icon: "☁️"
+    desc: |
+      Strony chronione przez Cloudflare blokują zwykłe requests.
+      cloudscraper symuluje przeglądarkę i obsługuje challenge Cloudflare.
+
+      Instalacja: pip install cloudscraper
+    code: |
+      import cloudscraper
+      from bs4 import BeautifulSoup
+
+      # Drop-in replacement dla requests
+      scraper = cloudscraper.create_scraper(
+          browser={"browser": "chrome", "platform": "windows", "mobile": False}
+      )
+
+      resp = scraper.get("https://cloudflare-protected-site.com")
+      soup = BeautifulSoup(resp.text, "html.parser")
+
+      # API jak requests
+      resp = scraper.post("https://example.com/login", data={"user": "x", "pass": "y"})
+
+  - name: fake-useragent — rotacja User-Agentów
+    icon: "🎭"
+    desc: |
+      Rotuj User-Agent między requestami żeby unikać blokad.
+      Baza danych rzeczywistych User-Agentów przeglądarek.
+
+      Instalacja: pip install fake-useragent
+    code: |
+      from fake_useragent import UserAgent
+      import requests
+
+      ua = UserAgent()
+
+      def get_random_headers():
+          return {"User-Agent": ua.random}
+
+      # Każdy request z innym User-Agent
+      for url in urls:
+          resp = requests.get(url, headers=get_random_headers())
+          # ...

@@ -1,0 +1,114 @@
+title: Branche — równoległa praca
+items:
+  - name: Tworzenie i zarządzanie branchami
+    desc: |
+      Branch to lekki wskaźnik na commit. Twórz branch na każdą funkcję lub bugfix —
+      izoluje zmiany, ułatwia code review i rollback.
+    code: |
+      # Utwórz i przejdź na nowy branch (nowoczesny sposób)
+      git switch -c feature/login
+
+      # Stary sposób (też wszędzie działa)
+      git checkout -b feature/login
+
+      # Przejdź na istniejący branch
+      git switch main
+      git switch feature/login
+
+      # Lista branchy
+      git branch           # lokalne
+      git branch -r        # zdalne (origin/*)
+      git branch -a        # wszystkie
+
+      # Zmień nazwę brancha
+      git branch -m stara-nazwa nowa-nazwa
+      git branch -m nowa-nazwa  # zmień nazwę aktualnego
+
+      # Usuń branch
+      git branch -d feature/login    # po merge (bezpieczne)
+      git branch -D feature/login    # force delete (bez merge)
+
+      # Usuń zdalny branch
+      git push origin --delete feature/login
+
+  - name: Merge — łączenie branchy
+    desc: |
+      Merge integruje zmiany z jednego brancha do drugiego.
+      Fast-forward gdy historia jest linearna (brak merge commit).
+      Merge commit gdy historia się rozeszła — zachowuje pełny kontekst.
+    code: |
+      # Będąc na main — wmerge feature branch
+      git switch main
+      git merge feature/login
+
+      # Fast-forward (tylko gdy historia linearna)
+      git merge --ff-only feature/login
+
+      # Wymuś merge commit nawet przy ff
+      git merge --no-ff feature/login -m "feat: merge login feature"
+
+      # Squash merge — wszystkie commity w jeden
+      git merge --squash feature/login
+      git commit -m "feat: add login functionality"
+
+      # Przerwij merge przy konflikcie
+      git merge --abort
+
+      # Po rozwiązaniu konfliktu
+      git add .
+      git commit           # lub git merge --continue
+
+  - name: Rebase — czysta historia
+    desc: |
+      Rebase przepisuje historię — przenosi commity feature brancha na czubek main.
+      Daje czystą, linearną historię bez merge commitów.
+      Złota zasada: nie rób rebase publicznych branchy (pushniętych przez innych).
+    code: |
+      # Będąc na feature branchu — rebase na main
+      git switch feature/login
+      git rebase main
+
+      # Interaktywny rebase — edytuj ostatnie 3 commity
+      git rebase -i HEAD~3
+
+      # W edytorze (nano/vim):
+      # pick   a1b2c3d first commit
+      # squash b2c3d4e second commit   ← połącz z poprzednim
+      # reword c3d4e5f third commit    ← zmień wiadomość
+      # drop   d4e5f6g fourth commit   ← usuń całkowicie
+
+      # Przerwij rebase
+      git rebase --abort
+
+      # Kontynuuj po rozwiązaniu konfliktu
+      git add .
+      git rebase --continue
+
+      # Po rebase — push z force (lokalna historia się zmieniła)
+      git push --force-with-lease origin feature/login
+
+  - name: Cherry-pick — wybierz konkretny commit
+    desc: |
+      Cherry-pick kopiuje wybrany commit na aktualny branch.
+      Przydatne gdy chcesz przenieść tylko jeden fix z innego brancha
+      bez mergowania całej gałęzi.
+    code: |
+      # Znajdź hash commitu
+      git log --oneline feature/hotfix
+
+      # Skopiuj commit na aktualny branch
+      git cherry-pick a1b2c3d
+
+      # Kilka commitów
+      git cherry-pick a1b2c3d b2c3d4e
+
+      # Zakres commitów
+      git cherry-pick a1b2c3d..e4f5g6h
+
+      # Cherry-pick bez automatycznego commita
+      git cherry-pick -n a1b2c3d
+      # edytuj pliki...
+      git commit -m "cherry: fix autoryzacji z brancha hotfix"
+
+      # Przerwij
+      git cherry-pick --abort

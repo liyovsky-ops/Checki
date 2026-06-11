@@ -1,0 +1,121 @@
+title: Zdalne repozytoria
+items:
+  - name: Remote — zarządzanie zdalnymi repo
+    desc: |
+      Remote to zdalna kopia repozytorium. origin to konwencjonalna nazwa pierwszego remote.
+      Możesz mieć wiele remote (np. origin = GitHub, upstream = fork source).
+    code: |
+      # Pokaż zdalne repozytoria
+      git remote -v
+      # origin  https://github.com/user/repo.git (fetch)
+      # origin  https://github.com/user/repo.git (push)
+
+      # Dodaj remote
+      git remote add origin https://github.com/user/repo.git
+
+      # Zmień URL remote
+      git remote set-url origin https://github.com/user/new-repo.git
+
+      # Usuń remote
+      git remote remove origin
+
+      # Pobierz zmiany (nie merguje automatycznie)
+      git fetch origin
+      git fetch --all          # wszystkie remote
+
+      # Pobierz + merguj
+      git pull origin main
+      git pull --rebase origin main   # z rebase zamiast merge
+
+  - name: Push — wysyłanie zmian
+    desc: |
+      push wysyła lokalne commity do zdalnego repo.
+      Pierwszy push brancha wymaga -u (--set-upstream) żeby powiązać branche.
+    code: |
+      # Wyślij aktualny branch (gdy już ustawiony upstream)
+      git push
+
+      # Pierwszy push nowego brancha
+      git push -u origin feature/login
+      # Po -u możesz używać samego: git push
+
+      # Wyślij do innego brancha
+      git push origin main
+
+      # Wyślij tagi
+      git push --tags
+      git push origin v1.0.0    # konkretny tag
+
+      # Usuń zdalny branch
+      git push origin --delete feature/stary-branch
+
+      # Force push (OSTROŻNIE!)
+      git push --force-with-lease   # bezpieczny force (sprawdza czy ktoś nie pushował)
+      git push -f                    # niebezpieczny — nigdy na main/shared branchy!
+
+  - name: Pull Request workflow
+    desc: |
+      PR (Pull Request) = prośba o włączenie kodu do main.
+      Standard pracy zespołowej. Umożliwia code review przed mergem.
+    code: |
+      # 1. Zacznij od aktualnego main
+      git switch main
+      git pull origin main
+
+      # 2. Utwórz feature branch
+      git switch -c feature/user-auth
+
+      # 3. Pracuj i commituj
+      git add .
+      git commit -m "feat: add JWT authentication"
+      git add .
+      git commit -m "test: add auth unit tests"
+
+      # 4. Push brancha
+      git push -u origin feature/user-auth
+
+      # 5. Utwórz PR na GitHub/GitLab
+      # GitHub CLI:
+      gh pr create --title "Add JWT authentication" \
+        --body "Adds JWT-based auth with refresh tokens"
+
+      # 6. Po code review i aprobacie — merge na GitHub UI
+      # Lub lokalnie:
+      git switch main
+      git merge --no-ff feature/user-auth
+      git push origin main
+
+      # 7. Posprzątaj
+      git branch -d feature/user-auth
+      git push origin --delete feature/user-auth
+
+  - name: Resolving merge conflicts
+    desc: |
+      Konflikt powstaje gdy dwie osoby edytowały tę samą linię.
+      Git oznacza konflikty markerami w pliku — musisz zdecydować co zostaje.
+    code: |
+      # Po git merge lub git pull z konfliktem:
+      # Git modyfikuje plik:
+      # <<<<<<< HEAD
+      # twoja wersja linii
+      # =======
+      # ich wersja linii
+      # >>>>>>> origin/main
+
+      # 1. Sprawdź które pliki mają konflikty
+      git status           # "both modified"
+      git diff             # pokaż konflikty
+
+      # 2. Edytuj plik — usuń markery, zostaw właściwą wersję
+      # Lub użyj narzędzia merge:
+      git mergetool        # uruchamia skonfigurowane narzędzie (VSCode, Vim, etc.)
+
+      # 3. Dodaj rozwiązane pliki
+      git add plik_z_konfliktem.py
+
+      # 4. Dokończ merge
+      git commit           # lub git merge --continue
+
+      # Skróty przy konflikcie — przyjmij całą jedną wersję
+      git checkout --ours   plik.py   # nasza wersja (HEAD)
+      git checkout --theirs plik.py   # ich wersja (merging branch)

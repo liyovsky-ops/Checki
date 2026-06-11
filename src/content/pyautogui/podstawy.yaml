@@ -1,0 +1,102 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać PyAutoGUI?
+  firstComponent: Pierwsze kroki
+  firstComponentLang: python
+
+intro:
+  title: Czym jest PyAutoGUI?
+  desc: |
+    PyAutoGUI to biblioteka do automatyzacji GUI — kontroluje mysz i klawiaturę tak jak człowiek.
+    Klikasz przyciski, wpisujesz tekst, robisz screenshoty i szukasz elementów na ekranie.
+    Działa na Windows, Mac i Linux. Idealna gdy aplikacja nie ma API i jedyna opcja to
+    sterowanie interfejsem graficznym. Stworzona przez Al Sweigart (autora "Automate the Boring Stuff").
+
+concepts:
+  - title: FAILSAFE — bezpiecznik
+    icon: "🛡️"
+    desc: |
+      Wbudowane zabezpieczenie — przesuń mysz w górny lewy róg ekranu żeby zatrzymać skrypt.
+      pyautogui.FAILSAFE = True (domyślnie włączone). Ratuje życie gdy skrypt wymknął się
+      spod kontroli i klika w złe miejsca. Nigdy nie wyłączaj bez powodu.
+
+  - title: PAUSE — kontrola tempa
+    icon: "⏱️"
+    desc: |
+      pyautogui.PAUSE = 0.5 dodaje 0.5s pauzy po każdej akcji. Spowalnia skrypt żeby GUI
+      nadążało za automatyzacją. Niezbędne dla stabilnych skryptów — bez pauzy klikasz zanim
+      okno się otworzy. Dla produkcji: 0.1–0.3s. Dla debugowania: 1–2s.
+
+  - title: Współrzędne ekranu
+    icon: "📍"
+    desc: |
+      Mysz działa na pikselach (x, y). Punkt (0, 0) to górny lewy róg ekranu.
+      pyautogui.position() zwraca aktualną pozycję kursora.
+      pyautogui.size() zwraca rozdzielczość ekranu (width, height).
+      Użyj python -m mouseinfo żeby interaktywnie znaleźć współrzędne.
+
+  - title: locateOnScreen — szukanie po obrazku
+    icon: "🔍"
+    desc: |
+      pyautogui.locateOnScreen("button.png") szuka obrazka na ekranie i zwraca jego pozycję.
+      Nie musisz hardkodować współrzędnych — skrypt działa niezależnie od rozdzielczości.
+      Z parametrem confidence=0.9 (wymaga opencv) toleruje drobne różnice w wyglądzie.
+      Podstawa odpornych, przenośnych skryptów automatyzacji.
+
+  - title: typewrite vs pyperclip
+    icon: "⌨️"
+    desc: |
+      typewrite() wpisuje tekst znak po znaku jak człowiek — ale nie obsługuje polskich znaków!
+      Rozwiązanie: pyperclip.copy("tekst z polskimi") + pyautogui.hotkey("ctrl", "v").
+      Kopiowanie do schowka i wklejenie działa z każdym zestawem znaków Unicode.
+
+  - title: Czas vs stabilność
+    icon: "⚖️"
+    desc: |
+      Szybkie skrypty (niskie PAUSE, duration=0) mogą być niestabilne — GUI nie nadąża.
+      Wolne skrypty (PAUSE=1, duration=1.0) są niezawodne ale trwają długo.
+      Złoty środek: PAUSE=0.2, duration=0.3-0.5 dla ruchów myszy. Testuj i dostosuj.
+
+whenToUse:
+  - Automatyzacja powtarzalnych zadań w programach bez API (Excel, legacy apps, ERP)
+  - Testowanie GUI aplikacji desktopowych gdy Selenium nie wystarczy
+  - Web scraping gdy strona blokuje WebDriver (aplikacje Flash, Java, Electron)
+  - Automatyczne wypełnianie formularzy w programach biurowych
+  - Integracja dwóch programów które nie mają API — "klik-bot" między nimi
+  - Skrypty do gier — farming, powtarzalne akcje (jeśli ToS pozwala)
+  - Automatyczne generowanie raportów w aplikacjach desktopowych
+
+firstComponent: |
+  import pyautogui
+  import time
+
+  # Konfiguracja bezpieczeństwa — zawsze na początku skryptu
+  pyautogui.FAILSAFE = True   # mysz w lewy górny róg = zatrzymaj
+  pyautogui.PAUSE = 0.5       # 500ms pauzy po każdej akcji
+
+  # Informacje o ekranie
+  w, h = pyautogui.size()
+  print(f"Ekran: {w}x{h}")
+
+  # Gdzie jest mysz?
+  x, y = pyautogui.position()
+  print(f"Mysz: {x}, {y}")
+
+  # Przesuń mysz do środka ekranu
+  pyautogui.moveTo(w // 2, h // 2, duration=0.5)
+
+  # Kliknij
+  pyautogui.click()
+
+  # Wpisz tekst (tylko ASCII!)
+  pyautogui.typewrite("Hello World", interval=0.05)
+
+  # Polskie znaki — przez schowek
+  import pyperclip
+  pyperclip.copy("Zażółć gęślą jaźń")
+  pyautogui.hotkey("ctrl", "v")
+
+  # Skrót klawiszowy
+  pyautogui.hotkey("ctrl", "s")   # zapisz
+
+  print("Gotowe!")

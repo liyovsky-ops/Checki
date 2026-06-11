@@ -1,0 +1,98 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać BeautifulSoup?
+  firstComponent: Pierwsze parsowanie
+  firstComponentLang: python
+
+intro:
+  title: Czym jest BeautifulSoup?
+  desc: |
+    BeautifulSoup (bs4) to biblioteka Python do parsowania dokumentów HTML i XML.
+    Tworzy drzewo parsowania z którego możesz wyciągać dane przez intuicyjne API.
+    Nie pobiera stron — to robi requests lub httpx. BS4 dostaje gotowy HTML i pozwala
+    wyszukiwać, nawigować i modyfikować strukturę dokumentu.
+    Standard web scrapingu w Pythonie — prosta, tolerancyjna na "brudny" HTML.
+
+concepts:
+  - title: Parser — silnik parsowania
+    icon: "⚙️"
+    desc: |
+      BS4 potrzebuje zewnętrznego parsera HTML. Trzy opcje:
+      • html.parser — wbudowany w Python, dobry na start, wolniejszy
+      • lxml — najszybszy, wymaga: pip install lxml
+      • html5lib — najbardziej tolerancyjny (jak przeglądarka), wolny
+      Wybór wpływa na wyniki dla "brudnego" HTML — przetestuj oba.
+
+  - title: Drzewo DOM
+    icon: "🌳"
+    desc: |
+      HTML jest drzewem obiektów. BeautifulSoup reprezentuje każdy element jako Tag,
+      tekst jako NavigableString, cały dokument jako BeautifulSoup.
+      Możesz nawigować w górę (parent), w dół (children) i w bok (siblings).
+
+  - title: find vs find_all
+    icon: "🔍"
+    desc: |
+      find() zwraca pierwszy pasujący element lub None.
+      find_all() zwraca listę wszystkich pasujących (może być pusta).
+      Oba przyjmują tag, atrybuty, tekst, funkcję filtrującą lub regex.
+      Skrót: soup("div") == soup.find_all("div")
+
+  - title: CSS Selectors — select()
+    icon: "🎯"
+    desc: |
+      soup.select("div.klasa") używa selektorów CSS jak w przeglądarce.
+      Obsługuje klasy (.klasa), ID (#id), atrybuty ([href]), zagnieżdżenie (div p),
+      bezpośrednie dziecko (div > p), pseudoklasy (:nth-of-type).
+      Szybszy w nauce jeśli znasz CSS.
+
+  - title: NavigableString — tekst
+    icon: "📝"
+    desc: |
+      tag.string — tekst bezpośrednio w elemencie (None jeśli są pod-elementy).
+      tag.get_text() — cały tekst razem z zagnieżdżonymi, można strip() i separator.
+      tag.strings — generator wszystkich fragmentów tekstu.
+      tag.stripped_strings — bez białych znaków.
+
+  - title: Requests + BS4
+    icon: "🌐"
+    desc: |
+      Standardowy pattern: requests.get(url) → response.text → BeautifulSoup().
+      Zawsze ustaw User-Agent żeby nie być zablokowanym.
+      Sprawdzaj response.status_code przed parsowaniem.
+      Dla dynamicznych stron (JavaScript) — potrzebujesz Selenium lub Playwright.
+
+whenToUse:
+  - Wyciąganie danych ze stron HTML — ceny, tytuły, opisy, linki
+  - Parsowanie plików HTML/XML lokalnie (raporty, eksport danych)
+  - Web scraping gdy strona renderuje HTML po stronie serwera (nie JS)
+  - Czyszczenie HTML — wyciągnij czysty tekst z artykułów
+  - Zbieranie danych do ML/analizy — buduj datasety ze stron webowych
+  - Monitorowanie zmian na stronach — ceny produktów, oferty pracy
+  - Automatyczne zbieranie linków, obrazków, plików do pobrania
+
+firstComponent: |
+  import requests
+  from bs4 import BeautifulSoup
+
+  # Pobierz stronę
+  url = "https://books.toscrape.com"
+  headers = {"User-Agent": "Mozilla/5.0 (scraper-demo/1.0)"}
+  response = requests.get(url, headers=headers)
+  response.raise_for_status()  # rzuć błąd jeśli != 200
+
+  # Utwórz parser
+  soup = BeautifulSoup(response.text, "html.parser")
+
+  # Znajdź element
+  title = soup.find("title")
+  print(title.text)  # Books to Scrape...
+
+  # Znajdź wszystkie produkty
+  books = soup.find_all("article", class_="product_pod")
+  print(f"Znaleziono: {len(books)} książek")
+
+  for book in books[:3]:
+      name  = book.h3.a["title"]
+      price = book.find("p", class_="price_color").text
+      print(f"{name}: {price}")

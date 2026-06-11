@@ -1,0 +1,182 @@
+title: Zaawansowane wzorce
+items:
+  - name: Obsługa błędów i stabilność
+    desc: |
+      Wzorzec dla niezawodnych skryptów automatyzacji. Retry logic, graceful exit,
+      logowanie błędów. Skrypt produkcyjny musi radzić sobie z nieoczekiwanymi sytuacjami.
+    code: |
+      import pyautogui
+      import time
+      import sys
+      import logging
+
+      logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+
+      pyautogui.FAILSAFE = True
+      pyautogui.PAUSE = 0.3
+
+      def safe_click(image, retries=3, confidence=0.85):
+          """Kliknij w element szukając go po obrazku z retry."""
+          for attempt in range(retries):
+              try:
+                  loc = pyautogui.locateOnScreen(image, confidence=confidence)
+                  if loc:
+                      pyautogui.click(pyautogui.center(loc))
+                      logging.info(f"Kliknięto {image}")
+                      return True
+              except Exception as e:
+                  logging.warning(f"Próba {attempt+1}/{retries}: {e}")
+              time.sleep(1)
+          logging.error(f"Nie znaleziono {image} po {retries} próbach")
+          return False
+
+      try:
+          safe_click("start_button.png")
+          time.sleep(2)
+          safe_click("confirm.png")
+      except pyautogui.FailSafeException:
+          logging.info("Zatrzymano przez FailSafe")
+          sys.exit(0)
+      except Exception as e:
+          logging.error(f"Nieoczekiwany błąd: {e}")
+          sys.exit(1)
+
+  - name: Okna dialogowe
+    desc: |
+      PyAutoGUI ma wbudowane proste okna dialogowe — alert, confirm, prompt, password.
+      Blokują skrypt do momentu odpowiedzi użytkownika.
+    code: |
+      import pyautogui
+
+      # Alert — tylko OK
+      pyautogui.alert("Skrypt zakończony pomyślnie!")
+
+      # Potwierdzenie — OK lub Cancel
+      result = pyautogui.confirm("Czy kontynuować automatyzację?")
+      if result == "OK":
+          print("Kontynuuję...")
+      else:
+          print("Anulowano")
+
+      # Prompt — pobierz tekst od użytkownika
+      filename = pyautogui.prompt("Podaj nazwę pliku docelowego:")
+      if filename:
+          print(f"Plik: {filename}")
+
+      # Hasło (ukrywa wpisywany tekst)
+      password = pyautogui.password("Podaj hasło do systemu:")
+
+  - name: Łączenie z pyperclip i subprocess
+    desc: |
+      Pełny skrypt automatyzacji — uruchamia program, wpisuje tekst z polskimi znakami,
+      zapisuje i zamyka. Standardowy wzorzec dla skryptów biurowych.
+    code: |
+      import pyautogui
+      import pyperclip
+      import subprocess
+      import time
+
+      # Uruchom Notatnik
+      subprocess.Popen("notepad.exe")
+      time.sleep(1.5)  # poczekaj na otwarcie
+
+      # Tekst z polskimi znakami przez schowek
+      pyperclip.copy("Raport dzienny\nZażółć gęślą jaźń — polskie znaki!")
+      pyautogui.hotkey("ctrl", "v")
+      time.sleep(0.3)
+
+      # Zaznacz wszystko i skopiuj z powrotem
+      pyautogui.hotkey("ctrl", "a")
+      pyautogui.hotkey("ctrl", "c")
+      content = pyperclip.paste()
+      print(f"Treść: {content[:50]}...")
+
+      # Zapisz
+      pyautogui.hotkey("ctrl", "s")
+      time.sleep(0.5)
+
+      # Podaj nazwę pliku (jeśli dialog)
+      pyautogui.typewrite("raport.txt", interval=0.05)
+      pyautogui.press("enter")
+
+      # Zamknij
+      pyautogui.hotkey("alt", "f4")
+
+  - name: Automatyzacja z harmonogramem
+    desc: |
+      Skrypt który działa cyklicznie — codziennie, co godzinę, o konkretnej porze.
+      schedule to prosty cron w Pythonie.
+    code: |
+      import schedule
+      import time
+      import pyautogui
+      import logging
+
+      logging.basicConfig(level=logging.INFO)
+
+      def daily_report():
+          """Codzienne wygenerowanie raportu o 9:00."""
+          logging.info("Uruchamiam raport dzienny")
+          try:
+              pyautogui.hotkey("win", "d")      # pokaż pulpit
+              time.sleep(1)
+              pyautogui.doubleClick(500, 300)   # otwórz aplikację
+              time.sleep(2)
+              # ... reszta automatyzacji ...
+              logging.info("Raport wygenerowany")
+          except Exception as e:
+              logging.error(f"Błąd: {e}")
+
+      def hourly_check():
+          """Co godzinę sprawdź status systemu."""
+          logging.info("Sprawdzam status...")
+
+      # Harmonogram
+      schedule.every().day.at("09:00").do(daily_report)
+      schedule.every().hour.do(hourly_check)
+      schedule.every(30).minutes.do(hourly_check)
+
+      logging.info("Harmonogram uruchomiony. Ctrl+C żeby zatrzymać.")
+      while True:
+          schedule.run_pending()
+          time.sleep(60)
+
+  - name: Nagrywanie i odtwarzanie akcji
+    desc: |
+      Wzorzec makra — nagraj akcje użytkownika, odtwórz automatycznie.
+      Pynput do nasłuchiwania, PyAutoGUI do odtwarzania.
+    code: |
+      from pynput import mouse, keyboard
+      import pyautogui
+      import time
+
+      recorded_actions = []
+      recording = False
+
+      def on_click(x, y, button, pressed):
+          if recording and pressed:
+              recorded_actions.append(('click', x, y, str(button)))
+
+      def on_move(x, y):
+          if recording:
+              recorded_actions.append(('move', x, y, time.time()))
+
+      # Nagraj akcje
+      print("Zacznij nagrywanie — F9 aby zatrzymać")
+      recording = True
+
+      with mouse.Listener(on_click=on_click, on_move=on_move) as listener:
+          keyboard.Listener(on_press=lambda k: setattr(listener, '_running', False)
+                            if k == keyboard.Key.f9 else None).start()
+          listener.join()
+
+      recording = False
+      print(f"Nagrano {len(recorded_actions)} akcji")
+
+      # Odtwórz
+      for action_type, x, y, extra in recorded_actions:
+          if action_type == 'click':
+              pyautogui.click(x, y)
+          elif action_type == 'move':
+              pyautogui.moveTo(x, y, duration=0.05)
+          time.sleep(0.05)

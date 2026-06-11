@@ -1,0 +1,124 @@
+title: Komendy Git
+groups:
+  - name: Setup i konfiguracja
+    icon: "⚙️"
+    commands:
+      - desc: Ustaw globalne dane użytkownika
+        code: |
+          git config --global user.name "Łukasz"
+          git config --global user.email "ty@email.com"
+      - desc: Ustaw domyślny edytor (VSCode)
+        code: git config --global core.editor "code --wait"
+      - desc: Ustaw pull z rebase (zalecane)
+        code: git config --global pull.rebase true
+      - desc: Wyświetl całą konfigurację
+        code: git config --global --list
+      - desc: Alias — krótkie komendy
+        code: |
+          git config --global alias.st status
+          git config --global alias.lg "log --oneline --graph --all"
+          git config --global alias.last "log -1 HEAD"
+
+  - name: Podstawy codzienne
+    icon: "📋"
+    commands:
+      - desc: Stan repozytorium
+        code: git status
+      - desc: Historia commitów (czytelna)
+        code: git log --oneline --graph --all
+      - desc: Co się zmieniło (nie staging)
+        code: git diff
+      - desc: Co trafi do commita (staging)
+        code: git diff --staged
+      - desc: Dodaj wszystko do staging
+        code: git add .
+      - desc: Dodaj konkretny plik
+        code: git add src/main.py
+      - desc: Interaktywny staging (wybierz hunki)
+        code: git add -p
+      - desc: Commit z wiadomością
+        code: |
+          git commit -m "feat: dodaj funkcję X"
+      - desc: Amend ostatniego commita (przed pushem)
+        code: git commit --amend --no-edit
+
+  - name: Branche
+    icon: "🌿"
+    commands:
+      - desc: Nowy branch i przejdź na niego
+        code: git switch -c feature/nowa-funkcja
+      - desc: Przełącz branch
+        code: git switch main
+      - desc: Lista wszystkich branchy
+        code: git branch -a
+      - desc: Usuń branch po merge
+        code: git branch -d feature/nowa-funkcja
+      - desc: Merge feature do main
+        code: |
+          git switch main
+          git merge --no-ff feature/nowa-funkcja
+      - desc: Rebase feature na main
+        code: |
+          git switch feature/nowa-funkcja
+          git rebase main
+      - desc: Interaktywny rebase (edytuj historię)
+        code: git rebase -i HEAD~3
+
+  - name: Zdalne repozytoria
+    icon: "☁️"
+    commands:
+      - desc: Klonuj repo
+        code: git clone https://github.com/user/repo.git
+      - desc: Dodaj remote origin
+        code: git remote add origin https://github.com/user/repo.git
+      - desc: Wyślij branch (pierwszy raz)
+        code: git push -u origin feature/login
+      - desc: Wyślij (kolejne razy)
+        code: git push
+      - desc: Pobierz zmiany (bez merge)
+        code: git fetch origin
+      - desc: Pobierz i merguj
+        code: git pull --rebase origin main
+      - desc: Usuń zdalny branch
+        code: git push origin --delete feature/stary-branch
+
+  - name: Cofanie i naprawianie
+    icon: "↩️"
+    commands:
+      - desc: Odrzuć zmiany w pliku (working dir)
+        code: git restore plik.py
+      - desc: Usuń plik ze staging
+        code: git restore --staged plik.py
+      - desc: Cofnij ostatni commit (zachowaj zmiany w staging)
+        code: git reset --soft HEAD~1
+      - desc: Cofnij commit (zachowaj w plikach, usuń ze staging)
+        code: git reset HEAD~1
+      - desc: Bezpieczne cofnięcie commita (tworzy revert commit)
+        code: git revert a1b2c3d
+      - desc: Odłóż bieżące zmiany na stos
+        code: |
+          git stash push -m "wip: opis"
+      - desc: Przywróć ostatni stash
+        code: git stash pop
+
+  - name: Analiza i szukanie
+    icon: "🔍"
+    commands:
+      - desc: Kto napisał tę linię?
+        code: git blame -L 10,20 plik.py
+      - desc: Kiedy pojawił się ten tekst w historii?
+        code: git log -S "nazwa_funkcji" --oneline
+      - desc: Wszystkie commity dla pliku
+        code: git log --follow -- plik.py
+      - desc: Znajdź commit który wprowadził bug (bisect)
+        code: |
+          git bisect start
+          git bisect bad          # aktualna wersja ma bug
+          git bisect good v1.0.0  # ta wersja działała
+          # Git automatycznie wybiera commit do przetestowania
+          # Po teście: git bisect good/bad
+          # Na koniec: git bisect reset
+      - desc: Pokaż zawartość commita
+        code: git show a1b2c3d
+      - desc: Znajdź usuniętą funkcję w historii
+        code: git log -G "def stara_funkcja" --patch
