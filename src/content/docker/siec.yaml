@@ -1,0 +1,90 @@
+items:
+  - name: Sieci Docker — komunikacja między kontenerami
+    desc: >
+      Kontenery w tej samej sieci mogą się pingować po nazwie serwisu.
+      Compose automatycznie tworzy sieć dla wszystkich serwisów — używaj nazwy serwisu jako hostname.
+    code: |
+      # docker-compose.yml — explicit networking
+      services:
+        api:
+          networks:
+            - backend
+            - frontend
+
+        db:
+          networks:
+            - backend          # tylko backend — nie dostępne z frontendu
+
+        nginx:
+          networks:
+            - frontend
+            - public
+
+      networks:
+        backend:
+          driver: bridge
+        frontend:
+          driver: bridge
+        public:
+          driver: bridge
+
+      # W kodzie Pythona — używaj nazwy serwisu jako hostname:
+      # DATABASE_URL = "postgresql://user:pass@db:5432/mydb"
+      #                                            ^^ nazwa serwisu w Compose
+
+  - name: Wolumeny — trwałe dane
+    desc: >
+      Dane w kontenerze giną gdy kontener jest usuwany.
+      Wolumeny i bind mounts przechowują dane na hoście.
+      Named volumes dla baz danych, bind mounts dla kodu w dev.
+    code: |
+      services:
+        db:
+          image: postgres:16-alpine
+          volumes:
+            # Named volume — Docker zarządza lokalizacją
+            - postgres_data:/var/lib/postgresql/data
+
+        api:
+          build: .
+          volumes:
+            # Bind mount — folder hosta mapowany do kontenera
+            - .:/app                     # live reload kodu
+            - ./logs:/app/logs           # logi na hoście
+
+            # Anonymous volume — nie nadpisuj node_modules z hosta
+            - /app/node_modules
+
+      volumes:
+        postgres_data:     # zadeklaruj named volume
+
+      # Zarządzanie wolumenami:
+      # docker volume ls
+      # docker volume inspect postgres_data
+      # docker volume rm postgres_data  (usuwa dane!)
+
+  - name: Zmienne środowiskowe i sekrety
+    desc: >
+      Nigdy nie hardcode sekretów w Dockerfile lub docker-compose.yml.
+      Używaj .env pliku — Compose czyta go automatycznie.
+    code: |
+      # .env (nie commituj do git!)
+      # POSTGRES_PASSWORD=supersecret
+      # SECRET_KEY=moj-klucz-jwt
+      # API_KEY=abc123
+
+      # docker-compose.yml — czyta z .env automatycznie
+      services:
+        api:
+          environment:
+            - SECRET_KEY=${SECRET_KEY}
+            - DATABASE_URL=postgresql://user:${POSTGRES_PASSWORD}@db/mydb
+
+        # Lub z pliku env:
+        db:
+          env_file:
+            - .env
+
+      # W Pythonie — pobierz z env:
+      # import os
+      # secret = os.environ["SECRET_KEY"]

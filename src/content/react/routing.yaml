@@ -1,0 +1,116 @@
+title: Routing — React Router v7
+
+items:
+  - name: Konfiguracja podstawowa
+    desc: "BrowserRouter otacza całą aplikację, Routes/Route definiują mapę URL → komponent."
+    icon: "🗺️"
+    code: |
+      import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+      function App() {
+        return (
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/users" element={<Users />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        );
+      }
+
+  - name: Nawigacja — Link i NavLink
+    desc: "Link zastępuje <a> — nie przeładowuje strony. NavLink automatycznie dodaje \"active\" className gdy URL pasuje."
+    icon: "🔗"
+    code: |
+      import { Link, NavLink } from 'react-router-dom';
+
+      // Link — podstawowy
+      <Link to="/about">O nas</Link>
+
+      // NavLink — dodaje className "active" gdy URL pasuje
+      <NavLink
+        to="/users"
+        className={({ isActive }) => isActive ? 'nav-active' : ''}
+      >
+        Użytkownicy
+      </NavLink>
+
+  - name: Dynamiczne trasy i useParams
+    desc: ":param w ścieżce to dynamiczny segment. useParams() odczytuje jego wartość w komponencie."
+    icon: "🎯"
+    code: |
+      // Definicja trasy
+      <Route path="/users/:id" element={<UserProfile />} />
+
+      // Komponent — odczytaj :id
+      import { useParams } from 'react-router-dom';
+
+      function UserProfile() {
+        const { id } = useParams();
+
+        useEffect(() => {
+          fetchUser(id).then(setUser);
+        }, [id]);
+
+        return <div>Użytkownik #{id}</div>;
+      }
+
+  - name: Zagnieżdżone trasy i Outlet
+    desc: Zagnieżdżone Route dla layoutów z sidebarem. Outlet renderuje aktywną podtrasę w miejscu gdzie jest wstawiony.
+    icon: "🏗️"
+    code: |
+      <Route path="/dashboard" element={<Dashboard />}>
+        <Route index element={<DashboardHome />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="profile" element={<Profile />} />
+      </Route>
+
+      // Dashboard.jsx — Outlet renderuje aktywną podtrasę
+      function Dashboard() {
+        return (
+          <div>
+            <Sidebar />
+            <main><Outlet /></main>
+          </div>
+        );
+      }
+
+  - name: Programatyczna nawigacja i useNavigate
+    desc: useNavigate() do nawigowania z kodu JS — po submit formularza, po logowaniu, po akcji.
+    icon: "🧭"
+    code: |
+      import { useNavigate } from 'react-router-dom';
+
+      function LoginForm() {
+        const navigate = useNavigate();
+
+        const handleLogin = async () => {
+          await login(credentials);
+          navigate('/dashboard'); // przekieruj po logowaniu
+          // lub navigate(-1) — cofnij
+          // lub navigate('/login', { replace: true }) — bez historii
+        };
+      }
+
+  - name: Protected Route — ochrona tras
+    desc: Komponent ProtectedRoute sprawdza auth przed renderowaniem. Przekierowuje do /login jeśli użytkownik nie jest zalogowany.
+    icon: "🔐"
+    code: |
+      function ProtectedRoute({ children }) {
+        const { isLoggedIn } = useAuth();
+
+        if (!isLoggedIn) {
+          return <Navigate to="/login" replace />;
+        }
+
+        return children;
+      }
+
+      // Użycie
+      <Route path="/dashboard" element={
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      } />

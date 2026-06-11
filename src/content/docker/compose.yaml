@@ -1,0 +1,129 @@
+items:
+  - name: docker-compose.yml — podstawowa struktura
+    desc: >
+      Compose definiuje wiele serwisów w jednym pliku YAML.
+      Każdy serwis to kontener z konfiguracją. Jeden plik — całe środowisko.
+    code: |
+      # docker-compose.yml
+      version: "3.9"
+
+      services:
+        api:
+          build: .                          # buduj z Dockerfile
+          ports:
+            - "8000:8000"                   # host:kontener
+          environment:
+            - DATABASE_URL=postgresql://user:pass@db:5432/mydb
+            - REDIS_URL=redis://redis:6379
+          depends_on:
+            - db
+            - redis
+          volumes:
+            - .:/app                        # hot reload w dev
+
+        db:
+          image: postgres:16-alpine
+          environment:
+            POSTGRES_USER: user
+            POSTGRES_PASSWORD: pass
+            POSTGRES_DB: mydb
+          volumes:
+            - postgres_data:/var/lib/postgresql/data
+
+        redis:
+          image: redis:7-alpine
+          ports:
+            - "6379:6379"
+
+      volumes:
+        postgres_data:
+
+  - name: Compose — dev vs produkcja
+    desc: >
+      Używaj wielu plików Compose — bazowy + override dla dev/prod.
+      docker-compose.override.yml ładuje się automatycznie w dev.
+    code: |
+      # docker-compose.yml — bazowy (produkcja)
+      services:
+        api:
+          image: registry.example.com/moja-apka:latest
+          restart: always
+          environment:
+            - DEBUG=false
+
+      # docker-compose.override.yml — dev (auto-load)
+      services:
+        api:
+          build: .              # buduj lokalnie zamiast pobierać image
+          volumes:
+            - .:/app            # live reload
+          environment:
+            - DEBUG=true
+          command: uvicorn main:app --reload --host 0.0.0.0
+
+      # Dev (auto-merge override):
+      # docker compose up
+
+      # Produkcja (tylko bazowy):
+      # docker compose -f docker-compose.yml up
+
+  - name: Compose — przydatne komendy
+    desc: >
+      Compose zarządza całym stackiem jedną komendą.
+      up, down, logs, exec — codzienne operacje.
+    code: |
+      # Uruchom wszystkie serwisy (w tle)
+      docker compose up -d
+
+      # Uruchom z rebuild (gdy zmieniłeś Dockerfile)
+      docker compose up -d --build
+
+      # Zatrzymaj wszystko
+      docker compose down
+
+      # Zatrzymaj i usuń wolumeny (reset bazy danych!)
+      docker compose down -v
+
+      # Logi wszystkich serwisów
+      docker compose logs -f
+
+      # Logi konkretnego serwisu
+      docker compose logs -f api
+
+      # Wejdź do kontenera
+      docker compose exec api bash
+      docker compose exec db psql -U user mydb
+
+      # Uruchom jednorazową komendę
+      docker compose run --rm api python manage.py migrate
+
+  - name: Health checks — monitoring serwisów
+    desc: >
+      Healthcheck mówi Docker kiedy serwis jest gotowy.
+      depends_on z condition: service_healthy czeka na zdrowy serwis przed startem kolejnego.
+    code: |
+      services:
+        db:
+          image: postgres:16-alpine
+          healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U user -d mydb"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
+
+        api:
+          build: .
+          depends_on:
+            db:
+              condition: service_healthy   # czekaj aż DB zdrowe
+            redis:
+              condition: service_started   # wystarczy że uruchomiony
+
+        redis:
+          image: redis:7-alpine
+          healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 5s
+            timeout: 3s
+            retries: 3

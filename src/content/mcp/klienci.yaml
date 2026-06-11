@@ -1,0 +1,92 @@
+title: Klienci MCP i integracje
+items:
+  - name: Claude Desktop — konfiguracja serwera
+    desc: >
+      Podłącz serwer MCP do Claude Desktop przez plik konfiguracyjny JSON.
+      Mac: ~/Library/Application Support/Claude/claude_desktop_config.json
+    code: |
+      {
+        "mcpServers": {
+          "moj-serwer": {
+            "command": "python",
+            "args": ["/path/to/server.py"],
+            "env": {
+              "DATABASE_URL": "sqlite:///mydb.sqlite"
+            }
+          },
+          "filesystem": {
+            "command": "npx",
+            "args": [
+              "-y",
+              "@modelcontextprotocol/server-filesystem",
+              "/Users/username/Desktop"
+            ]
+          },
+          "github": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-github"],
+            "env": {
+              "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_..."
+            }
+          }
+        }
+      }
+
+  - name: Claude Code — zarządzanie serwerami CLI
+    desc: >
+      Zarządzaj serwerami MCP bezpośrednio z terminala przez claude mcp.
+      Konfiguracja zapisywana w ~/.claude/settings.json.
+    code: |
+      # Dodaj serwer do Claude Code
+      claude mcp add moj-serwer python /path/to/server.py
+
+      # Dodaj z zmiennymi środowiskowymi
+      claude mcp add db-server \
+        --env DATABASE_URL=sqlite:///app.db \
+        python server.py
+
+      # Scope: global (wszystkie projekty) lub local (bieżący)
+      claude mcp add --scope global moj-serwer python server.py
+
+      # Sprawdź serwery
+      claude mcp list
+      claude mcp get moj-serwer
+
+      # Usuń serwer
+      claude mcp remove moj-serwer
+
+  - name: Klient programistyczny (Python)
+    desc: >
+      Połącz się z serwerem MCP z kodu Pythona — do testowania i automatyzacji.
+      Przydatne do integracji w agentach AI i testowania serwerów.
+    code: |
+      import asyncio
+      from mcp import ClientSession, StdioServerParameters
+      from mcp.client.stdio import stdio_client
+
+      async def main():
+          server_params = StdioServerParameters(
+              command="python",
+              args=["server.py"],
+          )
+
+          async with stdio_client(server_params) as (read, write):
+              async with ClientSession(read, write) as session:
+                  await session.initialize()
+
+                  # Listuj dostępne narzędzia
+                  tools = await session.list_tools()
+                  print("Narzędzia:", [t.name for t in tools.tools])
+
+                  # Wywołaj narzędzie
+                  result = await session.call_tool(
+                      "dodaj",
+                      arguments={"a": 5, "b": 3}
+                  )
+                  print("Wynik:", result.content[0].text)  # "8"
+
+                  # Listuj zasoby
+                  resources = await session.list_resources()
+                  print("Zasoby:", [r.uri for r in resources.resources])
+
+      asyncio.run(main())

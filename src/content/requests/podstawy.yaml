@@ -1,0 +1,59 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać requests?
+  firstComponent: Pierwszy request
+  firstComponentLang: Python
+
+intro:
+  title: Czym jest requests?
+  desc: >
+    requests to najpopularniejsza biblioteka Python do wykonywania zapytań HTTP.
+    "HTTP dla ludzi" — proste API, czytelny kod, automatyczna obsługa JSON, cookies, sesji i autoryzacji.
+    Podstawa każdego projektu scrapingu i automatyzacji w Pythonie.
+    Pobierana ponad 300 milionów razy miesięcznie.
+
+concepts:
+  - title: Response Object
+    desc: >
+      Każde zapytanie zwraca obiekt Response z: status_code, text, json(), headers, cookies, content (bytes).
+      Jeden obiekt = wszystko o odpowiedzi.
+    icon: "📦"
+  - title: Session
+    desc: >
+      Session przechowuje ustawienia między requestami: cookies, headers, auth.
+      Wielokrotnie szybsza niż osobne requesty — reużywa połączenia TCP.
+    icon: "🔗"
+  - title: Timeout
+    desc: >
+      ZAWSZE ustawiaj timeout. Bez niego request może czekać w nieskończoność i zamrozić skrypt.
+      timeout=(connect, read) — osobno dla połączenia i odczytu.
+    icon: "⏱️"
+  - title: Raise for Status
+    desc: >
+      response.raise_for_status() rzuca wyjątek przy błędzie HTTP (4xx, 5xx).
+      Krótszy i bezpieczniejszy niż ręczne sprawdzanie status_code.
+    icon: "🔴"
+
+whenToUse:
+  - Scraping stron — pobieranie HTML do parsowania przez BeautifulSoup
+  - Komunikacja z REST API — pobieranie i wysyłanie danych
+  - Automatyzacja — login, wypełnianie formularzy, pobieranie plików
+  - Monitoring — sprawdzanie czy serwis działa
+  - Integracja z zewnętrznymi serwisami (Slack, GitHub, webhooks)
+
+firstComponent: |
+  import requests
+
+  # Najprostsze GET
+  response = requests.get("https://api.github.com/users/tiangolo")
+
+  # Sprawdź status
+  print(response.status_code)  # 200
+
+  # JSON automatycznie
+  user = response.json()
+  print(user["name"])       # Sebastián Ramírez
+  print(user["public_repos"])
+
+  # ZAWSZE ustawiaj timeout!
+  response = requests.get("https://api.github.com", timeout=10)

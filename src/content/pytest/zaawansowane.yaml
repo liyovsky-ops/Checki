@@ -1,0 +1,126 @@
+title: Zaawansowane techniki
+
+items:
+  - name: Testowanie FastAPI — TestClient
+    desc: TestClient z httpx pozwala testować endpointy FastAPI bez uruchamiania serwera.
+    icon: "🌐"
+    code: |
+      from fastapi.testclient import TestClient
+      from app.main import app
+
+      client = TestClient(app)
+
+      def test_read_items():
+          response = client.get("/items/")
+          assert response.status_code == 200
+          assert isinstance(response.json(), list)
+
+      def test_create_item():
+          response = client.post(
+              "/items/",
+              json={"name": "Laptop", "price": 2999.99}
+          )
+          assert response.status_code == 201
+          data = response.json()
+          assert data["name"] == "Laptop"
+          assert "id" in data
+
+  - name: Mock z unittest.mock
+    desc: Mock podmienia obiekty w testach. patch jako dekorator lub context manager.
+    icon: "🎭"
+    code: |
+      from unittest.mock import Mock, patch, MagicMock
+
+      # Mock prostej funkcji
+      def test_email_sent():
+          with patch("app.services.send_email") as mock_send:
+              create_user({"email": "test@test.com"})
+              mock_send.assert_called_once_with("test@test.com")
+
+      # Mock zewnętrznego API
+      @patch("requests.get")
+      def test_weather_api(mock_get):
+          mock_get.return_value.json.return_value = {"temp": 22}
+          mock_get.return_value.status_code = 200
+
+          result = get_weather("Warsaw")
+          assert result["temp"] == 22
+          mock_get.assert_called_with("https://api.weather.com/Warsaw", timeout=10)
+
+  - name: pytest-cov — pokrycie kodu
+    desc: Mierz ile % kodu jest pokryte testami. Generuje raporty HTML i terminalne.
+    icon: "📊"
+    code: |
+      pip install pytest-cov
+
+      # Uruchom z coverage:
+      pytest --cov=app tests/
+
+      # Szczegółowy raport który linie nie pokryte:
+      pytest --cov=app --cov-report=term-missing tests/
+
+      # Raport HTML:
+      pytest --cov=app --cov-report=html tests/
+      # Otwórz htmlcov/index.html w przeglądarce
+
+      # Wymagaj minimum 80% pokrycia (failuje build):
+      pytest --cov=app --cov-fail-under=80 tests/
+
+  - name: Testowanie wyjątków
+    desc: pytest.raises sprawdza czy funkcja rzuca oczekiwany wyjątek. match weryfikuje treść wiadomości.
+    icon: "💥"
+    code: |
+      import pytest
+
+      def test_division_by_zero():
+          with pytest.raises(ZeroDivisionError):
+              result = 10 / 0
+
+      def test_value_error_message():
+          with pytest.raises(ValueError, match="musi być dodatnia"):
+              validate_age(-5)
+
+      def test_http_exception():
+          with pytest.raises(HTTPException) as exc_info:
+              get_user_or_404(user_id=9999)
+          assert exc_info.value.status_code == 404
+          assert "Nie znaleziono" in exc_info.value.detail
+
+  - name: Kolejność wykonania testów
+    desc: "pytest-ordering kontroluje kolejność testów. Przydatne gdy testy mają zależności (create → read → delete)."
+    icon: "🔢"
+    code: |
+      pip install pytest-ordering
+
+      import pytest
+
+      @pytest.mark.order(1)
+      def test_create_user():
+          r = client.post("/users/", json={"name": "Jan"})
+          assert r.status_code == 201
+
+      @pytest.mark.order(2)
+      def test_get_user():
+          r = client.get("/users/1")
+          assert r.status_code == 200
+
+      @pytest.mark.order(3)
+      def test_delete_user():
+          r = client.delete("/users/1")
+          assert r.status_code == 204
+
+  - name: pytest-benchmark — pomiar wydajności
+    desc: Mierz czas wykonania funkcji w testach. Porównuj wydajność różnych implementacji.
+    icon: "⏱️"
+    code: |
+      pip install pytest-benchmark
+
+      def test_sort_performance(benchmark):
+          data = list(range(10000, 0, -1))
+          result = benchmark(sorted, data)
+          assert result[0] == 1
+
+      # Uruchom i zapisz wyniki:
+      pytest --benchmark-save=baseline
+      # Porównaj z poprzednim:
+      pytest --benchmark-compare=baseline

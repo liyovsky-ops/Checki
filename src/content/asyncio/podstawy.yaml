@@ -1,0 +1,64 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać asyncio?
+  firstComponent: Pierwsze korutyny
+  firstComponentLang: Python
+
+intro:
+  title: Czym jest asyncio?
+  desc: >
+    asyncio to wbudowana biblioteka Pythona do pisania współbieżnego kodu z async/await.
+    Zamiast wątków używa event loop — jednego wątku który przełącza się między zadaniami gdy czekają na I/O.
+    Idealne gdy aplikacja spędza czas na sieci, plikach, bazie danych — nie na obliczeniach.
+
+concepts:
+  - title: Event Loop
+    desc: >
+      Serce asyncio. Jeden wątek który zarządza wszystkimi korutynami.
+      Gdy korutyna czeka (np. na HTTP), event loop uruchamia inną. Zero blokowania, zero wątków systemowych.
+    icon: "🔄"
+  - title: Korutyna (async def)
+    desc: >
+      Funkcja z async def to korutyna — nie uruchamia się od razu po wywołaniu.
+      Zwraca obiekt korutyny. Uruchamia się przez await lub asyncio.run(). Może zatrzymać się w miejscu await.
+    icon: "⚡"
+  - title: await
+    desc: >
+      await mówi: "tu mogę się zatrzymać i pozwolić innym korutynom działać".
+      Możesz await tylko wewnątrz async def. await czeka na awaitable: korutynę, Task, Future.
+    icon: "⏸️"
+  - title: gather vs TaskGroup
+    desc: >
+      asyncio.gather() uruchamia wiele korutyn równolegle i czeka na wszystkie.
+      TaskGroup (Python 3.11+) to nowszy, bezpieczniejszy sposób. Razem dają współbieżność I/O bez wątków.
+    icon: "🎯"
+
+whenToUse:
+  - Pobieranie danych z wielu URL jednocześnie (scraping, API calls)
+  - Serwery webowe — FastAPI, aiohttp obsługują wiele requestów w jednym wątku
+  - Bazy danych async — asyncpg, motor (MongoDB), aiosqlite
+  - WebSocket i long-polling — utrzymywanie wielu połączeń
+  - Pipeliny I/O — pobieranie, przetwarzanie, zapis bez blokowania
+  - "NIE DO: ciężkich obliczeń CPU — tu używaj multiprocessing"
+
+firstComponent: |
+  import asyncio
+  import httpx
+
+  async def pobierz(url: str) -> str:
+      async with httpx.AsyncClient() as client:
+          r = await client.get(url)
+          return r.text[:100]
+
+  async def main():
+      urls = [
+          "https://httpbin.org/get",
+          "https://httpbin.org/ip",
+          "https://httpbin.org/headers",
+      ]
+      # Wszystkie 3 requesty równolegle
+      wyniki = await asyncio.gather(*[pobierz(u) for u in urls])
+      for w in wyniki:
+          print(w[:60])
+
+  asyncio.run(main())

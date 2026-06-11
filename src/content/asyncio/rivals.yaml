@@ -1,0 +1,64 @@
+title: asyncio vs inne podejścia do współbieżności
+
+items:
+  - name: threading
+    icon: "🧵"
+    color: "#3572a5"
+    tagline: Wbudowane wątki — synchroniczny kod w wielu wątkach
+    pros:
+      - Wbudowane w Python — zero instalacji
+      - Działa z bibliotekami które nie mają async wersji
+      - Łatwiejszy mental model dla kodu synchronicznego
+      - Dobre dla GUI (tkinter, Qt) i legacy kodu
+    cons:
+      - GIL ogranicza prawdziwą równoległość CPU
+      - Każdy wątek = osobna pamięć systemowa
+      - 1000 wątków = dużo RAM. 1000 korutyn asyncio = prawie nic
+      - Trudniejsze debugowanie (race conditions)
+    vs: asyncio szybsze i lżejsze dla I/O-bound (HTTP, DB, pliki). threading gdy biblioteka nie ma async wersji lub piszesz GUI.
+
+  - name: multiprocessing
+    icon: "💻"
+    color: "#2c3e50"
+    tagline: Prawdziwa równoległość — osobne procesy, omija GIL
+    pros:
+      - Prawdziwa równoległość CPU — każdy rdzeń osobno
+      - Omija GIL całkowicie
+      - Izolacja procesów (bezpieczeństwo, odporność na crash)
+      - Idealne dla CPU-bound: ML, kompresja, przetwarzanie obrazów
+    cons:
+      - Każdy proces = osobna pamięć + overhead startu
+      - Komunikacja przez pickle (serializacja) — wolna
+      - Nie dla I/O — asyncio jest tutaj znacznie lepsze
+    vs: Zasada — asyncio dla I/O-bound (HTTP, DB), multiprocessing dla CPU-bound (obliczenia). Możesz łączyć — asyncio w głównym procesie, multiprocessing dla ciężkich zadań.
+
+  - name: trio
+    icon: "🎸"
+    color: "#f59e0b"
+    tagline: Alternatywny async framework — strukturalna współbieżność
+    pros:
+      - Nurseries — czytelniejszy model strukturalny niż asyncio Tasks
+      - Bezpieczniejsza anulacja korutyn
+      - Prostszy mental model
+      - Lepsza obsługa błędów w zagnieżdżonych korutynach
+    cons:
+      - Niekompatybilny z asyncio — nie użyjesz FastAPI, httpx, asyncpg
+      - Mały ekosystem bibliotek
+      - Mała społeczność
+      - Praktycznie brak ofert pracy
+    vs: asyncio ma cały ekosystem (FastAPI, SQLAlchemy, httpx). trio dla projektów od zera gdzie ekosystem nie jest kluczowy. W praktyce — używaj asyncio.
+
+  - name: concurrent.futures
+    icon: "🔧"
+    color: "#607d8b"
+    tagline: Wysokopoziomowe API dla wątków i procesów — wbudowane w Python
+    pros:
+      - Wbudowane w Python — zero instalacji
+      - Proste API (ThreadPoolExecutor, ProcessPoolExecutor)
+      - Działa z kodem synchronicznym bez refaktoringu
+      - as_completed() do obsługi wyników w kolejności ukończenia
+    cons:
+      - Nie zastępuje asyncio — inne podejście
+      - Wolniejsze niż asyncio przy dużej liczbie I/O tasks
+      - Brak natywnego await
+    vs: asyncio.run_in_executor() używa ThreadPoolExecutor wewnętrznie. Możesz łączyć — sync kod w executor, reszta async. concurrent.futures nie jest alternatywą — jest uzupełnieniem.

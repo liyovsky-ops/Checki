@@ -1,0 +1,103 @@
+title: Komendy asyncio
+groups:
+  - name: Instalacja bibliotek async
+    icon: "📦"
+    commands:
+      - desc: Async HTTP client (zamiennik requests)
+        code: pip install httpx
+      - desc: Async I/O plików
+        code: pip install aiofiles
+      - desc: Async driver PostgreSQL
+        code: pip install asyncpg
+      - desc: Async Redis client
+        code: pip install "redis[asyncio]"
+      - desc: Async HTTP client i serwer (aiohttp)
+        code: pip install aiohttp
+      - desc: Testowanie kodu async z pytest
+        code: pip install pytest-asyncio
+      - desc: Retry z exponential backoff
+        code: pip install tenacity
+
+  - name: Uruchamianie korutyn
+    icon: "▶️"
+    commands:
+      - desc: Uruchom korutynę — jedyny prawidłowy punkt wejścia
+        code: asyncio.run(main())
+      - desc: Uruchom wiele korutyn równolegle
+        code: wyniki = await asyncio.gather(f1(), f2(), f3())
+      - desc: Gather z obsługą błędów
+        code: wyniki = await asyncio.gather(*tasks, return_exceptions=True)
+      - desc: Utwórz Task — startuje natychmiast
+        code: task = asyncio.create_task(coro())
+      - desc: Async sleep — nie blokuje event loop
+        code: await asyncio.sleep(1.0)
+      - desc: Oddaj kontrolę event loop bez czekania
+        code: await asyncio.sleep(0)
+
+  - name: Synchronizacja
+    icon: "🔒"
+    commands:
+      - desc: Async mutex — wyłączny dostęp do zasobu
+        code: |
+          lock = asyncio.Lock()
+          async with lock:
+              # sekcja krytyczna
+      - desc: Ogranicz współbieżność do N równoległych
+        code: |
+          sem = asyncio.Semaphore(10)
+          async with sem:
+              await do_work()
+      - desc: Limit czasu na korutynę (Python 3.11+)
+        code: |
+          async with asyncio.timeout(5.0):
+              await wolna_operacja()
+      - desc: Limit czasu — starsza składnia
+        code: await asyncio.wait_for(coro(), timeout=5.0)
+      - desc: Sygnalizacja między korutynami
+        code: |
+          event = asyncio.Event()
+          await event.wait()   # czekaj
+          event.set()          # sygnalizuj
+      - desc: Async kolejka producer-consumer
+        code: |
+          queue = asyncio.Queue(maxsize=100)
+          await queue.put(item)
+          item = await queue.get()
+
+  - name: Tasks i TaskGroup
+    icon: "🎯"
+    commands:
+      - desc: Grupuj Tasks — Python 3.11+ (zalecany)
+        code: |
+          async with asyncio.TaskGroup() as tg:
+              t1 = tg.create_task(f1())
+              t2 = tg.create_task(f2())
+      - desc: Czekaj na pierwszy gotowy task
+        code: |
+          done, pending = await asyncio.wait(
+              tasks, return_when=asyncio.FIRST_COMPLETED)
+      - desc: Anuluj task
+        code: |
+          task.cancel()
+          try:
+              await task
+          except asyncio.CancelledError:
+              pass
+      - desc: Lista aktywnych tasks
+        code: asyncio.all_tasks()
+
+  - name: Debugowanie
+    icon: "🐛"
+    commands:
+      - desc: Uruchom z trybem debug
+        code: asyncio.run(main(), debug=True)
+      - desc: Włącz debug przez zmienną środowiskową
+        code: PYTHONASYNCIODEBUG=1 python script.py
+      - desc: Lista wszystkich aktywnych Tasks
+        code: |
+          for task in asyncio.all_tasks():
+              print(task.get_name(), task.get_coro())
+      - desc: Uruchom sync kod w threadpool (nie blokuje event loop)
+        code: |
+          loop = asyncio.get_event_loop()
+          wynik = await loop.run_in_executor(None, sync_func, arg)

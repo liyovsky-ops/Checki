@@ -1,0 +1,65 @@
+title: MCP vs inne podejścia do narzędzi AI
+
+items:
+  - name: LangChain Tools
+    icon: "🔗"
+    color: "#1c7a6b"
+    tagline: Framework agentów LLM z dużym ekosystemem gotowych narzędzi
+    pros:
+      - Ogromny ekosystem gotowych integracji (100+ narzędzi)
+      - Dojrzały framework — działał zanim MCP istniało
+      - Integracja z wieloma LLM (OpenAI, Anthropic, Gemini, lokalne)
+      - Chain i Agent abstrakcje dla złożonych workflow
+    cons:
+      - Vendor lock-in — narzędzia działają tylko w LangChain
+      - Zero przenośności między modelami / klientami
+      - API zmieniało się wielokrotnie (breaking changes)
+      - Duże zależności
+    vs: LangChain Tools = ekosystem dla jednego stacku. MCP = otwarty standard — jeden serwer działa z Claude, GPT, Gemini, Cursor. Jeśli interoperacyjność ważna — MCP.
+
+  - name: OpenAI Function Calling
+    icon: "✦"
+    color: "#412991"
+    tagline: Natywne wywołanie funkcji w modelach OpenAI
+    pros:
+      - Wbudowane w OpenAI API — zero dodatkowych zależności
+      - Dojrzałe i stabilne od GPT-4
+      - Structured outputs — gwarantowana struktura JSON
+      - Świetna dokumentacja i tooling
+    cons:
+      - Tylko OpenAI — zero przenośności między modelami
+      - Każdy model wymaga osobnej implementacji
+      - Brak ekosystemu gotowych serwerów
+      - Brak standaryzacji między providerami
+    vs: Function Calling = tylko OpenAI. MCP = standard między modelami. Ten sam serwer MCP podłączasz do Claude, GPT (przez adaptery) i Cursor.
+
+  - name: LlamaIndex Tools
+    icon: "🦙"
+    color: "#fbad41"
+    tagline: Framework RAG i agenci — najlepszy do chatbotów nad dokumentami
+    pros:
+      - Najlepszy ekosystem do RAG (Retrieval Augmented Generation)
+      - QueryEngine jako narzędzie — wyszukaj w dokumentach automatycznie
+      - Wiele integracji z data sources (PDF, Word, web)
+      - Aktywny development i dobra dokumentacja
+    cons:
+      - Głównie dla RAG use-case — mniej ogólny niż MCP
+      - Narzędzia nie są przenośne między klientami
+      - Trudniejszy setup niż prosty serwer MCP
+    vs: LlamaIndex idealne dla RAG pipelines. MCP ogólniejszy — do dowolnych narzędzi. Można łączyć — LlamaIndex do RAG, MCP do wystawienia go jako narzędzia dla klienta.
+
+  - name: AutoGen
+    icon: "🤖"
+    color: "#0067b8"
+    tagline: Multi-agent framework od Microsoft — agenty rozmawiają ze sobą
+    pros:
+      - Multi-agent conversations — wiele AI agentów współpracuje
+      - Kod wykonuje się automatycznie w sandboxie
+      - Dobry do complex workflows z iteracją
+      - Open source, aktywny development
+    cons:
+      - Złożony setup dla prostych przypadków
+      - Narzędzia nie są przenośne między frameworkami
+      - Trudniejszy w debugowaniu (wiele agentów)
+      - Overkill gdy jeden agent wystarczy
+    vs: AutoGen dla skomplikowanych workflow wieloagentowych. MCP prostszy — skupiony na dostarczaniu narzędzi do jednego modelu. Można łączyć — AutoGen + serwery MCP jako narzędzia.

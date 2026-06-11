@@ -1,0 +1,158 @@
+title: Zaawansowane wzorce
+
+items:
+  - name: Scraping z User-Agent rotation
+    desc: Rotuj User-Agent przy każdym requeście żeby wyglądać jak prawdziwy użytkownik i unikać blokad.
+    icon: "🔄"
+    code: |
+      from fake_useragent import UserAgent
+      import requests, random, time
+
+      ua = UserAgent()
+
+      def random_session():
+          session = requests.Session()
+          session.headers["User-Agent"] = ua.random
+          return session
+
+      urls = ["https://example.com/page/1", "https://example.com/page/2"]
+
+      for url in urls:
+          with random_session() as s:
+              response = s.get(url, timeout=10)
+              print(f"{s.headers['User-Agent'][:50]}...")
+          time.sleep(random.uniform(1, 3))  # losowy delay
+
+  - name: Concurrent requests — ThreadPoolExecutor
+    desc: Pobieranie wielu URLi jednocześnie przez wątki. requests jest sync — wątki to najprostszy sposób na parallelizm.
+    icon: "⚡"
+    code: |
+      import requests
+      from concurrent.futures import ThreadPoolExecutor, as_completed
+
+      def fetch(url):
+          try:
+              r = requests.get(url, timeout=10)
+              return url, r.status_code, len(r.content)
+          except Exception as e:
+              return url, None, str(e)
+
+      urls = [f"https://httpbin.org/get?n={i}" for i in range(10)]
+
+      with ThreadPoolExecutor(max_workers=5) as executor:
+          futures = {executor.submit(fetch, url): url for url in urls}
+          for future in as_completed(futures):
+              url, status, size = future.result()
+              print(f"{status} | {size} bytes | {url}")
+
+  - name: Requests + BeautifulSoup pipeline
+    desc: Klasyczny pipeline scrapingu. requests pobiera HTML, BeautifulSoup parsuje strukturę.
+    icon: "🍲"
+    code: |
+      import requests
+      from bs4 import BeautifulSoup
+
+      def scrape_links(url):
+          headers = {"User-Agent": "Mozilla/5.0"}
+          response = requests.get(url, headers=headers, timeout=10)
+          response.raise_for_status()
+
+          soup = BeautifulSoup(response.text, "html.parser")
+
+          links = []
+          for a in soup.find_all("a", href=True):
+              href = a["href"]
+              if href.startswith("http"):
+                  links.append({"text": a.text.strip(), "url": href})
+
+          return links
+
+      results = scrape_links("https://python.org")
+      for link in results[:5]:
+          print(f"{link['text']}: {link['url']}")
+
+  - name: Requests + FastAPI webhook
+    desc: Wysyłanie wyników automatyzacji do FastAPI, Slack, Discord lub Telegram.
+    icon: "🔔"
+    code: |
+      import requests
+
+      def send_to_slack(message: str, webhook_url: str):
+          payload = {
+              "text": message,
+              "username": "Automation Bot",
+              "icon_emoji": ":robot_face:"
+          }
+          response = requests.post(webhook_url, json=payload, timeout=10)
+          response.raise_for_status()
+          return response.status_code
+
+      def notify_fastapi(data: dict, api_url: str, api_key: str):
+          response = requests.post(
+              f"{api_url}/webhook/results",
+              json=data,
+              headers={"X-API-Key": api_key},
+              timeout=10
+          )
+          response.raise_for_status()
+          return response.json()
+
+  - name: HTTP caching z requests-cache
+    desc: Cache odpowiedzi na dysku. Podczas developmentu nie bombardujesz serwisów i nie trafiasz na rate limit.
+    icon: "💾"
+    code: |
+      import requests_cache
+      # pip install requests-cache
+
+      requests_cache.install_cache(
+          "scraping_cache",
+          expire_after=3600  # cache 1h
+      )
+
+      import requests
+
+      # Pierwszy request — prawdziwy HTTP
+      r = requests.get("https://api.github.com/users/torvalds", timeout=10)
+      print(r.from_cache)  # False
+
+      # Drugi request — z cache (natychmiastowy!)
+      r = requests.get("https://api.github.com/users/torvalds", timeout=10)
+      print(r.from_cache)  # True
+
+      requests_cache.clear()
+
+  - name: GraphQL przez requests
+    desc: API które używa GraphQL zamiast REST — GitHub API v4, Shopify i wiele nowoczesnych API.
+    icon: "🔷"
+    code: |
+      import requests
+
+      def graphql_query(endpoint, query, variables=None, token=None):
+          headers = {"Content-Type": "application/json"}
+          if token:
+              headers["Authorization"] = f"Bearer {token}"
+
+          payload = {"query": query, "variables": variables or {}}
+          response = requests.post(endpoint, json=payload, headers=headers, timeout=10)
+          response.raise_for_status()
+
+          result = response.json()
+          if "errors" in result:
+              raise Exception(result["errors"])
+          return result["data"]
+
+      # GitHub GraphQL API
+      query = """
+      query($login: String!) {
+        user(login: $login) {
+          name
+          repositories { totalCount }
+        }
+      }
+      """
+      data = graphql_query(
+          "https://api.github.com/graphql",
+          query,
+          variables={"login": "torvalds"},
+          token="YOUR_GITHUB_TOKEN"
+      )

@@ -1,0 +1,124 @@
+title: Komponenty i JSX
+
+items:
+  - name: Komponent funkcyjny (standard)
+    desc: Nowoczesny sposób pisania komponentów. Zwykła funkcja JavaScript która zwraca JSX. Używaj zawsze — klasy są legacy.
+    icon: "🧩"
+    code: |
+      function UserCard({ name, email, avatar }) {
+        return (
+          <div className="card">
+            <img src={avatar} alt={name} />
+            <h2>{name}</h2>
+            <p>{email}</p>
+          </div>
+        );
+      }
+
+  - name: Props — przekazywanie danych
+    desc: Props to dane przekazywane z rodzica do dziecka. Są readonly — komponent nie może ich modyfikować.
+    icon: "📨"
+    code: |
+      // Rodzic
+      <Button color="blue" size="lg" onClick={handleClick}>
+        Kliknij mnie
+      </Button>
+
+      // Komponent Button
+      function Button({ color, size, onClick, children }) {
+        return (
+          <button
+            className={`btn btn-${color} btn-${size}`}
+            onClick={onClick}
+          >
+            {children}
+          </button>
+        );
+      }
+
+  - name: Children — kompozycja komponentów
+    desc: Specjalny prop children pozwala zagnieżdżać komponenty jak HTML. Klucz do budowania elastycznych layoutów.
+    icon: "🏗️"
+    code: |
+      function Card({ title, children }) {
+        return (
+          <div className="card">
+            <h3>{title}</h3>
+            <div className="card-body">
+              {children}
+            </div>
+          </div>
+        );
+      }
+
+      // Użycie:
+      <Card title="Profil">
+        <Avatar />
+        <UserInfo />
+      </Card>
+
+  - name: Renderowanie warunkowe
+    desc: "React nie ma specjalnej składni dla if/else w JSX — używasz zwykłego JS: operator trójkowy, &&, lub zmienne."
+    icon: "🔀"
+    code: |
+      function Status({ isLoggedIn, userName }) {
+        return (
+          <div>
+            {isLoggedIn ? (
+              <p>Witaj, {userName}!</p>
+            ) : (
+              <button>Zaloguj się</button>
+            )}
+
+            {/* Pokaż tylko gdy true */}
+            {isLoggedIn && <LogoutButton />}
+          </div>
+        );
+      }
+
+  - name: Renderowanie list
+    desc: Listy renderujesz przez .map(). Każdy element musi mieć unikalny prop key — React używa go do optymalnego re-renderowania.
+    icon: "📋"
+    code: |
+      function UserList({ users }) {
+        return (
+          <ul>
+            {users.map(user => (
+              <li key={user.id}>
+                <strong>{user.name}</strong> — {user.email}
+              </li>
+            ))}
+          </ul>
+        );
+      }
+
+  - name: Formularze — controlled components
+    desc: W React formularz kontrolujesz przez state. Każda zmiana inputa aktualizuje state, state kontroluje wartość inputa.
+    icon: "📝"
+    code: |
+      function LoginForm() {
+        const [email, setEmail] = useState('');
+        const [password, setPassword] = useState('');
+
+        const handleSubmit = (e) => {
+          e.preventDefault();
+          console.log({ email, password });
+        };
+
+        return (
+          <form onSubmit={handleSubmit}>
+            <input
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="Email"
+            />
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Hasło"
+            />
+            <button type="submit">Zaloguj</button>
+          </form>
+        );
+      }

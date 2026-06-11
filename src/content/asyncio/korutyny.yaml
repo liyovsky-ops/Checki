@@ -1,0 +1,105 @@
+items:
+  - name: async def i await — podstawowa składnia
+    desc: >
+      async def definiuje korutynę. await czeka na wynik awaitable.
+      Korutyny możesz wywoływać tylko wewnątrz innych async def lub przez asyncio.run().
+    code: |
+      import asyncio
+
+      # Korutyna — funkcja z async def
+      async def przywitaj(imie: str, opoznienie: float):
+          await asyncio.sleep(opoznienie)  # nie blokuje event loop
+          print(f"Cześć, {imie}!")
+          return f"Gotowe: {imie}"
+
+      # Uruchomienie pojedynczej korutyny
+      async def main():
+          wynik = await przywitaj("Łukasz", 1.0)
+          print(wynik)
+
+      # Punkt wejścia — poza async def
+      asyncio.run(main())
+
+  - name: asyncio.gather() — równoległe wykonywanie
+    desc: >
+      gather() uruchamia wiele korutyn równolegle i czeka aż wszystkie się skończą.
+      Zwraca listę wyników w tej samej kolejności co argumenty.
+    code: |
+      import asyncio
+      import time
+
+      async def zadanie(n: int, czas: float) -> str:
+          await asyncio.sleep(czas)
+          return f"Zadanie {n} gotowe"
+
+      async def main():
+          start = time.perf_counter()
+
+          # Sekwencyjnie (wolno — suma czasów):
+          # r1 = await zadanie(1, 1.0)
+          # r2 = await zadanie(2, 1.0)
+
+          # Równolegle (szybko — max czasu):
+          r1, r2, r3 = await asyncio.gather(
+              zadanie(1, 1.0),
+              zadanie(2, 0.5),
+              zadanie(3, 0.8),
+          )
+          print(f"Czas: {time.perf_counter() - start:.2f}s")  # ~1.0s
+          print(r1, r2, r3)
+
+      asyncio.run(main())
+
+  - name: asyncio.gather() — obsługa błędów
+    desc: >
+      Domyślnie gather() rzuca wyjątek przy pierwszym błędzie.
+      return_exceptions=True zbiera wszystkie wyniki/błędy do listy — sam sprawdzasz co się udało.
+    code: |
+      import asyncio
+
+      async def moze_rzucic(n: int):
+          if n == 2:
+              raise ValueError(f"Błąd w zadaniu {n}")
+          await asyncio.sleep(0.1)
+          return f"OK: {n}"
+
+      async def main():
+          # return_exceptions=True — nie rzuca, zwraca Exception jako wynik
+          wyniki = await asyncio.gather(
+              moze_rzucic(1),
+              moze_rzucic(2),
+              moze_rzucic(3),
+              return_exceptions=True,
+          )
+
+          for i, w in enumerate(wyniki):
+              if isinstance(w, Exception):
+                  print(f"Zadanie {i+1} BŁĄD: {w}")
+              else:
+                  print(f"Zadanie {i+1}: {w}")
+
+      asyncio.run(main())
+
+  - name: TaskGroup — Python 3.11+ (zalecany)
+    desc: >
+      TaskGroup to nowszy, bezpieczniejszy sposób uruchamiania zadań.
+      Gdy jedno Task rzuci wyjątek, anuluje pozostałe. Lepsza obsługa błędów niż gather().
+    code: |
+      import asyncio
+
+      async def worker(name: str, delay: float) -> str:
+          await asyncio.sleep(delay)
+          print(f"{name} gotowy po {delay}s")
+          return name
+
+      async def main():
+          # Python 3.11+
+          async with asyncio.TaskGroup() as tg:
+              t1 = tg.create_task(worker("A", 1.0))
+              t2 = tg.create_task(worker("B", 0.5))
+              t3 = tg.create_task(worker("C", 0.8))
+          # Tu wszystkie tasks są skończone
+
+          print([t1.result(), t2.result(), t3.result()])
+
+      asyncio.run(main())

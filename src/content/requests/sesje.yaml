@@ -1,0 +1,111 @@
+title: Sesje i cookies
+
+items:
+  - name: Session — reużywanie połączeń
+    desc: Session utrzymuje połączenie TCP między requestami (keep-alive). Reużywa cookies i headers. Znacznie szybszy przy wielu requestach do tego samego hosta.
+    icon: "🔗"
+    code: |
+      import requests
+
+      # Z Session — jedno połączenie TCP, współdzielone headers
+      with requests.Session() as session:
+          session.headers.update({
+              "User-Agent": "Mozilla/5.0",
+              "Accept-Language": "pl-PL"
+          })
+
+          # Wszystkie requesty reużywają połączenie
+          r1 = session.get("https://api.example.com/page/1")
+          r2 = session.get("https://api.example.com/page/2")
+          r3 = session.get("https://api.example.com/page/3")
+      # Session automatycznie zamknięta przez with
+
+  - name: Session z logowaniem
+    desc: Zaloguj się przez Session — cookies są automatycznie przechowywane i wysyłane w kolejnych requestach.
+    icon: "🔐"
+    code: |
+      import requests
+
+      with requests.Session() as session:
+          # Krok 1: Zaloguj się
+          login_response = session.post(
+              "https://example.com/login",
+              data={"email": "user@test.com", "password": "secret"},
+              timeout=10
+          )
+          login_response.raise_for_status()
+
+          # Session automatycznie zapisała cookies!
+          print("Cookies:", session.cookies.get_dict())
+
+          # Krok 2: Chronione zasoby — cookies wysyłane automatycznie
+          dashboard = session.get("https://example.com/dashboard", timeout=10)
+          data = session.get("https://example.com/api/my-data", timeout=10)
+          print(data.json())
+
+  - name: Session z retry — automatyczne ponawianie
+    desc: HTTPAdapter z Retry automatycznie ponawia request przy błędach sieci lub 5xx. Kluczowe w produkcyjnym scrapingu.
+    icon: "🔄"
+    code: |
+      import requests
+      from requests.adapters import HTTPAdapter
+      from urllib3.util.retry import Retry
+
+      def create_resilient_session():
+          session = requests.Session()
+          retry = Retry(
+              total=3,
+              backoff_factor=1,  # czekaj 1s, 2s, 4s między próbami
+              status_forcelist=[429, 500, 502, 503, 504],
+          )
+          adapter = HTTPAdapter(max_retries=retry)
+          session.mount("https://", adapter)
+          session.mount("http://", adapter)
+          return session
+
+      with create_resilient_session() as session:
+          response = session.get("https://api.example.com/data", timeout=10)
+          # Automatycznie ponowi jeśli dostanie 503!
+
+  - name: Cookies — zarządzanie
+    desc: requests automatycznie obsługuje cookies. Możesz je ręcznie ustawiać, odczytywać i zapisywać między sesjami.
+    icon: "🍪"
+    code: |
+      import requests, json
+
+      with requests.Session() as session:
+          # Ręczne ustawienie cookie
+          session.cookies.set("session_id", "abc123", domain="example.com")
+
+          # Odczytaj cookies po requeście
+          session.get("https://example.com/login", timeout=10)
+          cookies_dict = session.cookies.get_dict()
+
+          # Zapisz cookies do pliku (między uruchomieniami)
+          with open("cookies.json", "w") as f:
+              json.dump(cookies_dict, f)
+
+      # Wczytaj cookies w następnym uruchomieniu
+      with requests.Session() as session:
+          with open("cookies.json") as f:
+              cookies = json.load(f)
+          session.cookies.update(cookies)
+
+  - name: Hooks — interceptory requestów
+    desc: response hooks = funkcje wywoływane po każdym requeście. Do logowania, retry logic, transformacji odpowiedzi.
+    icon: "🪝"
+    code: |
+      import requests
+
+      def log_response(response, *args, **kwargs):
+          print(f"{response.request.method} {response.url}")
+          print(f"→ {response.status_code} ({response.elapsed.total_seconds():.2f}s)")
+
+      def auto_raise(response, *args, **kwargs):
+          response.raise_for_status()
+
+      with requests.Session() as session:
+          session.hooks["response"].append(log_response)
+          session.hooks["response"].append(auto_raise)
+          # Każdy request automatycznie loguje i rzuca przy błędzie
+          r = session.get("https://api.example.com/data", timeout=10)

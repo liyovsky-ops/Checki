@@ -1,0 +1,141 @@
+title: Markery i parametryzacja
+
+items:
+  - name: parametrize — jeden test, wiele danych
+    desc: "Uruchom ten sam test dla wielu zestawów danych. Czytelniejsze i krótsze niż pisanie osobnych testów."
+    icon: "🔄"
+    code: |
+      import pytest
+
+      @pytest.mark.parametrize("input,expected", [
+          (2, 4),
+          (3, 9),
+          (4, 16),
+          (0, 0),
+          (-2, 4),
+      ])
+      def test_square(input, expected):
+          assert square(input) == expected
+
+      # z ID
+      @pytest.mark.parametrize("url,status", [
+          ("https://example.com", 200),
+          ("https://httpbin.org/status/404", 404),
+      ], ids=["homepage", "not-found"])
+      def test_http_status(url, status):
+          r = requests.get(url, timeout=10)
+          assert r.status_code == status
+
+  - name: skip i skipif
+    desc: "Pomiń test warunkowo lub bezwarunkowo. Przydatne dla testów zależnych od środowiska."
+    icon: "⏭️"
+    code: |
+      import pytest
+      import sys
+
+      @pytest.mark.skip(reason="Do naprawy po aktualizacji API")
+      def test_broken_feature():
+          assert deprecated_function() == 42
+
+      @pytest.mark.skipif(
+          sys.platform == "win32",
+          reason="Test tylko na Linux/Mac"
+      )
+      def test_unix_paths():
+          assert os.path.exists("/tmp")
+
+      @pytest.mark.skipif(
+          not os.getenv("DATABASE_URL"),
+          reason="Wymaga zmiennej DATABASE_URL"
+      )
+      def test_db_connection():
+          db = connect(os.getenv("DATABASE_URL"))
+          assert db.ping()
+
+  - name: xfail — oczekiwany błąd
+    desc: "xfail oznacza test który powinien nie przejść (expected failure). Jeśli przejdzie — to XPASS (zaskoczenie)."
+    icon: "❌"
+    code: |
+      import pytest
+
+      @pytest.mark.xfail(reason="Bug #123 — div by zero nie jest obsługiwany")
+      def test_edge_case():
+          result = divide(10, 0)  # rzuci ZeroDivisionError
+          assert result == float("inf")
+
+      @pytest.mark.xfail(strict=True)
+      def test_must_fail():
+          # strict=True: jeśli PRZEJDZIE — fail całego test suite
+          assert 1 == 2
+
+  - name: Własne markery
+    desc: Definiuj markery w pytest.ini do grupowania testów. Uruchamiaj tylko wybraną grupę przez -m.
+    icon: "🏷️"
+    code: |
+      # pytest.ini
+      # [pytest]
+      # markers =
+      #     slow: testy które trwają długo
+      #     integration: testy integracyjne z bazą danych
+      #     smoke: minimalne testy poprawności
+
+      import pytest
+
+      @pytest.mark.slow
+      def test_big_file_processing():
+          process_1gb_file()
+
+      @pytest.mark.integration
+      def test_database_save():
+          db.save({"key": "value"})
+
+      # Uruchom tylko szybkie testy:
+      # pytest -m "not slow"
+      # Uruchom tylko integracyjne:
+      # pytest -m integration
+
+  - name: pytest-asyncio — testy async
+    desc: Testuj funkcje async def z pytest-asyncio. Dekorator lub tryb auto.
+    icon: "⚡"
+    code: |
+      pip install pytest-asyncio
+
+      # pytest.ini lub pyproject.toml:
+      # [pytest]
+      # asyncio_mode = auto
+
+      import pytest
+      import pytest_asyncio
+      import httpx
+      from app.main import app
+
+      @pytest.mark.asyncio
+      async def test_async_endpoint():
+          async with httpx.AsyncClient(app=app, base_url="http://test") as ac:
+              response = await ac.get("/users/1")
+          assert response.status_code == 200
+
+      @pytest_asyncio.fixture
+      async def async_client():
+          async with httpx.AsyncClient(app=app, base_url="http://test") as ac:
+              yield ac
+
+  - name: Grupowanie w klasach
+    desc: Grupuj powiązane testy w klasie Test*. Fixtures działają normalnie, możesz dodać setup/teardown.
+    icon: "📦"
+    code: |
+      import pytest
+
+      class TestUserAPI:
+          def test_create_user(self, client):
+              r = client.post("/users/", json={"name": "Jan", "email": "jan@test.com"})
+              assert r.status_code == 201
+              assert r.json()["name"] == "Jan"
+
+          def test_get_user(self, client):
+              r = client.get("/users/1")
+              assert r.status_code == 200
+
+          def test_delete_user(self, client):
+              r = client.delete("/users/1")
+              assert r.status_code == 204

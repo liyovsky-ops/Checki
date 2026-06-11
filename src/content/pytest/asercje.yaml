@@ -1,0 +1,110 @@
+title: Asercje i debugowanie testów
+
+items:
+  - name: Podstawowe asercje
+    desc: pytest używa zwykłego assert Python. Automatycznie pokazuje wartości przy błędzie — nie musisz pisać komunikatów.
+    icon: "✅"
+    code: |
+      def test_basic_assertions():
+          # Równość
+          assert 2 + 2 == 4
+          assert "hello".upper() == "HELLO"
+
+          # Zawieranie
+          assert "world" in "hello world"
+          assert 3 in [1, 2, 3, 4]
+
+          # Typ
+          assert isinstance([], list)
+          assert isinstance("text", str)
+
+          # None i bool
+          assert result is not None
+          assert flag is True
+
+  - name: Asercje na kolekcjach
+    desc: Porównywanie list, słowników, zbiorów. pytest pokazuje różnicę przy niezgodności.
+    icon: "📋"
+    code: |
+      def test_collections():
+          # Listy — kolejność ma znaczenie
+          assert [1, 2, 3] == [1, 2, 3]
+
+          # Słowniki — wszystkie klucze muszą pasować
+          user = {"name": "Jan", "age": 30}
+          assert user == {"name": "Jan", "age": 30}
+
+          # Subset check (Python dict)
+          assert user.items() >= {"name": "Jan"}.items()
+
+          # Liczba elementów
+          items = get_all_items()
+          assert len(items) == 5
+          assert len(items) > 0
+
+  - name: Asercje na liczbach zmiennoprzecinkowych
+    desc: Nigdy nie porównuj floatów przez == — użyj pytest.approx.
+    icon: "🔢"
+    code: |
+      import pytest
+
+      def test_float_math():
+          # ŹLE:
+          # assert 0.1 + 0.2 == 0.3  # False! (floating point)
+
+          # DOBRZE:
+          assert 0.1 + 0.2 == pytest.approx(0.3)
+          assert 1.0001 == pytest.approx(1.0, rel=1e-3)  # 0.1% tolerancja
+          assert 1.0001 == pytest.approx(1.0, abs=1e-2)  # absolutna tolerancja
+
+          # Na listach:
+          assert [0.1, 0.2] == pytest.approx([0.1, 0.2])
+
+  - name: Asercje z wyjątkami
+    desc: pytest.raises sprawdza że funkcja rzuca konkretny wyjątek. match weryfikuje wiadomość.
+    icon: "💥"
+    code: |
+      import pytest
+
+      def test_exceptions():
+          with pytest.raises(ValueError):
+              int("nie liczba")
+
+          # Sprawdź wiadomość wyjątku
+          with pytest.raises(ValueError, match="invalid literal"):
+              int("abc")
+
+          # Inspect wyjątek
+          with pytest.raises(KeyError) as exc_info:
+              d = {}
+              _ = d["missing_key"]
+          assert exc_info.value.args[0] == "missing_key"
+
+  - name: Asercje na wyjściach (stdout/stderr)
+    desc: capsys przechwytuje stdout/stderr. Sprawdź co funkcja wypisuje.
+    icon: "📺"
+    code: |
+      def greet(name):
+          print(f"Cześć, {name}!")
+
+      def test_output(capsys):
+          greet("Łukasz")
+          captured = capsys.readouterr()
+          assert captured.out == "Cześć, Łukasz!\n"
+          assert captured.err == ""  # brak błędów na stderr
+
+  - name: Czytelne komunikaty błędów
+    desc: Dodaj własny komunikat do assert gdy domyślny jest niewystarczający.
+    icon: "💬"
+    code: |
+      def test_user_permissions(user):
+          perms = get_permissions(user.id)
+          assert "read" in perms, f"User {user.id} powinien mieć 'read', ma: {perms}"
+          assert "write" in perms, f"User {user.id} powinien mieć 'write', ma: {perms}"
+
+      # Złożone asercje — rozbij na osobne linie
+      def test_api_response(response):
+          assert response.status_code == 200, f"Status: {response.status_code}, body: {response.text}"
+          data = response.json()
+          assert "id" in data, f"Brak 'id' w: {data}"
+          assert data["id"] > 0, f"id musi być > 0, jest: {data['id']}"

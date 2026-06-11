@@ -1,0 +1,99 @@
+title: Async i Wydajność
+
+items:
+  - name: def vs async def — kiedy co używać
+    desc: "sync def = FastAPI uruchamia w osobnym wątku (bezpieczne dla blokujących operacji). async def = uruchamia bezpośrednio w event loop (tylko dla nieblokujących operacji)."
+    icon: "🔄"
+    code: |
+      import time
+      import asyncio
+
+      # sync: FastAPI automatycznie puszcza w threadpool
+      @app.get("/sync/")
+      def sync_endpoint():
+          time.sleep(1)  # blokuje, ale OK — w osobnym wątku
+          return {"type": "sync"}
+
+      # async: nie blokuj event loop!
+      @app.get("/async/")
+      async def async_endpoint():
+          await asyncio.sleep(1)  # nieblokujące
+          return {"type": "async"}
+
+  - name: asyncio.gather — równoległe zapytania
+    desc: gather() uruchamia coroutines równolegle. Kilka zapytań do bazy lub API naraz zamiast po kolei.
+    icon: "⚡"
+    code: |
+      import asyncio
+      import httpx
+
+      @app.get("/multi-fetch/")
+      async def multi_fetch():
+          async with httpx.AsyncClient() as client:
+              # równolegle, nie po kolei!
+              r1, r2, r3 = await asyncio.gather(
+                  client.get("https://api.github.com/users/tiangolo"),
+                  client.get("https://api.github.com/users/torvalds"),
+                  client.get("https://api.github.com/users/gvanrossum"),
+              )
+          return {
+              "tiangolo": r1.json()["public_repos"],
+              "torvalds": r2.json()["public_repos"],
+              "gvanrossum": r3.json()["public_repos"],
+          }
+
+  - name: asyncio.Queue — kolejka zadań
+    desc: Queue do komunikacji między coroutines. Producer wysyła zadania, consumer je przetwarza asynchronicznie.
+    icon: "📬"
+    code: |
+      import asyncio
+
+      queue = asyncio.Queue()
+
+      async def worker():
+          while True:
+              task = await queue.get()
+              print(f"Przetwarzam: {task}")
+              await asyncio.sleep(0.1)
+              queue.task_done()
+
+      @app.post("/tasks/")
+      async def add_task(task: dict):
+          await queue.put(task)
+          return {"queued": task}
+
+  - name: Redis cache — przykład
+    desc: Cache wyników w Redis z aioredis. Sprawdź cache → jeśli miss → pobierz z DB → zapisz w cache.
+    icon: "⚡"
+    code: |
+      import json
+      import redis.asyncio as redis
+
+      r = redis.from_url("redis://localhost")
+
+      @app.get("/users/{user_id}")
+      async def get_user_cached(user_id: int):
+          cache_key = f"user:{user_id}"
+          cached = await r.get(cache_key)
+          if cached:
+              return json.loads(cached)
+          # miss — pobierz z DB
+          user = {"id": user_id, "name": "Jan Kowalski"}
+          await r.setex(cache_key, 300, json.dumps(user))  # TTL 5 min
+          return user
+
+  - name: WebSockets
+    desc: FastAPI obsługuje WebSockets natywnie. Dwukierunkowa komunikacja w czasie rzeczywistym.
+    icon: "🔌"
+    code: |
+      from fastapi import WebSocket
+
+      @app.websocket("/ws/{client_id}")
+      async def websocket_endpoint(websocket: WebSocket, client_id: str):
+          await websocket.accept()
+          try:
+              while True:
+                  data = await websocket.receive_text()
+                  await websocket.send_text(f"Echo [{client_id}]: {data}")
+          except Exception:
+              await websocket.close()

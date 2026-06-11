@@ -1,0 +1,81 @@
+title: pytest vs inne narzędzia testowe
+
+items:
+  - name: unittest (stdlib)
+    icon: "🐍"
+    color: "#3572a5"
+    tagline: Wbudowany w Python — zero instalacji, styl JUnit
+    pros:
+      - Zero instalacji — wbudowany w Python
+      - Standardowe narzędzie bez zewnętrznych zależności
+      - Dobra integracja z IDE (PyCharm, VS Code)
+      - Kompatybilny z pytest — pytest uruchamia testy unittest
+    cons:
+      - Wymaga klas dziedziczących po TestCase
+      - Werbose API (assertEqual, assertIn, assertRaises...)
+      - Brak fixtures w stylu pytest
+      - Mniej czytelne raporty błędów
+    vs: unittest gdy nie możesz instalować pakietów. pytest jest czytelniejszy i ma lepszy DX. Dobra wiadomość — pytest uruchamia też testy unittest.
+
+  - name: nose2
+    icon: "🔴"
+    color: "#cc3a23"
+    tagline: Następnik nose — praktycznie martwy projekt
+    pros:
+      - Podobny do pytest
+      - Kompatybilny z unittest
+      - Plugin-based architektura
+    cons:
+      - Praktycznie nierozwijany — ostatni duży release lata temu
+      - Mała społeczność
+      - Brak nowoczesnych features (parametrize, markers, fixtures)
+      - Gorsze raporty niż pytest
+    vs: Unikaj nose/nose2 w nowych projektach. Migruj stary kod nose do pytest — API jest kompatybilne w wielu miejscach.
+
+  - name: Hypothesis
+    icon: "🔬"
+    color: "#2c7be5"
+    tagline: Property-based testing — generuje tysiące przypadków automatycznie
+    pros:
+      - Automatycznie generuje przypadki testowe na podstawie strategii
+      - Wykrywa edge cases których człowiek by nie wymyślił
+      - Świetny do testowania funkcji matematycznych i parserów
+      - Zapamiętuje znalezione błędy (shrinking)
+    cons:
+      - Nie zastępuje pytest — jest uzupełnieniem
+      - Wymaga nauki własnego API (strategies)
+      - Testy wolniejsze (wiele przypadków)
+      - Nie dla wszystkich typów testów
+    vs: Hypothesis + pytest = idealne połączenie. Hypothesis generuje dane, pytest uruchamia testy. Nie alternatywa — uzupełnienie.
+
+  - name: Tox
+    icon: "🌡️"
+    color: "#8a4fff"
+    tagline: Orchestrator testów — uruchamia testy w wielu środowiskach Python
+    pros:
+      - Testowanie na wielu wersjach Python (3.10, 3.11, 3.12) automatycznie
+      - Izolowane środowiska virtualenv
+      - Integracja z CI/CD
+      - Dobry dla bibliotek które wspierają wiele wersji Python
+    cons:
+      - Nie zastępuje pytest — orchestruje pytest
+      - Konfiguracja tox.ini może być skomplikowana
+      - Wolniejszy start (tworzy envs)
+      - Overkill dla aplikacji (nie bibliotek)
+    vs: Tox działa razem z pytest, nie zamiast. Używaj gdy rozwijasz bibliotekę Python wspierającą wiele wersji. Dla aplikacji — pytest wystarczy.
+
+  - name: Playwright (e2e)
+    icon: "🎭"
+    color: "#45ba4b"
+    tagline: Testy end-to-end — steruje prawdziwą przeglądarką
+    pros:
+      - Testuje prawdziwy UI w przeglądarce
+      - Auto-wait — czeka na elementy automatycznie
+      - Screenshots, video, tracing out of the box
+      - pytest-playwright integracja
+    cons:
+      - 100x wolniejszy niż testy jednostkowe
+      - Wymaga przeglądarki (Chromium/Firefox)
+      - Testuje UI nie logikę biznesową
+      - Trudniejszy w debugowaniu
+    vs: pytest dla logiki backendowej (szybki, unit/integration). Playwright dla UI/UX (wolniejszy, e2e). Oba są potrzebne — to różne warstwy testowania.

@@ -1,0 +1,73 @@
+title: Komendy MCP
+groups:
+  - name: Instalacja i setup
+    icon: "📦"
+    commands:
+      - desc: Zainstaluj Python SDK dla MCP
+        code: pip install mcp
+      - desc: MCP z narzędziami CLI (mcp dev, mcp run)
+        code: pip install "mcp[cli]"
+      - desc: Pełny stack MCP + HTTP + env vars
+        code: pip install "mcp[cli]" httpx python-dotenv
+      - desc: Sprawdź zainstalowaną wersję
+        code: python -c "import mcp; print(mcp.__version__)"
+      - desc: Sprawdź czy MCP jest zainstalowany
+        code: python -c "from mcp.server.fastmcp import FastMCP; print('MCP OK')"
+
+  - name: Rozwój i testowanie
+    icon: "🛠️"
+    commands:
+      - desc: Uruchom serwer z MCP Inspector (UI debugger)
+        code: mcp dev server.py
+      - desc: Uruchom serwer z dodatkowymi zależnościami
+        code: mcp dev server.py --with httpx --with pandas
+      - desc: Uruchom serwer bez Inspectora (jak robi Claude Desktop)
+        code: mcp run server.py
+      - desc: Uruchom serwer z transportem SSE (HTTP, wielu klientów)
+        code: mcp dev server.py --transport sse
+
+  - name: Claude Code — zarządzanie serwerami
+    icon: "🤖"
+    commands:
+      - desc: Dodaj serwer MCP do Claude Code
+        code: claude mcp add nazwa python /path/to/server.py
+      - desc: Dodaj serwer z zmienną środowiskową
+        code: claude mcp add nazwa python server.py -e API_KEY=abc
+      - desc: Dodaj serwer globalnie (wszystkie projekty)
+        code: claude mcp add --scope global nazwa python server.py
+      - desc: Pokaż skonfigurowane serwery
+        code: claude mcp list
+      - desc: Szczegóły konkretnego serwera
+        code: claude mcp get nazwa
+      - desc: Usuń serwer MCP
+        code: claude mcp remove nazwa
+
+  - name: Diagnoza i debugowanie
+    icon: "🐛"
+    commands:
+      - desc: Uruchom serwer i zapisz logi do pliku
+        code: python server.py 2>debug.log
+      - desc: Śledź logi serwera na żywo
+        code: tail -f debug.log
+      - desc: Podejrzyj konfigurację Claude Code
+        code: cat ~/.claude/settings.json | python3 -m json.tool
+      - desc: Loguj do stderr w serwerze (nie do stdout)
+        code: |
+          import sys
+          print("debug info", file=sys.stderr)
+
+  - name: Środowisko i konfiguracja
+    icon: "⚙️"
+    commands:
+      - desc: Ustaw API key dla serwera używającego Claude
+        code: export ANTHROPIC_API_KEY="sk-ant-..."
+      - desc: Wczytaj zmienne z pliku .env w serwerze
+        code: |
+          from dotenv import load_dotenv
+          load_dotenv()
+          import os
+          key = os.environ["API_KEY"]
+      - desc: Sprawdź lokalizację konfiguracji Claude Desktop (Mac)
+        code: ls "~/Library/Application Support/Claude/"
+      - desc: Sprawdź lokalizację konfiguracji Claude Desktop (Windows)
+        code: ls "$env:APPDATA\Claude\"

@@ -1,0 +1,66 @@
+title: Zarządzanie stanem
+
+items:
+  - name: useState — lokalny stan
+    desc: "Wbudowany, zero setup. Użyj dla prostego lokalnego stanu: toggle, liczniki, wartości formularzy w jednym komponencie."
+    icon: "⚛️"
+    code: |
+      const [open, setOpen] = useState(false);
+
+      // Bundle: 0 KB (wbudowany)
+      // Kiedy: dane widoczne tylko w jednym komponencie
+
+  - name: Context + useReducer — stan globalny bez bibliotek
+    desc: Wbudowane w React. Dobry wybór dla motywu, języka, auth — gdy prop drilling boli ale nie chcesz zewnętrznej biblioteki.
+    icon: "🔄"
+    code: |
+      const StateContext = createContext();
+
+      const [state, dispatch] = useReducer(reducer, initialState);
+
+      <StateContext.Provider value={{ state, dispatch }}>
+        <App />
+      </StateContext.Provider>
+
+      // W komponencie:
+      const { state, dispatch } = useContext(StateContext);
+
+      // Bundle: 0 KB (wbudowany)
+      // Kiedy: motyw, język, auth — globalny ale prosty stan
+
+  - name: Zustand — global state, proste i szybkie
+    desc: "Minimalistyczny global state. Brak Provider, brak boilerplate. ~1KB gzip. Must-have dla średnich projektów."
+    icon: "🐻"
+    code: |
+      import { create } from 'zustand';
+
+      const useStore = create((set) => ({
+        count: 0,
+        increment: () => set(s => ({ count: s.count + 1 })),
+        reset: () => set({ count: 0 }),
+      }));
+
+      // W komponencie (bez Provider!):
+      const { count, increment } = useStore();
+
+      // Bundle: ~1 KB
+      // Kiedy: średnie aplikacje, gdy Context jest za wolny lub za dużo boilerplate
+
+  - name: Redux Toolkit — enterprise state
+    desc: Oficjalny, nowoczesny Redux. Eliminuje ~70% boilerplate starego Reduxa. Dla dużych aplikacji z wieloma developerami.
+    icon: "🟣"
+    code: |
+      const counterSlice = createSlice({
+        name: 'counter',
+        initialState: { value: 0 },
+        reducers: {
+          increment: state => { state.value++ },  // Immer pod spodem
+          decrement: state => { state.value-- },
+        },
+      });
+
+      const { increment } = counterSlice.actions;
+      dispatch(increment());
+
+      // Bundle: ~15 KB
+      // Kiedy: duże aplikacje, time-travel debugging, wiele osób w teamie

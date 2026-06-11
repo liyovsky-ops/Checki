@@ -1,0 +1,121 @@
+items:
+  - name: asyncio.Task — zadania w tle
+    desc: >
+      Task to korutyna uruchomiona w event loop niezależnie.
+      Nie musisz na nią czekać od razu — może działać "w tle". create_task() startuje ją natychmiast.
+    code: |
+      import asyncio
+
+      async def background_task(name: str):
+          while True:
+              print(f"{name}: pracuję...")
+              await asyncio.sleep(2)
+
+      async def main():
+          # Utwórz task — startuje od razu, nie czekamy
+          task = asyncio.create_task(background_task("monitor"))
+
+          # Rób inne rzeczy
+          await asyncio.sleep(5)
+
+          # Anuluj task gdy skończymy
+          task.cancel()
+          try:
+              await task
+          except asyncio.CancelledError:
+              print("Task anulowany")
+
+      asyncio.run(main())
+
+  - name: asyncio.wait() — czekaj na niektóre tasks
+    desc: >
+      wait() daje większą kontrolę niż gather() — możesz czekać na pierwszy gotowy, pierwszy błąd lub wszystkie.
+      Zwraca (done, pending) sety.
+    code: |
+      import asyncio
+
+      async def zadanie(n: int, czas: float):
+          await asyncio.sleep(czas)
+          return n * 2
+
+      async def main():
+          tasks = [
+              asyncio.create_task(zadanie(i, i * 0.3))
+              for i in range(1, 5)
+          ]
+
+          # Czekaj na pierwszego gotowego
+          done, pending = await asyncio.wait(
+              tasks,
+              return_when=asyncio.FIRST_COMPLETED
+          )
+
+          for task in done:
+              print(f"Gotowy: {task.result()}")
+
+          # Anuluj pozostałe
+          for task in pending:
+              task.cancel()
+
+      asyncio.run(main())
+
+  - name: asyncio.timeout() — limit czasu
+    desc: >
+      timeout() i wait_for() ograniczają czas oczekiwania na korutynę.
+      Rzuca asyncio.TimeoutError gdy przekroczony.
+    code: |
+      import asyncio
+
+      async def wolna_operacja():
+          await asyncio.sleep(10)  # bardzo wolna
+          return "gotowe"
+
+      async def main():
+          # Sposób 1: wait_for (starszy)
+          try:
+              wynik = await asyncio.wait_for(
+                  wolna_operacja(),
+                  timeout=2.0  # 2 sekundy
+              )
+          except asyncio.TimeoutError:
+              print("Timeout — za wolno!")
+
+          # Sposób 2: timeout() context manager (Python 3.11+)
+          try:
+              async with asyncio.timeout(2.0):
+                  wynik = await wolna_operacja()
+          except TimeoutError:
+              print("Timeout!")
+
+      asyncio.run(main())
+
+  - name: asyncio.Queue — komunikacja między tasks
+    desc: >
+      Queue to async kolejka FIFO. Producer dodaje elementy, Consumer pobiera.
+      Naturalna komunikacja między korutynami bez race conditions.
+    code: |
+      import asyncio
+
+      async def producer(queue: asyncio.Queue, n: int):
+          for i in range(n):
+              await asyncio.sleep(0.1)
+              await queue.put(f"item-{i}")
+              print(f"Dodano: item-{i}")
+          await queue.put(None)  # sygnał końca
+
+      async def consumer(queue: asyncio.Queue):
+          while True:
+              item = await queue.get()
+              if item is None:
+                  break
+              print(f"Przetwarzam: {item}")
+              queue.task_done()
+
+      async def main():
+          queue = asyncio.Queue(maxsize=5)
+          await asyncio.gather(
+              producer(queue, 10),
+              consumer(queue),
+          )
+
+      asyncio.run(main())

@@ -1,0 +1,66 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać MCP?
+  firstComponent: Minimalny serwer MCP
+  firstComponentLang: Python
+
+intro:
+  title: Czym jest MCP?
+  desc: >
+    Model Context Protocol (MCP) to otwarty standard od Anthropic który pozwala modelom AI
+    (Claude, GPT, Gemini) łączyć się z zewnętrznymi narzędziami, bazami danych i usługami.
+    Zamiast hardkodować każdą integrację — tworzysz serwer MCP który wystawia narzędzia i zasoby.
+    Klient (np. Claude Desktop) łączy się i może ich używać. USB-C dla AI — jeden standard, wszystkie narzędzia.
+
+concepts:
+  - title: Architektura Host–Client–Server
+    desc: >
+      Host (np. Claude Desktop) uruchamia Klientów. Każdy Klient łączy się z jednym Serwerem MCP.
+      Serwer wystawia Narzędzia, Zasoby i Prompty. Model AI pyta hosta o dostępne narzędzia i może je wywoływać.
+    icon: "🏗️"
+  - title: Tools (Narzędzia)
+    desc: >
+      Funkcje które model może wywołać — jak function calling w OpenAI.
+      Przykłady: search_database(), create_file(), send_email().
+      Model sam decyduje kiedy użyć narzędzia na podstawie opisu.
+    icon: "🔧"
+  - title: Resources (Zasoby)
+    desc: >
+      Dane które serwer udostępnia do odczytu — pliki, wyniki zapytań, dokumenty.
+      URI-based: file:///path, database://query. Model może poprosić o zasób żeby uzyskać kontekst.
+    icon: "📦"
+  - title: "Transport: stdio vs HTTP"
+    desc: >
+      stdio — serwer uruchamiany jako subprocess, komunikacja przez stdin/stdout. Prosty, lokalny.
+      HTTP/SSE — serwer jako usługa sieciowa, wiele klientów. Claude Desktop używa stdio.
+    icon: "🚀"
+
+whenToUse:
+  - Podłącz Claude do własnej bazy danych — niech pisze SQL i czyta wyniki
+  - Daj AI dostęp do lokalnych plików i projektów (lepiej niż kopiowanie do chatu)
+  - Integracja z zewnętrznymi API (GitHub, Jira, Slack) bez pisania integracji per-model
+  - Własne narzędzia developerskie dostępne w Claude Code / Claude Desktop
+  - Agenci AI którzy wykonują akcje w systemie (tworzą pliki, uruchamiają skrypty)
+  - "Standaryzacja: jeden serwer MCP działa z każdym klientem (Claude, GPT, Gemini)"
+
+firstComponent: |
+  # pip install mcp
+  from mcp.server.fastmcp import FastMCP
+
+  # Utwórz serwer
+  mcp = FastMCP("Mój Serwer")
+
+  # Zdefiniuj narzędzie — model może je wywołać
+  @mcp.tool()
+  def dodaj(a: int, b: int) -> int:
+      """Dodaj dwie liczby."""
+      return a + b
+
+  @mcp.tool()
+  def powitaj(imie: str) -> str:
+      """Przywitaj użytkownika po imieniu."""
+      return f"Cześć, {imie}!"
+
+  # Uruchom serwer (stdio — dla Claude Desktop)
+  if __name__ == "__main__":
+      mcp.run()

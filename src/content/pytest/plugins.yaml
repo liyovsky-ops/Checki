@@ -1,0 +1,102 @@
+title: Pluginy pytest
+
+items:
+  - name: pytest-asyncio
+    desc: Testowanie kodu async def. Obsługuje asyncio, trio, anyio. Konieczne dla FastAPI async testów.
+    icon: "⚡"
+    code: |
+      pip install pytest-asyncio
+
+      # pyproject.toml:
+      # [tool.pytest.ini_options]
+      # asyncio_mode = "auto"
+
+      import pytest
+
+      @pytest.mark.asyncio
+      async def test_async_function():
+          result = await fetch_data()
+          assert result is not None
+
+  - name: pytest-cov
+    desc: Raportuje pokrycie kodu (coverage). Integracja z Codecov i CI/CD pipelines.
+    icon: "📊"
+    code: |
+      pip install pytest-cov
+
+      pytest --cov=myapp --cov-report=term-missing --cov-report=html
+      # htmlcov/index.html — interaktywny raport
+
+      # pyproject.toml:
+      # [tool.coverage.run]
+      # source = ["myapp"]
+      # omit = ["*/migrations/*", "*/tests/*"]
+
+  - name: pytest-mock
+    desc: Uproszczony dostęp do unittest.mock przez fixture mocker. Czytelniejszy niż @patch decorator.
+    icon: "🎭"
+    code: |
+      pip install pytest-mock
+
+      def test_send_email(mocker):
+          # zamiast @patch("app.email.send")
+          mock_send = mocker.patch("app.email.send")
+          mock_send.return_value = True
+
+          register_user("jan@test.com")
+
+          mock_send.assert_called_once_with(
+              to="jan@test.com",
+              subject="Witamy!"
+          )
+
+  - name: pytest-httpx
+    desc: Mockowanie requestów httpx w testach. Idealne dla testów FastAPI z wywołaniami zewnętrznych API.
+    icon: "🌐"
+    code: |
+      pip install pytest-httpx
+
+      def test_external_api(httpx_mock):
+          httpx_mock.add_response(
+              url="https://api.github.com/users/tiangolo",
+              json={"name": "Sebastián", "public_repos": 50}
+          )
+
+          result = get_github_user("tiangolo")
+          assert result["name"] == "Sebastián"
+
+  - name: pytest-xdist
+    desc: Równoległe uruchamianie testów na wielu CPU. Dramatycznie przyspiesza duże test suite.
+    icon: "🚀"
+    code: |
+      pip install pytest-xdist
+
+      # Uruchom na 4 workerach:
+      pytest -n 4
+
+      # Automatycznie wykryj liczbę CPU:
+      pytest -n auto
+
+      # UWAGA: testy muszą być niezależne od siebie
+      # Nie używaj shared state między testami!
+
+  - name: responses (requests mock)
+    desc: Mockowanie requestów biblioteki requests. Bez rzeczywistych połączeń HTTP w testach.
+    icon: "🔌"
+    code: |
+      pip install responses
+
+      import responses
+      import requests
+
+      @responses.activate
+      def test_scraper():
+          responses.add(
+              responses.GET,
+              "https://example.com",
+              body="<html><title>Test</title></html>",
+              status=200,
+          )
+
+          result = scrape_title("https://example.com")
+          assert result == "Test"

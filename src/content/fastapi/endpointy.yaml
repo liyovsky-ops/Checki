@@ -1,0 +1,101 @@
+title: Endpointy i HTTP Methods
+
+items:
+  - name: GET — pobieranie danych
+    desc: Odczyt zasobu. Parametry w URL (path lub query). Zwraca dane lub 404.
+    icon: "📥"
+    code: |
+      from fastapi import FastAPI, HTTPException
+
+      app = FastAPI()
+      items = {1: "laptop", 2: "telefon"}
+
+      @app.get("/items/{item_id}")
+      def get_item(item_id: int, lang: str = "pl"):
+          if item_id not in items:
+              raise HTTPException(status_code=404, detail="Nie znaleziono")
+          return {"id": item_id, "name": items[item_id], "lang": lang}
+
+  - name: POST — tworzenie zasobów
+    desc: Przyjmuje JSON body przez model Pydantic. Zwraca 201 z nowym zasobem.
+    icon: "📤"
+    code: |
+      from fastapi import FastAPI
+      from pydantic import BaseModel
+
+      app = FastAPI()
+
+      class Item(BaseModel):
+          name: str
+          price: float
+          available: bool = True
+
+      @app.post("/items/", status_code=201)
+      def create_item(item: Item):
+          # item jest w pełni zwalidowany
+          return {"id": 42, **item.model_dump()}
+
+  - name: PUT / PATCH / DELETE
+    desc: "PUT — zamień cały zasób. PATCH — zmień część. DELETE — usuń."
+    icon: "✏️"
+    code: |
+      @app.put("/items/{item_id}")
+      def replace_item(item_id: int, item: Item):
+          return {"id": item_id, **item.model_dump()}
+
+      @app.patch("/items/{item_id}")
+      def update_item(item_id: int, item: Item):
+          return {"id": item_id, "updated": item.model_dump(exclude_unset=True)}
+
+      @app.delete("/items/{item_id}", status_code=204)
+      def delete_item(item_id: int):
+          return None
+
+  - name: Response Model
+    desc: response_model=Schema automatycznie filtruje i waliduje zwracane dane. Usuwa pola których nie chcesz pokazywać (np. hasło).
+    icon: "📋"
+    code: |
+      from pydantic import BaseModel
+
+      class UserIn(BaseModel):
+          username: str
+          password: str
+
+      class UserOut(BaseModel):
+          username: str
+
+      @app.post("/users/", response_model=UserOut)
+      def create_user(user: UserIn):
+          # password nie trafi do odpowiedzi!
+          return user
+
+  - name: HTTPException i błędy
+    desc: "Rzucaj HTTPException z kodem statusu i szczegółami. FastAPI automatycznie formatuje do JSON."
+    icon: "🚨"
+    code: |
+      from fastapi import HTTPException
+
+      @app.get("/secret/{item_id}")
+      def get_secret(item_id: int, token: str):
+          if token != "supersecret":
+              raise HTTPException(
+                  status_code=403,
+                  detail="Brak dostępu",
+                  headers={"WWW-Authenticate": "Bearer"},
+              )
+          return {"secret": "dane poufne"}
+
+  - name: Background Tasks
+    desc: Wykonaj operację po zwróceniu odpowiedzi. Idealne do wysyłania emaili, logowania, powiadomień.
+    icon: "⚙️"
+    code: |
+      from fastapi import BackgroundTasks
+
+      def send_email(email: str, message: str):
+          # wolna operacja — nie blokuje response
+          print(f"Wysyłam do {email}: {message}")
+
+      @app.post("/notify/{email}")
+      def notify(email: str, background_tasks: BackgroundTasks):
+          background_tasks.add_task(send_email, email, "Twoje zadanie gotowe!")
+          return {"status": "Powiadomienie w kolejce"}

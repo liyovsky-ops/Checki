@@ -1,0 +1,131 @@
+title: Walidacja i Schematy
+
+items:
+  - name: Pydantic BaseModel i validator
+    desc: BaseModel waliduje dane wejściowe. @field_validator dodaje własną logikę walidacji dla konkretnych pól.
+    icon: "🔒"
+    code: |
+      from pydantic import BaseModel, field_validator, EmailStr
+
+      class User(BaseModel):
+          username: str
+          email: EmailStr
+          age: int
+
+          @field_validator("username")
+          @classmethod
+          def username_alphanumeric(cls, v):
+              if not v.isalnum():
+                  raise ValueError("Tylko litery i cyfry")
+              return v.lower()
+
+          @field_validator("age")
+          @classmethod
+          def age_positive(cls, v):
+              if v < 0 or v > 150:
+                  raise ValueError("Wiek musi być 0-150")
+              return v
+
+  - name: Query i Path parametry z walidacją
+    desc: Query() i Path() dodają walidację, typ i opis do parametrów URL. Dokumentacja generuje się automatycznie.
+    icon: "🔍"
+    code: |
+      from fastapi import Query, Path
+
+      @app.get("/items/")
+      def search_items(
+          q: str = Query(min_length=3, max_length=50, description="Szukaj po nazwie"),
+          page: int = Query(default=1, ge=1),
+          size: int = Query(default=10, ge=1, le=100),
+      ):
+          return {"query": q, "page": page, "size": size}
+
+      @app.get("/items/{item_id}")
+      def get_item(
+          item_id: int = Path(ge=1, description="ID musi być >= 1")
+      ):
+          return {"id": item_id}
+
+  - name: Zagnieżdżone modele
+    desc: Modele Pydantic można zagnieżdżać. FastAPI waliduje całą strukturę rekurencyjnie.
+    icon: "🏗️"
+    code: |
+      from pydantic import BaseModel
+      from typing import list
+
+      class Tag(BaseModel):
+          name: str
+          color: str = "#000"
+
+      class Address(BaseModel):
+          city: str
+          country: str
+
+      class Product(BaseModel):
+          name: str
+          price: float
+          address: Address
+          tags: list[Tag] = []
+
+      @app.post("/products/")
+      def create_product(product: Product):
+          return product
+
+  - name: Enum — dozwolone wartości
+    desc: Enum ogranicza wartość pola do zdefiniowanej listy. FastAPI pokazuje możliwe wartości w dokumentacji.
+    icon: "📋"
+    code: |
+      from enum import Enum
+      from pydantic import BaseModel
+
+      class Status(str, Enum):
+          active = "active"
+          inactive = "inactive"
+          pending = "pending"
+
+      class Item(BaseModel):
+          name: str
+          status: Status = Status.active
+
+      @app.get("/items/")
+      def get_by_status(status: Status):
+          return {"filter": status}
+
+  - name: File Upload
+    desc: "UploadFile do plików (streaming), Form() do danych formularza. Używaj File() gdy potrzebujesz walidacji."
+    icon: "📁"
+    code: |
+      from fastapi import File, UploadFile, Form
+
+      @app.post("/upload/")
+      async def upload_file(
+          file: UploadFile = File(...),
+          description: str = Form(default=""),
+      ):
+          content = await file.read()
+          return {
+              "filename": file.filename,
+              "size": len(content),
+              "description": description,
+          }
+
+  - name: Custom Response
+    desc: "JSONResponse, HTMLResponse, FileResponse, RedirectResponse — pełna kontrola nad typem odpowiedzi."
+    icon: "📨"
+    code: |
+      from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
+
+      @app.get("/json-error/")
+      def custom_error():
+          return JSONResponse(
+              status_code=422,
+              content={"error": "Własny format błędu", "code": "CUSTOM_001"},
+          )
+
+      @app.get("/html/")
+      def html_page():
+          return HTMLResponse("<h1>Witaj!</h1>")
+
+      @app.get("/old-url/")
+      def redirect():
+          return RedirectResponse(url="/new-url/", status_code=301)

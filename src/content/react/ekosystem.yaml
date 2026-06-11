@@ -1,0 +1,154 @@
+title: Ekosystem React
+
+items:
+  - name: Next.js
+    desc: "Full-stack React framework z SSR, SSG, file-based routing, API routes i React Server Components. Standard dla produkcyjnych aplikacji."
+    icon: "▲"
+    code: |
+      npx create-next-app@latest my-app --typescript
+
+      // app/page.tsx — Server Component (domyślnie)
+      export default async function Home() {
+        const data = await fetch('https://api.example.com/posts')
+        const posts = await data.json()
+        return <PostList posts={posts} />
+      }
+
+      // app/api/hello/route.ts — API endpoint
+      export async function GET() {
+        return Response.json({ message: 'Hello from API' })
+      }
+
+  - name: React Router
+    desc: Routing po stronie klienta dla SPA. Nawigacja między widokami bez przeładowania strony. Zagnieżdżone trasy, lazy loading.
+    icon: "🛣️"
+    code: |
+      npm install react-router-dom
+
+      import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+
+      <BrowserRouter>
+        <nav>
+          <Link to="/">Home</Link>
+          <Link to="/users">Users</Link>
+        </nav>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/users/:id" element={<UserPage />} />
+        </Routes>
+      </BrowserRouter>
+
+  - name: TanStack Query
+    desc: Zarządzanie danymi z serwera — automatyczne cachowanie, background refetch, loading/error states. Zastępuje useState+useEffect do fetchowania.
+    icon: "🔄"
+    code: |
+      npm install @tanstack/react-query
+
+      const { data, isLoading, error } = useQuery({
+        queryKey: ['users', userId],
+        queryFn: () => fetch(`/api/users/${userId}`).then(r => r.json()),
+        staleTime: 5 * 60 * 1000,  // 5 min cache
+      })
+
+      const mutation = useMutation({
+        mutationFn: (data) => fetch('/api/users', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        }),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+      })
+
+  - name: Zustand
+    desc: "Minimalistyczny global state — ~1KB. Brak Provider! Brak boilerplate. Must-have dla średnich projektów."
+    icon: "🐻"
+    code: |
+      npm install zustand
+
+      import { create } from 'zustand'
+
+      const useStore = create((set) => ({
+        count: 0,
+        increment: () => set(s => ({ count: s.count + 1 })),
+      }))
+
+      // W komponencie (bez Provider):
+      const { count, increment } = useStore()
+
+  - name: Tailwind CSS
+    desc: "Utility-first CSS framework. Budujesz UI przez klasy: className=\"flex items-center gap-4 bg-blue-500 text-white p-4 rounded\". Zero custom CSS."
+    icon: "🎨"
+    code: |
+      npm install tailwindcss @tailwindcss/vite
+
+      // tailwind.config.ts
+      export default {
+        content: ["./src/**/*.{js,ts,jsx,tsx}"],
+      }
+
+      // Użycie w JSX
+      <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+        Kliknij
+      </button>
+
+  - name: React Hook Form + Zod
+    desc: Wydajne formularze z minimalną liczbą re-renderów + walidacja schematem Zod. Najlepsza kombinacja do formularzy w React.
+    icon: "📝"
+    code: |
+      npm install react-hook-form zod @hookform/resolvers
+
+      import { useForm } from 'react-hook-form'
+      import { zodResolver } from '@hookform/resolvers/zod'
+      import { z } from 'zod'
+
+      const schema = z.object({
+        email: z.string().email(),
+        password: z.string().min(8),
+      })
+
+      const { register, handleSubmit, formState: { errors } } = useForm({
+        resolver: zodResolver(schema),
+      })
+
+  - name: Radix UI + shadcn/ui
+    desc: Radix UI — dostępne (a11y) prymitywy bez narzuconego stylu. shadcn/ui = gotowe komponenty na bazie Radix + Tailwind.
+    icon: "🎭"
+    code: |
+      npm install @radix-ui/react-dialog
+
+      // shadcn/ui — kopiujesz komponenty do projektu
+      npx shadcn@latest init
+      npx shadcn@latest add button dialog
+
+      // Gotowy Dialog z keyboard handling i ARIA
+      <Dialog>
+        <DialogTrigger>Otwórz</DialogTrigger>
+        <DialogContent>
+          <DialogTitle>Tytuł</DialogTitle>
+          <p>Treść dialogu</p>
+        </DialogContent>
+      </Dialog>
+
+  - name: Framer Motion
+    desc: "Deklaratywne animacje dla React. Spring physics, layout animations, exit animations przez AnimatePresence."
+    icon: "✨"
+    code: |
+      npm install framer-motion
+
+      import { motion, AnimatePresence } from 'framer-motion'
+
+      // Animacja wejścia
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        Zawartość
+      </motion.div>
+
+      // Hover i tap
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+      >
+        Kliknij
+      </motion.button>

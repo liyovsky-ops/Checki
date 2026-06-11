@@ -1,0 +1,82 @@
+title: Komendy pytest
+
+groups:
+  - name: Instalacja
+    icon: "📦"
+    commands:
+      - desc: Zainstaluj pytest
+        code: pip install pytest
+      - desc: Zainstaluj z pluginami
+        code: pip install pytest pytest-asyncio pytest-cov pytest-mock
+      - desc: Sprawdź wersję
+        code: pytest --version
+
+  - name: Uruchamianie
+    icon: "▶️"
+    commands:
+      - desc: Uruchom wszystkie testy
+        code: pytest
+      - desc: Uruchom z verbose output
+        code: pytest -v
+      - desc: Uruchom konkretny plik
+        code: pytest tests/test_users.py
+      - desc: Uruchom konkretną funkcję
+        code: pytest tests/test_users.py::test_create_user
+      - desc: Uruchom testy w klasie
+        code: pytest tests/test_users.py::TestUserAPI
+      - desc: Zatrzymaj po pierwszym błędzie
+        code: pytest -x
+      - desc: Zatrzymaj po N błędach
+        code: pytest --maxfail=3
+
+  - name: Filtrowanie
+    icon: "🔍"
+    commands:
+      - desc: Uruchom testy pasujące do wzorca
+        code: pytest -k "test_user"
+      - desc: Uruchom przez marker
+        code: pytest -m slow
+      - desc: Pomiń testy z markerem
+        code: pytest -m "not slow"
+      - desc: Uruchom w wielu procesach
+        code: pytest -n auto
+
+  - name: Output i raporty
+    icon: "📊"
+    commands:
+      - desc: Pokaż print() w testach
+        code: pytest -s
+      - desc: Pokaż najwolniejsze testy
+        code: pytest --durations=10
+      - desc: Coverage report
+        code: pytest --cov=app --cov-report=term-missing
+      - desc: Coverage HTML
+        code: pytest --cov=app --cov-report=html
+      - desc: Zapisz wyniki do pliku XML (CI)
+        code: pytest --junitxml=results.xml
+
+  - name: Konfiguracja
+    icon: "⚙️"
+    commands:
+      - desc: Pokaż konfigurację pytest
+        code: pytest --co -q
+      - desc: Listuj dostępne fixtures
+        code: pytest --fixtures
+      - desc: Pokaż markery
+        code: pytest --markers
+      - desc: Sprawdź czy testy by się znalazły (dry-run)
+        code: pytest --collect-only
+
+  - name: Debug
+    icon: "🔧"
+    commands:
+      - desc: Wejdź do debuggera przy błędzie
+        code: pytest --pdb
+      - desc: Verbose traceback
+        code: pytest --tb=long
+      - desc: Krótki traceback
+        code: pytest --tb=short
+      - desc: Uruchom poprzednio nieudane testy
+        code: pytest --lf
+      - desc: Uruchom poprzednio nieudane, potem resztę
+        code: pytest --ff

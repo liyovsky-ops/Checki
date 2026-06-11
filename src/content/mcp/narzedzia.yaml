@@ -1,0 +1,114 @@
+title: Definiowanie narzędzi (Tools)
+items:
+  - name: Typy parametrów i walidacja Pydantic
+    desc: >
+      MCP automatycznie generuje JSON schema z type hints.
+      Pydantic BaseModel jako parametr = pełna walidacja wejścia z opisami pól.
+    code: |
+      from mcp.server.fastmcp import FastMCP
+      from pydantic import BaseModel, Field
+      from typing import Optional, Literal
+      from enum import Enum
+
+      mcp = FastMCP("TypedServer")
+
+      class Priority(str, Enum):
+          LOW = "low"
+          MEDIUM = "medium"
+          HIGH = "high"
+
+      class TaskInput(BaseModel):
+          title: str = Field(description="Tytuł zadania")
+          priority: Priority = Field(default=Priority.MEDIUM)
+          tags: list[str] = Field(default_factory=list)
+          due_days: Optional[int] = Field(None, ge=0, le=365)
+
+      @mcp.tool()
+      def create_task(task: TaskInput) -> dict:
+          """Utwórz nowe zadanie z walidacją Pydantic."""
+          return {
+              "id": 42,
+              "title": task.title,
+              "priority": task.priority.value,
+              "tags": task.tags,
+          }
+
+      @mcp.tool()
+      def search(
+          query: str,
+          limit: int = Field(default=10, ge=1, le=100),
+          category: Literal["docs", "code", "issues"] = "docs"
+      ) -> list[str]:
+          """Wyszukaj z ograniczeniami na parametry."""
+          return [f"Wynik {i}: {query} ({category})" for i in range(limit)]
+
+  - name: Narzędzia asynchroniczne
+    desc: >
+      Async tools dla operacji I/O (HTTP, baza, pliki).
+      Serwer MCP obsługuje async def narzędzia natywnie.
+    code: |
+      from mcp.server.fastmcp import FastMCP
+      import httpx
+      import asyncio
+
+      mcp = FastMCP("AsyncServer")
+
+      @mcp.tool()
+      async def fetch_url(url: str) -> str:
+          """Pobierz zawartość URL."""
+          async with httpx.AsyncClient(timeout=10) as client:
+              response = await client.get(url)
+              response.raise_for_status()
+              return response.text[:5000]  # Ogranicz rozmiar
+
+      @mcp.tool()
+      async def fetch_multiple(urls: list[str]) -> dict[str, str]:
+          """Pobierz kilka URLi równolegle."""
+          async with httpx.AsyncClient(timeout=10) as client:
+              tasks = [client.get(url) for url in urls]
+              responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+          results = {}
+          for url, resp in zip(urls, responses):
+              if isinstance(resp, Exception):
+                  results[url] = f"Błąd: {resp}"
+              else:
+                  results[url] = resp.text[:1000]
+          return results
+
+      if __name__ == "__main__":
+          mcp.run()
+
+  - name: Obsługa błędów w narzędziach
+    desc: >
+      Jak poprawnie zgłaszać błędy modelowi.
+      McpError z ErrorCode daje czytelny komunikat — model wie co poszło nie tak.
+    code: |
+      from mcp.server.fastmcp import FastMCP
+      from mcp import McpError
+      from mcp.types import ErrorCode
+
+      mcp = FastMCP("ErrorHandlingServer")
+
+      @mcp.tool()
+      def divide(a: float, b: float) -> float:
+          """Podziel a przez b."""
+          if b == 0:
+              raise McpError(
+                  ErrorCode.INVALID_PARAMS,
+                  "Nie można dzielić przez zero"
+              )
+          return a / b
+
+      @mcp.tool()
+      def get_user(user_id: int) -> dict:
+          """Pobierz użytkownika z bazy."""
+          users = {1: {"name": "Anna"}, 2: {"name": "Bartek"}}
+          user = users.get(user_id)
+          if not user:
+              raise McpError(
+                  ErrorCode.INVALID_PARAMS,
+                  f"Użytkownik {user_id} nie istnieje. "
+                  f"Dostępni: {list(users.keys())}"
+              )
+          return user

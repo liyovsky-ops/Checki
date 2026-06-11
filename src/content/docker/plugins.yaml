@@ -1,0 +1,92 @@
+title: Ekosystem Docker
+items:
+  - name: Docker Compose
+    icon: "🎼"
+    desc: |
+      Multi-container orchestration — wbudowany w Docker CLI.
+      Dostępny jako docker compose (bez instalacji od Docker Desktop 3.0+)
+
+      Zarządza wieloma kontenerami jako jeden stack.
+      Jeden plik YAML, jedna komenda — całe środowisko gotowe.
+      Niezbędny w każdym projekcie z więcej niż jednym serwisem.
+    code: |
+      docker compose up -d        # uruchom stack w tle
+      docker compose down         # zatrzymaj i usuń
+      docker compose logs -f api  # logi serwisu
+      docker compose exec api bash  # wejdź do kontenera
+
+  - name: Docker Scout
+    icon: "🔍"
+    desc: |
+      Skanowanie podatności w images — wbudowany w Docker Desktop.
+      Instalacja: docker scout (wbudowany)
+
+      Skanuje image pod kątem znanych CVE (podatności).
+      Pokazuje które paczki mają problemy bezpieczeństwa i jak je naprawić.
+      Integracja z CI/CD pipeline.
+    code: |
+      docker scout cves moja-apka:latest
+      docker scout recommendations moja-apka:latest
+      # Output: lista CVE z krytycznością i rekomendacjami
+
+  - name: Dive
+    icon: "🏊"
+    desc: |
+      Eksploruj warstwy image — znajdź co zajmuje miejsce.
+      Instalacja: winget install wagoodman.dive / brew install dive
+
+      TUI do eksploracji warstw Docker image.
+      Pokazuje co każda instrukcja Dockerfile dodaje do rozmiaru.
+      Niezbędny do optymalizacji rozmiaru images.
+    code: |
+      dive moja-apka:latest
+      # Interaktywny widok:
+      # Lewo: warstwy z rozmiarem
+      # Prawo: pliki dodane w tej warstwie
+      # Tab: przełącz panel
+      # Space: pokaż zmienione pliki
+
+  - name: Trivy
+    icon: "🛡️"
+    desc: |
+      Kompleksowe skanowanie bezpieczeństwa — open source.
+      Instalacja: winget install AquaSecurity.Trivy / brew install trivy
+
+      Skanuje images, Dockerfile, docker-compose.yml pod kątem CVE, misconfig i sekretów.
+      Darmowy i open-source. Standard w CI/CD pipeline.
+    code: |
+      trivy image moja-apka:latest
+      trivy fs .                   # skanuj pliki projektu
+      trivy config .               # skanuj Dockerfile/Compose
+      # Output: tabela z CVE, severity (CRITICAL/HIGH/MEDIUM)
+
+  - name: Portainer
+    icon: "🖥️"
+    desc: |
+      Web GUI do zarządzania Dockerem — klikaj zamiast pisać.
+      Instalacja: docker run -d -p 9000:9000 portainer/portainer-ce
+
+      Web UI do zarządzania kontenerami, images, wolumenami, sieciami.
+      Dobry dla zespołów bez doświadczenia z Docker CLI lub do monitoringu.
+    code: |
+      docker run -d \
+        -p 9000:9000 \
+        --name portainer \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        portainer/portainer-ce:latest
+      # Otwórz: http://localhost:9000
+
+  - name: Watchtower
+    icon: "🔭"
+    desc: |
+      Auto-update kontenerów gdy pojawi się nowy image.
+      Instalacja: docker run containrrr/watchtower
+
+      Monitoruje registry i automatycznie aktualizuje kontenery gdy pojawi się nowa wersja.
+      Przydatne dla prostych deploymentów bez K8s.
+    code: |
+      docker run -d \
+        --name watchtower \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        containrrr/watchtower \
+        --interval 3600  # sprawdzaj co godzinę

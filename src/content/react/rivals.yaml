@@ -1,0 +1,93 @@
+title: React vs inne frameworki
+
+items:
+  - name: Vue.js
+    icon: "💚"
+    color: "#42b883"
+    tagline: Progresywny framework UI — łagodniejszy start
+    pros:
+      - Łagodniejsza krzywa uczenia niż React
+      - Single File Components (HTML+JS+CSS w jednym pliku)
+      - Wbudowany system reaktywności (ref, computed)
+      - Świetna, kompletna dokumentacja
+    cons:
+      - Mniejszy ekosystem niż React
+      - Znacznie mniej ofert pracy
+      - Mniej gotowych bibliotek UI (shadcn, Radix itp.)
+    vs: Vue prostszy na start, React wygrywa skalą ekosystemu i rynkiem pracy. Wybierz React jeśli szukasz zatrudnienia.
+
+  - name: Angular
+    icon: "🔺"
+    color: "#dd0031"
+    tagline: Pełny framework od Google — enterprise z TypeScript
+    pros:
+      - Pełna bateria (router, HTTP, forms, DI, CLI) — wszystko w jednym
+      - TypeScript first od początku
+      - Jasna, narzucona architektura dla dużych teamów
+    cons:
+      - Stroma krzywa uczenia — dużo konceptów (moduły, dekoratory, DI)
+      - Więcej boilerplate niż React
+      - Cięższy bundle na starcie
+    vs: Angular narzuca strukturę (plus dla teamów, minus dla wolności). React = biblioteka z wyborem. Dla enterprise i dużych teamów Angular. Dla większości projektów — React.
+
+  - name: Svelte
+    icon: "🔥"
+    color: "#ff3e00"
+    tagline: Kompilowany framework — zero runtime, mały bundle
+    pros:
+      - Kompiluje do vanilla JS — zero runtime overhead
+      - Mniejszy bundle niż React (brak Virtual DOM)
+      - Krótszy kod niż React (less boilerplate)
+      - Svelte 5 — runes ($state, $derived) nowoczesny model
+    cons:
+      - Mały ekosystem bibliotek UI
+      - Mała społeczność i mało ofert pracy
+      - SvelteKit młodszy i mniej dojrzały niż Next.js
+    vs: Svelte ma mniejszy bundle i prostszy kod. React ma nieporównywalnie większy ekosystem. Wybierz React dla projektów produkcyjnych, Svelte gdy bundle size jest priorytetem.
+
+  - name: Solid.js
+    icon: "⚡"
+    color: "#2c4f7c"
+    tagline: Najszybszy główny framework — fine-grained reactivity
+    pros:
+      - Najszybszy główny framework UI
+      - Brak Virtual DOM — aktualizacje DOM bezpośrednio przez signals
+      - API zbliżone do React — łatwa nauka jeśli znasz React
+      - Mały bundle
+    cons:
+      - Bardzo mała społeczność
+      - Mało gotowych bibliotek
+      - Prawie zero ofert pracy
+      - Inna semantyka mimo podobnego API
+    vs: Solid szybszy od React dzięki signals. Wybierz gdy budujesz performance-critical UI i masz już doświadczenie z React. Na co dzień — React.
+
+  - name: Next.js
+    icon: "▲"
+    color: "#888888"
+    tagline: React meta-framework z SSR i Server Components
+    pros:
+      - SSR, SSG, ISR out of the box
+      - App Router + React Server Components (zero JS na klienta)
+      - Server Actions — mutacje bez pisania API
+      - Optymalizacja Image, Font, Script automatyczna
+    cons:
+      - Vendor lock-in (Vercel)
+      - App Router ma stromą krzywą uczenia
+      - Pages Router vs App Router — dwie różne architektury w jednym projekcie
+    vs: Next.js jest zbudowany NA React — nie jest rywalem, to rozszerzenie. Większość nowych projektów React używa Next.js. Bez Next.js — budujesz czystego SPA bez SSR.
+
+  - name: Qwik
+    icon: "🦋"
+    color: "#18b6f6"
+    tagline: Resumowalny framework — natychmiastowe ładowanie bez hydration
+    pros:
+      - Natychmiastowe ładowanie — zero JS na start
+      - Resumability zamiast hydration (brak "martwego czasu" po SSR)
+      - Automatyczny code splitting na poziomie każdej funkcji
+      - Świetne Core Web Vitals
+    cons:
+      - Mała społeczność
+      - Ryzyko dla projektów produkcyjnych (nowa technologia)
+      - Inny model myślenia niż React
+      - Mało tutoriali i bibliotek
+    vs: Qwik rozwiązuje problem hydration w SSR który React/Next.js ma. Futurystyczne podejście. Wybierz dla stron content-heavy gdzie Core Web Vitals są krytyczne.

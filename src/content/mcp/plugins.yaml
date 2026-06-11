@@ -1,0 +1,108 @@
+title: Ekosystem MCP
+items:
+  - name: "@modelcontextprotocol/server-filesystem"
+    icon: "📁"
+    desc: |
+      Oficjalny serwer dostępu do systemu plików.
+      Instalacja: npx -y @modelcontextprotocol/server-filesystem /path/to/dir
+
+      Wystawia narzędzia: read_file, write_file, list_directory,
+      create_directory, move_file, search_files.
+      Najprostszy sposób dać Claude'owi dostęp do lokalnych plików.
+    code: |
+      // claude_desktop_config.json
+      {
+        "mcpServers": {
+          "filesystem": {
+            "command": "npx",
+            "args": [
+              "-y",
+              "@modelcontextprotocol/server-filesystem",
+              "/Users/username/projects"
+            ]
+          }
+        }
+      }
+
+  - name: "@modelcontextprotocol/server-github"
+    icon: "🐱"
+    desc: |
+      Oficjalny serwer GitHub MCP — issues, PR, kod.
+      Instalacja: npx -y @modelcontextprotocol/server-github
+
+      Narzędzia: create_issue, create_pull_request, search_repositories,
+      get_file_contents, push_files i więcej.
+      Wymaga GitHub Personal Access Token.
+    code: |
+      // claude_desktop_config.json
+      {
+        "mcpServers": {
+          "github": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-github"],
+            "env": {
+              "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_twój_token"
+            }
+          }
+        }
+      }
+
+  - name: mcp-server-sqlite
+    icon: "🗄️"
+    desc: |
+      Dostęp do bazy SQLite przez MCP.
+      Instalacja: pip install mcp-server-sqlite
+
+      Wystawia narzędzia: read_query, write_query, create_table,
+      list_tables, describe_table.
+      Bezpieczny tryb tylko do odczytu.
+    code: |
+      // claude_desktop_config.json
+      {
+        "mcpServers": {
+          "sqlite": {
+            "command": "python",
+            "args": ["-m", "mcp_server_sqlite", "--db-path", "app.db"]
+          }
+        }
+      }
+
+  - name: FastMCP (wbudowany w SDK)
+    icon: "⚡"
+    desc: |
+      Pythonowy framework do szybkiego tworzenia serwerów MCP.
+      Instalacja: pip install mcp
+
+      FastMCP jest wbudowany w oficjalne SDK Anthropic.
+      Dekoratory @mcp.tool(), @mcp.resource(), @mcp.prompt() — zero boilerplate.
+      Zalecany dla własnych serwerów MCP.
+    code: |
+      from mcp.server.fastmcp import FastMCP
+
+      mcp = FastMCP("MójSerwer")
+
+      @mcp.tool()
+      def hello(name: str) -> str:
+          """Przywitaj użytkownika."""
+          return f"Cześć, {name}!"
+
+      if __name__ == "__main__":
+          mcp.run()
+
+  - name: mcp-use (LangChain adapter)
+    icon: "🔗"
+    desc: |
+      Użyj serwerów MCP jako narzędzi w LangChain agents.
+      Instalacja: pip install mcp-use
+
+      Adapter który pozwala używać dowolnego serwera MCP
+      jako narzędzia w LangChain. Mostek między ekosystemem MCP a LangChain.
+    code: |
+      from mcp_use import MCPAgent, MCPClient
+      from langchain_anthropic import ChatAnthropic
+
+      client = MCPClient.from_config_file("claude_desktop_config.json")
+      llm = ChatAnthropic(model="claude-opus-4-5")
+      agent = MCPAgent(llm=llm, client=client, max_steps=15)
+
+      result = await agent.run("Jakie pliki są w folderze projects?")

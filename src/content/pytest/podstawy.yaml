@@ -1,0 +1,62 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać pytest?
+  firstComponent: Pierwszy test
+  firstComponentLang: Python
+
+intro:
+  title: Czym jest pytest?
+  desc: >
+    pytest to framework do testowania kodu Python.
+    Pozwala pisać testy jako zwykłe funkcje (nie klasy jak w unittest).
+    Automatycznie wykrywa pliki testów, daje czytelne raporty błędów i ma ogromny ekosystem pluginów.
+    Standard branżowy w automatyzacji i backend developmencie.
+
+concepts:
+  - title: Auto-discovery
+    desc: >
+      pytest automatycznie znajduje testy w plikach test_*.py lub *_test.py,
+      funkcjach test_* i klasach Test*. Zero konfiguracji — po prostu uruchom pytest.
+    icon: "🔍"
+  - title: Fixtures
+    desc: >
+      Fixtures to funkcje przygotowujące dane/zasoby dla testów.
+      Wstrzykiwane automatycznie przez nazwę argumentu.
+      Scope kontroluje czas życia (function, class, module, session).
+    icon: "🔧"
+  - title: Asercje
+    desc: >
+      Używasz zwykłego assert Pythona.
+      pytest automatycznie pokazuje wartości zmiennych gdy asercja padnie —
+      nie potrzebujesz assertEqual, assertTrue itp.
+    icon: "✅"
+  - title: Markery
+    desc: >
+      Markery (@pytest.mark.*) oznaczają testy: skip, xfail, parametrize.
+      Możesz też tworzyć własne markery do grupowania testów.
+    icon: "🏷️"
+
+whenToUse:
+  - Testowanie skryptów automatyzacji (sprawdź czy scraper zwraca dane)
+  - Testy jednostkowe funkcji i klas Python
+  - Testy integracyjne FastAPI, bazy danych, Redis
+  - Testy parametryczne — jeden test, wiele przypadków wejściowych
+  - CI/CD — automatyczne testy przed deployem
+
+firstComponent: |
+  # test_scraper.py
+  import pytest
+  from scraper import fetch_page, parse_links
+
+  def test_fetch_returns_html():
+      result = fetch_page("https://example.com")
+      assert result is not None
+      assert "<html" in result.lower()
+
+  def test_parse_links_finds_urls():
+      html = '<a href="https://google.com">link</a>'
+      links = parse_links(html)
+      assert len(links) == 1
+      assert "google.com" in links[0]
+
+  # Uruchom: pytest test_scraper.py -v

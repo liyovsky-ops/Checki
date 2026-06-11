@@ -1,0 +1,163 @@
+title: Ekosystem FastAPI
+
+items:
+  - name: SQLModel
+    desc: Biblioteka od twórcy FastAPI łącząca SQLAlchemy + Pydantic. Jeden model = schemat DB + walidacja API.
+    icon: "🗄️"
+    code: |
+      pip install sqlmodel
+
+      from sqlmodel import SQLModel, Field, Session, create_engine, select
+
+      class Hero(SQLModel, table=True):
+          id: int | None = Field(default=None, primary_key=True)
+          name: str
+          power: str
+
+      engine = create_engine("sqlite:///database.db")
+      SQLModel.metadata.create_all(engine)
+
+      # Użycie w endpoincie:
+      with Session(engine) as session:
+          hero = Hero(name="Batman", power="pieniądze")
+          session.add(hero)
+          session.commit()
+
+  - name: fastapi-users
+    desc: Gotowy system autoryzacji — rejestracja, login, JWT, OAuth2, weryfikacja email. Bez pisania od zera.
+    icon: "👤"
+    code: |
+      pip install fastapi-users[sqlalchemy]
+
+      from fastapi_users import FastAPIUsers
+      from fastapi_users.authentication import JWTStrategy, BearerTransport
+
+      # konfiguracja JWT
+      bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
+
+      def get_jwt_strategy() -> JWTStrategy:
+          return JWTStrategy(secret="SECRET", lifetime_seconds=3600)
+
+      # gotowe endpointy: /auth/jwt/login, /auth/register, /users/me
+
+  - name: slowapi (rate limiting)
+    desc: Rate limiting dla FastAPI oparty na limits. Ogranicz liczbę requestów per IP/user.
+    icon: "🚦"
+    code: |
+      pip install slowapi
+
+      from slowapi import Limiter, _rate_limit_exceeded_handler
+      from slowapi.util import get_remote_address
+      from slowapi.errors import RateLimitExceeded
+
+      limiter = Limiter(key_func=get_remote_address)
+      app.state.limiter = limiter
+      app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+      @app.get("/limited/")
+      @limiter.limit("5/minute")
+      async def limited_endpoint(request: Request):
+          return {"ok": True}
+
+  - name: fastapi-pagination
+    desc: Automatyczna paginacja wyników. Dekorator, który zamienia dowolny endpoint w paginowany.
+    icon: "📖"
+    code: |
+      pip install fastapi-pagination
+
+      from fastapi_pagination import Page, add_pagination, paginate
+      from fastapi_pagination.ext.sqlalchemy import paginate as sqlalchemy_paginate
+
+      add_pagination(app)
+
+      @app.get("/items/", response_model=Page[ItemSchema])
+      def list_items():
+          return paginate(items_list)
+      # automatycznie dodaje ?page=1&size=50 do dokumentacji
+
+  - name: pydantic-settings
+    desc: Zarządzanie konfiguracją przez zmienne środowiskowe i pliki .env. Z pełną walidacją Pydantic.
+    icon: "⚙️"
+    code: |
+      pip install pydantic-settings
+
+      from pydantic_settings import BaseSettings
+
+      class Settings(BaseSettings):
+          app_name: str = "Moje API"
+          database_url: str
+          debug: bool = False
+          secret_key: str
+
+          class Config:
+              env_file = ".env"
+
+      settings = Settings()
+      # .env: DATABASE_URL=postgresql://...
+
+  - name: fastapi-cache2
+    desc: Cache odpowiedzi endpointów przez decorator. Backend Redis lub in-memory.
+    icon: "⚡"
+    code: |
+      pip install fastapi-cache2[redis]
+
+      from fastapi_cache import FastAPICache
+      from fastapi_cache.backends.redis import RedisBackend
+      from fastapi_cache.decorator import cache
+      import redis.asyncio as aioredis
+
+      @asynccontextmanager
+      async def lifespan(app: FastAPI):
+          r = aioredis.from_url("redis://localhost")
+          FastAPICache.init(RedisBackend(r), prefix="fastapi-cache")
+          yield
+
+      @app.get("/expensive/")
+      @cache(expire=60)  # cache na 60 sekund
+      async def expensive_query():
+          await asyncio.sleep(2)  # symulacja wolnego zapytania
+          return {"data": "wynik"}
+
+  - name: Alembic — migracje DB
+    desc: Narzędzie do migracji bazy danych dla SQLAlchemy/SQLModel. Wersjonowanie schematu bazy.
+    icon: "🔀"
+    code: |
+      pip install alembic
+
+      # Inicjalizacja
+      alembic init alembic
+
+      # alembic/env.py — wskaż swoje modele:
+      from app.models import SQLModel
+      target_metadata = SQLModel.metadata
+
+      # Generuj migrację po zmianie modeli:
+      alembic revision --autogenerate -m "add users table"
+
+      # Zastosuj migrację:
+      alembic upgrade head
+
+  - name: Celery — zadania w tle
+    desc: Kolejka zadań asynchronicznych. Uruchamiaj długie operacje (email, PDF, scraping) poza requestem HTTP.
+    icon: "🌿"
+    code: |
+      pip install celery redis
+
+      from celery import Celery
+
+      celery_app = Celery(
+          "tasks",
+          broker="redis://localhost:6379/0",
+          backend="redis://localhost:6379/0",
+      )
+
+      @celery_app.task
+      def send_report_email(user_id: int):
+          # długa operacja — nie blokuje API
+          generate_and_send_pdf(user_id)
+
+      # W endpoincie FastAPI:
+      @app.post("/reports/")
+      def trigger_report(user_id: int):
+          send_report_email.delay(user_id)
+          return {"status": "raport w kolejce"}

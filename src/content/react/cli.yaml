@@ -1,0 +1,96 @@
+title: Komendy React / Vite
+
+groups:
+  - name: Tworzenie projektu
+    icon: "🚀"
+    commands:
+      - desc: Nowy projekt React + Vite (zalecane)
+        code: npm create vite@latest my-app -- --template react
+      - desc: React + TypeScript + Vite
+        code: npm create vite@latest my-app -- --template react-ts
+      - desc: Next.js — full-stack React
+        code: npx create-next-app@latest my-app --typescript
+      - desc: Vite z pnpm (najszybszy PM)
+        code: pnpm create vite my-app --template react-ts
+
+  - name: Development
+    icon: "⚙️"
+    commands:
+      - desc: Uruchom dev server Vite (HMR)
+        code: npm run dev
+      - desc: Vite na konkretnym porcie
+        code: npm run dev -- --port 3000
+      - desc: Vite dostępny w LAN (telefon)
+        code: npm run dev -- --host
+      - desc: Zbuduj produkcyjną wersję
+        code: npm run build
+      - desc: Podejrzyj build lokalnie
+        code: npm run preview
+
+  - name: TypeScript
+    icon: "🔷"
+    commands:
+      - desc: Sprawdź typy (bez generowania JS)
+        code: npx tsc --noEmit
+      - desc: Type check w trybie ciągłym
+        code: npx tsc --watch
+      - desc: Dodaj typy React do projektu
+        code: npm install -D typescript @types/react @types/react-dom
+
+  - name: Testy
+    icon: "🧪"
+    commands:
+      - desc: Uruchom Vitest (dev)
+        code: npx vitest
+      - desc: Vitest jednorazowo (CI)
+        code: npx vitest run
+      - desc: Vitest z coverage
+        code: npx vitest --coverage
+      - desc: Vitest z graficznym UI
+        code: npx vitest --ui
+      - desc: Zainstaluj Vitest + Testing Library
+        code: npm install -D vitest @testing-library/react @testing-library/jest-dom jsdom
+
+  - name: Zarządzanie paczkami
+    icon: "📦"
+    commands:
+      - desc: Zainstaluj wszystkie zależności
+        code: npm install
+      - desc: Dodaj React Router
+        code: npm install react-router-dom
+      - desc: Dodaj TanStack Query
+        code: npm install @tanstack/react-query
+      - desc: Dodaj Zustand
+        code: npm install zustand
+      - desc: Dodaj Tailwind CSS
+        code: npm install tailwindcss @tailwindcss/vite
+      - desc: Sprawdź przestarzałe paczki
+        code: npm outdated
+      - desc: Skanuj luki bezpieczeństwa
+        code: npm audit
+
+  - name: Deploy
+    icon: "🚢"
+    commands:
+      - desc: Deploy preview na Vercel
+        code: npx vercel
+      - desc: Deploy produkcyjny na Vercel
+        code: npx vercel --prod
+      - desc: Deploy na Netlify
+        code: npx netlify deploy --prod --dir dist
+      - desc: GitHub Pages — opublikuj dist
+        code: npx gh-pages -d dist
+
+  - name: Jakość kodu
+    icon: "🔧"
+    commands:
+      - desc: ESLint — znajdź problemy
+        code: npm run lint
+      - desc: ESLint z auto-naprawą
+        code: npx eslint . --fix
+      - desc: Prettier — sformatuj cały projekt
+        code: npx prettier --write .
+      - desc: Prettier — sprawdź formatowanie (CI)
+        code: npx prettier --check .
+      - desc: Analiza rozmiaru bundla (Vite)
+        code: npm install -D rollup-plugin-visualizer

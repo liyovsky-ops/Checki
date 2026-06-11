@@ -1,0 +1,95 @@
+title: Komendy requests / HTTP
+
+groups:
+  - name: Instalacja
+    icon: "📦"
+    commands:
+      - desc: Zainstaluj requests
+        code: pip install requests
+      - desc: requests + httpx (async) razem
+        code: pip install requests httpx
+      - desc: requests z SOCKS proxy support
+        code: pip install requests[socks]
+      - desc: Cache HTTP requestów
+        code: pip install requests-cache
+      - desc: Losowe User-Agent do scrapingu
+        code: pip install fake-useragent
+
+  - name: Podstawowe HTTP
+    icon: "🌐"
+    commands:
+      - desc: GET — pobierz dane
+        code: "requests.get(url, timeout=10)"
+      - desc: POST JSON — wyślij dane
+        code: "requests.post(url, json={'key': 'val'}, timeout=10)"
+      - desc: PUT — zamień zasób
+        code: "requests.put(url, json=data, timeout=10)"
+      - desc: DELETE — usuń zasób
+        code: "requests.delete(url, timeout=10)"
+      - desc: Sprawdź status i parsuj JSON
+        code: |
+          r = requests.get(url, timeout=10)
+          r.raise_for_status()
+          data = r.json()
+
+  - name: Session i nagłówki
+    icon: "🔐"
+    commands:
+      - desc: Utwórz sesję z retry
+        code: |
+          from requests.adapters import HTTPAdapter
+          from urllib3.util.retry import Retry
+          s = requests.Session()
+          s.mount("https://", HTTPAdapter(max_retries=Retry(total=3)))
+      - desc: Ustaw nagłówek Bearer token
+        code: "session.headers.update({'Authorization': 'Bearer TOKEN'})"
+      - desc: Timeout połączenia i odczytu
+        code: "requests.get(url, timeout=(3, 10))"
+      - desc: Rzuć wyjątek dla 4xx/5xx
+        code: "r.raise_for_status()"
+
+  - name: Testowanie requestów
+    icon: "🧪"
+    commands:
+      - desc: Test endpoint przez httpie
+        code: http GET https://httpbin.org/get
+      - desc: Test POST przez httpie
+        code: "http POST https://httpbin.org/post key=value"
+      - desc: Test przez curl (verbose)
+        code: "curl -v -X GET https://httpbin.org/get"
+      - desc: Zainstaluj mockowanie requestów
+        code: pip install responses
+      - desc: Test z mockiem requests
+        code: |
+          @responses.activate
+          def test_api():
+              responses.add(responses.GET, url, json={...})
+              r = requests.get(url)
+
+  - name: Debugging i monitoring
+    icon: "🔍"
+    commands:
+      - desc: Sprawdź wersję requests
+        code: python -c "import requests; print(requests.__version__)"
+      - desc: Włącz pełne logi HTTP
+        code: |
+          import logging
+          logging.basicConfig(level=logging.DEBUG)
+      - desc: Sprawdź informacje o pakiecie
+        code: pip show requests
+      - desc: Lista zainstalowanych paczek HTTP
+        code: pip list | grep -i request
+
+  - name: Produkcja i scraping
+    icon: "🚀"
+    commands:
+      - desc: Retry z backoff (profesjonalnie)
+        code: pip install tenacity
+      - desc: Rate limiting dekoratorem
+        code: pip install ratelimit
+      - desc: Rotate User-Agent automatycznie
+        code: pip install fake-useragent
+      - desc: Sprawdź httpbin.org endpoint echo
+        code: curl https://httpbin.org/anything
+      - desc: httpbin delay (test timeout)
+        code: curl "https://httpbin.org/delay/5"

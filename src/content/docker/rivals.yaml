@@ -1,0 +1,65 @@
+title: Docker vs alternatywy konteneryzacji
+
+items:
+  - name: Podman
+    icon: "🦭"
+    color: "#892ca0"
+    tagline: Daemonless Docker — rootless i bezpieczniejszy
+    pros:
+      - Daemonless — nie wymaga root daemon (bezpieczniejszy)
+      - Rootless containers domyślnie
+      - Kompatybilne z Docker CLI — drop-in replacement w wielu przypadkach
+      - Pod concept (podobny do K8s Pods) wbudowany
+    cons:
+      - Mniejszy ekosystem niż Docker (Docker Hub, Docker Compose)
+      - Docker Compose obsługa mniej dojrzała
+      - Mniej tutoriali online
+      - W niektórych środowiskach wymaga konfiguracji
+    vs: Podman = bezpieczniejszy Docker bez daemona. Docker lepszy do lokalnego dev (Desktop). Podman standard w RHEL/enterprise Linux na serwerach.
+
+  - name: Kubernetes (K8s)
+    icon: "☸️"
+    color: "#326ce5"
+    tagline: Orkiestracja kontenerów — standard produkcyjny na skalę
+    pros:
+      - Auto-scaling, self-healing, load balancing out of the box
+      - Standard w enterprise i chmurze (EKS, GKE, AKS)
+      - Declarative infrastructure (YAML manifesty)
+      - Rolling deployments — zero downtime
+    cons:
+      - Bardzo stroma krzywa uczenia
+      - Overkill dla małych projektów
+      - Wymaga dedykowanego DevOps
+      - Konfiguracja jest skomplikowana
+    vs: Docker do lokalnego developmentu i jednego serwera. K8s dla produkcji na wielu serwerach. Zacznij od Docker Compose — przejdź na K8s gdy przestanie wystarczać.
+
+  - name: containerd
+    icon: "📦"
+    color: "#575757"
+    tagline: Container runtime — Docker używa go pod spodem
+    pros:
+      - Lekki — Docker używa containerd jako runtime
+      - CRI standard dla Kubernetes
+      - Szybszy start kontenerów (mniejszy overhead)
+      - CNCF graduated — stabilny i sprawdzony
+    cons:
+      - Brak Docker Compose i user-friendly CLI
+      - Niskopoziomowy — dla platformy, nie dewelopera
+      - Brak Docker Hub integracji out of the box
+    vs: containerd to runtime pod spodem — nie używasz go bezpośrednio. Docker i K8s go używają za Ciebie. Musisz wiedzieć o nim gdy debugujesz K8s nodes (crictl).
+
+  - name: LXC / LXD
+    icon: "🐧"
+    color: "#f37726"
+    tagline: Kontenery systemowe — pełny OS w kontenerze jak lekka VM
+    pros:
+      - Kontener = pełny system Linux (init, systemd, wiele procesów)
+      - Bardziej zbliżony do VM niż Docker
+      - Świetny do developerskich sandbox środowisk
+      - Dobry dla środowisk wymagających pełnego OS
+    cons:
+      - Nie dla mikrousług — pełny OS to za dużo overhead dla jednej aplikacji
+      - Brak ekosystemu jak Docker Hub
+      - Mniej przenośny niż Docker obrazy
+      - Rzadziej używany w nowoczesnej produkcji
+    vs: Docker = jeden proces w kontenerze (mikrousługi). LXC = pełny system OS (sandbox, hosting). Zupełnie inne przypadki użycia — nie konkurenci.

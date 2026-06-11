@@ -1,0 +1,128 @@
+items:
+  - name: Async context manager i async iterator
+    desc: >
+      Własne klasy mogą implementować __aenter__/__aexit__ (async with) i __aiter__/__anext__ (async for).
+      Frameworki jak aiofiles, httpx używają tego wzorca.
+    code: |
+      import asyncio
+
+      class AsyncTimeit:
+          async def __aenter__(self):
+              import time
+              self._start = time.perf_counter()
+              return self
+
+          async def __aexit__(self, *args):
+              import time
+              elapsed = time.perf_counter() - self._start
+              print(f"Czas: {elapsed:.3f}s")
+
+      # Async generator (async iterator)
+      async def stream_numbers(n: int):
+          for i in range(n):
+              await asyncio.sleep(0.1)
+              yield i
+
+      async def main():
+          async with AsyncTimeit():
+              async for num in stream_numbers(5):
+                  print(num)
+
+      asyncio.run(main())
+
+  - name: asyncio w FastAPI — jak to działa
+    desc: >
+      FastAPI używa asyncio pod spodem. Endpoint async def = może obsługiwać wiele requestów bez blokowania.
+      Miksy sync/async w tym samym projekcie działają.
+    code: |
+      from fastapi import FastAPI
+      import asyncio
+      import httpx
+
+      app = FastAPI()
+
+      # Async endpoint — nie blokuje serwera podczas await
+      @app.get("/dane")
+      async def pobierz_dane():
+          async with httpx.AsyncClient() as client:
+              r = await client.get("https://api.example.com/data")
+          return r.json()
+
+      # Endpoint synchroniczny — FastAPI uruchamia go w threadpool
+      @app.get("/sync")
+      def synchroniczny():
+          import time
+          time.sleep(1)  # blokuje wątek ale nie event loop
+          return {"ok": True}
+
+      # Równoległy fetch wewnątrz endpointu
+      @app.get("/multi")
+      async def multi_fetch():
+          async with httpx.AsyncClient() as client:
+              r1, r2 = await asyncio.gather(
+                  client.get("https://api.example.com/a"),
+                  client.get("https://api.example.com/b"),
+              )
+          return {"a": r1.json(), "b": r2.json()}
+
+  - name: asyncio z bazą danych — asyncpg
+    desc: >
+      Synchroniczne sterowniki DB (psycopg2) blokują event loop.
+      Używaj asyncpg (PostgreSQL) — najszybszy async driver, natywnie async.
+    code: |
+      import asyncio
+      import asyncpg
+
+      async def main():
+          # asyncpg — najszybszy async PostgreSQL driver
+          conn = await asyncpg.connect(
+              "postgresql://user:password@localhost/db"
+          )
+
+          # Zapytanie
+          rows = await conn.fetch(
+              "SELECT id, name FROM users WHERE active = $1",
+              True
+          )
+
+          for row in rows:
+              print(row["id"], row["name"])
+
+          # Batch insert
+          await conn.executemany(
+              "INSERT INTO logs(msg) VALUES($1)",
+              [("log1",), ("log2",), ("log3",)]
+          )
+
+          await conn.close()
+
+      asyncio.run(main())
+
+  - name: Uruchamianie sync kodu w async — run_in_executor
+    desc: >
+      Nie zawsze możesz zmienić synchroniczny kod na async.
+      run_in_executor() uruchamia sync funkcję w threadpool bez blokowania event loop.
+    code: |
+      import asyncio
+      import time
+
+      def sync_operacja(n: int) -> int:
+          """Blokująca operacja — np. stara biblioteka, I/O"""
+          time.sleep(1)
+          return n * 2
+
+      async def main():
+          loop = asyncio.get_event_loop()
+
+          # Uruchom sync w threadpool — nie blokuje event loop
+          wynik = await loop.run_in_executor(None, sync_operacja, 5)
+          print(f"Wynik: {wynik}")
+
+          # Wiele jednocześnie
+          wyniki = await asyncio.gather(*[
+              loop.run_in_executor(None, sync_operacja, i)
+              for i in range(5)
+          ])
+          print(wyniki)  # [0, 2, 4, 6, 8]
+
+      asyncio.run(main())

@@ -1,0 +1,84 @@
+title: Komendy FastAPI / uvicorn
+
+groups:
+  - name: Instalacja
+    icon: "📦"
+    commands:
+      - desc: Zainstaluj FastAPI z uvicorn
+        code: pip install "fastapi[standard]"
+      - desc: Zainstaluj ręcznie z extras
+        code: pip install fastapi uvicorn[standard] pydantic
+      - desc: Zainstaluj dodatkowe narzędzia
+        code: pip install httpx pytest pytest-asyncio
+
+  - name: Uruchamianie
+    icon: "▶️"
+    commands:
+      - desc: Uruchom z hot-reload (development)
+        code: uvicorn main:app --reload
+      - desc: Uruchom na konkretnym porcie i hoście
+        code: uvicorn main:app --host 0.0.0.0 --port 8080
+      - desc: Uruchom z wieloma workerami (produkcja)
+        code: uvicorn main:app --workers 4
+      - desc: Uruchom przez fastapi CLI (od v0.100)
+        code: fastapi dev main.py
+      - desc: Uruchom przez fastapi CLI (produkcja)
+        code: fastapi run main.py
+
+  - name: Testowanie
+    icon: "🧪"
+    commands:
+      - desc: Testy z pytest
+        code: pytest tests/ -v
+      - desc: Testy z coverage
+        code: pytest --cov=app tests/
+      - desc: Wyślij request testowy przez httpie
+        code: http GET localhost:8000/items/1
+      - desc: Wyślij POST przez curl
+        code: "curl -X POST localhost:8000/items/ -H 'Content-Type: application/json' -d '{\"name\": \"test\"}'"
+
+  - name: Pydantic
+    icon: "🔒"
+    commands:
+      - desc: Sprawdź wersję Pydantic
+        code: python -c "import pydantic; print(pydantic.VERSION)"
+      - desc: Wygeneruj JSON Schema z modelu
+        code: python -c "from app.models import Item; print(Item.model_json_schema())"
+      - desc: Zmigruj kod Pydantic v1 → v2
+        code: pip install bump-pydantic && bump-pydantic app/
+
+  - name: Baza danych (Alembic)
+    icon: "🗄️"
+    commands:
+      - desc: Zainicjuj Alembic
+        code: alembic init alembic
+      - desc: Wygeneruj migrację automatycznie
+        code: alembic revision --autogenerate -m "opis zmian"
+      - desc: Zastosuj wszystkie migracje
+        code: alembic upgrade head
+      - desc: Cofnij ostatnią migrację
+        code: alembic downgrade -1
+      - desc: Sprawdź aktualną wersję DB
+        code: alembic current
+
+  - name: Deployment
+    icon: "🚀"
+    commands:
+      - desc: Uruchom przez Gunicorn + Uvicorn worker
+        code: gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker
+      - desc: Zbuduj Docker image
+        code: docker build -t myapi .
+      - desc: Uruchom kontener z API
+        code: docker run -p 8000:8000 myapi
+
+  - name: Narzędzia dev
+    icon: "🔧"
+    commands:
+      - desc: Sformatuj kod Pythonem
+        code: ruff format .
+      - desc: Sprawdź typy przez mypy
+        code: mypy app/ --ignore-missing-imports
+      - desc: Otwórz Swagger UI w przeglądarce
+        code: open http://localhost:8000/docs
+      - desc: Pobierz OpenAPI JSON schema
+        code: curl localhost:8000/openapi.json | python3 -m json.tool

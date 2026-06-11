@@ -1,0 +1,56 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać React?
+  firstComponent: Twój pierwszy komponent
+  firstComponentLang: JSX
+
+intro:
+  title: Czym jest React?
+  desc: >
+    React to deklaratywna biblioteka JavaScript do budowania interfejsów użytkownika.
+    Stworzona przez Meta w 2013 roku, jest dziś najpopularniejszym narzędziem frontendowym na świecie —
+    używana przez Facebook, Instagram, Airbnb, Netflix i tysiące innych produktów.
+
+concepts:
+  - title: Virtual DOM
+    desc: >
+      React utrzymuje lekką kopię DOM w pamięci.
+      Gdy coś się zmienia, porównuje nowy Virtual DOM ze starym (diffing)
+      i aktualizuje tylko zmienione fragmenty prawdziwego DOM — to sprawia że UI jest szybkie.
+    icon: "🧠"
+  - title: Komponenty
+    desc: >
+      UI dzielisz na małe, wielokrotnego użytku kawałki zwane komponentami.
+      Każdy komponent to funkcja która przyjmuje dane (props) i zwraca JSX — opis tego co ma się wyświetlić.
+    icon: "🧩"
+  - title: Jednokierunkowy przepływ danych
+    desc: >
+      Dane w React płyną zawsze z góry do dołu — od komponentu rodzica do dzieci przez props.
+      To ułatwia debugowanie bo zawsze wiesz skąd dane przyszły.
+    icon: "↓"
+  - title: JSX
+    desc: >
+      JSX to rozszerzenie składni JavaScript które wygląda jak HTML.
+      Piszesz tagi (div, h1, MyComponent) bezpośrednio w JS —
+      Babel kompiluje to do React.createElement() wywołań.
+    icon: "📝"
+
+whenToUse:
+  - Aplikacje SPA (Single Page Application)
+  - Dashboardy i panele admina
+  - Sklepy internetowe i marketplace
+  - Duże zespoły — komponentowa architektura skaluje się dobrze
+  - Gdy potrzebujesz bogatego ekosystemu (Next.js, React Native, biblioteki)
+
+firstComponent: |
+  function Powitanie({ imie }) {
+    return (
+      <div className="powitanie">
+        <h1>Cześć, {imie}! 👋</h1>
+        <p>To jest twój pierwszy komponent React.</p>
+      </div>
+    );
+  }
+
+  // Użycie:
+  // <Powitanie imie="Łukasz" />

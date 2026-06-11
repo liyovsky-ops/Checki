@@ -1,0 +1,134 @@
+title: Hooki React
+
+items:
+  - name: useState
+    desc: Lokalny stan komponentu. Zwraca parę — wartość i funkcję do aktualizacji. Re-renderuje komponent gdy stan się zmienia.
+    icon: "⚛️"
+    code: |
+      const [count, setCount] = useState(0);
+      const [user, setUser] = useState(null);
+      const [items, setItems] = useState([]);
+
+      // Aktualizacja
+      setCount(count + 1);
+      setCount(prev => prev + 1); // bezpieczniejsze (prev state)
+
+  - name: useEffect
+    desc: "Synchronizuje komponent z zewnętrznym systemem — fetch, subskrypcje, DOM. W React 18 Strict Mode efekt odpala się DWA RAZY w dev — cleanup musi działać poprawnie."
+    icon: "🔄"
+    code: |
+      // Tylko przy montowaniu (⚠️ 2x w Strict Mode dev)
+      useEffect(() => { ... }, []);
+
+      // Gdy zmieni się userId
+      useEffect(() => {
+        fetchUser(userId).then(setUser);
+      }, [userId]);
+
+      // Z cleanup — WYMAGANY dla subskrypcji/timerów
+      useEffect(() => {
+        const sub = subscribe(channel);
+        return () => sub.unsubscribe(); // cleanup
+      }, [channel]);
+
+  - name: useContext
+    desc: Dostęp do kontekstu bez prop drillingu. Przekazuje dane przez całe drzewo komponentów bez ręcznego przekazywania przez każdy poziom.
+    icon: "🌐"
+    code: |
+      const ThemeContext = createContext('light');
+
+      // Provider (wyżej w drzewie)
+      <ThemeContext.Provider value="dark">
+        <App />
+      </ThemeContext.Provider>
+
+      // Konsumpcja (gdziekolwiek w drzewie)
+      function Button() {
+        const theme = useContext(ThemeContext);
+        return <button className={theme}>Klik</button>;
+      }
+
+  - name: useRef
+    desc: "Referencja która nie powoduje re-renderu. Dwa zastosowania: dostęp do elementu DOM i przechowywanie wartości między renderami."
+    icon: "🔗"
+    code: |
+      // Dostęp do DOM
+      const inputRef = useRef(null);
+      <input ref={inputRef} />
+      inputRef.current.focus();
+
+      // Wartość bez re-renderu
+      const countRef = useRef(0);
+      countRef.current++; // nie re-renderuje
+
+  - name: useMemo
+    desc: "Memoizuje wynik drogiego obliczenia. Przelicza tylko gdy zmienią się zależności. Nie używaj przedwcześnie — React nie gwarantuje zachowania cache."
+    icon: "⚡"
+    code: |
+      const filteredUsers = useMemo(() => {
+        return users.filter(u =>
+          u.name.toLowerCase().includes(query)
+        );
+      }, [users, query]); // przelicz tylko gdy zmieni się users lub query
+
+  - name: useCallback
+    desc: "Memoizuje funkcję. Zwraca tę samą referencję między renderami. Działa tylko gdy dziecko jest opakowane w React.memo()."
+    icon: "📦"
+    code: |
+      const handleDelete = useCallback((id) => {
+        setItems(prev => prev.filter(item => item.id !== id));
+      }, []); // pusta lista = ta sama funkcja zawsze
+
+      <ExpensiveList onDelete={handleDelete} />
+
+  - name: useReducer
+    desc: Zaawansowane zarządzanie stanem przez reducer pattern. Lepsze od useState gdy logika jest złożona lub stan ma wiele powiązanych akcji.
+    icon: "🔁"
+    code: |
+      const reducer = (state, action) => {
+        switch (action.type) {
+          case 'INCREMENT': return { count: state.count + 1 };
+          case 'RESET':     return { count: 0 };
+          default:          return state;
+        }
+      };
+
+      const [state, dispatch] = useReducer(reducer, { count: 0 });
+      dispatch({ type: 'INCREMENT' });
+
+  - name: useId
+    desc: Generuje stabilne, unikalne ID spójne między server-side i client-side renderowaniem. React 18+.
+    icon: "🏷️"
+    code: |
+      function FormField({ label }) {
+        const id = useId();
+        return (
+          <>
+            <label htmlFor={id}>{label}</label>
+            <input id={id} />
+          </>
+        );
+      }
+
+  - name: Custom Hook
+    desc: "Własny hook to funkcja zaczynająca się od \"use\" która może używać innych hooków. Pozwala wydzielić i re-używać logikę stanową."
+    icon: "🔧"
+    code: |
+      function useFetch(url) {
+        const [data, setData] = useState(null);
+        const [loading, setLoading] = useState(true);
+        const [error, setError] = useState(null);
+
+        useEffect(() => {
+          fetch(url)
+            .then(r => r.json())
+            .then(setData)
+            .catch(setError)
+            .finally(() => setLoading(false));
+        }, [url]);
+
+        return { data, loading, error };
+      }
+
+      // Użycie
+      const { data, loading } = useFetch('/api/users');

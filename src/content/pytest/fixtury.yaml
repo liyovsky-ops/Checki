@@ -1,0 +1,113 @@
+title: Fixtures — przygotowanie danych
+
+items:
+  - name: Podstawowa fixture
+    desc: Fixture to funkcja przygotowująca dane lub zasoby. Wstrzykiwana przez nazwę argumentu.
+    icon: "🔧"
+    code: |
+      import pytest
+
+      @pytest.fixture
+      def sample_user():
+          return {"id": 1, "name": "Jan Kowalski", "email": "jan@example.com"}
+
+      def test_user_has_name(sample_user):
+          assert sample_user["name"] == "Jan Kowalski"
+
+      def test_user_has_email(sample_user):
+          assert "@" in sample_user["email"]
+
+  - name: Fixture scope — czas życia
+    desc: "scope kontroluje kiedy fixture jest tworzona/niszczona: function (default), class, module, session."
+    icon: "⏱️"
+    code: |
+      import pytest
+
+      @pytest.fixture(scope="module")
+      def db_connection():
+          # tworzona raz per plik testowy
+          conn = create_db_connection()
+          yield conn
+          conn.close()
+
+      @pytest.fixture(scope="session")
+      def app_config():
+          # tworzona raz dla całej sesji testów
+          return load_config("test")
+
+      @pytest.fixture  # scope="function" — default
+      def temp_data(db_connection):
+          # nowa dla każdego testu, ale reużywa db_connection
+          db_connection.execute("INSERT INTO items VALUES (1, 'test')")
+          yield
+          db_connection.execute("DELETE FROM items")
+
+  - name: Fixture z parametrami
+    desc: parametrize na fixture uruchamia test dla każdej wartości parametru — jak DRY version wielu testów.
+    icon: "🔁"
+    code: |
+      import pytest
+
+      @pytest.fixture(params=["sqlite", "postgresql", "mysql"])
+      def database(request):
+          db = connect_to(request.param)
+          yield db
+          db.disconnect()
+
+      def test_query_works(database):
+          # test uruchomi się 3 razy — raz per DB
+          result = database.execute("SELECT 1")
+          assert result is not None
+
+  - name: conftest.py — współdzielone fixtures
+    desc: Fixtures w conftest.py są automatycznie dostępne dla wszystkich testów w katalogu i podkatalogach.
+    icon: "📁"
+    code: |
+      # conftest.py w katalogu głównym testów
+      import pytest
+      from app.main import app
+      from fastapi.testclient import TestClient
+
+      @pytest.fixture(scope="session")
+      def client():
+          return TestClient(app)
+
+      @pytest.fixture
+      def auth_headers():
+          return {"Authorization": "Bearer test-token"}
+
+      # test_users.py — używa bez importowania:
+      def test_get_user(client, auth_headers):
+          r = client.get("/users/1", headers=auth_headers)
+          assert r.status_code == 200
+
+  - name: tmp_path — pliki tymczasowe
+    desc: tmp_path to wbudowana fixture dająca tymczasowy katalog. Idealny do testowania funkcji operujących na plikach.
+    icon: "📄"
+    code: |
+      def test_file_writer(tmp_path):
+          output_file = tmp_path / "output.txt"
+
+          # testuj swoją funkcję
+          write_data_to_file(output_file, [1, 2, 3])
+
+          content = output_file.read_text()
+          assert "1" in content
+          assert "2" in content
+
+  - name: monkeypatch — podmiana funkcji
+    desc: monkeypatch podmienia atrybuty/funkcje na czas testu. Idealne do mockowania zewnętrznych API.
+    icon: "🙈"
+    code: |
+      def test_fetch_without_internet(monkeypatch):
+          def fake_get(url, **kwargs):
+              class FakeResponse:
+                  status_code = 200
+                  def json(self):
+                      return {"fake": True}
+              return FakeResponse()
+
+          monkeypatch.setattr("requests.get", fake_get)
+
+          result = my_api_function()
+          assert result["fake"] is True

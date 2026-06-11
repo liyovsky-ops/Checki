@@ -1,0 +1,95 @@
+title: requests vs alternatywy HTTP
+
+items:
+  - name: httpx
+    icon: "⚡"
+    color: "#009688"
+    tagline: Nowoczesny HTTP client — identyczne API + async
+    pros:
+      - Async natywnie (await client.get()) przy identycznym API
+      - HTTP/2 support
+      - Timeout domyślnie włączony (bezpieczniejszy)
+      - Używany przez FastAPI TestClient
+    cons:
+      - Mniejsza społeczność niż requests
+      - Mniej tutoriali online
+      - Trochę więcej zużycia pamięci
+    vs: httpx = requests z async. Dla nowych projektów z asyncio lub FastAPI — httpx. Dla prostych sync skryptów — requests jest prostszy.
+
+  - name: aiohttp
+    icon: "🌊"
+    color: "#2196f3"
+    tagline: Async HTTP — klient i serwer w jednej paczce
+    pros:
+      - Bardzo wysoka wydajność async
+      - Klient i serwer HTTP w jednej paczce
+      - Streaming i WebSocket support
+      - Długoletni standard async HTTP
+    cons:
+      - Inne API niż requests (nie drop-in replacement)
+      - Więcej boilerplate
+      - Tylko async — nie działa sync
+      - httpx jest teraz prostszy w migracji
+    vs: aiohttp był standardem async zanim pojawił się httpx. Dziś httpx jest łatwiejszy w migracji z requests. aiohttp wciąż lider w surowej wydajności.
+
+  - name: urllib3
+    icon: "🔧"
+    color: "#607d8b"
+    tagline: Niskopoziomowy HTTP — requests używa go pod spodem
+    pros:
+      - Minimalny overhead
+      - Connection pooling wbudowany
+      - Pełna kontrola nad HTTP
+      - Zero zależności (requests go używa)
+    cons:
+      - Bardziej verbose API
+      - Brak auto JSON parse
+      - Trudniejszy do użycia
+      - Niższy poziom abstrakcji
+    vs: requests używa urllib3 pod spodem. Bezpośrednio urllib3 tylko gdy minimalizujesz zależności lub budujesz własną bibliotekę HTTP.
+
+  - name: Scrapy
+    icon: "🕷️"
+    color: "#60a839"
+    tagline: Framework do scrapingu — asynchroniczny spider z pipeline
+    pros:
+      - Asynchroniczne crawlowanie wielu stron jednocześnie
+      - Middleware, pipelines, auto-retry, throttling
+      - Export do CSV, JSON, XML out of the box
+      - Scrapy Cloud do deployu spiderów
+    cons:
+      - Overkill dla prostych przypadków
+      - Stroma krzywa uczenia
+      - Opinionated architektura
+      - Trudna integracja z asyncio
+    vs: requests = narzędzie (jedno zapytanie). Scrapy = framework (cały spider). Dla prostego scrapingu requests + BS4. Dla dużego projektu z dziesiątkami stron — Scrapy.
+
+  - name: Playwright / Selenium
+    icon: "🎭"
+    color: "#45ba4b"
+    tagline: Browser automation — scraping stron z JavaScriptem
+    pros:
+      - Renderuje JavaScript — scrape'uje SPA (React, Vue)
+      - Prawdziwa przeglądarka — omija wiele zabezpieczeń
+      - Screenshots, PDF, nagrywanie sesji
+      - Playwright szybszy i nowocześniejszy niż Selenium
+    cons:
+      - 100x wolniejszy niż requests
+      - Duże zasoby (RAM, CPU)
+      - Wymaga przeglądarki
+      - Trudniejszy w skalowaniu
+    vs: requests dla statycznego HTML (szybki, lekki). Playwright/Selenium gdy strona wymaga JS do wyrenderowania danych (SPA). Używaj requests gdzie możesz.
+
+  - name: httplib2
+    icon: "📡"
+    color: "#9e9e9e"
+    tagline: Historyczna alternatywa — stara biblioteka z cache HTTP
+    pros:
+      - Wbudowany cache HTTP (ETag, Last-Modified)
+      - Małe zależności
+    cons:
+      - Stary, mało aktywny projekt
+      - Gorsze API niż requests
+      - Mała społeczność
+      - requests-cache robi to samo lepiej
+    vs: httplib2 to relikt historyczny. Dziś requests + requests-cache robi to samo i lepiej. Unikaj w nowych projektach.

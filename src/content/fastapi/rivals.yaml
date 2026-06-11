@@ -1,0 +1,98 @@
+title: FastAPI vs inne frameworki
+
+items:
+  - name: Flask
+    icon: "🫙"
+    color: "#000000"
+    tagline: Minimalistyczny microframework — prosto i bez narzucania
+    pros:
+      - Prościejszy na start — mniej konceptów do nauczenia
+      - Ogromna baza tutoriali i zasobów
+      - Elastyczny — zero narzuconej architektury
+      - Dojrzały ekosystem rozszerzeń (Flask-SQLAlchemy, Flask-Login)
+    cons:
+      - Brak wbudowanej walidacji (musisz sam lub marshmallow/pydantic)
+      - Brak natywnego async (Flask 2.x ma, ale nie pierwszoklasowy)
+      - Brak auto-generowania dokumentacji
+      - Wolniejszy niż FastAPI przy I/O-bound
+    vs: Flask dla prostych aplikacji lub gdy masz istniejący kod Flask. FastAPI gdy potrzebujesz walidacji, async i auto-dokumentacji. Dla nowych projektów wybierz FastAPI.
+
+  - name: Django REST Framework
+    icon: "🎸"
+    color: "#0c4b33"
+    tagline: Batteries-included — ORM, admin, auth, serializers w pakiecie
+    pros:
+      - Wbudowany ORM, admin panel, auth, migracje
+      - Serializers z walidacją (odpowiednik Pydantic)
+      - Świetne do klasycznych REST API z bazą relacyjną
+      - Ogromna społeczność i ekosystem pluginów
+    cons:
+      - Znacznie wolniejszy niż FastAPI
+      - Brak natywnego async (drf jest sync)
+      - Więcej boilerplate na start
+      - Trudniejszy do użycia jako pure microservice
+    vs: DRF dla dużych, klasycznych webapps z relacyjną bazą. FastAPI dla API-first, mikroserwisów i projektów wymagających async i wydajności.
+
+  - name: Litestar
+    icon: "⭐"
+    color: "#5a3e84"
+    tagline: Bezpośredni konkurent FastAPI — rygorystyczny i modularny
+    pros:
+      - Bardziej rygorystyczna walidacja i kontrola nad warstwami
+      - Wbudowana obsługa WebSockets, SSE, GraphQL
+      - DTOs (Data Transfer Objects) jako pierwszoklasowy koncept
+      - Dependency injection bardziej elastyczny niż FastAPI
+    cons:
+      - Mniejszy ekosystem niż FastAPI
+      - Mniej tutoriali i zasobów
+      - Mniejsza społeczność
+      - Szybciej zmienia API (mniej stabilny)
+    vs: Oba są doskonałe. FastAPI ma większy ekosystem i więcej ofert pracy. Litestar ma lepszą architekturę dla zaawansowanych. Wybierz FastAPI jeśli nie masz konkretnego powodu.
+
+  - name: aiohttp
+    icon: "🌊"
+    color: "#2196f3"
+    tagline: Niskopoziomowy async HTTP — klient i serwer
+    pros:
+      - Bardzo wysoka wydajność async
+      - Klient i serwer w jednej paczce
+      - Pełna kontrola nad HTTP pipeline
+      - WebSocket support
+    cons:
+      - Brak walidacji, DI, auto-dokumentacji
+      - Dużo więcej boilerplate niż FastAPI
+      - Wymaga własnego routowania
+      - Trudniejszy w utrzymaniu
+    vs: aiohttp gdy budujesz własny framework lub potrzebujesz niskopoziomowej kontroli. FastAPI gdy chcesz produktywności i gotowych narzędzi (walidacja, docs, DI).
+
+  - name: Express (Node.js)
+    icon: "🟢"
+    color: "#68a063"
+    tagline: Node.js microframework — najpopularniejszy backend JS
+    pros:
+      - Ogromny ekosystem npm
+      - Szybszy niż Python przy CPU-bound
+      - JSON jako natywny format
+      - Więcej devów zna JS niż Python
+    cons:
+      - Brak typów (TypeScript opcjonalny, ale nie zawsze używany)
+      - Brak wbudowanej walidacji
+      - Callback hell (async/await pomaga, ale...)
+      - Inny ekosystem — nie dla Python-only stacków
+    vs: Express jeśli cały stack to JavaScript. FastAPI gdy używasz Pythona (ML, scraping, automatyzacja). FastAPI ma lepszą walidację i auto-docs niż Express.
+
+  - name: Tornado
+    icon: "🌪️"
+    color: "#f56500"
+    tagline: Stary async framework Python — sprawdzony w produkcji od 2009
+    pros:
+      - Bardzo dojrzały — w produkcji od 2009
+      - Wbudowany WebSocket i long-polling
+      - Dobry dla aplikacji wymagających wielu persistent connections
+      - Mała ilość zależności
+    cons:
+      - Starszy styl kodu niż FastAPI (callbacks zamiast async/await)
+      - Brak auto-dokumentacji i Pydantic
+      - Mniejsza społeczność
+      - Python 3.10+ idiomy nieobsługiwane
+    vs: Tornado dla long-polling, WebSocket-heavy aplikacji lub legacy kodu. FastAPI dla nowych projektów — nowocześniejszy DX, lepsza dokumentacja, Pydantic.

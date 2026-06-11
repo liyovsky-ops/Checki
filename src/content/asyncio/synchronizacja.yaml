@@ -1,0 +1,112 @@
+items:
+  - name: asyncio.Lock — mutual exclusion
+    desc: >
+      Lock zapobiega równoczesnemu dostępowi do zasobu.
+      Gdy jedna korutyna ma Lock, inne czekają. Async odpowiednik threading.Lock.
+    code: |
+      import asyncio
+
+      class SharedCounter:
+          def __init__(self):
+              self.value = 0
+              self._lock = asyncio.Lock()
+
+          async def increment(self, amount: int):
+              async with self._lock:  # tylko jedna korutyna na raz
+                  current = self.value
+                  await asyncio.sleep(0)  # symulacja I/O
+                  self.value = current + amount
+
+      async def main():
+          counter = SharedCounter()
+
+          await asyncio.gather(*[
+              counter.increment(1) for _ in range(100)
+          ])
+
+          print(f"Wynik: {counter.value}")  # zawsze 100, nie mniej
+
+      asyncio.run(main())
+
+  - name: asyncio.Event — sygnalizacja
+    desc: >
+      Event to flaga którą jedna korutyna ustawia (set()), a inne czekają (wait()).
+      Używane do synchronizacji — "poczekaj aż coś się stanie".
+    code: |
+      import asyncio
+
+      async def waiter(event: asyncio.Event, name: str):
+          print(f"{name}: czekam na sygnał...")
+          await event.wait()
+          print(f"{name}: dostałem sygnał!")
+
+      async def setter(event: asyncio.Event):
+          await asyncio.sleep(2)
+          print("Ustawiam event!")
+          event.set()
+
+      async def main():
+          event = asyncio.Event()
+
+          await asyncio.gather(
+              waiter(event, "Worker A"),
+              waiter(event, "Worker B"),
+              setter(event),
+          )
+
+      asyncio.run(main())
+
+  - name: asyncio.Semaphore — ograniczenie współbieżności
+    desc: >
+      Semaphore pozwala N korutynom na raz. Kluczowe przy scrapingu —
+      nie bombarduj serwera 1000 requestami jednocześnie. Ustaw limit np. 10.
+    code: |
+      import asyncio
+      import httpx
+
+      async def fetch(client: httpx.AsyncClient,
+                      url: str,
+                      sem: asyncio.Semaphore) -> str:
+          async with sem:  # max 10 jednocześnie
+              r = await client.get(url)
+              return r.text[:50]
+
+      async def main():
+          urls = [f"https://httpbin.org/delay/1?n={i}"
+                  for i in range(50)]
+
+          sem = asyncio.Semaphore(10)  # max 10 równoległych
+
+          async with httpx.AsyncClient() as client:
+              wyniki = await asyncio.gather(*[
+                  fetch(client, url, sem) for url in urls
+              ])
+
+          print(f"Pobrano {len(wyniki)} stron")
+
+      asyncio.run(main())
+
+  - name: asyncio.Condition — zaawansowana synchronizacja
+    desc: >
+      Condition łączy Lock z powiadomieniami.
+      Korutyny czekają (wait_for) aż warunek zostanie spełniony. Przydatne do producer-consumer z warunkami.
+    code: |
+      import asyncio
+
+      async def main():
+          condition = asyncio.Condition()
+          items = []
+
+          async def producer():
+              async with condition:
+                  items.append("gotowe")
+                  condition.notify_all()
+
+          async def consumer():
+              async with condition:
+                  await condition.wait_for(lambda: len(items) > 0)
+                  print(f"Odebrano: {items.pop()}")
+
+          await asyncio.gather(consumer(), producer())
+
+      asyncio.run(main())

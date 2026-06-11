@@ -1,0 +1,101 @@
+title: Komendy Docker
+groups:
+  - name: Kontenery
+    icon: "📦"
+    commands:
+      - desc: Uruchom kontener w tle z portem i nazwą
+        code: docker run -d -p 8000:8000 --name api moja-apka
+      - desc: Lista działających kontenerów
+        code: docker ps
+      - desc: Lista wszystkich kontenerów (łącznie z zatrzymanymi)
+        code: docker ps -a
+      - desc: Wejdź do działającego kontenera
+        code: docker exec -it kontener bash
+      - desc: Wejdź do kontenera alpine (bez bash)
+        code: docker exec -it kontener sh
+      - desc: Śledź logi kontenera na żywo
+        code: docker logs -f kontener
+      - desc: Ostatnie 100 linii logów
+        code: docker logs --tail 100 kontener
+      - desc: Zatrzymaj kontener (graceful)
+        code: docker stop kontener
+      - desc: Zatrzymaj i usuń kontener
+        code: docker stop kontener && docker rm kontener
+      - desc: Zużycie CPU i RAM na żywo
+        code: docker stats
+      - desc: Pełne metadane kontenera (JSON)
+        code: docker inspect kontener
+      - desc: Kopiuj plik z kontenera na hosta
+        code: docker cp kontener:/app/log.txt ./log.txt
+
+  - name: Images
+    icon: "🖼️"
+    commands:
+      - desc: Zbuduj image z Dockerfile w bieżącym folderze
+        code: docker build -t moja-apka:latest .
+      - desc: Buduj bez cache (fresh rebuild)
+        code: docker build --no-cache -t moja-apka:latest .
+      - desc: Buduj z konkretnym Dockerfile
+        code: docker build -f Dockerfile.prod -t moja-apka:prod .
+      - desc: Lista lokalnych images
+        code: docker images
+      - desc: Pobierz image z Docker Hub
+        code: docker pull python:3.12-slim
+      - desc: Usuń lokalny image
+        code: docker rmi moja-apka:latest
+      - desc: Tag image do Docker Hub
+        code: docker tag moja-apka:latest username/moja-apka:v1.0
+      - desc: Push image do registry
+        code: docker push username/moja-apka:v1.0
+      - desc: Sprawdź warstwy image i ich rozmiar
+        code: docker history moja-apka:latest
+
+  - name: Docker Compose
+    icon: "🎼"
+    commands:
+      - desc: Uruchom stack (w tle z rebuildem)
+        code: docker compose up -d --build
+      - desc: Zatrzymaj stack (zachowaj wolumeny)
+        code: docker compose down
+      - desc: Zatrzymaj stack i usuń wolumeny (reset DB)
+        code: docker compose down -v
+      - desc: Logi konkretnego serwisu (live)
+        code: docker compose logs -f api
+      - desc: Wejdź do kontenera serwisu
+        code: docker compose exec api bash
+      - desc: Uruchom jednorazową komendę
+        code: docker compose run --rm api python manage.py migrate
+      - desc: Status serwisów
+        code: docker compose ps
+      - desc: Restart konkretnego serwisu
+        code: docker compose restart api
+
+  - name: Sieć i wolumeny
+    icon: "🔌"
+    commands:
+      - desc: Lista sieci Docker
+        code: docker network ls
+      - desc: Szczegóły sieci (podłączone kontenery)
+        code: docker network inspect moja-siec
+      - desc: Utwórz własną sieć
+        code: docker network create moja-siec
+      - desc: Lista wolumenów
+        code: docker volume ls
+      - desc: Szczegóły wolumenu (lokalizacja na hoście)
+        code: docker volume inspect postgres_data
+
+  - name: Czyszczenie
+    icon: "🧹"
+    commands:
+      - desc: Sprawdź ile miejsca zajmuje Docker
+        code: docker system df
+      - desc: Usuń zatrzymane kontenery i nieużywane images
+        code: docker system prune
+      - desc: Usuń WSZYSTKO nieużywane (ostrożnie)
+        code: docker system prune -af
+      - desc: Usuń nieużywane wolumeny
+        code: docker volume prune
+      - desc: Usuń dangling images (bez tagu)
+        code: docker image prune
+      - desc: Usuń wszystkie nieużywane images
+        code: docker image prune -a

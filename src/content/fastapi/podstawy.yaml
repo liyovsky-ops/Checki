@@ -1,0 +1,58 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać FastAPI?
+  firstComponent: Pierwszy endpoint
+  firstComponentLang: Python
+
+intro:
+  title: Czym jest FastAPI?
+  desc: >
+    FastAPI to nowoczesny framework do budowania API w Pythonie.
+    Oparty na standardach OpenAPI i JSON Schema.
+    Automatycznie generuje interaktywną dokumentację (Swagger UI).
+    Jeden z najszybszych frameworków Python — wydajnością dorównuje NodeJS i Go dzięki ASGI i async/await.
+
+concepts:
+  - title: Type Hints
+    desc: >
+      FastAPI używa type hints Pythona do automatycznej walidacji, serializacji i generowania dokumentacji.
+      Piszesz typy → FastAPI robi resztę.
+    icon: "🏷️"
+  - title: Pydantic
+    desc: >
+      Walidacja danych przez modele Pydantic.
+      Definiujesz schemat jako klasę Python — FastAPI waliduje request i zwraca czytelne błędy automatycznie.
+    icon: "🔒"
+  - title: Async / Await
+    desc: >
+      Natywna obsługa async/await. Endpoint może być synchroniczny lub asynchroniczny —
+      FastAPI sam obsłuży oba przypadki przez ASGI (Starlette).
+    icon: "⚡"
+  - title: Auto Docs
+    desc: >
+      Swagger UI dostępny na /docs, ReDoc na /redoc.
+      Zero konfiguracji — dokumentacja generuje się z kodu automatycznie przy każdej zmianie.
+    icon: "📄"
+
+whenToUse:
+  - REST API do automatyzacji i scrapingu (odbieranie wyników, wyzwalanie tasków)
+  - Backend dla agentów AI (LangGraph, MCP endpoints)
+  - Mikrousługi i pipeliny danych
+  - Szybkie prototypy API z automatyczną dokumentacją
+  - "Zastąpienie Flask gdy potrzebujesz walidacji, async i typów"
+
+firstComponent: |
+  from fastapi import FastAPI
+
+  app = FastAPI()
+
+  @app.get("/")
+  def root():
+      return {"message": "Hello, FastAPI!"}
+
+  @app.get("/items/{item_id}")
+  def get_item(item_id: int, q: str | None = None):
+      return {"item_id": item_id, "query": q}
+
+  # Uruchom: uvicorn main:app --reload
+  # Docs:    http://localhost:8000/docs
