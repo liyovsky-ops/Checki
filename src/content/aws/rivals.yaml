@@ -1,128 +1,82 @@
-title: Rywale — AWS vs inne platformy cloud
+title: AWS vs inne platformy cloud
+
 items:
   - name: Microsoft Azure
     icon: "🔷"
-    desc: |
-      Drugi największy cloud (22% rynku). Siłą Azure jest integracja z ekosystemem Microsoft.
-      Przewaga w enterprise: Windows Server, Active Directory, Office 365, .NET, Visual Studio.
-
-      Kiedy Azure wygrywa z AWS:
-      • Firma używa Active Directory → Azure AD (Entra ID) integruje się natywnie
-      • Stack Microsoft: C#/.NET, SQL Server, SharePoint, Teams, Power BI
-      • Hybrid cloud z on-premises Windows środowiskiem (Azure Arc, Azure Stack)
-      • DevOps: Azure DevOps (pipelines, boards, repos) to jedne z najlepszych narzędzi CI/CD
-      • Compliance w Europie: Microsoft ma bardzo dobre certyfikacje dla sektora publicznego
-
-      Gdzie AWS jest lepszy:
-      • Liczba serwisów (200+ vs ~100 w Azure)
-      • ML/AI: SageMaker vs Azure ML — AWS dojrzalszy
-      • Serverless: Lambda dojrzalsza niż Azure Functions
-      • Ekosystem partnerów i marketplace
-
-      Ekwiwalenty AWS → Azure:
-      EC2 → Azure VMs | S3 → Blob Storage | RDS → Azure SQL | Lambda → Azure Functions
-      ECS/EKS → AKS | CloudFront → Azure CDN | Route 53 → Azure DNS | IAM → Azure AD/RBAC
-      CloudFormation → ARM/Bicep | CloudTrail → Azure Monitor Activity Log | DynamoDB → Cosmos DB
-
-      Certyfikacja: AZ-900 (Fundamentals) → AZ-104 (Administrator) → AZ-305 (Solutions Architect)
+    color: "#0078d4"
+    tagline: Drugi największy cloud — mocny w enterprise Microsoft stack
+    pros:
+      - Natywna integracja z Active Directory, Office 365, .NET, SQL Server
+      - Azure DevOps — jeden z najlepszych CI/CD pipeline w branży
+      - Compliance w Europie — świetne certyfikacje dla sektora publicznego
+      - Hybrid cloud z on-premises Windows (Azure Arc, Azure Stack)
+    cons:
+      - Mniejsza liczba serwisów niż AWS (100 vs 200+)
+      - ML/AI dojrzalszy w AWS (SageMaker vs Azure ML)
+      - Lambda dojrzalsza niż Azure Functions
+      - Mniejszy ekosystem partnerów
+    vs: Azure gdy firma używa Microsoft stack (Windows, .NET, AD, SQL Server). AWS dla reszty — większy ekosystem, więcej serwisów, lider rynku.
 
   - name: Google Cloud Platform (GCP)
     icon: "🟡"
-    desc: |
-      Trzeci gracz (10% rynku). Siłą GCP jest networking, Big Data i AI/ML (Google wynalazł Kubernetes,
-      Transformer, TensorFlow). Reputacja: najlepsza sieć globalna, najtańsze data transfer.
-
-      Kiedy GCP wygrywa:
-      • AI/ML: Vertex AI, TPU (własny chip ML), najszybszy dostęp do modeli Google (Gemini)
-      • Big Data native: BigQuery (serverless DW, PB w sekundy), Pub/Sub, Dataflow (Apache Beam)
-      • Kubernetes: GKE to najdojrzalszy managed K8s (Google stworzył K8s)
-      • Networking: sieć Google = CDN globalny z latency < 1ms między regionami
-      • Firebase: mobile backend (realtime DB, auth, hosting, analytics) = zero backend code
-      • Cena: często tańsze niż AWS przy sustained use (automatic discounts)
-
-      Gdzie AWS jest lepszy:
-      • Enterprise adoption i support
-      • Liczba serwisów i regionów
-      • Dojrzałość marktplace i ekosystemu partnerów
-
-      Ekwiwalenty AWS → GCP:
-      EC2 → Compute Engine | S3 → Cloud Storage | RDS → Cloud SQL | Lambda → Cloud Functions
-      EKS → GKE | CloudFront → Cloud CDN | Route 53 → Cloud DNS | DynamoDB → Firestore/Bigtable
-      Redshift → BigQuery | Kinesis → Pub/Sub | SageMaker → Vertex AI | CloudTrail → Cloud Audit Logs
+    color: "#4285f4"
+    tagline: Najlepsza sieć globalna — AI/ML i Big Data
+    pros:
+      - Vertex AI i TPU — najlepszy dostęp do modeli Google (Gemini)
+      - BigQuery — serverless data warehouse (petabajty w sekundy)
+      - GKE — najdojrzalszy managed Kubernetes (Google stworzył K8s)
+      - Sieć Google — najniższa latencja między regionami
+    cons:
+      - Mniejsze enterprise adoption niż AWS/Azure
+      - Mniejsza liczba serwisów niż AWS
+      - Historycznie słabszy support
+      - Mniejsza liczba regionów
+    vs: GCP dla AI/ML (Vertex AI, TPU), Big Data (BigQuery), Kubernetes. AWS dla ogólnych workloadów i enterprise z pełnym ekosystemem.
 
   - name: DigitalOcean
     icon: "🌊"
-    desc: |
-      Developer-friendly cloud dla startupów i indie developers. Proste UI, przewidywalne ceny,
-      świetna dokumentacja. Nie ma 200 serwisów AWS ale to bywa zaletą — nie gubisz się.
-
-      Mocne strony:
-      • Simplicity: Droplet gotowy w 55 sekund, UI dla ludzi
-      • Pricing: flat rate, zero niespodzianek — Droplet $6/mies = $6/mies (AWS to: EC2 + EBS + bandwidth + IPs)
-      • Dokumentacja: DigitalOcean tutorials to jedne z najlepszych w branży
-      • App Platform: Heroku-like PaaS — push git → deploy. Bez DevOps.
-      • Managed Kubernetes (DOKS): prostszy niż EKS, tańszy
-
-      Gdzie AWS wygrywa:
-      • Skala: DO nie obsłuży enterprise potrzeb
-      • Serwisy: brak managed ML, advanced security, CDN enterprise, etc.
-      • Compliance: ograniczone certyfikacje
-      • Globalne zasięg: ~15 datacenter vs AWS 30+ regionów
-
-      Kiedy wybrać DO:
-      Startup budujący MVP, personal projects, małe firmy (<50 pracowników),
-      aplikacje gdzie całkowity koszt DO ($6-200/mies) jest wystarczający.
-      Postgres, Redis, MySQL fully managed za ułamek ceny AWS RDS.
+    color: "#0080ff"
+    tagline: Developer-friendly cloud — proste ceny dla startupów
+    pros:
+      - Prosta UI i przewidywalne flat-rate ceny
+      - Droplet gotowy w 55 sekund
+      - Świetna dokumentacja — jedne z najlepszych tutoriali w branży
+      - App Platform (Heroku-like) — push git → deploy
+    cons:
+      - Brak managed ML, advanced security, enterprise serwisów
+      - Nie obsłuży enterprise scale
+      - Ograniczone compliance certyfikacje
+      - ~15 datacenter vs AWS 30+ regionów
+    vs: DigitalOcean dla startupów, indie devs i małych firm gdzie flat-rate $6-200/mies wystarczy. AWS dla enterprise i gdy potrzebujesz zaawansowanych managed serwisów.
 
   - name: Hetzner Cloud
     icon: "🟠"
-    desc: |
-      Europejski cloud z Niemiec. NAJTAŃSZY w przeliczeniu na wydajność/cenę.
-      Popularne szczególnie w Polsce, Niemczech, startupach bootstrapowych.
+    color: "#d50c2d"
+    tagline: Najtańszy cloud EU — bootstrapowe projekty i self-hosting
+    pros:
+      - Najtańszy w przeliczeniu na wydajność — CX22 €3.79/mies (vs AWS ~$18)
+      - 20TB/mies traffic wliczone — zero niespodzianek na rachunku
+      - Object Storage S3-compatible za ułamek ceny S3
+      - Lokalizacje EU (DE, FI) i US
+    cons:
+      - Zero managed serwisów (brak RDS, Lambda, ML)
+      - Brak Marketplace i partnerów
+      - Ograniczony support
+      - Brak HIPAA, SOC 2 i enterprise compliance
+    vs: Hetzner dla self-hostingu (Postgres, Redis, MinIO, Gitea) i projektów gdzie liczy się cena. AWS gdy potrzebujesz managed serwisów lub enterprise compliance.
 
-      Dlaczego Hetzner:
-      • Cena: CX22 (2 vCPU, 4GB RAM) = €3.79/mies. AWS t3.small (2 vCPU, 2GB) = ~$18/mies.
-      • Lokalizacje EU: Falkenstein/Nuremberg (DE), Helsinki (FI), Ashburn (US), Singapore
-      • Prosta struktura cenowa: serwer + traffic (20TB/mies wliczone!)
-      • Object Storage (S3-compatible): €0.0117/GB/mies vs S3 $0.023/GB
-      • Block Storage, Managed LB, Firewall, Networks (VPC) — wszystko tanie i proste
-
-      Ograniczenia vs AWS:
-      • Zero managed serwisów: brak RDS, Lambda, ML, CDN (możesz samemu postawić)
-      • Mały ekosystem (brak Marketplace, partnerów)
-      • Support: community first, paid support ograniczony
-      • Compliance: nie ma HIPAA, SOC 2 itd.
-
-      Kiedy wybrać Hetzner:
-      Self-hosting: Postgres, Redis, Meilisearch, MinIO (S3-compatible), Gitea, Nextcloud.
-      Mikroserwisy gdzie chcesz kontrolę bez cloud vendor lock-in.
-      Developer środowiska, staging, projekty gdzie liczy się każde euro.
-
-  - name: Vercel & Netlify — Serverless dla Frontend
+  - name: Vercel & Netlify
     icon: "▲"
-    desc: |
-      Nie bezpośredni rywal AWS ale alternatywa dla frontend deploymentu.
-      Abstrakcja nad AWS/GCP — zero DevOps dla statycznych stron i SSR.
-
-      Vercel:
-      • Twórcy Next.js — pierwszoklasowe wsparcie (ISR, Edge Functions, Server Actions)
-      • Deploy: `git push` → automatyczny preview URL → deploy do produkcji
-      • Edge Network: globalny CDN, Edge Runtime (V8 isolates, nie Node.js)
-      • Serverless Functions: API routes z Node.js/Edge
-      • Analytics: Core Web Vitals, real user monitoring
-      • Free tier: 100GB bandwidth, 6000 deployments/mies — w praktyce wystarczy dla projektów indie
-      • Kiedy płać: $20/mies Pro dla custom domains, większe limity, team features
-
-      Netlify:
-      • Bardziej generalistyczny: React, Vue, Angular, Gatsby, Hugo, Jekyll...
-      • Netlify Functions (Lambda wrapper), Forms, Identity (Cognito wrapper)
-      • Netlify Edge Functions (Deno runtime)
-      • Kiedy wybrać nad Vercel: nie-Next.js projekty, prostsze potrzeby
-
-      AWS Amplify vs Vercel:
-      Amplify to AWS odpowiedź na Vercel/Netlify — CI/CD dla frontend + backend (AppSync, Cognito).
-      Vercel ma lepszy DX dla Next.js; Amplify daje pełny AWS backend bez konfiguracji.
-
-      Praktyczna zasada:
-      Next.js projekt → Vercel. Inne frameworki → Netlify lub Cloudflare Pages.
-      Potrzebujesz backend AWS? → Amplify lub EC2/Lambda + CloudFront.
+    color: "#000000"
+    tagline: Serverless hosting dla frontend — zero DevOps
+    pros:
+      - Git push → automatyczny deploy (zero konfiguracji CI/CD)
+      - Globalny CDN out of the box
+      - Darmowy tier wystarczający dla indie projektów
+      - Vercel — pierwszoklasowy support Next.js (ISR, Server Actions)
+    cons:
+      - Tylko dla frontend/statycznych stron i serverless functions
+      - Vendor lock-in (zwłaszcza Vercel + Next.js)
+      - Kosztowne przy dużym ruchu vs DIY na AWS/Hetzner
+      - Brak pełnego backendu (bazy, kolejki)
+    vs: Vercel/Netlify dla frontend bez DevOps (Next.js, React, Vue). AWS gdy potrzebujesz pełnego backendu, baz danych, ML. Można łączyć — frontend na Vercel, backend na AWS Lambda.

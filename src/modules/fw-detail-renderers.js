@@ -110,6 +110,26 @@ export function renderRivals(items) {
     ).join('') + '</div>';
 }
 
+export function renderRivalsSection(section) {
+  let html = section.title ? '<div class="fwd-section-title">' + escFwd(section.title) + '</div>' : '';
+  html += '<div class="fwd-rivals-grid">' +
+    (section.items || []).map(function(r, i) {
+      const color = r.color || 'var(--fw-color)';
+      return '<div class="fwd-rival-card" style="animation-delay:' + (i * 0.06) + 's;border-left:3px solid ' + color + '">' +
+        '<div class="fwd-rival-header"><span class="fwd-rival-icon">' + (r.icon || '') + '</span>' +
+        '<div><div class="fwd-rival-name" style="color:' + color + '">' + escFwd(r.name) + '</div>' +
+        '<div class="fwd-rival-tagline">' + escFwd(r.tagline || '') + '</div></div></div>' +
+        (r.pros && r.pros.length
+          ? '<div class="fwd-pros-cons"><ul class="fwd-pro-list">' + r.pros.map(function(p) { return '<li>' + escFwd(p) + '</li>'; }).join('') + '</ul>' +
+            (r.cons && r.cons.length ? '<ul class="fwd-con-list">' + r.cons.map(function(c) { return '<li>' + escFwd(c) + '</li>'; }).join('') + '</ul>' : '') +
+            '</div>'
+          : '') +
+        (r.vs ? '<div class="fwd-vs-react">🆚 ' + escFwd(r.vs) + '</div>' : '') +
+        '</div>';
+    }).join('') + '</div>';
+  return html;
+}
+
 export function renderPlugins(items) {
   return '<div class="fwd-plugins-grid">' +
     items.map((p, i) =>

@@ -1,77 +1,62 @@
-title: Rywale — alternatywy dla Git
+title: Git vs alternatywy VCS
+
 items:
   - name: Mercurial (Hg)
     icon: "🔵"
-    desc: |
-      Rozproszony VCS stworzony w tym samym czasie co Git (2005).
-      Prostszy interfejs, bardziej konsekwentne komendy, ale znacznie mniejsza popularność.
-
-      Gdzie Mercurial wygrywa:
-      • Prostsze komendy — bardziej intuicyjny niż Git dla początkujących
-      • Lepsza obsługa dużych repozytoriów binarnych
-      • Immutable commits domyślnie — nie możesz przepisać historii
-      • Używany przez Facebook (wewnętrznie), Bitbucket (do 2020)
-
-      Dlaczego Git wygrał:
-      Git jest wszędzie — GitHub, GitLab, każdy projekt open source.
-      Lepsze branche, szybszy, więcej zasobów online. Mercurial = niche market.
+    color: "#4675bc"
+    tagline: Rozproszony VCS stworzony równolegle z Git — prostsze komendy
+    pros:
+      - Prostsze i bardziej konsekwentne komendy niż Git
+      - Lepsza obsługa dużych repozytoriów binarnych
+      - Immutable commits domyślnie
+      - Używany przez Facebook (wewnętrznie) i Bitbucket (do 2020)
+    cons:
+      - Znacznie mniejsza popularność niż Git
+      - GitHub/GitLab nie obsługują Mercurial
+      - Mniejsza społeczność i mniej zasobów
+      - Praktycznie brak nowych projektów
+    vs: Git wygrał — jest wszędzie (GitHub, GitLab, każdy open source). Mercurial był lepszy technicznie ale ekosystem zdecydował. Nowe projekty — zawsze Git.
 
   - name: SVN (Subversion)
     icon: "📁"
-    desc: |
-      Scentralizowany VCS — stare podejście, jeden centralny serwer.
-      Nadal używany w legacy enterprise systemach, embedded, game dev (duże binarne assety).
-
-      Kiedy SVN nadal ma sens:
-      • Kontrola dostępu per folder (nie per repo jak w Git) — banki, korporacje
-      • Duże pliki binarne (grafiki, modele 3D) — Git nie radzi sobie z nimi
-      • Prosta historia liniowa bez branchy
-      • Legacy systemy których nie warto migrować
-
-      Dlaczego Git zamiast SVN:
-      Offline work, szybkie branche, zdecentralizowany, lepsze merging.
-      SVN to relikt — nie zaczynaj nowych projektów z SVN.
+    color: "#809cc9"
+    tagline: Scentralizowany VCS — nadal w legacy enterprise
+    pros:
+      - Kontrola dostępu per folder (nie per repo jak Git)
+      - Dobre dla dużych plików binarnych (grafiki, modele 3D)
+      - Prosta, liniowa historia bez branchy
+      - Nadal używany w embedded, game dev, bankach
+    cons:
+      - Wymaga centralnego serwera — brak offline work
+      - Wolne branchowanie i mergowanie
+      - Zdecentralizowany backup niemożliwy
+      - Relikt — nowe projekty go nie używają
+    vs: SVN nadal żyje w legacy enterprise. Dla nowych projektów — Git jest oczywistym wyborem. Git ma offline work, szybkie branche i lepszy merge.
 
   - name: GitHub vs GitLab vs Bitbucket
     icon: "🌐"
-    desc: |
-      Nie są alternatywami dla Git — to hosty dla repozytoriów Git + narzędzia CI/CD.
+    color: "#333333"
+    tagline: Hosting Git — nie rywal, a platforma dla repozytoriów
+    pros:
+      - GitHub — największy ekosystem, Copilot, portfolio dla rekruterów
+      - GitLab — self-hosted, wbudowany CI/CD, compliance enterprise
+      - Bitbucket — integracja z Jira/Confluence (Atlassian stack)
+    cons:
+      - GitHub — vendor lock-in (Microsoft)
+      - GitLab — CI/CD bardziej skomplikowany w konfiguracji
+      - Bitbucket — mały ekosystem open source
+    vs: Portfolio i open source → GitHub. Firma z compliance lub self-hosting → GitLab. Atlassian stack (Jira, Confluence) → Bitbucket. Nie są rywalami Git — to hosty dla repozytoriów Git.
 
-      GitHub:
-      • Największy ekosystem — miliardy repozytoriów open source
-      • GitHub Actions (CI/CD) — bardzo dobre
-      • GitHub Copilot integracja
-      • Darmowe dla publicznych i prywatnych repo
-      • Najlepsza strona do portfolio — rekruterzy tu patrzą
-
-      GitLab:
-      • Self-hosted (możesz postawić na własnym serwerze — ważne dla enterprise)
-      • Wbudowany CI/CD (GitLab CI) lepszy niż GitHub Actions zdaniem wielu
-      • Issues, Wiki, Container Registry w jednym miejscu
-      • Popularne w firmach które chcą kontroli nad danymi
-
-      Bitbucket:
-      • Integracja z Jira i innymi narzędziami Atlassian
-      • Popularne w firmach używających Confluence/Jira
-      • Mniejszy ekosystem open source
-
-  - name: Git Flow vs Trunk-Based Development
+  - name: Git Flow vs Trunk-Based Dev
     icon: "🌳"
-    desc: |
-      Nie alternatywy dla Git — różne strategie pracy z branchami.
-
-      Git Flow (klasyczny):
-      • main (produkcja) + develop (integracja) + feature/* + release/* + hotfix/*
-      • Dużo branchy, formalna struktura release
-      • Dobry dla: wersjonowane produkty, długie cykle release
-
-      Trunk-Based Development (nowoczesny):
-      • Jeden main branch — wszyscy pushują bezpośrednio lub przez short-lived feature branches
-      • Feature flags zamiast długich feature branchy
-      • Wymaga: dobrego CI/CD, automatycznych testów, feature flags
-      • Dobry dla: ciągłe deploye, SaaS, szybki development
-
-      GitHub Flow (uproszczony, popularny):
-      • main + feature branch → PR → merge
-      • Prosty, działa dla większości projektów
-      • To czego używają większość open source projektów
+    color: "#f05032"
+    tagline: Strategie pracy z branchami — nie rywal, a filozofia użycia Git
+    pros:
+      - Git Flow — jasna struktura (main, develop, feature/*, release/*, hotfix/*)
+      - Git Flow — dobre dla wersjonowanych produktów i długich release cycles
+      - Trunk-Based — jeden main branch, wszyscy commitują bezpośrednio
+      - Trunk-Based — wymagany przez CI/CD i continuous deployment
+    cons:
+      - Git Flow — dużo branchy, skomplikowane merge przy długich feature branchach
+      - Trunk-Based — wymaga dobrego CI/CD i feature flags
+    vs: Git Flow dla wersjonowanych produktów (mobile app, SDK). Trunk-Based dla SaaS z continuous deployment. GitHub Flow (main + feature branch + PR) działa dla większości projektów.

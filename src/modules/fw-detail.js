@@ -1,4 +1,4 @@
-import { renderBasics, renderGenericSection, renderComponents, renderHooks, renderRouting, renderState, renderRivals, renderPlugins, renderCommands } from './fw-detail-renderers.js';
+import { renderBasics, renderGenericSection, renderComponents, renderHooks, renderRouting, renderState, renderRivals, renderRivalsSection, renderPlugins, renderCommands } from './fw-detail-renderers.js';
 import { setFwCmdGroups } from './fw-detail-modal.js';
 import { FW_REACT_DATA }     from '../data/fw_react.js';
 import { FW_FASTAPI_DATA }   from '../data/fw_fastapi.js';
@@ -95,6 +95,7 @@ export function switchDetailTab(tabId) {
 }
 
 function isGeneric(val) { return val && Array.isArray(val.items); }
+function isRivals(val) { return val && Array.isArray(val.items) && val.items.length > 0 && val.items[0].tagline !== undefined; }
 
 function renderTabContent(tabId, data) {
   const el = document.getElementById('fwd-content');
@@ -107,7 +108,7 @@ function renderTabContent(tabId, data) {
     case 'hooki':      el.innerHTML = isGeneric(data.content.hooki)      ? renderGenericSection(data.content.hooki, meta)      : renderHooks(data.content.hooki); break;
     case 'routing':    el.innerHTML = isGeneric(data.content.routing)    ? renderGenericSection(data.content.routing, meta)    : renderRouting(data.content.routing, meta); break;
     case 'state':      el.innerHTML = isGeneric(data.content.state)      ? renderGenericSection(data.content.state, meta)      : renderState(data.content.state); break;
-    case 'rywale':     el.innerHTML = isGeneric(data.content.rywale)  ? renderGenericSection(data.content.rywale, meta)  : renderRivals(data.content.rywale);  break;
+    case 'rywale':     el.innerHTML = isRivals(data.content.rywale) ? renderRivalsSection(data.content.rywale) : (isGeneric(data.content.rywale) ? renderGenericSection(data.content.rywale, meta) : renderRivals(data.content.rywale)); break;
     case 'pluginy':    el.innerHTML = isGeneric(data.content.pluginy) ? renderGenericSection(data.content.pluginy, meta) : renderPlugins(data.content.pluginy); break;
     case 'komendy':    el.innerHTML = renderCommands(data.content.komendy); break;
     default: el.innerHTML = '<div class="fwd-coming-soon"><div>Wkrótce...</div></div>';
