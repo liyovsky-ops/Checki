@@ -1,0 +1,115 @@
+title: CI/CD vs alternatywy
+
+items:
+  - name: Jenkins
+    icon: "🤖"
+    color: "#d33833"
+    tagline: Klasyczny serwer CI — najstarszy, najbardziej elastyczny
+    pros:
+      - Self-hosted — pełna kontrola nad infrastrukturą i danymi
+      - Ogromny ekosystem pluginów (1800+) — integracja z prawie wszystkim
+      - Groovy Jenkinsfile — programowalny pipeline jako kod
+      - Bezpłatny open-source — bez limitów buildów ani minut
+      - Shared Libraries — współdzielenie kodu pipeline między projektami
+    cons:
+      - Plugin hell — konflikty, aktualizacje, przestarzałe pluginy
+      - Wymaga dedykowanego serwera i administracji
+      - Groovy jest trudny — wysoka bariera wejścia
+      - UI przestarzały — mało intuicyjny
+      - Konfiguracja przez UI zamiast kodu (legacy) — trudna w wersjonowaniu
+    vs: Jenkins dla legacy enterprise z setkami istniejących pipeline'ów lub wymaganiami compliance (self-hosted). GitHub Actions dla nowych projektów na GitHubie. Jenkins to inwestycja w konfigurację — lepiej zacząć od prostszego narzędzia.
+
+  - name: CircleCI
+    icon: "⭕"
+    color: "#343434"
+    tagline: Szybki SaaS CI/CD — dobry DX, orbs i parallelism
+    pros:
+      - Bardzo szybki setup — kilka minut do działającego pipeline
+      - Orbs — gotowe paczki konfiguracji (jak GitHub Actions marketplace)
+      - Parallelism — testy automatycznie dzielone na wiele kontenerów
+      - Resource classes — wybór CPU/RAM dla joba
+      - SSH debug — wejdź do działającego joba przez SSH gdy coś nie działa
+    cons:
+      - Płatny przy większym użyciu — free tier ograniczony
+      - Vendor lock-in — orbs to CircleCI-specyficzne
+      - Wiąże się z CircleCI SaaS — dane przechodzą przez ich serwery
+      - Mniejszy marketplace niż GitHub Actions
+      - Self-hosted runner (CircleCI Server) — drogi i skomplikowany
+    vs: CircleCI dla firm na GitHub lub Bitbucket z budżetem i potrzebą szybkiego CI. GitHub Actions droższy dla dużych organizacji (minuty), ale bezpłatny dla publicznych repo. CircleCI lepszy DX dla dużych test suite dzięki parallelism.
+
+  - name: GitLab CI
+    icon: "🦊"
+    color: "#fc6d26"
+    tagline: Wbudowany w GitLab — runner self-hosted lub SaaS, pełna platforma DevOps
+    pros:
+      - Wbudowany w GitLab — jeden tool dla repo, CI/CD, Container Registry, issue tracker
+      - Runner self-hosted — własna infrastruktura, brak limitów minut
+      - Environments i deployments — wbudowane GitOps
+      - Auto DevOps — automatyczny pipeline bez konfiguracji
+      - Darmowe dla self-hosted (Community Edition)
+      - Review Apps — automatyczne środowiska dla każdego MR
+    cons:
+      - Warto tylko gdy używasz GitLab jako git hosting
+      - Bardziej złożona konfiguracja niż GitHub Actions dla beginnerów
+      - SaaS (gitlab.com) ma limity na free tier
+      - YAML składnia verbose — include/extends trudniejszy niż GitHub Actions
+      - Self-hosted GitLab wymaga administracji serwera
+    vs: GitLab CI gdy cały stack na GitLab (repo + CI + registry + deploy). GitHub Actions gdy na GitHubie. GitLab CI mocniejszy w environments i deployments — GitHub Actions w marketplace actions.
+
+  - name: GitHub Actions
+    icon: "🐙"
+    color: "#2088ff"
+    tagline: Wbudowany w GitHub — największy marketplace, zero konfiguracji
+    pros:
+      - Zero konfiguracji — plik YAML w .github/workflows i gotowe
+      - Największy marketplace actions (20000+ gotowych actions)
+      - GITHUB_TOKEN — automatyczny token bez konfiguracji
+      - Bezpłatny dla publicznych repozytoriów — unlimited minut
+      - Matrix builds — testy na wielu systemach/wersjach jednocześnie
+      - Reusable workflows — DRY na poziomie organizacji
+      - OIDC — bez statycznych kluczy do AWS/GCP/Azure
+    cons:
+      - Płatny dla prywatnych repo (2000 minut/miesiąc free, potem per-minuta)
+      - Vendor lock-in — actions to GitHub-specyficzne
+      - Brak SSH debug do działającego joba (tylko tmate workaround)
+      - Self-hosted runners wymagają konfiguracji
+      - Sekrety na poziomie repo/organizacji (brak Vault out of the box)
+    vs: GitHub Actions to default choice dla wszystkich projektów na GitHubie. Publiczne repo — darmowe i bez ograniczeń. Prywatne — koszt warto porównać z CircleCI/GitLab. Jenkins gdy self-hosted z pełną kontrolą.
+
+  - name: ArgoCD
+    icon: "🐙"
+    color: "#ef7b4d"
+    tagline: GitOps dla Kubernetes — synchronizuj cluster z repozytorium
+    pros:
+      - GitOps — stan klastra = stan repozytorium, automatyczna synchronizacja
+      - Deklaratywne deployments — aplikacja "chce być" w określonym stanie
+      - Automatyczny drift detection i self-healing
+      - Rollback natychmiastowy — git revert = rollback
+      - Web UI — wizualizacja stanu aplikacji w Kubernetes
+      - Multi-cluster — zarządzaj wieloma klastrami z jednego miejsca
+    cons:
+      - Tylko dla Kubernetes — nie zastąpi GitHub Actions do build/test
+      - Stroma krzywa uczenia — GitOps to inny mental model
+      - Wymaga Kubernetes — overkill dla małych projektów
+      - Konfiguracja RBAC i multi-tenancy skomplikowana
+      - CI (build/test) i CD (deploy) to oddzielne narzędzia w tym modelu
+    vs: ArgoCD uzupełnia GitHub Actions — Actions buduje i pushuje image (CI), ArgoCD deployuje na Kubernetes (CD). Nie konkurenci — współpracują. ArgoCD = standard dla K8s GitOps. Bez K8s nie potrzebujesz ArgoCD.
+
+  - name: Buildkite
+    icon: "🏗️"
+    color: "#14cc80"
+    tagline: Self-hosted agenci, enterprise scale, hybrid cloud
+    pros:
+      - Agenci self-hosted — własna infrastruktura, bez limitu minut
+      - Enterprise scale — skaluje do tysięcy buildów równolegle
+      - Hybrid model — agenci wszędzie (AWS, GCP, on-prem, macOS)
+      - Szybszy setup niż Jenkins, lepszy DX od self-hosted GitLab
+      - Test Analytics — automatyczne wykrywanie flaky tests
+      - Elastic CI Stack — gotowy AWS CloudFormation do autoscalingu agentów
+    cons:
+      - Płatny SaaS (UI i orchestration) — agenci gratis
+      - Mniejszy ekosystem pluginów niż Jenkins czy GitHub Actions
+      - Mniej znany — trudniej znaleźć pomoc
+      - Konfiguracja infrastruktury agentów — więcej DevOps niż GitHub Actions
+      - Brak darmowego tier dla prywatnych projektów
+    vs: Buildkite dla enterprise z wymogami self-hosted ale bez bólu Jenkinsa. Dobry dla firm z regulacjami (dane nie wychodzą za chmurę prywatną). GitHub Actions lepszy dla większości projektów — Buildkite gdy skala i compliance wymagają własnej infrastruktury.

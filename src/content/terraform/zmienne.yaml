@@ -1,0 +1,509 @@
+title: Zmienne Terraform
+
+items:
+  - name: "variable — typy i walidacja"
+    icon: "📥"
+    desc: >
+      Zmienne wejściowe parametryzują moduły i środowiska. Typy wymuszają poprawność danych.
+      Validation block sprawdza wartości przy runtime — nie tylko typy.
+    code: |
+      # Podstawowe typy zmiennych
+      variable "environment" {
+        type        = string
+        description = "Nazwa srodowiska (dev/staging/prod)"
+        default     = "dev"
+
+        validation {
+          condition     = contains(["dev", "staging", "prod"], var.environment)
+          error_message = "Srodowisko musi byc: dev, staging lub prod."
+        }
+      }
+
+      variable "instance_count" {
+        type        = number
+        description = "Liczba instancji EC2"
+        default     = 1
+
+        validation {
+          condition     = var.instance_count >= 1 && var.instance_count <= 10
+          error_message = "Liczba instancji musi byc od 1 do 10."
+        }
+      }
+
+      variable "enable_monitoring" {
+        type        = bool
+        description = "Czy wlaczyc szczegolowy monitoring"
+        default     = false
+      }
+
+      # Lista
+      variable "availability_zones" {
+        type        = list(string)
+        description = "Lista stref dostepnosci"
+        default     = ["eu-west-1a", "eu-west-1b"]
+      }
+
+      # Mapa
+      variable "instance_types" {
+        type = map(string)
+        default = {
+          dev     = "t3.micro"
+          staging = "t3.small"
+          prod    = "t3.medium"
+        }
+      }
+
+      # Obiekt z polami
+      variable "database_config" {
+        type = object({
+          engine         = string
+          version        = string
+          instance_class = string
+          storage_gb     = number
+          multi_az       = bool
+        })
+        default = {
+          engine         = "postgres"
+          version        = "15.4"
+          instance_class = "db.t3.micro"
+          storage_gb     = 20
+          multi_az       = false
+        }
+      }
+
+      # Lista obiektow
+      variable "sg_rules" {
+        type = list(object({
+          port     = number
+          protocol = string
+          cidr     = string
+        }))
+        default = []
+      }
+
+      # Wrażliwa zmienna — nie pokazuj w output i logach
+      variable "db_password" {
+        type      = string
+        sensitive = true
+      }
+
+      # Dowolny typ
+      variable "extra_config" {
+        type    = any
+        default = {}
+      }
+
+  - name: locals
+    icon: "🧮"
+    desc: >
+      Locals to obliczane lokalnie stałe — nie są parametrami modułu, nie można ich nadpisać z zewnątrz.
+      Redukują powtórzenia, centralizują logikę. Referencja: local.nazwa (nie locals).
+    code: |
+      # Plik locals.tf lub sekcja w main.tf
+
+      locals {
+        # Prosta konkatenacja
+        name_prefix = "${var.project}-${var.environment}"
+
+        # Obliczenie z warunku
+        is_production = var.environment == "prod"
+
+        # Wspólne tagi — raz zdefiniowane, używane wszędzie
+        common_tags = {
+          Project     = var.project
+          Environment = var.environment
+          ManagedBy   = "terraform"
+          CreatedAt   = "2024-01-01"
+        }
+
+        # Wybór wartości przez lookup
+        instance_type = lookup(var.instance_types, var.environment, "t3.micro")
+
+        # Konwersja listy na set (deduplikacja)
+        unique_azs = toset(var.availability_zones)
+
+        # Obliczenia CIDR dla subnetów
+        vpc_cidr     = "10.0.0.0/16"
+        public_cidrs = [
+          cidrsubnet(local.vpc_cidr, 8, 0),  # 10.0.0.0/24
+          cidrsubnet(local.vpc_cidr, 8, 1),  # 10.0.1.0/24
+          cidrsubnet(local.vpc_cidr, 8, 2),  # 10.0.2.0/24
+        ]
+
+        # Referencja do innego local
+        app_sg_name = "${local.name_prefix}-app-sg"
+        db_sg_name  = "${local.name_prefix}-db-sg"
+
+        # Lista wszystkich tagów instancji
+        instance_tags = merge(local.common_tags, {
+          Name = "${local.name_prefix}-web"
+          Tier = "web"
+        })
+
+        # Mapowanie region -> AMI
+        ami_map = {
+          "eu-west-1" = "ami-0905a3c97561e0b69"
+          "us-east-1" = "ami-0c02fb55956c7d316"
+        }
+
+        # Pobierz AMI dla aktualnego regionu
+        current_ami = local.ami_map[var.aws_region]
+      }
+
+      # Użycie locals
+      resource "aws_instance" "web" {
+        ami           = local.current_ami
+        instance_type = local.instance_type
+        tags          = local.instance_tags
+      }
+
+  - name: output
+    icon: "📤"
+    desc: >
+      Output values eksportują dane z modułu — adresy IP, ARNy, ID zasobów.
+      Widoczne po terraform apply, dostępne dla parent modułu przez module.nazwa.output.
+    code: |
+      # outputs.tf — wartości wyjściowe modułu
+
+      # Prosty output
+      output "vpc_id" {
+        description = "ID glownego VPC"
+        value       = aws_vpc.main.id
+      }
+
+      # Output z warunkiem
+      output "instance_ip" {
+        description = "Publiczny IP instancji (lub pusty jesli prywatna)"
+        value       = aws_instance.web.public_ip != "" ? aws_instance.web.public_ip : aws_instance.web.private_ip
+      }
+
+      # Wrażliwy output — nie pokazuj w logu apply
+      output "db_password" {
+        description = "Haslo do bazy danych"
+        value       = random_password.db.result
+        sensitive   = true
+      }
+
+      # Output mapy
+      output "subnet_ids" {
+        description = "Mapa: typ subnetu -> lista ID"
+        value = {
+          public  = aws_subnet.public[*].id
+          private = aws_subnet.private[*].id
+        }
+      }
+
+      # Output z depends_on — gdy wartość zależy od pośredniego zasobu
+      output "load_balancer_dns" {
+        description = "DNS load balancera"
+        value       = aws_lb.main.dns_name
+        depends_on  = [aws_lb_listener.http]
+      }
+
+      # Dostęp do outputów z parent module
+      # module.network.vpc_id
+      # module.network.subnet_ids.private
+
+      # Pokaż output po apply
+      # terraform output
+      # terraform output vpc_id
+      # terraform output -json
+      # terraform output -raw vpc_id
+
+  - name: "terraform.tfvars i .tfvars.json"
+    icon: "📄"
+    desc: >
+      Pliki .tfvars automatycznie ładowane przez Terraform. Idealne do środowiskowych
+      konfiguracji. Plik terraform.tfvars ładowany zawsze, *.auto.tfvars też automatycznie.
+    code: |
+      # terraform.tfvars — wartosci domyslne (commituj do git)
+      project     = "moja-firma"
+      aws_region  = "eu-west-1"
+      environment = "dev"
+
+      availability_zones = ["eu-west-1a", "eu-west-1b"]
+
+      instance_types = {
+        dev     = "t3.micro"
+        staging = "t3.small"
+        prod    = "t3.large"
+      }
+
+      # --------
+
+      # prod.tfvars — wartosci dla produkcji
+      # Uzycie: terraform apply -var-file="prod.tfvars"
+      environment     = "prod"
+      instance_count  = 3
+      enable_monitoring = true
+
+      database_config = {
+        engine         = "postgres"
+        version        = "15.4"
+        instance_class = "db.r6g.large"
+        storage_gb     = 100
+        multi_az       = true
+      }
+
+      # --------
+
+      # terraform.tfvars.json — alternatywny format JSON
+      # {
+      #   "project": "moja-firma",
+      #   "aws_region": "eu-west-1",
+      #   "instance_count": 2
+      # }
+
+      # --------
+
+      # .gitignore — co nie powinno byc w git
+      # *.tfvars        <- jezeli zawieraja sekrety (hasla, klucze)
+      # .terraform/
+      # *.tfstate
+      # *.tfstate.backup
+      # .terraform.lock.hcl <- mozna commitowac (lockfile providerow)
+
+      # Priorytet wczytywania zmiennych (od najnizszego):
+      # 1. defaults w variable {}
+      # 2. terraform.tfvars
+      # 3. terraform.tfvars.json
+      # 4. *.auto.tfvars (alfabetycznie)
+      # 5. -var-file na CLI
+      # 6. -var na CLI
+      # 7. TF_VAR_* env variables (najwyzszy priorytet)
+
+  - name: Environment variables
+    icon: "🌍"
+    desc: >
+      Zmienne środowiskowe z prefiksem TF_VAR_ są automatycznie mapowane na zmienne Terraform.
+      Idealne dla CI/CD — sekrety nie trafiają do plików ani logów.
+    code: |
+      # Pattern: TF_VAR_{nazwa_zmiennej}
+
+      # W terminalu (bash/zsh)
+      export TF_VAR_environment="prod"
+      export TF_VAR_instance_count="3"
+      export TF_VAR_db_password="super-tajne-haslo-123"
+
+      # Uruchom — Terraform automatycznie odczyta TF_VAR_*
+      # terraform plan
+
+      # --------
+
+      # W GitHub Actions
+      # env:
+      #   TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+      #   TF_VAR_environment: "prod"
+      # steps:
+      #   - run: terraform apply -auto-approve
+
+      # --------
+
+      # Zmienne Terraform specjalne (TF_ bez VAR)
+      # TF_LOG=DEBUG        - wlacz debugowanie (DEBUG/INFO/WARN/ERROR)
+      # TF_LOG_PATH=tf.log  - zapisz logi do pliku
+      # TF_INPUT=false      - nie pytaj interaktywnie (CI/CD)
+      # TF_IN_AUTOMATION=1  - tryb CI (zmienia UX output)
+      # TF_WORKSPACE=prod   - ustaw workspace
+      # TF_CLI_ARGS_plan="-compact-warnings" - domyslne args dla komendy
+
+      # --------
+
+      # Walidacja ze zrodla zewnetrznego (np. Vault)
+      # export TF_VAR_db_password=$(vault kv get -field=password secret/db)
+      # terraform apply
+
+  - name: Funkcje wbudowane
+    icon: "⚙️"
+    desc: >
+      Terraform ma bogatą bibliotekę funkcji. Używasz ich w wyrażeniach — w locals, resource atrybutach,
+      outputs. Nie ma własnych funkcji definiowanych przez użytkownika (do wersji 1.x).
+    code: |
+      locals {
+        # ===== STRING =====
+        # format — formatowanie jak printf
+        name = format("%s-%s-%03d", var.project, var.env, 1)
+        # wynik: "moja-firma-prod-001"
+
+        # upper / lower / title
+        env_up = upper(var.environment)  # "PROD"
+
+        # join — lista do stringa
+        sg_name = join("-", ["web", "app", "sg"])  # "web-app-sg"
+
+        # split — string do listy
+        parts = split(",", "a,b,c")  # ["a", "b", "c"]
+
+        # replace — zamien substring
+        safe_name = replace(var.project, " ", "-")
+
+        # trimspace / trim
+        clean = trimspace("  hello  ")  # "hello"
+
+        # ===== NUMERYCZNE =====
+        # min / max
+        capped = min(var.count, 10)
+        floor_val = floor(3.7)  # 3
+
+        # ===== KOLEKCJE =====
+        # length — dlugosc listy/mapy/stringa
+        az_count = length(var.availability_zones)
+
+        # lookup — wartosc z mapy z defaultem
+        itype = lookup(var.instance_types, var.env, "t3.micro")
+
+        # toset / tolist / tomap — konwersje typow
+        unique_azs = toset(var.availability_zones)
+
+        # flatten — spłaszcz listę list
+        all_ids = flatten([aws_subnet.public[*].id, aws_subnet.private[*].id])
+
+        # merge — polacz mapy (prawy nadpisuje lewy)
+        all_tags = merge(local.common_tags, { Extra = "value" })
+
+        # keys / values — z mapy
+        tag_keys = keys(local.common_tags)
+
+        # ===== ENCODING =====
+        # jsonencode / jsondecode
+        policy_str = jsonencode({ Version = "2012-10-17", Statement = [] })
+
+        # base64encode / base64decode
+        encoded = base64encode("hello world")
+
+        # ===== FILESYSTEM =====
+        # file — wczytaj plik jako string
+        user_data = file("${path.module}/scripts/init.sh")
+
+        # templatefile — wczytaj plik z podstawieniami
+        user_data_tpl = templatefile("${path.module}/scripts/init.sh.tpl", {
+          db_host = aws_db_instance.main.address
+          db_name = "appdb"
+        })
+
+        # ===== CIDR =====
+        # cidrsubnet — wylicz subnet
+        sub1 = cidrsubnet("10.0.0.0/16", 8, 0)  # 10.0.0.0/24
+        sub2 = cidrsubnet("10.0.0.0/16", 8, 1)  # 10.0.1.0/24
+
+        # cidrhost — konkretny host w sieci
+        first_ip = cidrhost("10.0.0.0/24", 1)  # 10.0.0.1
+
+        # ===== DATETIME =====
+        timestamp_str = formatdate("YYYY-MM-DD", timestamp())
+      }
+
+  - name: Conditional expressions
+    icon: "❓"
+    desc: >
+      Terraform obsługuje operator trójargumentowy (ternary). Brak if/else bloków —
+      warunek zawsze musi zwrócić wartość. Count trick do opcjonalnych zasobów.
+    code: |
+      # Ternary operator — warunek ? wartość_true : wartość_false
+      variable "environment" {
+        default = "dev"
+      }
+
+      resource "aws_instance" "web" {
+        ami = data.aws_ami.amazon_linux.id
+
+        # Typ instancji zależy od środowiska
+        instance_type = var.environment == "prod" ? "t3.large" : "t3.micro"
+
+        # Monitoring tylko na produkcji
+        monitoring = var.environment == "prod" ? true : false
+      }
+
+      # Count trick — opcjonalne zasoby
+      variable "create_nat_gateway" {
+        type    = bool
+        default = false
+      }
+
+      resource "aws_nat_gateway" "main" {
+        # Jeśli false — count=0, resource nie jest tworzony
+        count         = var.create_nat_gateway ? 1 : 0
+        allocation_id = aws_eip.nat[0].id
+        subnet_id     = aws_subnet.public[0].id
+      }
+
+      resource "aws_eip" "nat" {
+        count  = var.create_nat_gateway ? 1 : 0
+        domain = "vpc"
+      }
+
+      # Conditional output
+      output "nat_gateway_ip" {
+        value = var.create_nat_gateway ? aws_eip.nat[0].public_ip : null
+      }
+
+      # Zagnieżdżone warunki (możliwe, ale zniechęcane)
+      locals {
+        storage_class = (
+          var.environment == "prod"    ? "gp3"
+          : var.environment == "staging" ? "gp2"
+          : "standard"
+        )
+
+        # Warunek na null — coalesce pattern
+        bucket_name = var.custom_bucket != null ? var.custom_bucket : "${var.project}-default"
+      }
+
+  - name: "for expressions i splat"
+    icon: "🔁"
+    desc: >
+      For expressions transformują listy i mapy. Splat operator [*] to skrót dla for.
+      Potężne narzędzie do transformacji danych bez zewnętrznych narzędzi.
+    code: |
+      variable "users" {
+        default = ["alice", "bob", "charlie"]
+      }
+
+      variable "servers" {
+        default = {
+          web = { type = "t3.micro", count = 2 }
+          api = { type = "t3.small", count = 3 }
+        }
+      }
+
+      locals {
+        # For expression — lista do listy
+        upper_users = [for u in var.users : upper(u)]
+        # ["ALICE", "BOB", "CHARLIE"]
+
+        # For expression z filtrem (if)
+        prod_users = [for u in var.users : u if u != "alice"]
+        # ["bob", "charlie"]
+
+        # For expression — lista do mapy
+        user_map = { for u in var.users : u => "${u}@firma.pl" }
+        # { alice = "alice@firma.pl", bob = "bob@firma.pl", ... }
+
+        # For expression po mapie
+        server_names = [for name, cfg in var.servers : "${name}: ${cfg.type} x${cfg.count}"]
+        # ["web: t3.micro x2", "api: t3.small x3"]
+
+        # Splat operator — pobierz atrybut ze wszystkich elementów
+        all_public_ips  = aws_instance.web[*].public_ip
+        all_subnet_ids  = aws_subnet.public[*].id
+
+        # Zagnieżdżony for
+        all_cidrs = flatten([
+          for subnet in aws_subnet.public : subnet.cidr_block
+        ])
+
+        # For expression z indeksem
+        indexed = { for i, u in var.users : i => u }
+        # { 0 = "alice", 1 = "bob", 2 = "charlie" }
+      }
+
+      # For expression w resource
+      resource "aws_iam_user" "team" {
+        for_each = toset(var.users)
+        name     = each.value
+      }
+
+      # Pobranie wszystkich nazw userów z for_each
+      output "user_arns" {
+        value = { for name, user in aws_iam_user.team : name => user.arn }
+      }

@@ -1,0 +1,529 @@
+title: Ekosystem Terraform — Providers
+
+items:
+  - name: AWS Provider
+    icon: "☁️"
+    desc: >
+      Oficjalny provider do zarządzania setkami serwisów AWS. Największy provider
+      w ekosystemie — ponad 1000 typów zasobów. Obsługuje assume_role, multi-region
+      i multiple AWS accounts.
+    code: |
+      # versions.tf
+      terraform {
+        required_providers {
+          aws = {
+            source  = "hashicorp/aws"
+            version = "~> 5.0"
+          }
+        }
+      }
+
+      # Podstawowa konfiguracja
+      provider "aws" {
+        region = "eu-west-1"
+
+        # Opcjonalne — credentials z env lub ~./aws/credentials
+        # access_key = var.aws_access_key  # lepiej przez env AWS_ACCESS_KEY_ID
+        # secret_key = var.aws_secret_key  # lepiej przez env AWS_SECRET_ACCESS_KEY
+
+        # Domyslne tagi dla wszystkich zasobów
+        default_tags {
+          tags = {
+            Project   = var.project
+            ManagedBy = "terraform"
+          }
+        }
+      }
+
+      # Assume Role — Terraform zakłada rolę IAM (cross-account lub least-privilege)
+      provider "aws" {
+        alias  = "production"
+        region = "eu-west-1"
+
+        assume_role {
+          role_arn     = "arn:aws:iam::123456789:role/TerraformDeployRole"
+          session_name = "terraform-session"
+          external_id  = var.external_id
+        }
+      }
+
+      # Multi-region — provider z aliasem
+      provider "aws" {
+        alias  = "us_east"
+        region = "us-east-1"
+      }
+
+      provider "aws" {
+        alias  = "eu_west"
+        region = "eu-west-1"
+      }
+
+      # Użycie aliasów
+      resource "aws_s3_bucket" "eu_bucket" {
+        provider = aws.eu_west
+        bucket   = "moja-firma-eu"
+      }
+
+      resource "aws_s3_bucket" "us_bucket" {
+        provider = aws.us_east
+        bucket   = "moja-firma-us"
+      }
+
+  - name: Azure Provider (azurerm)
+    icon: "🔵"
+    desc: >
+      Provider do zarządzania Azure Resource Manager. Wymaga Service Principal
+      lub Managed Identity do autentykacji. Największy provider po AWS.
+    code: |
+      terraform {
+        required_providers {
+          azurerm = {
+            source  = "hashicorp/azurerm"
+            version = "~> 3.0"
+          }
+        }
+      }
+
+      # Konfiguracja Azure Provider
+      provider "azurerm" {
+        features {}
+
+        # Autentykacja przez zmienne środowiskowe (zalecane dla CI/CD):
+        # ARM_CLIENT_ID     = client_id service principal
+        # ARM_CLIENT_SECRET = secret
+        # ARM_TENANT_ID     = tenant_id
+        # ARM_SUBSCRIPTION_ID = subscription_id
+
+        # Lub jawnie (dla lokalnego devu):
+        # client_id       = var.azure_client_id
+        # client_secret   = var.azure_client_secret
+        # tenant_id       = var.azure_tenant_id
+        # subscription_id = var.azure_subscription_id
+      }
+
+      # Resource Group — kontener dla zasobów Azure
+      resource "azurerm_resource_group" "main" {
+        name     = "${var.project}-${var.environment}-rg"
+        location = "West Europe"
+
+        tags = {
+          Project     = var.project
+          Environment = var.environment
+          ManagedBy   = "terraform"
+        }
+      }
+
+      # Virtual Network (odpowiednik VPC)
+      resource "azurerm_virtual_network" "main" {
+        name                = "${var.project}-vnet"
+        address_space       = ["10.0.0.0/16"]
+        location            = azurerm_resource_group.main.location
+        resource_group_name = azurerm_resource_group.main.name
+      }
+
+      resource "azurerm_subnet" "private" {
+        name                 = "private-subnet"
+        resource_group_name  = azurerm_resource_group.main.name
+        virtual_network_name = azurerm_virtual_network.main.name
+        address_prefixes     = ["10.0.1.0/24"]
+      }
+
+      # Azure Blob Storage (odpowiednik S3)
+      resource "azurerm_storage_account" "main" {
+        name                     = "${var.project}storage"
+        resource_group_name      = azurerm_resource_group.main.name
+        location                 = azurerm_resource_group.main.location
+        account_tier             = "Standard"
+        account_replication_type = "GRS"
+        enable_https_traffic_only = true
+      }
+
+  - name: GCP Provider (google)
+    icon: "🟡"
+    desc: >
+      Provider do zarządzania Google Cloud Platform. Autentykacja przez Service Account
+      JSON key lub Application Default Credentials. Obsługuje wszystkie serwisy GCP.
+    code: |
+      terraform {
+        required_providers {
+          google = {
+            source  = "hashicorp/google"
+            version = "~> 5.0"
+          }
+        }
+      }
+
+      # Konfiguracja GCP Provider
+      provider "google" {
+        project = var.gcp_project_id
+        region  = "europe-west1"
+        zone    = "europe-west1-b"
+
+        # Autentykacja:
+        # 1. Application Default Credentials (gcloud auth application-default login)
+        # 2. Service Account key file:
+        #    credentials = file("service-account.json")
+        # 3. Env GOOGLE_CREDENTIALS = zawartość JSON klucza
+      }
+
+      # VPC w GCP
+      resource "google_compute_network" "main" {
+        name                    = "${var.project}-vpc"
+        auto_create_subnetworks = false
+      }
+
+      resource "google_compute_subnetwork" "private" {
+        name          = "private-subnet"
+        ip_cidr_range = "10.0.1.0/24"
+        region        = "europe-west1"
+        network       = google_compute_network.main.id
+      }
+
+      # GCE Instance (odpowiednik EC2)
+      resource "google_compute_instance" "web" {
+        name         = "web-server"
+        machine_type = "e2-micro"
+        zone         = "europe-west1-b"
+
+        boot_disk {
+          initialize_params {
+            image = "debian-cloud/debian-12"
+          }
+        }
+
+        network_interface {
+          network    = google_compute_network.main.id
+          subnetwork = google_compute_subnetwork.private.id
+        }
+
+        metadata_startup_script = "apt-get install -y nginx && systemctl start nginx"
+      }
+
+      # Cloud Storage Bucket (odpowiednik S3)
+      resource "google_storage_bucket" "assets" {
+        name          = "${var.project}-assets-${var.gcp_project_id}"
+        location      = "EU"
+        force_destroy = false
+
+        uniform_bucket_level_access = true
+
+        versioning {
+          enabled = true
+        }
+      }
+
+  - name: Kubernetes Provider
+    icon: "☸️"
+    desc: >
+      Provider do zarządzania zasobami Kubernetes — Deployments, Services, ConfigMaps,
+      Secrets, Namespaces. Połączenie z klastrem przez kubeconfig lub dane z managed K8s.
+    code: |
+      terraform {
+        required_providers {
+          kubernetes = {
+            source  = "hashicorp/kubernetes"
+            version = "~> 2.25"
+          }
+        }
+      }
+
+      # Połączenie przez kubeconfig (lokalne dev)
+      provider "kubernetes" {
+        config_path    = "~/.kube/config"
+        config_context = "my-cluster"
+      }
+
+      # Połączenie z EKS (produkcja)
+      data "aws_eks_cluster" "main" {
+        name = "my-eks-cluster"
+      }
+
+      data "aws_eks_cluster_auth" "main" {
+        name = "my-eks-cluster"
+      }
+
+      provider "kubernetes" {
+        host                   = data.aws_eks_cluster.main.endpoint
+        cluster_ca_certificate = base64decode(data.aws_eks_cluster.main.certificate_authority[0].data)
+        token                  = data.aws_eks_cluster_auth.main.token
+      }
+
+      # ConfigMap
+      resource "kubernetes_config_map" "app" {
+        metadata {
+          name      = "app-config"
+          namespace = "default"
+        }
+
+        data = {
+          DATABASE_URL = "postgres://${var.db_host}:5432/appdb"
+          REDIS_URL    = "redis://${var.redis_host}:6379"
+          LOG_LEVEL    = "info"
+        }
+      }
+
+      # Secret
+      resource "kubernetes_secret" "app" {
+        metadata {
+          name      = "app-secrets"
+          namespace = "default"
+        }
+
+        data = {
+          DB_PASSWORD  = base64encode(var.db_password)
+          API_KEY      = base64encode(var.api_key)
+        }
+      }
+
+      # Namespace
+      resource "kubernetes_namespace" "app" {
+        metadata {
+          name = "my-app"
+          labels = {
+            "app.kubernetes.io/managed-by" = "terraform"
+          }
+        }
+      }
+
+  - name: Helm Provider
+    icon: "⛵"
+    desc: >
+      Helm Provider wdraża Helm charts przez Terraform. Idealne do instalacji
+      nginx-ingress, cert-manager, prometheus, external-dns z konfiguracją jako kod.
+    code: |
+      terraform {
+        required_providers {
+          helm = {
+            source  = "hashicorp/helm"
+            version = "~> 2.12"
+          }
+        }
+      }
+
+      # Konfiguracja Helm Provider
+      provider "helm" {
+        kubernetes {
+          host                   = data.aws_eks_cluster.main.endpoint
+          cluster_ca_certificate = base64decode(data.aws_eks_cluster.main.certificate_authority[0].data)
+          token                  = data.aws_eks_cluster_auth.main.token
+        }
+      }
+
+      # Instalacja NGINX Ingress Controller
+      resource "helm_release" "nginx_ingress" {
+        name             = "nginx-ingress"
+        repository       = "https://kubernetes.github.io/ingress-nginx"
+        chart            = "ingress-nginx"
+        namespace        = "ingress-nginx"
+        version          = "4.9.0"
+        create_namespace = true
+
+        set {
+          name  = "controller.replicaCount"
+          value = "2"
+        }
+
+        set {
+          name  = "controller.service.type"
+          value = "LoadBalancer"
+        }
+      }
+
+      # Instalacja cert-manager (TLS certificates)
+      resource "helm_release" "cert_manager" {
+        name             = "cert-manager"
+        repository       = "https://charts.jetstack.io"
+        chart            = "cert-manager"
+        namespace        = "cert-manager"
+        version          = "v1.13.3"
+        create_namespace = true
+
+        set {
+          name  = "installCRDs"
+          value = "true"
+        }
+      }
+
+      # Instalacja kube-prometheus-stack (monitoring)
+      resource "helm_release" "prometheus" {
+        name             = "prometheus"
+        repository       = "https://prometheus-community.github.io/helm-charts"
+        chart            = "kube-prometheus-stack"
+        namespace        = "monitoring"
+        version          = "55.0.0"
+        create_namespace = true
+
+        # Wartości jako YAML inline
+        values = [
+          <<-EOF
+            grafana:
+              adminPassword: ${var.grafana_password}
+              ingress:
+                enabled: true
+                hosts:
+                  - grafana.moja-firma.pl
+            prometheus:
+              prometheusSpec:
+                retention: 15d
+                storageSpec:
+                  volumeClaimTemplate:
+                    spec:
+                      storageClassName: gp3
+                      resources:
+                        requests:
+                          storage: 50Gi
+          EOF
+        ]
+      }
+
+  - name: random Provider
+    icon: "🎲"
+    desc: >
+      Provider do generowania losowych wartości — sufiksy dla globalnie unikalnych nazw
+      (S3 buckets, RDS identifiers), hasła, UUID. Wartości są zachowane w state i nie
+      zmieniają się przy kolejnych apply.
+    code: |
+      terraform {
+        required_providers {
+          random = {
+            source  = "hashicorp/random"
+            version = "~> 3.6"
+          }
+        }
+      }
+
+      # random_id — losowe bajty jako hex/base64
+      resource "random_id" "bucket_suffix" {
+        byte_length = 4
+        # hex output: np. "a1b2c3d4"
+      }
+
+      resource "aws_s3_bucket" "assets" {
+        # S3 bucket names muszą być globalnie unikalne
+        bucket = "moja-firma-assets-${random_id.bucket_suffix.hex}"
+      }
+
+      # random_string — losowy string z kontrolą znaków
+      resource "random_string" "db_username" {
+        length  = 16
+        special = false
+        upper   = false
+        # wynik: "qwertyuiopasdfgh"
+      }
+
+      resource "aws_db_instance" "main" {
+        username = random_string.db_username.result
+        # ...
+      }
+
+      # random_password — bezpieczne hasło
+      resource "random_password" "db_password" {
+        length           = 32
+        special          = true
+        override_special = "!#$%&*()-_=+[]{}<>:?"
+        min_special      = 2
+        min_upper        = 2
+        min_lower        = 2
+        min_numeric      = 2
+      }
+
+      resource "aws_db_instance" "main" {
+        password = random_password.db_password.result
+        # ...
+      }
+
+      # Output hasła (sensitive — nie pokazuj w logach)
+      output "db_password" {
+        value     = random_password.db_password.result
+        sensitive = true
+      }
+
+      # random_shuffle — przelosuj listę
+      resource "random_shuffle" "az" {
+        input        = ["eu-west-1a", "eu-west-1b", "eu-west-1c"]
+        result_count = 2
+      }
+
+      # Użyj pierwszych 2 losowych AZ
+      resource "aws_subnet" "app" {
+        count             = 2
+        availability_zone = random_shuffle.az.result[count.index]
+        # ...
+      }
+
+      # random_uuid — UUID v4
+      resource "random_uuid" "session_secret" {}
+
+      output "session_secret" {
+        value     = random_uuid.session_secret.result
+        sensitive = true
+      }
+
+  - name: null Provider
+    icon: "⬛"
+    desc: >
+      null_resource to zasób który nic nie robi — ale można do niego dołączyć
+      provisioners i triggers. Przydatny do uruchamiania skryptów, powiadomień
+      i obejść gdy nie ma lepszego rozwiązania.
+    code: |
+      terraform {
+        required_providers {
+          null = {
+            source  = "hashicorp/null"
+            version = "~> 3.2"
+          }
+        }
+      }
+
+      # null_resource z provisioner — uruchom skrypt po apply
+      resource "null_resource" "db_migration" {
+        # triggers — uruchom ponownie gdy zmieni się hash pliku migracji
+        triggers = {
+          migration_hash = filemd5("${path.module}/migrations/latest.sql")
+          db_endpoint    = aws_db_instance.main.address
+        }
+
+        provisioner "local-exec" {
+          command = <<-EOT
+            psql \
+              -h ${aws_db_instance.main.address} \
+              -U ${aws_db_instance.main.username} \
+              -d ${aws_db_instance.main.db_name} \
+              -f ${path.module}/migrations/latest.sql
+          EOT
+
+          environment = {
+            PGPASSWORD = var.db_password
+          }
+        }
+
+        depends_on = [aws_db_instance.main]
+      }
+
+      # null_resource — powiadomienie po deployu
+      resource "null_resource" "notify_deploy" {
+        triggers = {
+          always_run = timestamp()  # uruchom przy każdym apply
+        }
+
+        provisioner "local-exec" {
+          command = <<-EOT
+            curl -X POST "${var.slack_webhook_url}" \
+              -H "Content-Type: application/json" \
+              -d '{"text": "Deploy zakończony: ${var.environment}"}'
+          EOT
+        }
+
+        depends_on = [aws_instance.web, aws_db_instance.main]
+      }
+
+      # terraform_data — nowszy replacement dla null_resource (Terraform 1.4+)
+      # Nie wymaga null providera
+      resource "terraform_data" "bootstrap" {
+        # Uruchom tylko gdy hash pliku się zmieni
+        triggers_replace = [filemd5("${path.module}/scripts/bootstrap.sh")]
+
+        provisioner "local-exec" {
+          command = "bash ${path.module}/scripts/bootstrap.sh"
+        }
+      }

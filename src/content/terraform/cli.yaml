@@ -1,0 +1,142 @@
+title: Komendy Terraform
+
+groups:
+  - name: Podstawowy workflow
+    icon: "🚀"
+    commands:
+      - desc: Zainicjuj katalog roboczy (pobierz providery i moduły)
+        code: terraform init
+      - desc: Zaktualizuj providery i moduły
+        code: terraform init -upgrade
+      - desc: Sprawdź poprawność składni HCL
+        code: terraform validate
+      - desc: Sformatuj wszystkie pliki .tf (auto-indent, wyrównanie)
+        code: terraform fmt
+      - desc: Sprawdź formatowanie bez zmian (do CI)
+        code: terraform fmt -check -recursive
+      - desc: Pokaż plan zmian (co zostanie stworzone/zmienione/zniszczone)
+        code: terraform plan
+      - desc: Zastosuj zmiany (zapyta o potwierdzenie)
+        code: terraform apply
+      - desc: Zniszcz wszystkie zarządzane zasoby
+        code: terraform destroy
+
+  - name: Plan i Apply
+    icon: "📋"
+    commands:
+      - desc: Zapisz plan do pliku (deterministyczny apply)
+        code: terraform plan -out=tfplan
+      - desc: Zastosuj wcześniej zapisany plan (bez pytania o potwierdzenie)
+        code: terraform apply tfplan
+      - desc: Apply bez pytania o potwierdzenie (CI/CD)
+        code: terraform apply -auto-approve
+      - desc: Plan tylko dla konkretnego zasobu
+        code: terraform plan -target=aws_instance.web
+      - desc: Apply tylko konkretnego zasobu
+        code: terraform apply -target=module.vpc
+      - desc: Przekaż zmienną przez CLI
+        code: terraform plan -var="environment=prod"
+      - desc: Użyj pliku zmiennych
+        code: terraform apply -var-file="prod.tfvars"
+      - desc: Zniszcz konkretny zasób
+        code: terraform destroy -target=aws_instance.web
+      - desc: Plan ze zwięzłymi ostrzeżeniami
+        code: terraform plan -compact-warnings
+      - desc: Plan w trybie JSON (do parsowania)
+        code: terraform plan -json | jq '.resource_changes[].change.actions'
+
+  - name: State management
+    icon: "🗂️"
+    commands:
+      - desc: Lista wszystkich zasobów w state
+        code: terraform state list
+      - desc: Szczegóły konkretnego zasobu ze state
+        code: terraform state show aws_instance.web
+      - desc: Przenieś zasób w state (rename bez destroy/create)
+        code: terraform state mv aws_instance.old aws_instance.new
+      - desc: Przenieś zasób do modułu
+        code: terraform state mv aws_instance.web module.compute.aws_instance.web
+      - desc: Usuń zasób ze state (Terraform przestaje nim zarządzać)
+        code: terraform state rm aws_instance.web
+      - desc: Pobierz state jako JSON
+        code: terraform state pull
+      - desc: Wymuś aktualizację state z rzeczywistości (deprecated w 1.6, używaj plan -refresh-only)
+        code: terraform refresh
+      - desc: Plan który tylko odświeża state (nie zmienia zasobów)
+        code: terraform plan -refresh-only
+      - desc: Odblokuj zablokowany state
+        code: terraform force-unlock LOCK_ID
+
+  - name: Import i migracja
+    icon: "📥"
+    commands:
+      - desc: Importuj istniejący zasób AWS do state
+        code: terraform import aws_instance.web i-0abc123def456
+      - desc: Importuj bucket S3
+        code: terraform import aws_s3_bucket.logs my-bucket-name
+      - desc: Importuj zasób z for_each (cudzysłowy wokół klucza)
+        code: "terraform import 'aws_iam_user.team[\"alice\"]' alice"
+      - desc: Importuj zasób z count
+        code: "terraform import 'aws_instance.workers[0]' i-0abc123"
+      - desc: Generuj konfigurację z importu (Terraform 1.6+)
+        code: terraform plan -generate-config-out=generated.tf
+      - desc: Zamień provider w state (migracja)
+        code: terraform state replace-provider registry.terraform.io/hashicorp/aws registry.terraform.io/hashicorp/aws
+
+  - name: Workspace
+    icon: "🗂️"
+    commands:
+      - desc: Lista wszystkich workspace'ów
+        code: terraform workspace list
+      - desc: Utwórz i przełącz na nowy workspace
+        code: terraform workspace new dev
+      - desc: Przełącz na istniejący workspace
+        code: terraform workspace select prod
+      - desc: Pokaż aktualny workspace
+        code: terraform workspace show
+      - desc: Usuń workspace (musi być pusty)
+        code: terraform workspace delete dev
+
+  - name: Debugging
+    icon: "🐛"
+    commands:
+      - desc: Włącz debug logging (TRACE/DEBUG/INFO/WARN/ERROR)
+        code: TF_LOG=DEBUG terraform plan
+      - desc: Zapisz logi do pliku
+        code: TF_LOG=DEBUG TF_LOG_PATH=./terraform.log terraform apply
+      - desc: Interaktywna konsola do testowania wyrażeń
+        code: terraform console
+      - desc: Pokaż graf zależności (format DOT)
+        code: terraform graph
+      - desc: Wizualizuj graf (wymaga graphviz)
+        code: terraform graph | dot -Tsvg > graph.svg
+      - desc: Pokaż outputy
+        code: terraform output
+      - desc: Pokaż konkretny output jako raw string
+        code: terraform output -raw vpc_id
+      - desc: Outputy jako JSON
+        code: terraform output -json
+      - desc: Pokaż wersję Terraform i providerów
+        code: terraform version
+      - desc: Pokaż dostawców używanych w projekcie
+        code: terraform providers
+
+  - name: Instalacja
+    icon: "💿"
+    commands:
+      - desc: Zainstaluj tfenv (menedżer wersji Terraform)
+        code: brew install tfenv
+      - desc: Lista dostępnych wersji Terraform
+        code: tfenv list-remote
+      - desc: Zainstaluj konkretną wersję przez tfenv
+        code: tfenv install 1.6.6
+      - desc: Użyj konkretnej wersji przez tfenv
+        code: tfenv use 1.6.6
+      - desc: Zainstaluj przez asdf (multi-runtime manager)
+        code: asdf plugin add terraform && asdf install terraform 1.6.6
+      - desc: Zainstaluj na Ubuntu/Debian przez apt
+        code: "wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg && sudo apt install terraform"
+      - desc: Zainstaluj OpenTofu (open-source fork)
+        code: brew install opentofu
+      - desc: Zainstaluj Terragrunt
+        code: brew install terragrunt

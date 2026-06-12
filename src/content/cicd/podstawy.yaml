@@ -1,0 +1,136 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać CI/CD?
+  firstComponent: Pierwszy pipeline
+  firstComponentLang: yaml
+
+intro:
+  title: Czym jest CI/CD?
+  desc: >
+    CI/CD to praktyka automatycznego budowania, testowania i wdrażania aplikacji przy każdym pushu do repozytorium.
+    CI (Continuous Integration) — każdy commit uruchamia testy i linting automatycznie.
+    CD (Continuous Delivery) — gotowy artefakt trafia na staging jednym kliknięciem.
+    CD (Continuous Deployment) — gotowy artefakt trafia na produkcję w pełni automatycznie, bez ręcznej interwencji.
+    Efekt: mniej regresji, szybsze wydania, pewność że "main" zawsze działa.
+
+concepts:
+  - title: Continuous Integration
+    desc: >
+      Każdy push/PR uruchamia automatyczny pipeline — lint, testy, build.
+      Błędy wykrywane są natychmiast, nie tydzień później przy merge.
+      Trunk-based development — wszyscy commitują do main/dev, krótkie gałęzie feature.
+      Cel: main branch zawsze w stanie nadającym się do deployu.
+    icon: "🔧"
+  - title: Pipeline
+    desc: >
+      Sekwencja kroków wykonywanych automatycznie — build, test, deploy.
+      Każdy krok to job, job składa się ze steps (kroków).
+      Jobs mogą działać równolegle (matrix) lub sekwencyjnie (needs).
+      Jeśli jeden krok się nie powiedzie, pipeline zatrzymuje się.
+    icon: "🔀"
+  - title: Artifact
+    desc: >
+      Wynik etapu build — Docker image, plik .zip, .whl, .jar, binarka.
+      Artifact przechodzi przez pipeline — buildowany raz, testowany i deployowany.
+      Gwarancja: na prod trafia dokładnie ten sam artifact co był testowany.
+      GitHub Actions — actions/upload-artifact / download-artifact.
+    icon: "📦"
+  - title: Environment
+    desc: >
+      Środowisko deploymentu — dev, staging, production.
+      Dev — każdy branch, szybki feedback. Staging — kopia produkcji, testy manualne.
+      Production — stabilny kod po akceptacji. Każde środowisko może mieć inne sekrety i konfigurację.
+      GitHub Environments — wymagają approvals przed deplojem na prod.
+    icon: "🌍"
+
+whenToUse:
+  - Każdy projekt z więcej niż jednym developerem — automatyczne testy przed mergem
+  - Deploy na serwer — zamiast ręcznego SSH i kopiowania plików
+  - Docker images — automatyczny build i push do registry przy każdym tagu
+  - Open source — CI jako quality gate dla pull requestów od zewnętrznych kontrybutorów
+  - Regularne wydania — cron pipeline co tydzień buduje i taguje release
+  - Compliance i audyt — log każdego deployu kto, kiedy, co wdrożył
+
+firstComponent: |
+  # Kompletny GitHub Actions workflow — Python CI + Docker push
+  # Plik: .github/workflows/ci.yml
+
+  name: CI/CD Pipeline
+
+  on:
+    push:
+      branches: [main, dev]
+    pull_request:
+      branches: [main]
+
+  env:
+    REGISTRY: ghcr.io
+    IMAGE_NAME: ${{ github.repository }}
+
+  jobs:
+    # ---- Job 1: testy i linting ----
+    test:
+      runs-on: ubuntu-latest
+
+      steps:
+        # Sklonuj repozytorium
+        - uses: actions/checkout@v4
+
+        # Zainstaluj Pythona z cache pip
+        - uses: actions/setup-python@v5
+          with:
+            python-version: "3.12"
+            cache: "pip"
+
+        # Zainstaluj zależności
+        - name: Zainstaluj zależności
+          run: pip install -r requirements.txt
+
+        # Linting — ruff
+        - name: Lint (ruff)
+          run: ruff check .
+
+        # Testy z coverage
+        - name: Uruchom testy
+          run: pytest --cov=. --cov-report=xml
+
+    # ---- Job 2: build i push Docker image ----
+    build-and-push:
+      needs: test          # uruchom dopiero po pomyślnych testach
+      runs-on: ubuntu-latest
+      if: github.ref == 'refs/heads/main'
+
+      permissions:
+        contents: read
+        packages: write
+
+      steps:
+        - uses: actions/checkout@v4
+
+        # Zaloguj się do GitHub Container Registry
+        - name: Zaloguj do GHCR
+          uses: docker/login-action@v3
+          with:
+            registry: ${{ env.REGISTRY }}
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
+
+        # Automatyczne tagi — latest, SHA, branch name
+        - name: Przygotuj metadane obrazu
+          id: meta
+          uses: docker/metadata-action@v5
+          with:
+            images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            tags: |
+              type=sha,prefix=sha-
+              type=ref,event=branch
+              type=raw,value=latest,enable={{is_default_branch}}
+
+        # Build i push
+        - name: Build i push Docker image
+          uses: docker/build-push-action@v5
+          with:
+            context: .
+            push: true
+            tags: ${{ steps.meta.outputs.tags }}
+            labels: ${{ steps.meta.outputs.labels }}

@@ -1,0 +1,107 @@
+title: Terraform vs alternatywy IaC
+
+items:
+  - name: Pulumi
+    icon: "🟣"
+    color: "#8a3391"
+    tagline: "IaC w prawdziwych językach — Python, TypeScript, Go, C#"
+    pros:
+      - Piszesz w TypeScript/Python/Go/C# — pełna moc języka (pętle, klasy, biblioteki)
+      - Łatwiejsze testy jednostkowe infrastruktury (pytest, jest)
+      - Natywna integracja z NPM i PyPI ekosystemem
+      - Pulumi AI generuje konfigurację z opisu w języku naturalnym
+      - Silne typowanie — błędy wykrywasz w IDE przed deploy
+    cons:
+      - Większa złożoność — trzeba znać język programowania + Pulumi SDK
+      - Mniej tutoriali i mniejsza społeczność niż Terraform
+      - Płatne plany dla team features (remote state, secrets)
+      - Debug trudniejszy — stack traces z SDKa, nie z konfiguracji
+    vs: Terraform gdy chcesz prostego deklaratywnego HCL i dużej społeczności z gotowymi przykładami. Pulumi gdy Twój team woli TypeScript/Python i potrzebujesz zaawansowanej logiki której nie da się wyrazić w HCL.
+
+  - name: AWS CloudFormation
+    icon: "🟠"
+    color: "#FF9900"
+    tagline: "Natywna IaC AWS — YAML/JSON, pełna integracja z serwisami AWS"
+    pros:
+      - Natywna integracja z AWS — zero-day support dla nowych serwisów
+      - StackSets — deploy do wielu kont i regionów naraz
+      - AWS Control Tower i Service Catalog integracja
+      - Bezpłatny — płacisz tylko za zasoby (nie za narzędzie)
+      - CloudFormation Drift Detection — wykrywa zmiany poza IaC
+    cons:
+      - Tylko AWS — zero wsparcia dla Azure, GCP, Kubernetes
+      - YAML/JSON są verbose i trudne do czytania przy dużych templateach
+      - Brak prawdziwego języka — logika jest ograniczona
+      - Rollback wolniejszy i bardziej skomplikowany niż terraform destroy
+      - Brak lokalnego stanu — każda zmiana przez AWS API
+    vs: CloudFormation gdy jesteś 100% AWS i używasz AWS Organizations, Control Tower lub chcesz zero-day support. Terraform dla multi-cloud lub gdy cenisz sobie HCL nad YAML/JSON.
+
+  - name: AWS CDK
+    icon: "🔷"
+    color: "#3F8624"
+    tagline: "TypeScript/Python generuje CloudFormation — L2/L3 Constructs"
+    pros:
+      - Piszesz w TypeScript/Python, generuje CloudFormation pod spodem
+      - L2/L3 Constructs — high-level abstrakcje (np. ApplicationLoadBalancedFargateService jedną linią)
+      - Pełna moc języka programowania — klasy, dziedziczenie, biblioteki
+      - CDK Patterns — gotowe wzorce produkcyjne
+      - Świetna integracja z AWS Well-Architected Framework
+    cons:
+      - Tylko AWS (przez CloudFormation)
+      - Duże zmiany kodu = duże zmiany CloudFormation = długi deployment
+      - Trudniejszy debugging — warstwa abstrakcji nad abstrakcją
+      - Breaking changes między wersjami CDK bywają bolesne
+      - Wolniejszy niż Terraform (generowanie + CF deployment)
+    vs: CDK gdy Twój team to developerzy TypeScript/Python pracujący tylko na AWS i chcą high-level abstrakcji. Terraform gdy masz DevOps team, multi-cloud lub cenisz prostotę HCL.
+
+  - name: Ansible
+    icon: "🔴"
+    color: "#EE0000"
+    tagline: "Configuration management i provisioning — Playbooks, nie state"
+    pros:
+      - Agentless — tylko SSH, bez instalacji na serwerach
+      - Idempotentne Playbooks — możesz uruchamiać wielokrotnie
+      - Ogromna kolekcja modułów (Ansible Galaxy) — DB, sieć, cloud, system
+      - Świetne do konfiguracji maszyn i aplikacji (nie tylko IaC)
+      - Łatwiejsze do nauki niż Terraform dla sysadminów
+    cons:
+      - Brak prawdziwego state — nie wie co jest wdrożone, tylko co robić
+      - Wolniejszy niż Terraform dla infrastruktury chmurowej (SSH + sequential)
+      - Złożone Playbooks stają się trudne do zarządzania
+      - Mniej odpowiedni do tworzenia VPC, subnetów, load balancerów
+    vs: Terraform do tworzenia infrastruktury (VPC, EC2, RDS). Ansible do konfiguracji tego co stworzył Terraform (install nginx, deploy app). Kombo Terraform + Ansible to standard w wielu firmach.
+
+  - name: OpenTofu
+    icon: "🟤"
+    color: "#FFDA18"
+    tagline: "Fork Terraform po zmianie licencji BSL — open-source, 1:1 kompatybilny"
+    pros:
+      - Prawdziwy open-source (MPL 2.0) — po zmianie licencji Terraform na BSL
+      - Pełna kompatybilność z Terraform — te same pliki .tf, te same providery
+      - Aktywna społeczność Linux Foundation / OpenTofu Initiative
+      - Szybszy development nowych funkcji (np. provider functions wcześniej)
+      - Bezpieczne dla firm obawiających się licensing issues
+    cons:
+      - Mniejsza społeczność i mniejszy ekosystem komercyjny (na razie)
+      - Mniej certyfikacji i szkoleń niż Terraform
+      - HCP Terraform (Terraform Cloud) nie jest kompatybilny — potrzebujesz alternatywy
+      - Wolniejszy release nowych provider features
+    vs: Używaj OpenTofu jeśli masz obawy prawne co do licencji BSL, pracujesz w open-source projekcie lub preferujesz community governance. Terraform HashiCorp jeśli używasz HCP Terraform (managed state/runs) lub masz umowę enterprise z HashiCorp.
+
+  - name: Crossplane
+    icon: "⚓"
+    color: "#1B6FC8"
+    tagline: "IaC przez Kubernetes CRDs — GitOps-first, cloud-native"
+    pros:
+      - Infrastruktura jako Kubernetes resources — kubectl apply zamiast terraform apply
+      - GitOps-native — ArgoCD / Flux zarządza infrastrukturą jak aplikacjami
+      - Kompozycja zasobów (Composite Resources) — własne abstrakcje dla developerów
+      - Continuous reconciliation — Crossplane stale utrzymuje desired state
+      - Unifikacja: K8s zarządza aplikacjami I infrastrukturą
+    cons:
+      - Wymaga działającego klastra Kubernetes — dodatkowa zależność
+      - Stroma krzywa uczenia — K8s + Crossplane + CRDs + Compositions
+      - Mniejsza dojrzałość niż Terraform dla skomplikowanej infrastruktury
+      - Debug trudniejszy — K8s events i status conditions
+      - Nie wszystkie providery są tak dojrzałe jak Terraform providers
+    vs: Terraform gdy Twój team to DevOps/infra engineers z doświadczeniem w HCL. Crossplane gdy masz platform engineering team budujący self-service infra dla developerów i już używasz Kubernetes jako control plane.

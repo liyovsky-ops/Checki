@@ -1,0 +1,518 @@
+title: Moduły Terraform
+
+items:
+  - name: "Moduł — podstawy"
+    icon: "📦"
+    desc: >
+      Moduł to katalog z plikami .tf — każdy projekt Terraform to root module.
+      Child modules to wielokrotnie używalne bloki. Źródła modułów to lokalne ścieżki,
+      Terraform Registry, GitHub, S3. Wersjonowanie krytyczne w produkcji.
+    code: |
+      # Typy modułów:
+      # Root module  — katalog gdzie uruchamiasz terraform init/apply
+      # Child module — wywoływany przez blok module {}
+
+      # Wywołanie modułu z rejestru publicznego
+      module "vpc" {
+        source  = "terraform-aws-modules/vpc/aws"
+        version = "~> 5.0"
+
+        name = "my-vpc"
+        cidr = "10.0.0.0/16"
+
+        azs             = ["eu-west-1a", "eu-west-1b", "eu-west-1c"]
+        private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+        public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+
+        enable_nat_gateway = true
+        single_nat_gateway = true
+
+        tags = {
+          Terraform   = "true"
+          Environment = "dev"
+        }
+      }
+
+      # Wywołanie modułu lokalnego
+      module "web_servers" {
+        source = "./modules/ec2"
+
+        # Zmienne modułu
+        instance_count = 3
+        instance_type  = "t3.micro"
+        subnet_ids     = module.vpc.private_subnets
+        vpc_id         = module.vpc.vpc_id
+
+        tags = {
+          Environment = var.environment
+        }
+      }
+
+      # Użycie outputów modułu
+      output "web_sg_id" {
+        value = module.web_servers.security_group_id
+      }
+
+      # Po dodaniu modułu zawsze uruchom: terraform init
+      # Moduły są pobierane do .terraform/modules/
+
+  - name: Tworzenie własnego modułu
+    icon: "🔧"
+    desc: >
+      Dobry moduł ma jedną odpowiedzialność, czytelny interfejs (variables.tf + outputs.tf)
+      i sensowne domyślne wartości. Trzymaj moduły w katalogu modules/ lub osobnym repo.
+    code: |
+      # Struktura modułu: modules/ec2/
+      # modules/ec2/
+      # ├── main.tf       — zasoby
+      # ├── variables.tf  — wejście modułu
+      # ├── outputs.tf    — wyjście modułu
+      # └── versions.tf   — wymagania (opcjonalne)
+
+      # modules/ec2/variables.tf
+      variable "instance_count" {
+        type        = number
+        description = "Liczba instancji EC2"
+        default     = 1
+      }
+
+      variable "instance_type" {
+        type        = string
+        description = "Typ instancji EC2"
+        default     = "t3.micro"
+      }
+
+      variable "subnet_ids" {
+        type        = list(string)
+        description = "Lista ID subnetow"
+      }
+
+      variable "vpc_id" {
+        type        = string
+        description = "ID VPC"
+      }
+
+      variable "tags" {
+        type    = map(string)
+        default = {}
+      }
+
+      # modules/ec2/main.tf
+      data "aws_ami" "amazon_linux" {
+        most_recent = true
+        owners      = ["amazon"]
+        filter {
+          name   = "name"
+          values = ["al2023-ami-*-x86_64"]
+        }
+      }
+
+      resource "aws_security_group" "ec2" {
+        name   = "ec2-module-sg"
+        vpc_id = var.vpc_id
+
+        egress {
+          from_port   = 0
+          to_port     = 0
+          protocol    = "-1"
+          cidr_blocks = ["0.0.0.0/0"]
+        }
+
+        tags = var.tags
+      }
+
+      resource "aws_instance" "this" {
+        count         = var.instance_count
+        ami           = data.aws_ami.amazon_linux.id
+        instance_type = var.instance_type
+        subnet_id     = var.subnet_ids[count.index % length(var.subnet_ids)]
+
+        vpc_security_group_ids = [aws_security_group.ec2.id]
+
+        tags = merge(var.tags, {
+          Name = "ec2-${count.index + 1}"
+        })
+      }
+
+      # modules/ec2/outputs.tf
+      output "instance_ids" {
+        description = "Lista ID instancji"
+        value       = aws_instance.this[*].id
+      }
+
+      output "private_ips" {
+        description = "Lista prywatnych IP"
+        value       = aws_instance.this[*].private_ip
+      }
+
+      output "security_group_id" {
+        description = "ID security group"
+        value       = aws_security_group.ec2.id
+      }
+
+  - name: Wywołanie modułu lokalnego
+    icon: "📂"
+    desc: >
+      Moduły lokalne to ścieżki relatywne zaczynające się od ./. Po każdej zmianie
+      source modułu lub nowym dodaniu wymagane terraform init.
+    code: |
+      # Struktura projektu z modułami lokalnymi
+      # projekt/
+      # ├── main.tf
+      # ├── variables.tf
+      # ├── outputs.tf
+      # └── modules/
+      #     ├── vpc/
+      #     │   ├── main.tf
+      #     │   ├── variables.tf
+      #     │   └── outputs.tf
+      #     ├── ec2/
+      #     └── rds/
+
+      # main.tf — root module
+
+      # Moduł VPC
+      module "vpc" {
+        source = "./modules/vpc"
+
+        project     = var.project
+        environment = var.environment
+        vpc_cidr    = "10.0.0.0/16"
+        azs         = ["eu-west-1a", "eu-west-1b"]
+      }
+
+      # Moduł EC2 — używa outputów z vpc
+      module "app_servers" {
+        source = "./modules/ec2"
+
+        instance_count = var.environment == "prod" ? 3 : 1
+        instance_type  = "t3.small"
+        vpc_id         = module.vpc.vpc_id
+        subnet_ids     = module.vpc.private_subnet_ids
+
+        tags = {
+          Project     = var.project
+          Environment = var.environment
+        }
+      }
+
+      # Moduł RDS — zależy od VPC
+      module "database" {
+        source = "./modules/rds"
+
+        db_name        = "appdb"
+        instance_class = "db.t3.micro"
+        vpc_id         = module.vpc.vpc_id
+        subnet_ids     = module.vpc.private_subnet_ids
+        app_sg_id      = module.app_servers.security_group_id
+      }
+
+      # Outputs z modułów
+      output "app_private_ips" {
+        value = module.app_servers.private_ips
+      }
+
+      output "db_endpoint" {
+        value = module.database.endpoint
+      }
+
+      # Komendy
+      # terraform init                    - pobierz moduły
+      # terraform get                     - aktualizuj moduły
+      # terraform plan -target=module.vpc - plan tylko dla jednego modułu
+
+  - name: Terraform Registry
+    icon: "📚"
+    desc: >
+      Registry.terraform.io — centralne repozytorium modułów i providerów. Moduły
+      oficjalne (terraform-aws-modules) to sprawdzone, battle-tested rozwiązania.
+      Zawsze pinuj wersję — ~ pozwala na patch, >= oznacza minimum.
+    code: |
+      # Źródło z Terraform Registry
+      # format: <NAMESPACE>/<MODULE>/<PROVIDER>
+
+      module "vpc" {
+        source  = "terraform-aws-modules/vpc/aws"
+        version = "~> 5.1"   # ~> 5.1 = >=5.1, <6.0
+
+        # Dokumentacja: registry.terraform.io/modules/terraform-aws-modules/vpc/aws
+      }
+
+      module "ec2_instance" {
+        source  = "terraform-aws-modules/ec2-instance/aws"
+        version = "~> 5.0"
+
+        name          = "web-server"
+        instance_type = "t3.micro"
+        subnet_id     = module.vpc.private_subnets[0]
+
+        tags = {
+          Terraform   = "true"
+          Environment = "dev"
+        }
+      }
+
+      module "rds" {
+        source  = "terraform-aws-modules/rds/aws"
+        version = "~> 6.0"
+
+        identifier = "my-postgres"
+        engine     = "postgres"
+        engine_version = "15"
+        instance_class = "db.t3.micro"
+
+        db_name  = "appdb"
+        username = "postgres"
+
+        subnet_ids             = module.vpc.private_subnets
+        vpc_security_group_ids = [aws_security_group.rds.id]
+      }
+
+      # Źródło z GitHub (bez wersjonowania — nie polecane dla prod)
+      module "custom" {
+        source = "github.com/moja-firma/terraform-modules//modules/vpc?ref=v1.2.0"
+      }
+
+      # Źródło z S3 (prywatne moduły)
+      module "private" {
+        source  = "s3::https://s3.amazonaws.com/my-modules/vpc.zip"
+      }
+
+      # terraform init — pobiera i cache'uje moduły w .terraform/modules/
+
+  - name: Popularne moduły AWS
+    icon: "☁️"
+    desc: >
+      terraform-aws-modules to zbiór oficjalnych, dobrze utrzymanych modułów dla AWS.
+      Każdy moduł ma dziesiątki opcji — sprawdź README na registry.terraform.io.
+    code: |
+      # Moduł VPC — pełna sieć AWS
+      module "vpc" {
+        source  = "terraform-aws-modules/vpc/aws"
+        version = "~> 5.1"
+
+        name = "${var.project}-vpc"
+        cidr = "10.0.0.0/16"
+
+        azs              = ["eu-west-1a", "eu-west-1b", "eu-west-1c"]
+        private_subnets  = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+        public_subnets   = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+        database_subnets = ["10.0.201.0/24", "10.0.202.0/24", "10.0.203.0/24"]
+
+        enable_nat_gateway   = true
+        single_nat_gateway   = false  # NAT per AZ dla HA (kosztowne)
+        enable_dns_hostnames = true
+        enable_dns_support   = true
+
+        # Tagi wymagane przez EKS
+        private_subnet_tags = {
+          "kubernetes.io/role/internal-elb" = 1
+        }
+        public_subnet_tags = {
+          "kubernetes.io/role/elb" = 1
+        }
+      }
+
+      # Moduł EKS — klaster Kubernetes
+      module "eks" {
+        source  = "terraform-aws-modules/eks/aws"
+        version = "~> 20.0"
+
+        cluster_name    = "${var.project}-eks"
+        cluster_version = "1.29"
+
+        vpc_id     = module.vpc.vpc_id
+        subnet_ids = module.vpc.private_subnets
+
+        eks_managed_node_groups = {
+          workers = {
+            instance_types = ["t3.medium"]
+            min_size       = 1
+            max_size       = 5
+            desired_size   = 2
+          }
+        }
+      }
+
+      # Moduł ALB — Application Load Balancer
+      module "alb" {
+        source  = "terraform-aws-modules/alb/aws"
+        version = "~> 9.0"
+
+        name    = "${var.project}-alb"
+        vpc_id  = module.vpc.vpc_id
+        subnets = module.vpc.public_subnets
+
+        security_groups = [aws_security_group.alb.id]
+
+        target_groups = [
+          {
+            name_prefix      = "app-"
+            backend_protocol = "HTTP"
+            backend_port     = 8080
+            target_type      = "instance"
+          }
+        ]
+
+        http_tcp_listeners = [
+          {
+            port               = 80
+            protocol           = "HTTP"
+            target_group_index = 0
+          }
+        ]
+      }
+
+  - name: Module outputs i passing data
+    icon: "🔗"
+    desc: >
+      Dane płyną między modułami przez outputs i zmienne. Jeden moduł nie może
+      bezpośrednio odwołać się do zasobów innego — tylko przez outputs.
+    code: |
+      # Moduł: modules/network/outputs.tf
+      output "vpc_id" {
+        value = aws_vpc.main.id
+      }
+
+      output "public_subnet_ids" {
+        value = aws_subnet.public[*].id
+      }
+
+      output "private_subnet_ids" {
+        value = aws_subnet.private[*].id
+      }
+
+      # -----
+
+      # Root module: main.tf
+      module "network" {
+        source = "./modules/network"
+        cidr   = "10.0.0.0/16"
+      }
+
+      module "compute" {
+        source = "./modules/compute"
+
+        # Przekaż outputy z network do compute
+        vpc_id     = module.network.vpc_id
+        subnet_ids = module.network.private_subnet_ids
+      }
+
+      module "database" {
+        source = "./modules/database"
+
+        vpc_id    = module.network.vpc_id
+        subnet_ids = module.network.private_subnet_ids
+        app_sg_id  = module.compute.app_security_group_id
+      }
+
+      # Root module: outputs.tf — zbierz wszystkie outputy
+      output "app_url" {
+        description = "URL aplikacji"
+        value       = "http://${module.compute.load_balancer_dns}"
+      }
+
+      output "db_endpoint" {
+        description = "Endpoint bazy danych"
+        value       = module.database.endpoint
+        sensitive   = false
+      }
+
+      # -----
+
+      # terraform_remote_state — outputy z innego state (cross-project)
+      data "terraform_remote_state" "network" {
+        backend = "s3"
+        config = {
+          bucket = "moja-firma-tfstate"
+          key    = "network/terraform.tfstate"
+          region = "eu-west-1"
+        }
+      }
+
+      # Dostęp do outputów z innego state
+      resource "aws_instance" "app" {
+        ami       = data.aws_ami.amazon_linux.id
+        subnet_id = data.terraform_remote_state.network.outputs.private_subnet_ids[0]
+      }
+
+  - name: Terragrunt
+    icon: "🌳"
+    desc: >
+      Terragrunt to wrapper nad Terraform redukujący powtórzenia (DRY). Centralna
+      konfiguracja backendu, auto-propagacja zmiennych środowiskowych, run-all dla
+      wielu modułów naraz. Popularny w dużych organizacjach z wieloma środowiskami.
+    code: |
+      # Struktura projektu z Terragrunt
+      # infra/
+      # ├── terragrunt.hcl        — root config (backend, providers)
+      # ├── eu-west-1/
+      # │   ├── dev/
+      # │   │   ├── vpc/
+      # │   │   │   └── terragrunt.hcl
+      # │   │   ├── eks/
+      # │   │   │   └── terragrunt.hcl
+      # │   │   └── rds/
+      # │   │       └── terragrunt.hcl
+      # │   └── prod/
+      # │       └── vpc/
+      # │           └── terragrunt.hcl
+
+      # terragrunt.hcl — root config
+      locals {
+        region  = "eu-west-1"
+        project = "moja-firma"
+      }
+
+      # Konfiguracja remote state — raz dla wszystkich modułów
+      remote_state {
+        backend = "s3"
+        generate = {
+          path      = "backend.tf"
+          if_exists = "overwrite_terragrunt"
+        }
+        config = {
+          bucket         = "${local.project}-tfstate-${local.region}"
+          key            = "${path_relative_to_include()}/terraform.tfstate"
+          region         = local.region
+          encrypt        = true
+          dynamodb_table = "${local.project}-tfstate-lock"
+        }
+      }
+
+      # eu-west-1/dev/vpc/terragrunt.hcl
+      terraform {
+        source = "terraform-aws-modules/vpc/aws//."
+      }
+
+      include "root" {
+        path = find_in_parent_folders()
+      }
+
+      inputs = {
+        name = "dev-vpc"
+        cidr = "10.0.0.0/16"
+
+        azs             = ["eu-west-1a", "eu-west-1b"]
+        private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
+        public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
+
+        enable_nat_gateway = true
+      }
+
+      # eu-west-1/dev/eks/terragrunt.hcl — zależy od VPC
+      dependency "vpc" {
+        config_path = "../vpc"
+      }
+
+      inputs = {
+        vpc_id     = dependency.vpc.outputs.vpc_id
+        subnet_ids = dependency.vpc.outputs.private_subnets
+      }
+
+      # Komendy Terragrunt
+      # terragrunt plan            - plan jednego modułu
+      # terragrunt apply           - apply jednego modułu
+      # terragrunt run-all plan    - plan wszystkich modułów w katalogu
+      # terragrunt run-all apply   - apply wszystkich (topologicznie sortuje deps)
+      # terragrunt run-all destroy - zniszcz wszystko

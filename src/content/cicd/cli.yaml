@@ -1,0 +1,152 @@
+title: Komendy CI/CD
+
+groups:
+  - name: GitHub CLI (gh)
+    icon: "🐙"
+    commands:
+      - desc: Lista ostatnich workflow runs
+        code: gh run list
+      - desc: Lista runs konkretnego workflow
+        code: gh run list --workflow=ci.yml
+      - desc: Podgląd szczegółów runa
+        code: gh run view 1234567890
+      - desc: Śledź logi runa na żywo
+        code: gh run watch 1234567890
+      - desc: Pobierz logi konkretnego joba
+        code: gh run view 1234567890 --log
+      - desc: Ręcznie uruchom workflow
+        code: gh workflow run ci.yml
+      - desc: Uruchom workflow z parametrem
+        code: gh workflow run deploy.yml -f environment=staging
+      - desc: Lista wszystkich workflows w repo
+        code: gh workflow list
+      - desc: Wyłącz workflow
+        code: gh workflow disable ci.yml
+      - desc: Ustaw sekret w repo
+        code: gh secret set MY_SECRET
+      - desc: Ustaw sekret z pliku
+        code: gh secret set MY_SECRET < secret.txt
+      - desc: Lista sekretów (bez wartości)
+        code: gh secret list
+      - desc: Usuń sekret
+        code: gh secret delete MY_SECRET
+      - desc: Ustaw zmienną środowiskową (nie sekret)
+        code: gh variable set MY_VAR --body "value"
+
+  - name: GitLab CLI (glab)
+    icon: "🦊"
+    commands:
+      - desc: Podgląd pipeline dla bieżącego brancha
+        code: glab ci view
+      - desc: Lista pipeline'ów
+        code: glab pipeline list
+      - desc: Status konkretnego pipeline
+        code: glab pipeline status 12345
+      - desc: Uruchom pipeline ręcznie
+        code: glab ci run
+      - desc: Uruchom pipeline na konkretnym branchu
+        code: glab ci run --branch main
+      - desc: Śledź logi joba na żywo
+        code: glab ci trace
+      - desc: Retry nieudanego pipeline
+        code: glab pipeline retry 12345
+      - desc: Anuluj pipeline
+        code: glab pipeline cancel 12345
+      - desc: Ustaw zmienną CI/CD
+        code: glab variable set MY_VAR value
+      - desc: Ustaw zmienną masked (ukryta w logach)
+        code: glab variable set MY_SECRET secret_val --masked
+      - desc: Lista zmiennych CI/CD
+        code: glab variable list
+      - desc: Usuń zmienną
+        code: glab variable delete MY_VAR
+
+  - name: act — lokalne GitHub Actions
+    icon: "🎭"
+    commands:
+      - desc: Lista dostępnych workflow i jobów
+        code: act --list
+      - desc: Uruchom event push (domyślny)
+        code: act push
+      - desc: Uruchom konkretny job
+        code: act -j test
+      - desc: Uruchom konkretny workflow
+        code: act -W .github/workflows/ci.yml
+      - desc: Symuluj pull_request event
+        code: act pull_request
+      - desc: Dry-run — pokaż co by się wykonało
+        code: act push -n
+      - desc: Podaj sekrety z pliku
+        code: act push --secret-file .secrets
+      - desc: Uruchom z konkretnym image runnera
+        code: act push -P ubuntu-latest=catthehacker/ubuntu:act-latest
+      - desc: Verbose — pełne logi
+        code: act push -v
+
+  - name: Docker w pipeline
+    icon: "🐳"
+    commands:
+      - desc: Build image z tagiem i BuildKit
+        code: DOCKER_BUILDKIT=1 docker build -t moja-apka:latest .
+      - desc: Build multi-platform (amd64 + arm64)
+        code: docker buildx build --platform linux/amd64,linux/arm64 -t org/app:latest --push .
+      - desc: Push image do registry
+        code: docker push ghcr.io/org/moja-apka:latest
+      - desc: Skanuj CVE przez Trivy
+        code: trivy image moja-apka:latest
+      - desc: Skanuj przez Docker Scout
+        code: docker scout cves moja-apka:latest
+      - desc: Sprawdź warstwy i rozmiar
+        code: docker history moja-apka:latest
+      - desc: Eksploruj warstwy interaktywnie (dive)
+        code: dive moja-apka:latest
+      - desc: Zaloguj do ghcr.io przez token
+        code: echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+      - desc: Lista lokalna images z rozmiarem
+        code: docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+      - desc: Usuń wszystkie nieużywane images
+        code: docker image prune -af
+
+  - name: pre-commit
+    icon: "🪝"
+    commands:
+      - desc: Zainstaluj hooki git (jednorazowo)
+        code: pre-commit install
+      - desc: Zainstaluj hooki dla commit-msg
+        code: pre-commit install --hook-type commit-msg
+      - desc: Uruchom wszystkie hooki na wszystkich plikach
+        code: pre-commit run --all-files
+      - desc: Uruchom konkretny hook
+        code: pre-commit run ruff --all-files
+      - desc: Pomiń hooki dla jednego commita (nagły przypadek)
+        code: git commit --no-verify -m "hotfix"
+      - desc: Aktualizuj hooki do najnowszych wersji
+        code: pre-commit autoupdate
+      - desc: Wyczyść środowiska hooków
+        code: pre-commit clean
+      - desc: Sprawdź konfigurację hooków
+        code: pre-commit validate-config
+      - desc: Generuj plik .secrets.baseline dla detect-secrets
+        code: detect-secrets scan > .secrets.baseline
+
+  - name: Diagnostyka pipeline
+    icon: "🔧"
+    commands:
+      - desc: Pobierz logi GitHub Actions runa
+        code: gh run view --log
+      - desc: Pobierz logi zakończonego runa do pliku
+        code: gh run view 1234567890 --log > pipeline.log
+      - desc: Sprawdź status wszystkich checks na PR
+        code: gh pr checks 42
+      - desc: Śledź logi GitLab CI job na żywo
+        code: glab ci trace
+      - desc: Sprawdź GitLab CI lint (waliduj .gitlab-ci.yml)
+        code: glab ci lint
+      - desc: Podgląd zmiennych w GitHub Actions (debug mode)
+        code: gh variable set ACTIONS_STEP_DEBUG --body true
+      - desc: Wyświetl wszystkie zmienne env w kroku Actions
+        code: env | sort
+      - desc: Sprawdź które pliki się zmieniły (dla path filtering)
+        code: git diff --name-only origin/main...HEAD
+      - desc: Sprawdź logi ostatniego docker compose
+        code: docker compose logs --tail 50 --timestamps

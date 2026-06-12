@@ -1,0 +1,491 @@
+title: Docker w CI
+
+items:
+  - name: Multi-stage build — minimalny image produkcyjny
+    icon: "🏗️"
+    desc: >
+      Multi-stage build używa kilku FROM w jednym Dockerfile. Builder stage zawiera narzędzia
+      kompilacji, final stage tylko runtime. COPY --from=builder kopiuje skompilowane pliki.
+      Efekt: image produkcyjny 3-10x mniejszy, bez narzędzi deweloperskich i podatności.
+    code: |
+      # Dockerfile z multi-stage build dla Pythona
+
+      # ---- Stage 1: builder ----
+      FROM python:3.12 AS builder
+
+      WORKDIR /app
+
+      # Zainstaluj narzędzia budowania (zostają tylko w tym stage)
+      RUN pip install build
+
+      COPY pyproject.toml requirements.txt ./
+      # Instaluj zależności do folderu użytkownika (przenośne)
+      RUN pip install --user --no-cache-dir -r requirements.txt
+
+      COPY src/ ./src/
+
+      # Zbuduj wheel
+      RUN python -m build --wheel
+
+      # ---- Stage 2: runtime — minimalny image ----
+      FROM python:3.12-slim
+
+      WORKDIR /app
+
+      # Skopiuj zainstalowane paczki z buildera
+      COPY --from=builder /root/.local /root/.local
+
+      # Skopiuj tylko kod aplikacji (bez narzędzi dev)
+      COPY --from=builder /app/src ./src
+
+      # Utwórz non-root usera — bezpieczeństwo
+      RUN adduser --disabled-password --no-create-home --uid 1000 appuser
+      USER appuser
+
+      ENV PATH=/root/.local/bin:$PATH
+      EXPOSE 8000
+
+      # Healthcheck wbudowany w image
+      HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+        CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+
+      CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  - name: Layer caching w CI — BuildKit cache mounts
+    icon: "⚡"
+    desc: >
+      BuildKit cache mounts (--mount=type=cache) przechowują cache pip/apt między buildami
+      bez wchodzenia do warstw image. W GitHub Actions — cache-from/cache-to type=gha.
+      Drastycznie skraca czas buildu — pip z 60s do 5s przy kolejnym uruchomieniu.
+    code: |
+      # Dockerfile z BuildKit cache mounts
+      # syntax=docker/dockerfile:1.6
+      FROM python:3.12-slim
+
+      WORKDIR /app
+
+      COPY requirements.txt .
+
+      # --mount=type=cache — cache pip między buildami (nie wchodzi do image)
+      RUN --mount=type=cache,target=/root/.cache/pip \
+          pip install -r requirements.txt
+
+      COPY . .
+
+      CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0"]
+
+      ---
+      # GitHub Actions — cache BuildKit przez GitHub Cache API
+      # .github/workflows/build.yml
+
+      jobs:
+        build:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Ustaw Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Build z cache GitHub Actions
+              uses: docker/build-push-action@v5
+              with:
+                context: .
+                push: false
+                load: true
+                tags: moja-apka:latest
+                # cache-from pobiera cache z poprzednich runów
+                cache-from: type=gha
+                # cache-to zapisuje cache po buildzie
+                cache-to: type=gha,mode=max
+
+            # Alternatywa — registry cache (cache w Docker Hub/ghcr.io)
+            - name: Build z registry cache
+              uses: docker/build-push-action@v5
+              with:
+                push: true
+                tags: ghcr.io/org/app:latest
+                cache-from: type=registry,ref=ghcr.io/org/app:buildcache
+                cache-to: type=registry,ref=ghcr.io/org/app:buildcache,mode=max
+
+  - name: Docker Compose w testach integracyjnych
+    icon: "🧪"
+    desc: >
+      docker-compose.test.yml uruchamia serwisy pomocnicze (PostgreSQL, Redis) dla testów
+      integracyjnych w CI. W GitHub Actions — services: robi to samo bez Compose.
+      Na GitLab — services: w job definition. Testy łączą się przez localhost (GitHub)
+      lub nazwę hosta (GitLab).
+    code: |
+      # docker-compose.test.yml — środowisko testów integracyjnych
+      services:
+        postgres:
+          image: postgres:16-alpine
+          environment:
+            POSTGRES_DB: testdb
+            POSTGRES_USER: testuser
+            POSTGRES_PASSWORD: testpass
+          ports:
+            - "5432:5432"
+          healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U testuser -d testdb"]
+            interval: 5s
+            timeout: 3s
+            retries: 10
+
+        redis:
+          image: redis:7-alpine
+          ports:
+            - "6379:6379"
+
+        app-test:
+          build: .
+          depends_on:
+            postgres:
+              condition: service_healthy
+          environment:
+            DATABASE_URL: postgresql://testuser:testpass@postgres:5432/testdb
+            REDIS_URL: redis://redis:6379
+          command: pytest tests/integration -v
+
+      ---
+      # GitHub Actions — services bez Compose
+      jobs:
+        integration-tests:
+          runs-on: ubuntu-latest
+
+          services:
+            postgres:
+              image: postgres:16-alpine
+              env:
+                POSTGRES_DB: testdb
+                POSTGRES_USER: testuser
+                POSTGRES_PASSWORD: testpass
+              ports:
+                - 5432:5432
+              options: >-
+                --health-cmd pg_isready
+                --health-interval 10s
+                --health-timeout 5s
+                --health-retries 5
+
+            redis:
+              image: redis:7-alpine
+              ports:
+                - 6379:6379
+
+          steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-python@v5
+              with:
+                python-version: "3.12"
+                cache: pip
+            - run: pip install -r requirements.txt pytest
+            - name: Uruchom testy integracyjne
+              env:
+                DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+                REDIS_URL: redis://localhost:6379
+              run: pytest tests/integration -v
+
+  - name: Skanowanie bezpieczeństwa obrazów
+    icon: "🛡️"
+    desc: >
+      Trivy, Docker Scout i Grype skanują Docker images pod kątem znanych CVE.
+      Integracja z GitHub Actions — wyniki w zakładce Security. SARIF format
+      pozwala importować wyniki do GitHub Security Advisories. Blokuj deploy
+      gdy wykryto podatności HIGH/CRITICAL.
+    code: |
+      # GitHub Actions — skanowanie Trivy + upload wyników
+      name: Security Scan
+
+      on:
+        push:
+          branches: [main]
+        schedule:
+          - cron: "0 6 * * 1"   # co poniedziałek o 6:00
+
+      jobs:
+        scan:
+          runs-on: ubuntu-latest
+
+          permissions:
+            security-events: write   # do uploadu SARIF
+
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Build image do skanowania
+              run: docker build -t moja-apka:scan .
+
+            # Trivy — skan filesystem i image
+            - name: Skanuj image Trivy
+              uses: aquasecurity/trivy-action@master
+              with:
+                image-ref: "moja-apka:scan"
+                format: "sarif"
+                output: "trivy-results.sarif"
+                severity: "CRITICAL,HIGH"
+                exit-code: "1"       # zatrzymaj pipeline przy wykryciu Critical
+
+            - name: Upload wyników do GitHub Security
+              uses: github/codeql-action/upload-sarif@v3
+              if: always()           # uploaduj nawet gdy skan wykrył problemy
+              with:
+                sarif_file: "trivy-results.sarif"
+
+            # Docker Scout — alternatywa z Docker
+            - name: Docker Scout CVEs
+              uses: docker/scout-action@v1
+              with:
+                command: cves
+                image: moja-apka:scan
+                only-severities: critical,high
+                exit-code: true
+
+            # Grype — Anchore scanner
+            - name: Grype scan
+              uses: anchore/scan-action@v3
+              with:
+                image: moja-apka:scan
+                fail-build: true
+                severity-cutoff: high
+
+  - name: Strategia tagowania obrazów
+    icon: "🏷️"
+    desc: >
+      Dobre tagowanie obrazów to podstawa bezpiecznego CI/CD — nigdy nie deployuj przez "latest".
+      SHA tagi są immutable — wiesz dokładnie co wdrożono. Semver tagi do release.
+      docker/metadata-action automatycznie generuje wszystkie potrzebne tagi.
+    code: |
+      # docker/metadata-action — automatyczne tagowanie
+      # .github/workflows/release.yml
+
+      jobs:
+        build-push:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Generuj tagi i metadane
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                images: |
+                  ghcr.io/org/moja-apka
+                  docker.io/username/moja-apka
+                tags: |
+                  # SHA — immutable, zawsze wiesz co deploydjesz
+                  type=sha,prefix=sha-,format=short
+
+                  # Branch tag — ghcr.io/org/app:main
+                  type=ref,event=branch
+
+                  # PR tag — ghcr.io/org/app:pr-42
+                  type=ref,event=pr
+
+                  # Semver z tagu git — v1.2.3 → 1.2.3, 1.2, 1
+                  type=semver,pattern={{version}}
+                  type=semver,pattern={{major}}.{{minor}}
+                  type=semver,pattern={{major}}
+
+                  # latest tylko na default branch (main)
+                  type=raw,value=latest,enable={{is_default_branch}}
+
+                  # Data build
+                  type=raw,value={{date 'YYYYMMDD'}},enable={{is_default_branch}}
+
+                labels: |
+                  org.opencontainers.image.title=Moja Aplikacja
+                  org.opencontainers.image.description=Opis aplikacji
+                  org.opencontainers.image.vendor=Moja Firma
+
+            - name: Pokaż wygenerowane tagi
+              run: echo "${{ steps.meta.outputs.tags }}"
+
+            - name: Build i push
+              uses: docker/build-push-action@v5
+              with:
+                push: ${{ github.event_name != 'pull_request' }}
+                tags: ${{ steps.meta.outputs.tags }}
+                labels: ${{ steps.meta.outputs.labels }}
+
+  - name: ghcr.io — GitHub Container Registry
+    icon: "📦"
+    desc: >
+      GitHub Container Registry (ghcr.io) — darmowe prywatne/publiczne repo dla obrazów.
+      GITHUB_TOKEN wystarczy do push/pull w tym samym repo. Bez dodatkowych kont.
+      Obrazy prywatne domyślnie, publiczne widoczne dla wszystkich. Granularne uprawnienia
+      przez GitHub Packages settings. Wbudowane w każde repo GitHub.
+    code: |
+      # Logowanie i push do ghcr.io
+      # .github/workflows/docker-ghcr.yml
+
+      name: Build i Push do GHCR
+
+      on:
+        push:
+          branches: [main]
+          tags: ["v*"]
+
+      jobs:
+        build:
+          runs-on: ubuntu-latest
+
+          permissions:
+            contents: read
+            packages: write    # wymagane do push na ghcr.io
+
+          steps:
+            - uses: actions/checkout@v4
+
+            # Zaloguj do ghcr.io przez GITHUB_TOKEN
+            - name: Zaloguj do GHCR
+              uses: docker/login-action@v3
+              with:
+                registry: ghcr.io
+                username: ${{ github.actor }}
+                password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Metadane obrazu
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                images: ghcr.io/${{ github.repository }}
+
+            - uses: docker/setup-buildx-action@v3
+
+            - name: Build i push
+              uses: docker/build-push-action@v5
+              with:
+                push: true
+                tags: ${{ steps.meta.outputs.tags }}
+                cache-from: type=gha
+                cache-to: type=gha,mode=max
+
+      # Pull w innym workflow lub na serwerze
+      # echo $TOKEN | docker login ghcr.io -u USER --password-stdin
+      # docker pull ghcr.io/org/moja-apka:latest
+
+  - name: Docker Hub automatyzacja
+    icon: "🐋"
+    desc: >
+      Docker Hub — największe publiczne registry. Automatyczny build przez webhook
+      lub GitHub Actions. Wymaga DOCKERHUB_USERNAME i DOCKERHUB_TOKEN (nie hasło).
+      Token tworzy się w Account Settings → Security. Publiczne obrazy darmowe,
+      prywatne od 1 repo free tier.
+    code: |
+      # Push do Docker Hub przez GitHub Actions
+      # .github/workflows/dockerhub.yml
+
+      name: Docker Hub Push
+
+      on:
+        push:
+          tags: ["v*.*.*"]   # tylko przy release tagach
+
+      jobs:
+        push-hub:
+          runs-on: ubuntu-latest
+
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Zaloguj do Docker Hub
+              uses: docker/login-action@v3
+              with:
+                username: ${{ secrets.DOCKERHUB_USERNAME }}
+                password: ${{ secrets.DOCKERHUB_TOKEN }}  # token, nie hasło!
+
+            - name: Metadane
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                images: ${{ secrets.DOCKERHUB_USERNAME }}/moja-apka
+                tags: |
+                  type=semver,pattern={{version}}
+                  type=semver,pattern={{major}}.{{minor}}
+                  type=raw,value=latest
+
+            - uses: docker/setup-buildx-action@v3
+
+            - name: Build i push do Docker Hub
+              uses: docker/build-push-action@v5
+              with:
+                push: true
+                tags: ${{ steps.meta.outputs.tags }}
+                platforms: linux/amd64,linux/arm64
+
+            # Aktualizuj opis README na Docker Hub
+            - name: Aktualizuj README na Docker Hub
+              uses: peter-evans/dockerhub-description@v4
+              with:
+                username: ${{ secrets.DOCKERHUB_USERNAME }}
+                password: ${{ secrets.DOCKERHUB_TOKEN }}
+                repository: ${{ secrets.DOCKERHUB_USERNAME }}/moja-apka
+                readme-filepath: ./DOCKER_HUB.md
+
+  - name: Buildx — multi-platform builds
+    icon: "🏗️"
+    desc: >
+      docker buildx buduje obrazy na wiele architektur jednocześnie — linux/amd64 (x86 serwery)
+      i linux/arm64 (Apple Silicon M1/M2, AWS Graviton, Raspberry Pi).
+      QEMU emuluje inne architektury. Manifest list — jeden tag, wiele platform.
+      Użytkownik pobiera właściwy obraz automatycznie.
+    code: |
+      # Multi-platform build w GitHub Actions
+      # .github/workflows/multiplatform.yml
+
+      name: Multi-Platform Build
+
+      on:
+        push:
+          branches: [main]
+          tags: ["v*"]
+
+      jobs:
+        build-multiplatform:
+          runs-on: ubuntu-latest
+
+          steps:
+            - uses: actions/checkout@v4
+
+            # QEMU — emulacja innych architektur
+            - name: Ustaw QEMU
+              uses: docker/setup-qemu-action@v3
+              with:
+                platforms: all
+
+            # Buildx — rozszerzony builder
+            - name: Ustaw Docker Buildx
+              uses: docker/setup-buildx-action@v3
+              with:
+                platforms: linux/amd64,linux/arm64,linux/arm/v7
+
+            - name: Zaloguj do GHCR
+              uses: docker/login-action@v3
+              with:
+                registry: ghcr.io
+                username: ${{ github.actor }}
+                password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Metadane
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                images: ghcr.io/${{ github.repository }}
+
+            # Build na wszystkie platformy równocześnie
+            - name: Build i push multi-platform
+              uses: docker/build-push-action@v5
+              with:
+                context: .
+                push: true
+                platforms: linux/amd64,linux/arm64
+                tags: ${{ steps.meta.outputs.tags }}
+                labels: ${{ steps.meta.outputs.labels }}
+                cache-from: type=gha
+                cache-to: type=gha,mode=max
+
+            # Weryfikacja — sprawdź manifest
+            - name: Sprawdź manifest
+              run: |
+                docker buildx imagetools inspect ghcr.io/${{ github.repository }}:latest

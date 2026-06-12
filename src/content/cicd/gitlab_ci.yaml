@@ -1,0 +1,525 @@
+title: GitLab CI
+
+items:
+  - name: Struktura .gitlab-ci.yml
+    icon: "📋"
+    desc: >
+      GitLab CI konfiguracja w .gitlab-ci.yml w katalogu głównym repo.
+      stages definiuje kolejność etapów. Każdy job należy do etapu.
+      image — bazowy Docker image dla joba. before_script — uruchamiane przed każdym jobem.
+      Zmienne CI_* dostępne automatycznie (CI_COMMIT_SHA, CI_REGISTRY, CI_PROJECT_PATH).
+    code: |
+      # .gitlab-ci.yml — podstawowa struktura
+
+      # Kolejność etapów pipeline
+      stages:
+        - build
+        - test
+        - deploy
+
+      # Domyślny image dla wszystkich jobów
+      default:
+        image: python:3.12-slim
+
+      # Globalne zmienne środowiskowe
+      variables:
+        PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+        APP_NAME: moja-apka
+
+      # Skrypt uruchamiany przed każdym jobem
+      before_script:
+        - pip install --upgrade pip
+
+      # Definicja joba
+      build-app:
+        stage: build
+        script:
+          - pip install -r requirements.txt
+          - python -m build
+        artifacts:
+          paths:
+            - dist/
+          expire_in: 1 week
+
+      run-tests:
+        stage: test
+        script:
+          - pip install -r requirements.txt pytest pytest-cov
+          - pytest --cov=src --cov-report=xml -v
+        coverage: '/TOTAL.*\s+(\d+%)$/'    # regex do wyciągania coverage
+        artifacts:
+          reports:
+            coverage_report:
+              coverage_format: cobertura
+              path: coverage.xml
+
+      deploy-staging:
+        stage: deploy
+        script:
+          - echo "Deploying to staging..."
+        environment:
+          name: staging
+          url: https://staging.example.com
+        only:
+          - main
+
+  - name: Stages i jobs — równoległość i zależności
+    icon: "🔀"
+    desc: >
+      needs: pozwala jobowi zacząć gdy inne joby (nie cały stage) są gotowe.
+      Domyślnie job czeka na cały poprzedni stage — needs przełamuje tę barierę.
+      Joby bez needs w tym samym stage uruchamiają się równolegle automatycznie.
+    code: |
+      stages:
+        - build
+        - test
+        - package
+        - deploy
+
+      # Build — dwa równoległe joby
+      build-backend:
+        stage: build
+        script:
+          - pip install -r requirements.txt
+          - python -m py_compile src/main.py
+          - echo "Backend build OK"
+        artifacts:
+          paths: [src/]
+
+      build-frontend:
+        stage: build
+        image: node:20-alpine
+        script:
+          - npm ci
+          - npm run build
+        artifacts:
+          paths: [dist/]
+
+      # Test — czeka na konkretne joby (nie cały build stage)
+      test-backend:
+        stage: test
+        needs: [build-backend]    # nie czeka na build-frontend
+        script:
+          - pip install pytest
+          - pytest tests/ -v
+
+      test-frontend:
+        stage: test
+        needs: [build-frontend]   # nie czeka na build-backend
+        image: node:20-alpine
+        script:
+          - npm test
+
+      # Package — czeka na oba testy
+      docker-build:
+        stage: package
+        needs: [test-backend, test-frontend]
+        image: docker:26
+        services:
+          - docker:26-dind
+        script:
+          - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA .
+          - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+
+      # Deploy — ostatni krok
+      deploy:
+        stage: deploy
+        needs: [docker-build]
+        script:
+          - echo "Deploy: $CI_COMMIT_SHORT_SHA"
+        only:
+          - main
+
+  - name: Rules — warunkowe joby
+    icon: "⚙️"
+    desc: >
+      rules zastępuje stare only/except — bardziej elastyczne i czytelne.
+      rules:if — warunek na podstawie zmiennych GitLab CI.
+      rules:changes — uruchom tylko gdy zmienił się konkretny plik.
+      rules:exists — uruchom gdy istnieje plik. when: manual — wymaga kliknięcia.
+    code: |
+      stages:
+        - test
+        - build
+        - deploy
+
+      # Job tylko na main branch
+      deploy-production:
+        stage: deploy
+        script:
+          - ./deploy.sh production
+        rules:
+          - if: $CI_COMMIT_BRANCH == "main"
+            when: on_success
+          - when: never   # domyślnie — nigdy poza main
+
+      # Job tylko przy tagach semver
+      publish-release:
+        stage: deploy
+        script:
+          - python -m twine upload dist/*
+        rules:
+          - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+            when: on_success
+
+      # Job tylko gdy zmienił się Dockerfile
+      build-docker:
+        stage: build
+        script:
+          - docker build .
+        rules:
+          - changes:
+              - Dockerfile
+              - requirements.txt
+            when: on_success
+          - when: never
+
+      # Job uruchamiany ręcznie
+      deploy-manual:
+        stage: deploy
+        script:
+          - ./deploy.sh $ENVIRONMENT
+        variables:
+          ENVIRONMENT: staging
+        rules:
+          - if: $CI_PIPELINE_SOURCE == "web"    # uruchamiany przez UI
+            when: manual
+          - if: $CI_COMMIT_BRANCH == "main"
+            when: manual
+            allow_failure: false   # pipeline czeka na ukończenie
+
+      # Uruchom po schedule (cron)
+      nightly-tests:
+        stage: test
+        script:
+          - pytest tests/ -v --slow
+        rules:
+          - if: $CI_PIPELINE_SOURCE == "schedule"
+            when: on_success
+
+  - name: Python CI na GitLab
+    icon: "🐍"
+    desc: >
+      Kompletny pipeline CI dla projektu Python na GitLab — lint ruff, testy pytest
+      z coverage report i badge, upload XML raportu jako artifacts.
+      Coverage badge automatycznie wyświetlany w README po konfiguracji regex.
+    code: |
+      stages:
+        - lint
+        - test
+
+      variables:
+        PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+      # Cache pip między runami
+      .python-cache: &python-cache
+        cache:
+          key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
+          paths:
+            - .cache/pip
+            - .venv/
+
+      lint:
+        stage: lint
+        image: python:3.12-slim
+        <<: *python-cache
+        script:
+          - pip install ruff
+          - ruff check . --output-format=gitlab
+          - ruff format --check .
+        allow_failure: false
+
+      test:
+        stage: test
+        image: python:3.12-slim
+        <<: *python-cache
+        script:
+          - pip install -r requirements.txt pytest pytest-cov
+          - pytest
+              --cov=src
+              --cov-report=xml:coverage.xml
+              --cov-report=term-missing
+              --cov-fail-under=75
+              -v
+              --junitxml=report.xml
+        coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+        artifacts:
+          when: always
+          reports:
+            junit: report.xml
+            coverage_report:
+              coverage_format: cobertura
+              path: coverage.xml
+          expire_in: 30 days
+
+  - name: Docker build i push do GitLab Registry
+    icon: "🐳"
+    desc: >
+      GitLab ma wbudowany Container Registry. CI_REGISTRY, CI_REGISTRY_IMAGE,
+      CI_REGISTRY_USER, CI_REGISTRY_PASSWORD to automatyczne zmienne.
+      docker:dind (Docker in Docker) jako service — wymagane dla docker build w pipeline.
+      DOCKER_TLS_CERTDIR wyłącza TLS dla prostszej konfiguracji.
+    code: |
+      stages:
+        - build
+        - push
+
+      variables:
+        DOCKER_TLS_CERTDIR: ""      # wyłącz TLS dla dind
+        DOCKER_HOST: tcp://docker:2375
+
+      build-image:
+        stage: build
+        image: docker:26
+        services:
+          - docker:26-dind           # Docker daemon jako sidecar
+        before_script:
+          - docker info
+          - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY
+              -u $CI_REGISTRY_USER --password-stdin
+        script:
+          # Build z tagami — SHA + branch + latest na main
+          - |
+            docker build \
+              --build-arg BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+              --build-arg GIT_COMMIT=$CI_COMMIT_SHORT_SHA \
+              -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA \
+              -t $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG \
+              .
+          - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+          - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
+
+        # Na main push też latest
+          - |
+            if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+              docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA $CI_REGISTRY_IMAGE:latest
+              docker push $CI_REGISTRY_IMAGE:latest
+            fi
+
+  - name: Cache i artefakty
+    icon: "💾"
+    desc: >
+      cache przechowuje katalogi między pipeline runami (przyspiesza instalację).
+      artifacts przechowuje pliki między jobami w tym samym pipeline i po zakończeniu.
+      expire_in kontroluje czas przechowywania. reports — specjalne typy (junit, coverage).
+      Cache key można oprzeć na hash pliku zależności.
+    code: |
+      stages:
+        - install
+        - test
+        - report
+
+      # Template do reużycia cache
+      .node-cache:
+        cache:
+          key:
+            files:
+              - package-lock.json       # cache nieważny gdy zmienił się lock file
+          paths:
+            - node_modules/
+          policy: pull-push             # pobierz i zaktualizuj cache
+
+      install-deps:
+        stage: install
+        image: node:20-alpine
+        extends: .node-cache
+        script:
+          - npm ci
+
+      run-tests:
+        stage: test
+        image: node:20-alpine
+        extends: .node-cache
+        cache:
+          policy: pull                  # tylko pobieraj cache, nie zapisuj
+        script:
+          - npm test -- --coverage
+        artifacts:
+          paths:
+            - coverage/                 # pliki dostępne do pobrania z UI
+          reports:
+            junit: junit.xml            # wyniki testów widoczne w GitLab UI
+          expire_in: 1 week
+          when: always                  # zachowaj artefakty nawet gdy job failed
+
+      # Artefakt przekazany do kolejnego joba
+      build-prod:
+        stage: report
+        script:
+          - npm run build
+        artifacts:
+          paths:
+            - dist/
+          expire_in: 1 month
+          name: "build-$CI_COMMIT_SHORT_SHA"
+
+  - name: Environments i deployments
+    icon: "🌍"
+    desc: >
+      environment w GitLab CI śledzi deploymenty — historia, rollback, auto-stop.
+      url — link do środowiska widoczny w UI. on_stop — job zatrzymujący środowisko.
+      auto_stop_in — automatyczne zatrzymanie po czasie (review apps).
+      Środowiska widoczne w Deployments → Environments w GitLab.
+    code: |
+      stages:
+        - deploy
+
+      # Deploy na staging — automatyczny
+      deploy-staging:
+        stage: deploy
+        script:
+          - kubectl set image deployment/api api=$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+          - kubectl rollout status deployment/api
+        environment:
+          name: staging
+          url: https://staging.example.com
+          on_stop: stop-staging         # job do zatrzymania środowiska
+        rules:
+          - if: $CI_COMMIT_BRANCH == "dev"
+
+      # Job zatrzymujący środowisko staging
+      stop-staging:
+        stage: deploy
+        script:
+          - kubectl delete deployment api || true
+        environment:
+          name: staging
+          action: stop
+        when: manual
+        rules:
+          - if: $CI_COMMIT_BRANCH == "dev"
+
+      # Review app dla każdego MR — automatyczne środowisko
+      deploy-review:
+        stage: deploy
+        script:
+          - ./deploy-review.sh $CI_MERGE_REQUEST_IID
+        environment:
+          name: review/$CI_MERGE_REQUEST_IID
+          url: https://mr-$CI_MERGE_REQUEST_IID.review.example.com
+          on_stop: stop-review
+          auto_stop_in: 3 days          # automatyczne usunięcie po 3 dniach
+        rules:
+          - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+      stop-review:
+        stage: deploy
+        script:
+          - ./teardown-review.sh $CI_MERGE_REQUEST_IID
+        environment:
+          name: review/$CI_MERGE_REQUEST_IID
+          action: stop
+        when: manual
+
+  - name: Include i extends — reużycie konfiguracji
+    icon: "♻️"
+    desc: >
+      include wczytuje YAML z pliku lokalnego, remote URL lub GitLab templates.
+      extends dziedziczy konfigurację z template joba (merge kluczy).
+      YAML anchors (&/<<:/*) do inline reużycia w tym samym pliku.
+      Kombinacja include + extends pozwala budować bibliotekę gotowych jobów dla organizacji.
+    code: |
+      # ---- Główny .gitlab-ci.yml ----
+
+      include:
+        # Lokalny plik z templatami
+        - local: ".gitlab/ci-templates.yml"
+        # Remote — templates z innego repo
+        - project: "org/ci-templates"
+          ref: main
+          file: "/templates/python.yml"
+        # Gotowe GitLab templates
+        - template: "Security/SAST.gitlab-ci.yml"
+        - template: "Jobs/Code-Quality.gitlab-ci.yml"
+
+      stages:
+        - test
+        - build
+
+      # Użyj templates przez extends
+      test-backend:
+        extends: .python-test           # z ci-templates.yml
+        variables:
+          PYTHON_VERSION: "3.12"
+
+      build-docker:
+        extends: .docker-build          # z ci-templates.yml
+        variables:
+          DOCKERFILE: Dockerfile.prod
+
+      ---
+      # ---- .gitlab/ci-templates.yml ----
+
+      # YAML anchor — reużycie inline
+      .python-defaults: &python-defaults
+        image: python:3.12-slim
+        cache:
+          paths: [.cache/pip]
+        before_script:
+          - pip install --upgrade pip
+
+      # Template job — poprzedzone kropką, nie uruchamiane bezpośrednio
+      .python-test:
+        <<: *python-defaults            # rozwiń anchor
+        stage: test
+        script:
+          - pip install -r requirements.txt pytest
+          - pytest -v
+
+      .docker-build:
+        stage: build
+        image: docker:26
+        services: [docker:26-dind]
+        before_script:
+          - docker login $CI_REGISTRY -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
+        script:
+          - docker build -f ${DOCKERFILE:-Dockerfile} -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA .
+          - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+
+  - name: GitLab Pages — deploy statycznych stron
+    icon: "📄"
+    desc: >
+      GitLab Pages hostuje statyczne strony prosto z pipeline. Job musi się nazywać
+      "pages", artefakt trafia do katalogu "public/", deploy tylko z main branch.
+      URL w formacie username.gitlab.io/project-name. Działa dla MkDocs, Sphinx, Vite, itp.
+    code: |
+      stages:
+        - build
+        - deploy
+
+      build-docs:
+        stage: build
+        image: python:3.12-slim
+        script:
+          - pip install mkdocs mkdocs-material
+          - mkdocs build --site-dir public
+        artifacts:
+          paths:
+            - public/
+          expire_in: 1 week
+
+      # Job MUSI się nazywać "pages" — GitLab rozpoznaje po nazwie
+      pages:
+        stage: deploy
+        dependencies:
+          - build-docs
+        script:
+          - echo "Deploying to GitLab Pages..."
+        artifacts:
+          paths:
+            - public/              # MUSI być "public/"
+        rules:
+          - if: $CI_COMMIT_BRANCH == "main"   # deploy tylko z main
+
+      # Alternatywnie — build i deploy w jednym jobie
+      pages-simple:
+        stage: deploy
+        image: node:20-alpine
+        script:
+          - npm ci
+          - npm run build -- --outDir public
+        artifacts:
+          paths:
+            - public/
+        rules:
+          - if: $CI_COMMIT_BRANCH == "main"

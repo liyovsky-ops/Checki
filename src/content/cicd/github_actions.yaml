@@ -1,0 +1,756 @@
+title: GitHub Actions
+
+items:
+  - name: Struktura workflow
+    icon: "📋"
+    desc: >
+      Workflow to plik YAML w .github/workflows/. Składa się z triggerów (on:),
+      jobów (jobs:) i kroków (steps:). Jobs domyślnie równoległe — uses: do gotowych
+      actions, run: do komend shell. Kontekst github.*, env.*, secrets.* dostępny wszędzie.
+    code: |
+      # .github/workflows/ci.yml
+      name: CI Pipeline
+
+      # Triggery — kiedy workflow się odpala
+      on:
+        push:
+          branches: [main, dev]
+          paths:
+            - "src/**"
+            - "tests/**"
+        pull_request:
+          branches: [main]
+
+      # Zmienne środowiskowe dostępne dla wszystkich jobów
+      env:
+        PYTHON_VERSION: "3.12"
+        APP_NAME: moja-apka
+
+      jobs:
+        build:
+          # Runner — ubuntu-latest, windows-latest, macos-latest
+          runs-on: ubuntu-latest
+
+          # Timeout — zabezpieczenie przed zawieszonym jobem
+          timeout-minutes: 15
+
+          steps:
+            # Krok z gotowym action (uses:)
+            - name: Pobierz kod
+              uses: actions/checkout@v4
+              with:
+                fetch-depth: 0        # pełna historia (potrzebna np. dla SonarCloud)
+
+            # Krok z komendą shell (run:)
+            - name: Sprawdź wersję Pythona
+              run: python --version
+
+            # Krok z wieloma komendami
+            - name: Zainstaluj i sprawdź
+              run: |
+                pip install -r requirements.txt
+                pip list
+                python -c "import app; print('Import OK')"
+
+            # Krok warunkowy — uruchom tylko gdy poprzedni się nie powiódł
+            - name: Wyślij powiadomienie o błędzie
+              if: failure()
+              run: echo "Pipeline failed!"
+
+  - name: Triggery — kiedy odpalić workflow
+    icon: "⚡"
+    desc: >
+      GitHub Actions obsługuje wiele typów triggerów — push, PR, cron, ręczne uruchomienie
+      (workflow_dispatch) z parametrami, wywołanie z innego workflow (workflow_call).
+      Filtrowanie po branches, tags, paths pozwala uruchamiać tylko potrzebne joby.
+    code: |
+      on:
+        # Push do gałęzi lub tagu
+        push:
+          branches: [main, "release/*"]
+          tags: ["v*.*.*"]
+          paths-ignore:
+            - "docs/**"
+            - "*.md"
+
+        # Pull request — uruchom przy otwarciu, synchronizacji, reopenie
+        pull_request:
+          branches: [main]
+          types: [opened, synchronize, reopened]
+
+        # Harmonogram CRON — codziennie o 2:00 UTC
+        schedule:
+          - cron: "0 2 * * *"
+
+        # Ręczne uruchomienie z parametrami
+        workflow_dispatch:
+          inputs:
+            environment:
+              description: "Środowisko docelowe"
+              required: true
+              default: "staging"
+              type: choice
+              options: [staging, production]
+            run_tests:
+              description: "Uruchom testy?"
+              type: boolean
+              default: true
+            version:
+              description: "Wersja do deployu"
+              type: string
+
+      jobs:
+        deploy:
+          runs-on: ubuntu-latest
+          steps:
+            - name: Pokaż parametry
+              run: |
+                echo "Środowisko: ${{ inputs.environment }}"
+                echo "Testy: ${{ inputs.run_tests }}"
+                echo "Wersja: ${{ inputs.version }}"
+
+  - name: Python CI — lint, testy, coverage
+    icon: "🐍"
+    desc: >
+      Kompletny pipeline CI dla projektu Python — setup-python z cache, ruff do lintingu,
+      pytest z coverage, upload raportu do Codecov. Cache pip przyspiesza instalację
+      z kilkudziesięciu sekund do kilku.
+    code: |
+      name: Python CI
+
+      on:
+        push:
+          branches: [main, dev]
+        pull_request:
+          branches: [main]
+
+      jobs:
+        test:
+          runs-on: ubuntu-latest
+
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Ustaw Pythona z cache pip
+              uses: actions/setup-python@v5
+              with:
+                python-version: "3.12"
+                cache: "pip"           # automatyczny cache ~/.cache/pip
+
+            - name: Zainstaluj zależności
+              run: |
+                pip install --upgrade pip
+                pip install -r requirements.txt
+                pip install ruff pytest pytest-cov
+
+            - name: Lint — ruff check
+              run: ruff check . --output-format=github
+
+            - name: Format — ruff format (sprawdź bez zmiany)
+              run: ruff format --check .
+
+            - name: Testy z coverage
+              run: |
+                pytest \
+                  --cov=src \
+                  --cov-report=xml \
+                  --cov-report=term-missing \
+                  --cov-fail-under=80 \
+                  -v
+
+            - name: Upload coverage do Codecov
+              uses: codecov/codecov-action@v4
+              with:
+                token: ${{ secrets.CODECOV_TOKEN }}
+                file: ./coverage.xml
+                fail_ci_if_error: true
+
+  - name: Node.js CI — lint, test, build
+    icon: "🟢"
+    desc: >
+      Pipeline CI dla projektu Node.js/JavaScript — setup-node z cache npm,
+      ESLint, testy Vitest/Jest, build produkcyjny. Cache node_modules przyspiesza
+      instalację. Upload artefaktu build dla późniejszego deployu.
+    code: |
+      name: Node.js CI
+
+      on:
+        push:
+          branches: [main, dev]
+        pull_request:
+          branches: [main]
+
+      jobs:
+        test:
+          runs-on: ubuntu-latest
+
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Ustaw Node.js z cache npm
+              uses: actions/setup-node@v4
+              with:
+                node-version: "20"
+                cache: "npm"           # cache ~/.npm
+
+            - name: Zainstaluj zależności
+              run: npm ci             # czysta instalacja z package-lock.json
+
+            - name: Lint — ESLint
+              run: npm run lint
+
+            - name: Sprawdź typy — TypeScript
+              run: npm run type-check
+
+            - name: Testy jednostkowe
+              run: npm test -- --coverage
+
+            - name: Build produkcyjny
+              run: npm run build
+
+            - name: Upload artefaktu build
+              uses: actions/upload-artifact@v4
+              with:
+                name: dist-${{ github.sha }}
+                path: dist/
+                retention-days: 7
+
+  - name: Docker build i push do ghcr.io
+    icon: "🐳"
+    desc: >
+      Build Docker image i push do GitHub Container Registry (ghcr.io).
+      docker/metadata-action generuje tagi automatycznie — latest, SHA, branch, semver.
+      docker/build-push-action używa BuildKit. GITHUB_TOKEN wystarczy do ghcr.io.
+    code: |
+      name: Docker Build i Push
+
+      on:
+        push:
+          branches: [main]
+          tags: ["v*.*.*"]
+
+      env:
+        REGISTRY: ghcr.io
+        IMAGE_NAME: ${{ github.repository }}
+
+      jobs:
+        build-push:
+          runs-on: ubuntu-latest
+
+          permissions:
+            contents: read
+            packages: write    # wymagane do ghcr.io
+
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Zaloguj do GitHub Container Registry
+              uses: docker/login-action@v3
+              with:
+                registry: ${{ env.REGISTRY }}
+                username: ${{ github.actor }}
+                password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Przygotuj metadane i tagi
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                tags: |
+                  type=sha,prefix=sha-,format=short
+                  type=ref,event=branch
+                  type=semver,pattern={{version}}
+                  type=semver,pattern={{major}}.{{minor}}
+                  type=raw,value=latest,enable={{is_default_branch}}
+
+            - name: Ustaw Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Build i push image
+              uses: docker/build-push-action@v5
+              with:
+                context: .
+                push: true
+                tags: ${{ steps.meta.outputs.tags }}
+                labels: ${{ steps.meta.outputs.labels }}
+                cache-from: type=gha
+                cache-to: type=gha,mode=max
+
+  - name: Matrix builds — wiele wersji/systemów
+    icon: "🔢"
+    desc: >
+      strategy.matrix uruchamia ten sam job dla każdej kombinacji wartości.
+      Świetne do testów na wielu wersjach Pythona/Node lub systemach operacyjnych.
+      matrix.include dodaje dodatkowe kombinacje, matrix.exclude wyklucza niechciane.
+      Fail-fast wyłącza pozostałe joby gdy jeden się nie powiedzie.
+    code: |
+      name: Matrix Tests
+
+      on: [push, pull_request]
+
+      jobs:
+        test:
+          runs-on: ${{ matrix.os }}
+
+          strategy:
+            fail-fast: false    # nie przerywaj gdy jeden fail
+            matrix:
+              os: [ubuntu-latest, macos-latest, windows-latest]
+              python-version: ["3.10", "3.11", "3.12"]
+              exclude:
+                # wyklucz kombinację — macos + 3.10 (wolne/drogie)
+                - os: macos-latest
+                  python-version: "3.10"
+              include:
+                # dodatkowe kombinacje z extra zmiennymi
+                - os: ubuntu-latest
+                  python-version: "3.12"
+                  experimental: true
+
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Ustaw Python ${{ matrix.python-version }}
+              uses: actions/setup-python@v5
+              with:
+                python-version: ${{ matrix.python-version }}
+                cache: "pip"
+
+            - name: Zainstaluj i uruchom testy
+              run: |
+                pip install -r requirements.txt pytest
+                pytest -v --tb=short
+
+            - name: Pokaż kombinację
+              run: |
+                echo "OS: ${{ matrix.os }}"
+                echo "Python: ${{ matrix.python-version }}"
+
+  - name: Secrets i zmienne środowiskowe
+    icon: "🔐"
+    desc: >
+      secrets.* do wrażliwych danych (API keys, hasła) — zaszyfrowane, nie widoczne w logach.
+      vars.* do konfiguracji niebędącej tajemnicą (URL, nazwy). env: context na poziomie
+      workflow/job/step. GITHUB_TOKEN automatyczny token do API GitHuba.
+    code: |
+      name: Deploy z secretami
+
+      on:
+        push:
+          branches: [main]
+
+      # Zmienne środowiskowe dostępne globalnie
+      env:
+        APP_ENV: production
+        APP_NAME: moja-apka
+
+      jobs:
+        deploy:
+          runs-on: ubuntu-latest
+
+          # Zmienne na poziomie joba
+          env:
+            DEPLOY_URL: ${{ vars.PRODUCTION_URL }}  # nie-tajne zmienne (vars.*)
+
+          steps:
+            - uses: actions/checkout@v4
+
+            # Użyj sekretów w krokach
+            - name: Zaloguj do Docker Hub
+              uses: docker/login-action@v3
+              with:
+                username: ${{ secrets.DOCKERHUB_USERNAME }}
+                password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+            - name: Deploy na serwer
+              env:
+                # Sekret dostępny tylko w tym kroku
+                SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+                DATABASE_URL: ${{ secrets.DATABASE_URL }}
+              run: |
+                echo "Deploying to ${{ env.DEPLOY_URL }}"
+                # sekret nigdy nie pojawi się w logach
+                echo "::add-mask::$SSH_PRIVATE_KEY"
+
+            # Automatyczny GITHUB_TOKEN — do operacji na repo
+            - name: Utwórz GitHub Release
+              uses: softprops/action-gh-release@v2
+              if: startsWith(github.ref, 'refs/tags/')
+              with:
+                token: ${{ secrets.GITHUB_TOKEN }}  # automatyczny
+                generate_release_notes: true
+
+  - name: Artefakty — przekazywanie między jobami
+    icon: "📤"
+    desc: >
+      upload-artifact zapisuje pliki po zakończeniu joba, download-artifact pobiera je
+      w kolejnym jobie. Użyteczne gdy build generuje pliki które test/deploy musi wykorzystać.
+      Artefakty są przechowywane przez retention-days dni.
+    code: |
+      name: Build i Deploy z artefaktami
+
+      on:
+        push:
+          branches: [main]
+
+      jobs:
+        # Job 1 — buduje aplikację
+        build:
+          runs-on: ubuntu-latest
+          outputs:
+            artifact-name: ${{ steps.set-name.outputs.name }}
+
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Build Python wheel
+              run: python -m build
+
+            - name: Ustaw nazwę artefaktu
+              id: set-name
+              run: echo "name=dist-${{ github.sha }}" >> $GITHUB_OUTPUT
+
+            - name: Upload artefaktu
+              uses: actions/upload-artifact@v4
+              with:
+                name: ${{ steps.set-name.outputs.name }}
+                path: dist/
+                retention-days: 30   # przechowuj 30 dni
+
+        # Job 2 — testuje artefakt (czeka na build)
+        test-artifact:
+          needs: build
+          runs-on: ubuntu-latest
+
+          steps:
+            - name: Download artefaktu
+              uses: actions/download-artifact@v4
+              with:
+                name: ${{ needs.build.outputs.artifact-name }}
+                path: ./dist
+
+            - name: Zainstaluj z wheel
+              run: pip install dist/*.whl
+
+            - name: Sprawdź instalację
+              run: python -c "import moja_apka; print('OK')"
+
+        # Job 3 — publikuje do PyPI (czeka na testy)
+        publish:
+          needs: [build, test-artifact]
+          runs-on: ubuntu-latest
+          if: startsWith(github.ref, 'refs/tags/v')
+
+          steps:
+            - name: Download artefaktu
+              uses: actions/download-artifact@v4
+              with:
+                name: ${{ needs.build.outputs.artifact-name }}
+                path: ./dist
+
+            - name: Opublikuj na PyPI
+              uses: pypa/gh-action-pypi-publish@release/v1
+              with:
+                password: ${{ secrets.PYPI_API_TOKEN }}
+
+  - name: Cache — przyspiesz pipeline
+    icon: "⚡"
+    desc: >
+      actions/cache zapisuje katalogi między runami workflow. Klucz cache zawiera hash
+      pliku z zależnościami — cache nieważny gdy zmienił się requirements.txt/package-lock.json.
+      restore-keys to fallback gdy dokładny klucz nie istnieje. Oszczędza 1-3 minuty per run.
+    code: |
+      name: CI z cache
+
+      on: [push, pull_request]
+
+      jobs:
+        test:
+          runs-on: ubuntu-latest
+
+          steps:
+            - uses: actions/checkout@v4
+
+            # ---- Cache pip ----
+            - name: Cache pip
+              uses: actions/cache@v4
+              with:
+                path: ~/.cache/pip
+                key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+                restore-keys: |
+                  ${{ runner.os }}-pip-
+
+            # ---- Cache npm ----
+            - name: Cache npm
+              uses: actions/cache@v4
+              with:
+                path: ~/.npm
+                key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+                restore-keys: |
+                  ${{ runner.os }}-npm-
+
+            # ---- Cache Docker layers przez BuildKit ----
+            - name: Cache Docker layers
+              uses: actions/cache@v4
+              with:
+                path: /tmp/.buildx-cache
+                key: ${{ runner.os }}-docker-${{ hashFiles('**/Dockerfile') }}-${{ github.sha }}
+                restore-keys: |
+                  ${{ runner.os }}-docker-${{ hashFiles('**/Dockerfile') }}-
+                  ${{ runner.os }}-docker-
+
+            - name: Build z cache Docker
+              uses: docker/build-push-action@v5
+              with:
+                context: .
+                push: false
+                cache-from: type=local,src=/tmp/.buildx-cache
+                cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+            # Zapobiegaj nieograniczonemu wzrostowi cache
+            - name: Przenieś cache (zapobiegaj puchnieniu)
+              run: |
+                rm -rf /tmp/.buildx-cache
+                mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+  - name: Deploy na VPS przez SSH
+    icon: "🚀"
+    desc: >
+      Deploy na własny serwer przez SSH — appleboy/ssh-action wykonuje komendy zdalnie.
+      Sekret zawiera klucz SSH, host i użytkownika. Na serwerze wystarczy docker compose pull
+      i restart. Prosta, niezawodna metoda dla projektów bez Kubernetes.
+    code: |
+      name: Deploy na VPS
+
+      on:
+        push:
+          branches: [main]
+
+      jobs:
+        # Najpierw build i push image
+        build:
+          runs-on: ubuntu-latest
+          outputs:
+            image-tag: ${{ steps.meta.outputs.version }}
+
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Zaloguj do GHCR
+              uses: docker/login-action@v3
+              with:
+                registry: ghcr.io
+                username: ${{ github.actor }}
+                password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Metadane obrazu
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                images: ghcr.io/${{ github.repository }}
+                tags: type=sha,prefix=sha-,format=short
+
+            - name: Build i push
+              uses: docker/build-push-action@v5
+              with:
+                push: true
+                tags: ${{ steps.meta.outputs.tags }}
+
+        # Deploy na serwer przez SSH
+        deploy:
+          needs: build
+          runs-on: ubuntu-latest
+
+          steps:
+            - name: Deploy przez SSH
+              uses: appleboy/ssh-action@v1
+              with:
+                host: ${{ secrets.VPS_HOST }}
+                username: ${{ secrets.VPS_USER }}
+                key: ${{ secrets.VPS_SSH_KEY }}
+                script: |
+                  # Zaloguj do GHCR na serwerze
+                  echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+                  # Pobierz nowy image
+                  docker pull ghcr.io/${{ github.repository }}:${{ needs.build.outputs.image-tag }}
+
+                  # Restart docker compose stack
+                  cd /opt/moja-apka
+                  docker compose pull
+                  docker compose up -d --no-deps api
+
+                  # Sprawdź czy kontener działa
+                  docker compose ps
+                  docker compose exec -T api python -c "print('Health check OK')"
+
+  - name: Deploy na AWS — ECR i ECS
+    icon: "☁️"
+    desc: >
+      Deployment na AWS — push Docker image do Elastic Container Registry (ECR),
+      aktualizacja task definition i deploy na ECS Fargate. aws-actions/configure-aws-credentials
+      konfiguruje CLI. Wymaga roli IAM z uprawnieniami ECR + ECS.
+    code: |
+      name: Deploy na AWS ECS
+
+      on:
+        push:
+          tags: ["v*.*.*"]
+
+      env:
+        AWS_REGION: eu-central-1
+        ECR_REPOSITORY: moja-apka
+        ECS_SERVICE: moja-apka-service
+        ECS_CLUSTER: production
+        CONTAINER_NAME: api
+
+      jobs:
+        deploy:
+          runs-on: ubuntu-latest
+
+          steps:
+            - uses: actions/checkout@v4
+
+            # Skonfiguruj AWS CLI przez OIDC (bez długoterminowych kluczy)
+            - name: Konfiguruj AWS credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                role-to-assume: arn:aws:iam::123456789:role/GitHubActionsRole
+                aws-region: ${{ env.AWS_REGION }}
+
+            # Zaloguj do ECR
+            - name: Zaloguj do Amazon ECR
+              id: login-ecr
+              uses: aws-actions/amazon-ecr-login@v2
+
+            # Build i push do ECR
+            - name: Build, tag i push do ECR
+              id: build-image
+              env:
+                ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+                IMAGE_TAG: ${{ github.sha }}
+              run: |
+                docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+                docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+                echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+            # Pobierz aktualną task definition i podmień image
+            - name: Pobierz ECS task definition
+              run: |
+                aws ecs describe-task-definition \
+                  --task-definition ${{ env.ECS_SERVICE }} \
+                  --query taskDefinition > task-def.json
+
+            - name: Podmień image w task definition
+              id: task-def
+              uses: aws-actions/amazon-ecs-render-task-definition@v1
+              with:
+                task-definition: task-def.json
+                container-name: ${{ env.CONTAINER_NAME }}
+                image: ${{ steps.build-image.outputs.image }}
+
+            # Deploy nowej wersji na ECS
+            - name: Deploy na Amazon ECS
+              uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+              with:
+                task-definition: ${{ steps.task-def.outputs.task-definition }}
+                service: ${{ env.ECS_SERVICE }}
+                cluster: ${{ env.ECS_CLUSTER }}
+                wait-for-service-stability: true
+
+  - name: Reusable workflow — wielokrotne użycie
+    icon: "♻️"
+    desc: >
+      workflow_call pozwala wywołać jeden workflow z innego — DRY dla CI/CD.
+      Caller przekazuje inputs i secrets. Reusable workflow enkapsuluje logikę deployu.
+      Idealne gdy wiele projektów podziela ten sam pipeline (monorepo, organizacja).
+    code: |
+      # ---- Plik 1: .github/workflows/reusable-deploy.yml ----
+      # To jest reusable workflow — wywoływany przez inne workflows
+
+      name: Reusable Deploy
+
+      on:
+        workflow_call:
+          inputs:
+            environment:
+              required: true
+              type: string
+              description: "Środowisko docelowe"
+            image-tag:
+              required: true
+              type: string
+          secrets:
+            VPS_HOST:
+              required: true
+            VPS_SSH_KEY:
+              required: true
+          outputs:
+            deploy-url:
+              description: "URL zdeploy'owanej aplikacji"
+              value: ${{ jobs.deploy.outputs.url }}
+
+      jobs:
+        deploy:
+          runs-on: ubuntu-latest
+          environment: ${{ inputs.environment }}
+          outputs:
+            url: ${{ steps.get-url.outputs.url }}
+
+          steps:
+            - name: Deploy przez SSH
+              uses: appleboy/ssh-action@v1
+              with:
+                host: ${{ secrets.VPS_HOST }}
+                username: deploy
+                key: ${{ secrets.VPS_SSH_KEY }}
+                script: |
+                  cd /opt/app
+                  IMAGE_TAG=${{ inputs.image-tag }} docker compose up -d
+
+            - name: Pobierz URL
+              id: get-url
+              run: echo "url=https://${{ inputs.environment }}.example.com" >> $GITHUB_OUTPUT
+
+      ---
+      # ---- Plik 2: .github/workflows/ci-cd.yml ----
+      # Caller — wywołuje reusable workflow
+
+      name: CI/CD
+
+      on:
+        push:
+          branches: [main]
+
+      jobs:
+        build:
+          runs-on: ubuntu-latest
+          outputs:
+            tag: ${{ steps.meta.outputs.version }}
+          steps:
+            - uses: actions/checkout@v4
+            - id: meta
+              uses: docker/metadata-action@v5
+              with:
+                images: ghcr.io/org/app
+                tags: type=sha,format=short
+
+        deploy-staging:
+          needs: build
+          uses: ./.github/workflows/reusable-deploy.yml
+          with:
+            environment: staging
+            image-tag: ${{ needs.build.outputs.tag }}
+          secrets:
+            VPS_HOST: ${{ secrets.STAGING_HOST }}
+            VPS_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+
+        deploy-production:
+          needs: deploy-staging
+          uses: ./.github/workflows/reusable-deploy.yml
+          with:
+            environment: production
+            image-tag: ${{ needs.build.outputs.tag }}
+          secrets:
+            VPS_HOST: ${{ secrets.PROD_HOST }}
+            VPS_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}

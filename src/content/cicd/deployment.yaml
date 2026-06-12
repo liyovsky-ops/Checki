@@ -1,0 +1,562 @@
+title: Strategie deploymentu
+
+items:
+  - name: Blue/Green deployment
+    icon: "🟢"
+    desc: >
+      Dwa identyczne środowiska — Blue (aktualnie produkcja) i Green (nowa wersja).
+      Wdróż na Green, przetestuj, przełącz load balancer. Instant rollback — przełącz z powrotem.
+      Zero downtime gwarantowane. Wymaga 2x zasobów serwera. Standard w enterprise.
+    code: |
+      # Blue/Green deployment w GitHub Actions z AWS ALB
+      # .github/workflows/blue-green.yml
+
+      name: Blue/Green Deploy
+
+      on:
+        push:
+          tags: ["v*.*.*"]
+
+      jobs:
+        deploy:
+          runs-on: ubuntu-latest
+
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Konfiguruj AWS
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+                aws-region: eu-central-1
+
+            # Sprawdź który kolor jest aktualnie produkcją
+            - name: Wykryj aktualny kolor
+              id: detect
+              run: |
+                CURRENT=$(aws elbv2 describe-tags \
+                  --resource-arns ${{ secrets.ALB_ARN }} \
+                  --query 'TagDescriptions[0].Tags[?Key==`active-color`].Value' \
+                  --output text)
+                echo "current=$CURRENT" >> $GITHUB_OUTPUT
+                echo "target=$([ '$CURRENT' = 'blue' ] && echo 'green' || echo 'blue')" >> $GITHUB_OUTPUT
+
+            # Deploy na target (nieaktywne środowisko)
+            - name: Deploy na ${{ steps.detect.outputs.target }}
+              run: |
+                TARGET=${{ steps.detect.outputs.target }}
+                # Podmień image w ECS task definition
+                aws ecs update-service \
+                  --cluster production \
+                  --service "moja-apka-$TARGET" \
+                  --force-new-deployment
+                # Poczekaj na stabilizację
+                aws ecs wait services-stable \
+                  --cluster production \
+                  --services "moja-apka-$TARGET"
+
+            # Smoke test — sprawdź nową wersję przed przełączeniem
+            - name: Smoke test nowej wersji
+              run: |
+                TARGET_URL="https://${{ steps.detect.outputs.target }}.internal.example.com"
+                curl --fail --retry 5 --retry-delay 5 "$TARGET_URL/health"
+                curl --fail "$TARGET_URL/version"
+
+            # Przełącz ruch na nowy kolor
+            - name: Przełącz load balancer na ${{ steps.detect.outputs.target }}
+              run: |
+                TARGET=${{ steps.detect.outputs.target }}
+                # Aktualizuj ALB target group
+                aws elbv2 modify-listener \
+                  --listener-arn ${{ secrets.ALB_LISTENER_ARN }} \
+                  --default-actions Type=forward,TargetGroupArn=${{ secrets[format('TG_{0}_ARN', steps.detect.outputs.target)] }}
+                # Zaktualizuj tag active-color
+                aws elbv2 add-tags \
+                  --resource-arns ${{ secrets.ALB_ARN }} \
+                  --tags Key=active-color,Value=$TARGET
+                echo "Ruch przełączony na $TARGET"
+
+  - name: Canary deployment
+    icon: "🐦"
+    desc: >
+      Stopniowe wdrażanie — nowa wersja dostaje najpierw 5%, potem 25%, 50%, 100% ruchu.
+      Na każdym etapie monitorujesz error rate i latency. Rollback natychmiastowy — zmień
+      wagę z powrotem. Kubernetes obsługuje canary przez Argo Rollouts lub Istio.
+      Minimalizuje ryzyko przy dużych zmianach.
+    code: |
+      # Canary deployment — GitHub Actions + kubectl
+      # Wymaga Kubernetes z Argo Rollouts
+
+      name: Canary Deploy
+
+      on:
+        push:
+          branches: [main]
+
+      jobs:
+        canary:
+          runs-on: ubuntu-latest
+
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Konfiguruj kubectl
+              uses: azure/setup-kubectl@v4
+
+            - name: Konfiguruj kubeconfig
+              run: echo "${{ secrets.KUBECONFIG }}" | base64 -d > kubeconfig.yaml
+
+            # Ustaw nową wersję jako canary (5% ruchu)
+            - name: Deploy canary (5% ruchu)
+              env:
+                KUBECONFIG: kubeconfig.yaml
+                IMAGE_TAG: ${{ github.sha }}
+              run: |
+                # Argo Rollouts — canary krok 1
+                kubectl argo rollouts set image moja-apka \
+                  api=ghcr.io/org/moja-apka:$IMAGE_TAG \
+                  --namespace production
+
+                # Promuj do 5% (Argo Rollouts zarządza ważeniem)
+                kubectl argo rollouts promote moja-apka \
+                  --namespace production
+
+            # Poczekaj i sprawdź metryki
+            - name: Czekaj i sprawdź błędy (5 minut)
+              run: |
+                sleep 300
+                # Sprawdź error rate przez Prometheus/Grafana API
+                ERROR_RATE=$(curl -s "http://prometheus/api/v1/query?query=rate(http_errors_total[5m])" \
+                  | jq '.data.result[0].value[1]' -r)
+                echo "Error rate: $ERROR_RATE"
+                # Jeśli error rate > 1% — zatrzymaj
+                python3 -c "
+                import sys
+                rate = float('$ERROR_RATE' or 0)
+                if rate > 0.01:
+                    print(f'ERROR RATE TOO HIGH: {rate:.2%}')
+                    sys.exit(1)
+                print(f'OK: {rate:.2%}')
+                "
+
+            # Promuj do 50%
+            - name: Promuj do 50% ruchu
+              run: |
+                kubectl argo rollouts promote moja-apka --namespace production
+                sleep 120  # 2 minuty monitorowania
+
+            # Pełny rollout — 100%
+            - name: Pełny rollout (100%)
+              run: |
+                kubectl argo rollouts promote moja-apka --full --namespace production
+
+            # Rollback w razie awarii
+            - name: Rollback przy błędzie
+              if: failure()
+              run: |
+                kubectl argo rollouts abort moja-apka --namespace production
+                kubectl argo rollouts undo moja-apka --namespace production
+
+  - name: Rolling deployment — Kubernetes
+    icon: "⚙️"
+    desc: >
+      Kubernetes rolling update zastępuje pody stopniowo — stara wersja działa dopóki
+      nowa nie jest gotowa. maxSurge — ile dodatkowych podów można uruchomić jednocześnie.
+      maxUnavailable — ile podów może być niedostępnych. readinessProbe decyduje
+      czy nowy pod jest gotowy do ruchu.
+    code: |
+      # Kubernetes Deployment z rolling update
+      # k8s/deployment.yaml
+
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: moja-apka
+        namespace: production
+      spec:
+        replicas: 4
+
+        # Strategia rolling update
+        strategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxSurge: 1          # maks 1 dodatkowy pod podczas update (25%)
+            maxUnavailable: 0    # zero podów niedostępnych (zero downtime)
+
+        selector:
+          matchLabels:
+            app: moja-apka
+
+        template:
+          metadata:
+            labels:
+              app: moja-apka
+          spec:
+            containers:
+              - name: api
+                image: ghcr.io/org/moja-apka:REPLACE_TAG
+                ports:
+                  - containerPort: 8000
+
+                # Readiness probe — pod dostaje ruch tylko gdy "gotowy"
+                readinessProbe:
+                  httpGet:
+                    path: /health
+                    port: 8000
+                  initialDelaySeconds: 10
+                  periodSeconds: 5
+                  failureThreshold: 3
+
+                # Liveness probe — restart gdy aplikacja "wisi"
+                livenessProbe:
+                  httpGet:
+                    path: /health
+                    port: 8000
+                  initialDelaySeconds: 30
+                  periodSeconds: 10
+
+      ---
+      # GitHub Actions — podmień tag i apply
+      jobs:
+        deploy:
+          steps:
+            - name: Deploy na Kubernetes
+              run: |
+                # Podmień tag w manifeście
+                sed -i "s/REPLACE_TAG/${{ github.sha }}/g" k8s/deployment.yaml
+
+                # Zastosuj manifest
+                kubectl apply -f k8s/deployment.yaml
+
+                # Poczekaj na ukończenie rollout
+                kubectl rollout status deployment/moja-apka \
+                  --namespace production \
+                  --timeout=10m
+
+                # Historia rollouts
+                kubectl rollout history deployment/moja-apka --namespace production
+
+  - name: Feature flags — deployment bez włączenia
+    icon: "🚩"
+    desc: >
+      Feature flags pozwalają deployować kod produkcji bez aktywowania funkcji dla użytkowników.
+      Oddziela deployment od release — wdrożysz w środę, włączysz w piątek.
+      Narzędzia: LaunchDarkly, Unleash (self-hosted open-source), flagsmith.
+      Prosty feature flag w Python bez biblioteki zewnętrznej.
+    code: |
+      # ---- Prosty feature flag w Pythonie ----
+      # feature_flags.py
+
+      import os
+      from functools import lru_cache
+
+      # Flagi z zmiennych środowiskowych lub konfiguracji
+      @lru_cache(maxsize=None)
+      def is_enabled(flag_name: str) -> bool:
+          """Sprawdź czy feature flag jest włączony."""
+          env_var = f"FEATURE_{flag_name.upper()}"
+          return os.getenv(env_var, "false").lower() in ("true", "1", "yes")
+
+      # Użycie w kodzie
+      def process_payment(order_id: str):
+          if is_enabled("NEW_PAYMENT_FLOW"):
+              return new_payment_flow(order_id)
+          return legacy_payment_flow(order_id)
+
+      # ---- Unleash — self-hosted feature flags ----
+      # docker-compose.yml dla Unleash
+
+      services:
+        unleash:
+          image: unleashorg/unleash-server:latest
+          environment:
+            DATABASE_URL: postgresql://unleash:pass@db/unleash
+            INIT_FRONTEND_API_TOKENS: "default:development.unleash-insecure-frontend-api-token"
+          ports:
+            - "4242:4242"
+          depends_on: [db]
+
+        db:
+          image: postgres:16-alpine
+          environment:
+            POSTGRES_DB: unleash
+            POSTGRES_USER: unleash
+            POSTGRES_PASSWORD: pass
+
+      # ---- Python SDK Unleash ----
+      from UnleashClient import UnleashClient
+
+      client = UnleashClient(
+          url="http://unleash:4242/api",
+          app_name="moja-apka",
+          custom_headers={"Authorization": "default:development.*"}
+      )
+      client.initialize_client()
+
+      # Sprawdź flagę z kontekstem użytkownika
+      if client.is_enabled("new-checkout", {"userId": user.id}):
+          return new_checkout_flow()
+
+  - name: Sekrety w pipeline — bezpieczne praktyki
+    icon: "🔐"
+    desc: >
+      GitHub Environments z required reviewers — deploy na prod wymaga zatwierdzenia.
+      Vault (HashiCorp) centralizuje sekrety — dynamiczne credentials dla każdego joba.
+      AWS Secrets Manager rotuje automatycznie. OIDC eliminuje długoterminowe klucze API
+      w CI/CD — GitHub Actions zakłada rolę IAM przez token JWT.
+    code: |
+      # GitHub Actions OIDC — bez długoterminowych kluczy AWS
+      # Tylko rola IAM, żadnego ACCESS_KEY w secretach
+
+      name: Deploy z OIDC
+
+      on:
+        push:
+          branches: [main]
+
+      jobs:
+        deploy:
+          runs-on: ubuntu-latest
+          environment: production    # wymaga approval w GitHub Environments
+
+          permissions:
+            id-token: write   # wymagane do OIDC
+            contents: read
+
+          steps:
+            - uses: actions/checkout@v4
+
+            # OIDC — GitHub zakłada rolę IAM bez statycznych kluczy
+            - name: Konfiguruj AWS przez OIDC
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                role-to-assume: arn:aws:iam::ACCOUNT_ID:role/GitHubActionsRole
+                role-session-name: github-actions-${{ github.run_id }}
+                aws-region: eu-central-1
+
+            # HashiCorp Vault — dynamiczne sekrety
+            - name: Pobierz sekrety z Vault
+              uses: hashicorp/vault-action@v3
+              with:
+                url: ${{ secrets.VAULT_ADDR }}
+                method: jwt
+                role: github-actions
+                secrets: |
+                  secret/data/prod/db DB_PASSWORD | DATABASE_PASSWORD;
+                  secret/data/prod/api API_KEY | EXTERNAL_API_KEY
+
+            - name: Deploy z dynamicznymi sekretami
+              run: |
+                # Sekrety dostępne jako zmienne środowiskowe
+                echo "Deploying with dynamic credentials"
+                # DATABASE_PASSWORD i EXTERNAL_API_KEY dostępne automatycznie
+
+  - name: Rollback strategie
+    icon: "↩️"
+    desc: >
+      Trzy podejścia do rollback: revert commit (git), re-deploy poprzedniego tagu (Docker),
+      Kubernetes rollout undo (natychmiastowe). Najszybszy: rollout undo — sekunda.
+      Najczystszy: git revert — historia zmian widoczna. Zawsze miej gotowy plan B przed deployem.
+    code: |
+      # ---- Rollback 1: Git revert ----
+      # Stwórz commit który cofa zmiany (historia zachowana)
+      git revert HEAD --no-edit
+      git push origin main
+      # GitHub Actions automatycznie uruchomi pipeline z reverted kodem
+
+      # ---- Rollback 2: Re-deploy poprzedniego tagu ----
+      # .github/workflows/rollback.yml
+
+      name: Rollback
+
+      on:
+        workflow_dispatch:
+          inputs:
+            tag:
+              description: "Tag do przywrócenia (np. v1.2.3 lub sha-abc123)"
+              required: true
+              type: string
+
+      jobs:
+        rollback:
+          runs-on: ubuntu-latest
+          environment: production
+
+          steps:
+            - name: Rollback do ${{ inputs.tag }}
+              uses: appleboy/ssh-action@v1
+              with:
+                host: ${{ secrets.VPS_HOST }}
+                username: deploy
+                key: ${{ secrets.VPS_SSH_KEY }}
+                script: |
+                  cd /opt/moja-apka
+                  # Podmień tag w docker-compose
+                  sed -i "s|image:.*|image: ghcr.io/org/app:${{ inputs.tag }}|" compose.yml
+                  docker compose pull
+                  docker compose up -d --no-deps api
+                  echo "Rollback do ${{ inputs.tag }} zakończony"
+
+      # ---- Rollback 3: Kubernetes rollout undo ----
+      # Sprawdź historię deploymentów
+      kubectl rollout history deployment/moja-apka --namespace production
+
+      # Cofnij do poprzedniej wersji (najszybszy rollback)
+      kubectl rollout undo deployment/moja-apka --namespace production
+
+      # Cofnij do konkretnej wersji
+      kubectl rollout undo deployment/moja-apka \
+        --to-revision=3 \
+        --namespace production
+
+      # Sprawdź status
+      kubectl rollout status deployment/moja-apka --namespace production
+
+  - name: Health checks i smoke tests
+    icon: "❤️"
+    desc: >
+      Po każdym deployu sprawdź czy aplikacja faktycznie działa — smoke test.
+      wait-for-it.sh czeka na port TCP przed uruchomieniem testów.
+      Kubernetes readinessProbe blokuje ruch do poda dopóki /health nie zwróci 200.
+      curl --retry z exponential backoff to minimum dla każdego pipeline.
+    code: |
+      # GitHub Actions — smoke test po deploy
+      # .github/workflows/deploy.yml (fragment po kroku deploy)
+
+      jobs:
+        deploy-and-verify:
+          runs-on: ubuntu-latest
+
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Deploy
+              id: deploy
+              run: |
+                # ... kroki deployu ...
+                echo "url=https://api.example.com" >> $GITHUB_OUTPUT
+
+            # Smoke test — podstawowy health check
+            - name: Smoke test — health endpoint
+              run: |
+                URL="${{ steps.deploy.outputs.url }}"
+                # curl z retry i backoff
+                curl \
+                  --fail \
+                  --silent \
+                  --retry 10 \
+                  --retry-delay 5 \
+                  --retry-connrefused \
+                  --max-time 30 \
+                  "$URL/health" | jq .
+
+            # Sprawdź wersję — upewnij się że nowy kod jest aktywny
+            - name: Weryfikuj wersję
+              run: |
+                DEPLOYED_VERSION=$(curl -sf ${{ steps.deploy.outputs.url }}/version | jq -r .version)
+                echo "Wdrożona wersja: $DEPLOYED_VERSION"
+                echo "Oczekiwana: ${{ github.sha }}"
+                [ "$DEPLOYED_VERSION" = "${{ github.sha }}" ] || exit 1
+
+            # Podstawowe testy funkcjonalne po deploy
+            - name: API smoke tests
+              run: |
+                BASE_URL="${{ steps.deploy.outputs.url }}"
+                # Sprawdź główne endpointy
+                curl -sf "$BASE_URL/api/v1/status" > /dev/null
+                curl -sf -o /dev/null -w "%{http_code}" "$BASE_URL/" | grep -q "200"
+                echo "Wszystkie smoke testy zakończone pomyślnie"
+
+            # Powiadomienie na Slack o udanym deploy
+            - name: Powiadomienie Slack
+              if: success()
+              uses: slackapi/slack-github-action@v2
+              with:
+                webhook: ${{ secrets.SLACK_WEBHOOK }}
+                webhook-type: incoming-webhook
+                payload: |
+                  {
+                    "text": "Deploy zakończony — ${{ github.repository }}@${{ github.sha }} na prod"
+                  }
+
+  - name: Monorepo CI — deploy tylko zmienionego serwisu
+    icon: "📂"
+    desc: >
+      W monorepo nie deploy wszystkich serwisów przy każdym pushu — filtruj po paths.
+      GitHub Actions paths: filter lub nx affected sprawdzają które pakiety się zmieniły.
+      Turborepo pipeline uruchamia tylko dotkniete joby. Oszczędza czas i zasoby CI.
+    code: |
+      # Monorepo — oddzielne workflow per serwis
+      # .github/workflows/api.yml
+
+      name: Deploy API
+
+      on:
+        push:
+          branches: [main]
+          paths:
+            - "services/api/**"    # odpal tylko gdy zmienił się serwis api
+            - "packages/shared/**" # lub współdzielona biblioteka
+            - ".github/workflows/api.yml"
+
+      jobs:
+        test-and-deploy:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@v4
+            - run: cd services/api && npm ci && npm test
+            - run: cd services/api && docker build -t ghcr.io/org/api:${{ github.sha }} .
+
+      ---
+      # Turborepo — uruchom tylko zmienione paczki
+      # .github/workflows/ci.yml
+
+      name: Turborepo CI
+
+      on: [push, pull_request]
+
+      jobs:
+        build:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@v4
+              with:
+                fetch-depth: 0    # pełna historia dla turbo
+
+            - uses: actions/setup-node@v4
+              with:
+                node-version: 20
+                cache: npm
+
+            - run: npm ci
+
+            # Turbo z remote cache (Vercel)
+            - name: Build i test — tylko zmienione
+              run: npx turbo build test --filter='...[origin/main]'
+              env:
+                TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+                TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+
+      ---
+      # Nx Affected — alternatywa dla Angular/Nx monorepo
+      # .github/workflows/nx.yml
+
+      jobs:
+        affected:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@v4
+              with:
+                fetch-depth: 0
+
+            - uses: actions/setup-node@v4
+              with:
+                node-version: 20
+                cache: npm
+
+            - run: npm ci
+
+            - name: Uruchom tylko dotknięte projekty
+              run: |
+                npx nx affected --target=test --base=origin/main
+                npx nx affected --target=build --base=origin/main

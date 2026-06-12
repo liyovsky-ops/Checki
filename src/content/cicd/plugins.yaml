@@ -1,0 +1,456 @@
+title: Narzędzia CI/CD
+
+items:
+  - name: actions/checkout@v4
+    icon: "📥"
+    desc: |
+      Oficjalny action do klonowania repozytorium.
+      Instalacja: wbudowany w GitHub Actions Marketplace.
+
+      Domyślnie klonuje płytko (depth 1) — szybciej.
+      fetch-depth: 0 dla pełnej historii (potrzebne do git log, SonarCloud, semantic-release).
+      sparse-checkout gdy potrzebujesz tylko część plików (monorepo, duże repo).
+    code: |
+      # Podstawowe użycie
+      - uses: actions/checkout@v4
+
+      # Pełna historia — wymagana dla semantic-release, SonarCloud
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Sparse checkout — tylko wybrane katalogi (duże monorepo)
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            services/api
+            packages/shared
+          sparse-checkout-cone-mode: true
+
+      # Checkout innego repo (np. shared configs)
+      - uses: actions/checkout@v4
+        with:
+          repository: org/shared-configs
+          token: ${{ secrets.ORG_PAT }}
+          path: shared-configs
+
+      # Checkout z submodułami
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  - name: actions/setup-python@v5
+    icon: "🐍"
+    desc: |
+      Oficjalny action do instalacji Pythona z cache pip.
+      Instalacja: wbudowany w GitHub Actions Marketplace.
+
+      cache: pip automatycznie cache'uje ~/.cache/pip.
+      python-version: "3.x" instaluje najnowszy patch automatycznie.
+      Obsługuje pyenv, poetry, pipenv. Konfiguruje PATH.
+    code: |
+      # Podstawowe użycie z cache
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"              # cache ~/.cache/pip automatycznie
+
+      # Wiele wersji w matrix
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      # Poetry — cache przez poetry
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "poetry"
+
+      # Plik z wersją (.python-version)
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+          cache: "pip"
+
+      # Pełny przykład z instalacją
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff pytest pytest-cov
+
+  - name: actions/setup-node@v4
+    icon: "🟢"
+    desc: |
+      Oficjalny action do instalacji Node.js z cache.
+      Instalacja: wbudowany w GitHub Actions Marketplace.
+
+      cache: npm/yarn/pnpm — automatyczne wykrycie package manager.
+      node-version: "lts/*" zawsze zainstaluje aktualną LTS.
+      nvmrc: true czyta wersję z pliku .nvmrc.
+    code: |
+      # npm z cache
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # pnpm — wymaga instalacji przed setup-node
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      # Yarn berry
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+
+      # Z pliku .nvmrc
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      # Pełny przykład
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci           # zawsze npm ci w CI (nie npm install)
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  - name: docker/build-push-action@v5
+    icon: "🐳"
+    desc: |
+      Build i push Docker image w GitHub Actions.
+      Instalacja: wbudowany w GitHub Actions Marketplace.
+
+      Wymaga docker/setup-buildx-action. cache-from/to przez GitHub Actions cache (type=gha).
+      platforms do multi-arch build. Bez push: true — tylko buduje lokalnie.
+    code: |
+      # Pełny przykład — build i push do ghcr.io
+      - name: Ustaw Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Zaloguj do GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Metadane obrazu
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build i push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            GIT_COMMIT=${{ github.sha }}
+
+  - name: actions/cache@v4
+    icon: "💾"
+    desc: |
+      Cachowanie katalogów między workflow runs — przyspiesza pipeline.
+      Instalacja: wbudowany w GitHub Actions Marketplace.
+
+      Klucz oparty na hash pliku zależności — nieważny gdy plik się zmieni.
+      restore-keys to fallback gdy exact match nie istnieje.
+      Max rozmiar cache 10GB per repo.
+    code: |
+      # Cache pip
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      # Cache npm (node_modules — szybszy niż cache ~/.npm)
+      - uses: actions/cache@v4
+        id: npm-cache
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+      - if: steps.npm-cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+      # Cache Gradle (Java/Android)
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
+      # Cache wielokatalogi
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.local/share/virtualenvs
+          key: ${{ runner.os }}-pipenv-${{ hashFiles('Pipfile.lock') }}
+
+  - name: codecov/codecov-action@v4
+    icon: "📊"
+    desc: |
+      Upload raportu coverage do Codecov — widget i PR comments z wynikami.
+      Instalacja: wbudowany w GitHub Actions Marketplace.
+
+      Generuj XML report przez pytest-cov (--cov-report=xml) lub lcov.
+      Token CODECOV_TOKEN wymagany dla prywatnych repo (darmowy dla publicznych).
+      fail_ci_if_error blokuje PR gdy upload się nie powiedzie.
+    code: |
+      # Generuj raport coverage w pytest
+      - name: Testy z coverage
+        run: |
+          pytest \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-fail-under=80
+
+      # Upload do Codecov
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.xml
+          flags: unittests           # tag dla filtrowania
+          name: codecov-${{ github.sha }}
+          fail_ci_if_error: true
+          verbose: true
+
+      # Dla projektów Node.js — Jest z lcov
+      - name: Jest coverage
+        run: jest --coverage --coverageReporters=lcov
+
+      - name: Upload coverage Node
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          flags: frontend
+
+  - name: slackapi/slack-github-action
+    icon: "💬"
+    desc: |
+      Powiadomienia Slack z GitHub Actions — po deploy, przy błędzie, po release.
+      Instalacja: wbudowany w GitHub Actions Marketplace.
+
+      Wymaga Slack App z Incoming Webhooks lub Bot Token.
+      Webhook prostszy — jeden URL, jeden kanał. Bot Token daje więcej możliwości.
+    code: |
+      # Powiadomienie Slack przez Incoming Webhook (prostsze)
+      - name: Notify Slack — sukces
+        if: success()
+        uses: slackapi/slack-github-action@v2
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "Deploy zakończony!",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Deploy zakończony*\nRepo: ${{ github.repository }}\nCommit: ${{ github.sha }}\nBy: ${{ github.actor }}"
+                  }
+                }
+              ]
+            }
+
+      # Powiadomienie o błędzie
+      - name: Notify Slack — błąd
+        if: failure()
+        uses: slackapi/slack-github-action@v2
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "Pipeline FAILED!",
+              "attachments": [{
+                "color": "danger",
+                "text": "Repo: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\nActor: ${{ github.actor }}\nLink: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              }]
+            }
+
+  - name: sonarsource/sonarcloud-github-action
+    icon: "🔍"
+    desc: |
+      Analiza jakości kodu przez SonarCloud — metryki, code smells, duplicacje, coverage.
+      Instalacja: wbudowany w GitHub Actions Marketplace.
+
+      Wymaga konta SonarCloud (darmowe dla publicznych repo) i SONAR_TOKEN.
+      Automatycznie komentuje w PR gdy znajdzie problemy. Konfiguracja w sonar-project.properties.
+    code: |
+      # sonar-project.properties — konfiguracja
+      # sonar.projectKey=org_moja-apka
+      # sonar.organization=org
+      # sonar.sources=src
+      # sonar.tests=tests
+      # sonar.python.version=3.12
+      # sonar.python.coverage.reportPaths=coverage.xml
+
+      # GitHub Actions — pełna analiza
+      - name: Testy i coverage
+        run: pytest --cov=src --cov-report=xml
+
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=org_moja-apka
+            -Dsonar.organization=org
+            -Dsonar.sources=src
+            -Dsonar.python.coverage.reportPaths=coverage.xml
+            -Dsonar.qualitygate.wait=true
+
+      # Quality Gate — zablokuj merge gdy jakość za niska
+      - name: Check Quality Gate
+        uses: sonarsource/sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  - name: act — lokalne GitHub Actions
+    icon: "🎭"
+    desc: |
+      Uruchamiaj GitHub Actions lokalnie — bez pushu do repo, instant feedback.
+      Instalacja: winget install nektos.act / brew install act / gh extension install https://github.com/nektos/gh-act
+
+      Wymaga Docker. Używa podobnych images co GitHub-hosted runners.
+      act czyta .github/workflows/ i symuluje wykonanie pipeline lokalnie.
+    code: |
+      # Instalacja (Linux/macOS)
+      curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
+
+      # Lista dostępnych workflow i jobów
+      act --list
+
+      # Uruchom domyślny event (push) — wszystkie joby
+      act push
+
+      # Uruchom konkretny job
+      act -j test
+
+      # Uruchom konkretny workflow
+      act -W .github/workflows/ci.yml
+
+      # Symuluj pull_request event
+      act pull_request
+
+      # Podaj sekrety lokalnie
+      act push -s GITHUB_TOKEN=your_token -s DOCKER_PASSWORD=pass
+
+      # Plik z sekretami (nie commituj!)
+      # .secrets
+      # GITHUB_TOKEN=ghp_xxx
+      # DOCKER_PASSWORD=abc
+      act push --secret-file .secrets
+
+      # Użyj mniejszego (szybszego) image runnera
+      act push -P ubuntu-latest=catthehacker/ubuntu:act-latest
+
+      # Podgląd co by się wykonało (dry-run)
+      act push -n
+
+  - name: pre-commit — hooki przed commitem
+    icon: "🪝"
+    desc: |
+      Automatyczne sprawdzenie kodu przed każdym commitem — ruff, mypy, prettier, detect-secrets.
+      Instalacja: pip install pre-commit
+
+      Konfiguracja w .pre-commit-config.yaml. Hooki uruchamiają się lokalnie i w CI.
+      Blokuje commit gdy hook się nie powiedzie — napraw kod, commit ponownie.
+    code: |
+      # .pre-commit-config.yaml — konfiguracja hooków
+
+      repos:
+        # Podstawowe hooki
+        - repo: https://github.com/pre-commit/pre-commit-hooks
+          rev: v4.6.0
+          hooks:
+            - id: trailing-whitespace
+            - id: end-of-file-fixer
+            - id: check-yaml
+            - id: check-json
+            - id: check-merge-conflict
+            - id: detect-private-key
+
+        # Ruff — linting i formatowanie Python
+        - repo: https://github.com/astral-sh/ruff-pre-commit
+          rev: v0.4.10
+          hooks:
+            - id: ruff
+              args: [--fix]
+            - id: ruff-format
+
+        # Mypy — type checking
+        - repo: https://github.com/pre-commit/mirrors-mypy
+          rev: v1.10.0
+          hooks:
+            - id: mypy
+              additional_dependencies: [types-requests]
+
+        # Prettier — formatowanie JS/TS/CSS/YAML
+        - repo: https://github.com/pre-commit/mirrors-prettier
+          rev: v4.0.0-alpha.8
+          hooks:
+            - id: prettier
+              types_or: [javascript, typescript, css, yaml]
+
+        # detect-secrets — zapobiegaj commitowaniu sekretów
+        - repo: https://github.com/Yelp/detect-secrets
+          rev: v1.5.0
+          hooks:
+            - id: detect-secrets
+              args: ["--baseline", ".secrets.baseline"]
+
+      # Instalacja hooków
+      # pre-commit install
+
+      # Uruchom na wszystkich plikach
+      # pre-commit run --all-files
+
+      # Aktualizuj hooki do najnowszych wersji
+      # pre-commit autoupdate
+
+      # W GitHub Actions — sprawdź że hooki przechodzą
+      # - uses: pre-commit/action@v3.0.1

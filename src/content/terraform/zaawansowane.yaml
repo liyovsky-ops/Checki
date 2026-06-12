@@ -1,0 +1,499 @@
+title: State i Workspace
+
+items:
+  - name: "State — czym jest i dlaczego ważny"
+    icon: "🗺️"
+    desc: >
+      terraform.tfstate to baza danych Terraform — mapuje zasoby w kodzie na rzeczywiste
+      zasoby w chmurze. Zawiera ID, atrybuty, zależności. Bez state Terraform nie wie
+      co już istnieje. Nigdy nie commituj do git — zawiera sekrety (hasła, klucze).
+    code: |
+      # terraform.tfstate — przykładowa zawartość (skrócona)
+      # {
+      #   "version": 4,
+      #   "terraform_version": "1.6.0",
+      #   "serial": 42,
+      #   "lineage": "uuid-tutaj",
+      #   "outputs": {
+      #     "vpc_id": { "value": "vpc-0abc123", "type": "string" }
+      #   },
+      #   "resources": [
+      #     {
+      #       "mode": "managed",
+      #       "type": "aws_instance",
+      #       "name": "web",
+      #       "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      #       "instances": [
+      #         {
+      #           "schema_version": 1,
+      #           "attributes": {
+      #             "id": "i-0abc123def456",
+      #             "ami": "ami-0905a3c97561e0b69",
+      #             "instance_type": "t3.micro",
+      #             ...
+      #           }
+      #         }
+      #       ]
+      #     }
+      #   ]
+      # }
+
+      # WAŻNE: co jest w state
+      # - ID zasobów (np. i-0abc123)
+      # - Wszystkie atrybuty (w tym wrażliwe — hasła, klucze!)
+      # - Zależności między zasobami
+      # - Metadata Terraform
+
+      # .gitignore — zawsze dodaj:
+      # *.tfstate
+      # *.tfstate.backup
+      # .terraform/
+      # .terraform.lock.hcl  <- można commitować (lockfile)
+
+      # Podstawowe komendy
+      # terraform state list              - lista wszystkich zasobów w state
+      # terraform state show aws_instance.web - szczegóły zasobu
+      # terraform refresh                 - zsynchronizuj state z rzeczywistością
+      # terraform force-unlock LOCK_ID    - odblokuj zablokowany state
+
+  - name: "Remote State — S3 + DynamoDB locking"
+    icon: "☁️"
+    desc: >
+      Lokalny state nie nadaje się dla zespołów — brak locking, ryzyko conflictów.
+      S3 + DynamoDB to standard: S3 przechowuje state, DynamoDB zapobiega równoczesnym
+      zmianom (distributed locking). Zawsze szyfruj state w S3.
+    code: |
+      # backend.tf — konfiguracja remote state
+      # UWAGA: zmienne nie działają w bloku backend{}
+      # Wartości muszą być hardcode lub przekazywane przez -backend-config
+
+      terraform {
+        backend "s3" {
+          bucket         = "moja-firma-tfstate-eu-west-1"
+          key            = "prod/main/terraform.tfstate"
+          region         = "eu-west-1"
+          encrypt        = true
+
+          # DynamoDB table dla locking
+          dynamodb_table = "terraform-state-lock"
+        }
+      }
+
+      # Utwórz S3 bucket i DynamoDB jednorazowo (chicken-and-egg problem)
+      # Najpierw utwórz ręcznie lub osobnym projektem Terraform bez remote state
+
+      # bootstrap/main.tf — utwórz infrastrukturę dla state
+      resource "aws_s3_bucket" "tfstate" {
+        bucket = "moja-firma-tfstate-eu-west-1"
+
+        lifecycle {
+          prevent_destroy = true
+        }
+      }
+
+      resource "aws_s3_bucket_versioning" "tfstate" {
+        bucket = aws_s3_bucket.tfstate.id
+        versioning_configuration {
+          status = "Enabled"  # odtworzenie poprzednich wersji state
+        }
+      }
+
+      resource "aws_s3_bucket_server_side_encryption_configuration" "tfstate" {
+        bucket = aws_s3_bucket.tfstate.id
+        rule {
+          apply_server_side_encryption_by_default {
+            sse_algorithm = "AES256"
+          }
+        }
+      }
+
+      resource "aws_s3_bucket_public_access_block" "tfstate" {
+        bucket                  = aws_s3_bucket.tfstate.id
+        block_public_acls       = true
+        block_public_policy     = true
+        ignore_public_acls      = true
+        restrict_public_buckets = true
+      }
+
+      resource "aws_dynamodb_table" "tfstate_lock" {
+        name         = "terraform-state-lock"
+        billing_mode = "PAY_PER_REQUEST"
+        hash_key     = "LockID"
+
+        attribute {
+          name = "LockID"
+          type = "S"
+        }
+
+        lifecycle {
+          prevent_destroy = true
+        }
+      }
+
+      # Inicjalizacja z remote state
+      # terraform init \
+      #   -backend-config="bucket=moja-firma-tfstate" \
+      #   -backend-config="key=prod/main/terraform.tfstate"
+
+  - name: terraform_remote_state
+    icon: "🔗"
+    desc: >
+      Data source do pobierania outputów z innego state file. Pozwala dzielić dane
+      między oddzielnymi projektami Terraform bez tworzenia zależności w kodzie.
+    code: |
+      # Projekt "network" eksportuje VPC ID
+      # infra/network/outputs.tf
+      output "vpc_id" {
+        value = aws_vpc.main.id
+      }
+
+      output "private_subnet_ids" {
+        value = aws_subnet.private[*].id
+      }
+
+      # --------
+
+      # Projekt "app" odczytuje outputy z projektu "network"
+      # infra/app/main.tf
+
+      data "terraform_remote_state" "network" {
+        backend = "s3"
+        config = {
+          bucket = "moja-firma-tfstate"
+          key    = "prod/network/terraform.tfstate"
+          region = "eu-west-1"
+        }
+      }
+
+      # Użycie outputów z remote state
+      resource "aws_instance" "app" {
+        ami           = data.aws_ami.amazon_linux.id
+        instance_type = "t3.micro"
+
+        # Pobierz subnet z innego state
+        subnet_id = data.terraform_remote_state.network.outputs.private_subnet_ids[0]
+
+        vpc_security_group_ids = [aws_security_group.app.id]
+      }
+
+      resource "aws_security_group" "app" {
+        name   = "app-sg"
+        # Pobierz VPC ID z innego state
+        vpc_id = data.terraform_remote_state.network.outputs.vpc_id
+      }
+
+      # Alternatywa — AWS SSM Parameter Store (mniej coupling)
+      # W projekcie network:
+      resource "aws_ssm_parameter" "vpc_id" {
+        name  = "/infra/prod/vpc_id"
+        type  = "String"
+        value = aws_vpc.main.id
+      }
+
+      # W projekcie app:
+      data "aws_ssm_parameter" "vpc_id" {
+        name = "/infra/prod/vpc_id"
+      }
+
+      # vpc_id = data.aws_ssm_parameter.vpc_id.value
+
+  - name: Workspace
+    icon: "🗂️"
+    desc: >
+      Workspace to oddzielne state files w tym samym backendzie — dev/staging/prod
+      z jednego kodu. Alternatywa: osobne katalogi z własnym state dla każdego środowiska.
+    code: |
+      # Workspace commands
+      # terraform workspace list      - lista wszystkich workspace'ów (default zawsze istnieje)
+      # terraform workspace new dev   - utwórz workspace dev
+      # terraform workspace new prod  - utwórz workspace prod
+      # terraform workspace select dev - przełącz na dev
+      # terraform workspace show      - aktualny workspace
+      # terraform workspace delete dev - usuń (musi być pusty)
+
+      # Użycie workspace w kodzie
+      locals {
+        env = terraform.workspace  # "dev", "staging" lub "prod"
+
+        instance_config = {
+          dev = {
+            instance_type = "t3.micro"
+            count         = 1
+          }
+          prod = {
+            instance_type = "t3.large"
+            count         = 3
+          }
+        }
+
+        current_config = lookup(local.instance_config, local.env, local.instance_config["dev"])
+      }
+
+      resource "aws_instance" "web" {
+        count         = local.current_config.count
+        ami           = data.aws_ami.amazon_linux.id
+        instance_type = local.current_config.instance_type
+
+        tags = {
+          Name        = "web-${terraform.workspace}-${count.index + 1}"
+          Environment = terraform.workspace
+        }
+      }
+
+      # Remote state z workspace
+      terraform {
+        backend "s3" {
+          bucket = "moja-firma-tfstate"
+          key    = "main/terraform.tfstate"
+          # workspace_key_prefix domyslnie "env:"
+          # state files: env:/dev/main/terraform.tfstate
+          #              env:/prod/main/terraform.tfstate
+          region = "eu-west-1"
+        }
+      }
+
+      # Uwaga: workspace != środowisko produkcyjne
+      # Dla dużych teamów lepsze są osobne katalogi (dev/, staging/, prod/)
+      # lub Terragrunt z osobnymi state per środowisko
+
+  - name: terraform import
+    icon: "📥"
+    desc: >
+      Import pozwala wziąć istniejący zasób pod zarządzanie Terraform bez niszczenia go.
+      Od Terraform 1.5 można używać bloku import {} zamiast komendy CLI.
+    code: |
+      # Sposób 1: Komenda CLI (klasyczny)
+      # terraform import TYP.NAZWA ID_ZASOBU
+
+      # Zaimportuj istniejącą instancję EC2
+      # terraform import aws_instance.web i-0abc123def456
+
+      # Zaimportuj S3 bucket
+      # terraform import aws_s3_bucket.logs moja-firma-logs
+
+      # Zaimportuj zasób z for_each (cudzysłowy!)
+      # terraform import 'aws_iam_user.team["alice"]' alice
+
+      # Zaimportuj zasób z count
+      # terraform import 'aws_instance.workers[0]' i-0abc123
+
+      # --------
+
+      # Sposób 2: Blok import {} (Terraform 1.5+, zalecany)
+      import {
+        id = "i-0abc123def456"
+        to = aws_instance.web
+      }
+
+      import {
+        id = "moja-firma-logs"
+        to = aws_s3_bucket.logs
+      }
+
+      # Terraform 1.6+ — generowanie konfiguracji
+      # terraform plan -generate-config-out=generated.tf
+      # Terraform automatycznie napisze resource block na podstawie importowanego zasobu
+
+      # Workflow importu:
+      # 1. Napisz resource block w kodzie (puste lub z atrybutami)
+      resource "aws_instance" "web" {
+        ami           = "ami-0905a3c97561e0b69"  # uzupełnij po imporcie
+        instance_type = "t3.micro"
+      }
+
+      # 2. Uruchom import
+      # terraform import aws_instance.web i-0abc123def456
+
+      # 3. Uruchom plan — sprawdź co Terraform chce zmienić
+      # terraform plan
+
+      # 4. Dostosuj kod do rzeczywistości (plan powinien dać "No changes")
+
+  - name: moved block
+    icon: "✂️"
+    desc: >
+      Blok moved refaktoryzuje state bez niszczenia zasobów. Rename zasobu, przeniesienie
+      do modułu, zmiana for_each key — wszystko bez terraform destroy + create.
+    code: |
+      # Zmiana nazwy zasobu — bez moved Terraform zniszczyłby stary i stworzył nowy
+      # Stara nazwa: aws_instance.server
+      # Nowa nazwa:  aws_instance.web
+
+      moved {
+        from = aws_instance.server
+        to   = aws_instance.web
+      }
+
+      # Przeniesienie do modułu
+      moved {
+        from = aws_instance.web
+        to   = module.compute.aws_instance.web
+      }
+
+      # Zmiana from count na for_each (bez utraty zasobów)
+      # Stara konfiguracja: resource "aws_iam_user" "users" { count = ... }
+      # Nowa konfiguracja: resource "aws_iam_user" "users" { for_each = ... }
+
+      moved {
+        from = aws_iam_user.users[0]
+        to   = aws_iam_user.users["alice"]
+      }
+
+      moved {
+        from = aws_iam_user.users[1]
+        to   = aws_iam_user.users["bob"]
+      }
+
+      # Po apply możesz usunąć bloki moved
+      # (zostaw je na chwilę żeby inni w teamie też mogli apply bez problemu)
+
+      # Refaktoryzacja modułu — przeniesienie zasobu między modułami
+      moved {
+        from = module.old_network.aws_vpc.main
+        to   = module.new_network.aws_vpc.main
+      }
+
+      # Sprawdź co moved zrobi:
+      # terraform plan   — zobaczy "# aws_instance.web has moved to module.compute.aws_instance.web"
+
+  - name: Lifecycle rules
+    icon: "♻️"
+    desc: >
+      Lifecycle meta-argument kontroluje zachowanie zasobu przy zmianach.
+      create_before_destroy eliminuje downtime. prevent_destroy chroni dane produkcyjne.
+      ignore_changes ignoruje zewnętrzne zmiany (np. auto-scaling, manual edits).
+    code: |
+      # create_before_destroy — zero-downtime replacements
+      # Używaj dla zasobów które nie mogą mieć downtime: ALB, RDS, EC2 z EIP
+      resource "aws_instance" "web" {
+        ami           = data.aws_ami.amazon_linux.id
+        instance_type = "t3.micro"
+
+        lifecycle {
+          create_before_destroy = true
+          # Terraform tworzy nową instancję, potem usuwa starą
+          # UWAGA: zmienna name musi być unikalna — dodaj suffix random lub timestamp
+        }
+      }
+
+      # prevent_destroy — ochrona przed przypadkowym zniszczeniem
+      resource "aws_db_instance" "prod" {
+        identifier        = "prod-postgres"
+        engine            = "postgres"
+        instance_class    = "db.r6g.large"
+        allocated_storage = 100
+
+        lifecycle {
+          prevent_destroy = true
+          # terraform destroy -> błąd: Resource aws_db_instance.prod has lifecycle.prevent_destroy
+          # Musisz ręcznie usunąć blok prevent_destroy żeby móc zniszczyć zasób
+        }
+      }
+
+      # ignore_changes — ignoruj zewnętrzne zmiany
+      resource "aws_instance" "app" {
+        ami           = data.aws_ami.amazon_linux.id
+        instance_type = "t3.micro"
+
+        lifecycle {
+          # Ignoruj zmiany AMI — np. gdy ASG wymienia instancje
+          ignore_changes = [ami]
+
+          # Ignoruj tagi — gdy AWS automatycznie dodaje tagi
+          # ignore_changes = [tags["LastModified"]]
+
+          # Ignoruj wszystko (ostrożnie!)
+          # ignore_changes = all
+        }
+      }
+
+      # replace_triggered_by — wymuś replacement gdy zmieni się inny zasób
+      resource "aws_instance" "app" {
+        ami           = data.aws_ami.amazon_linux.id
+        instance_type = "t3.micro"
+
+        lifecycle {
+          # Zastąp instancję gdy zmieni się launch template
+          replace_triggered_by = [aws_launch_template.app.latest_version]
+        }
+      }
+
+  - name: Provisioners
+    icon: "⚙️"
+    desc: >
+      Provisioners uruchamiają skrypty na zasobach po ich stworzeniu. Ostateczność —
+      Terraform nie może śledzić ich stanu. Preferuj cloud-init, user_data, Ansible lub
+      SSM Run Command zamiast provisioners.
+    code: |
+      # local-exec — uruchom komendę na LOKALNEJ maszynie (gdzie jest Terraform)
+      resource "aws_instance" "web" {
+        ami           = data.aws_ami.amazon_linux.id
+        instance_type = "t3.micro"
+
+        # Po stworzeniu instancji — uruchom lokalnie
+        provisioner "local-exec" {
+          command = "echo ${self.public_ip} >> inventory.txt"
+        }
+
+        # przy destroy — usuń z inventory
+        provisioner "local-exec" {
+          when    = destroy
+          command = "sed -i '/${self.public_ip}/d' inventory.txt"
+        }
+      }
+
+      # Powiadomienie przez local-exec (lepsze użycie)
+      resource "aws_db_instance" "main" {
+        identifier = "main-postgres"
+        engine     = "postgres"
+        # ...
+
+        provisioner "local-exec" {
+          command = <<-EOT
+            aws sns publish \
+              --topic-arn ${var.alerts_topic_arn} \
+              --message "RDS ${self.identifier} created: ${self.address}"
+          EOT
+        }
+      }
+
+      # remote-exec — uruchom komendę NA ZDALNYM zasobie przez SSH
+      # UWAGA: wymaga public IP i otwartego SSH — antypattern w 2024
+      resource "aws_instance" "legacy" {
+        ami           = data.aws_ami.amazon_linux.id
+        instance_type = "t3.micro"
+
+        connection {
+          type        = "ssh"
+          user        = "ec2-user"
+          private_key = file("~/.ssh/id_rsa")
+          host        = self.public_ip
+        }
+
+        provisioner "remote-exec" {
+          inline = [
+            "sudo yum update -y",
+            "sudo yum install -y nginx",
+            "sudo systemctl start nginx"
+          ]
+        }
+      }
+
+      # LEPIEJ — użyj user_data (cloud-init), bez potrzeby SSH
+      resource "aws_instance" "modern" {
+        ami           = data.aws_ami.amazon_linux.id
+        instance_type = "t3.micro"
+
+        user_data = <<-EOF
+          #!/bin/bash
+          yum update -y
+          yum install -y nginx
+          systemctl start nginx
+          systemctl enable nginx
+        EOF
+      }
+
+      # Kiedy provisioner ma sens:
+      # - local-exec do powiadomień po apply
+      # - local-exec do wywołania Ansible
+      # - null_resource z provisioner gdy chcesz run-once bez tworzenia zasobu

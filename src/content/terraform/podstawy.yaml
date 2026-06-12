@@ -1,0 +1,98 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Terraform?
+  firstComponent: Pierwszy zasób
+  firstComponentLang: hcl
+
+intro:
+  title: Czym jest Terraform?
+  desc: >
+    Terraform to narzędzie Infrastructure as Code (IaC) od HashiCorp — opisujesz infrastrukturę w plikach HCL,
+    a Terraform tworzy ją automatycznie w dowolnej chmurze (AWS, Azure, GCP) lub on-premise.
+    Deklaratywny model oznacza, że mówisz CO chcesz, nie JAK to zrobić — Terraform oblicza diff
+    między stanem aktualnym a pożądanym i stosuje tylko niezbędne zmiany.
+    Idempotentność gwarantuje, że wielokrotne uruchomienie daje ten sam wynik.
+    Dependency graph automatycznie wyznacza kolejność tworzenia zasobów.
+
+concepts:
+  - title: HCL
+    desc: >
+      HashiCorp Configuration Language — deklaratywny język konfiguracji Terraform.
+      Czytelny jak YAML, ale z logiką — zmienne, wyrażenia, pętle, funkcje wbudowane.
+      Pliki .tf są parsowane razem — kolejność nie ma znaczenia, Terraform sam wyznacza graf.
+    icon: "📝"
+  - title: Provider
+    desc: >
+      Plugin łączący Terraform z API konkretnej platformy — AWS, Azure, GCP, Kubernetes, GitHub...
+      Provider dostarcza typy zasobów (np. aws_instance, azurerm_resource_group).
+      Konfigurowany w bloku terraform { required_providers {} } i provider {}.
+      Registry: registry.terraform.io z tysiącami oficjalnych i community providerów.
+    icon: "🔌"
+  - title: Resource
+    desc: >
+      Podstawowy budulec Terraform — reprezentuje jeden zasób infrastruktury, np. EC2, S3, VPC, RDS.
+      Składnia: resource "typ_zasobu" "nazwa_lokalna" { atrybuty }.
+      Terraform śledzi każdy resource w state file i wykrywa zmiany przy kolejnym planie.
+    icon: "🧱"
+  - title: State
+    desc: >
+      Plik terraform.tfstate — mapa rzeczywistości. Terraform zapisuje tu ID i atrybuty wszystkich
+      zarządzanych zasobów. Bez state nie wie co już istnieje. W teamie zawsze remote state
+      (S3 + DynamoDB locking). Nigdy nie commituj tfstate do git — zawiera sekrety!
+    icon: "🗺️"
+
+whenToUse:
+  - Tworzenie i zarządzanie infrastrukturą chmurową (AWS, Azure, GCP) w powtarzalny sposób
+  - Multi-cloud i multi-region deployments z jednego miejsca
+  - Onboarding nowych środowisk (dev/staging/prod) z identyczną konfiguracją
+  - Dokumentacja infrastruktury — kod jest dokumentacją, zawsze aktualną
+  - Automatyzacja w CI/CD pipeline — terraform plan w PR, apply po merge
+  - Zarządzanie zespołem — code review infrastruktury jak kodu aplikacji
+  - Disaster recovery — odtworzenie całej infrastruktury jedną komendą
+
+firstComponent: |
+  # Struktura projektu Terraform
+  # main.tf    - zasoby główne
+  # variables.tf - deklaracje zmiennych
+  # outputs.tf  - wartości wyjściowe
+  # versions.tf - wymagania providerów
+
+  # versions.tf — wymagania providerów
+  terraform {
+    required_version = ">= 1.6"
+    required_providers {
+      aws = {
+        source  = "hashicorp/aws"
+        version = "~> 5.0"
+      }
+    }
+  }
+
+  # main.tf — konfiguracja providera i zasoby
+  provider "aws" {
+    region = "eu-west-1"
+  }
+
+  # Zasób EC2
+  resource "aws_instance" "web" {
+    ami           = "ami-0905a3c97561e0b69"  # Amazon Linux 2023
+    instance_type = "t3.micro"
+
+    tags = {
+      Name        = "moj-serwer"
+      Environment = "dev"
+      ManagedBy   = "terraform"
+    }
+  }
+
+  # outputs.tf — wyeksportuj IP serwera
+  output "web_public_ip" {
+    description = "Publiczny adres IP serwera"
+    value       = aws_instance.web.public_ip
+  }
+
+  # --- Uruchomienie ---
+  # terraform init      - pobierz provider AWS
+  # terraform plan      - podglad zmian (nic nie tworzy)
+  # terraform apply     - utwórz infrastrukturę (potwierdź: yes)
+  # terraform destroy   - usuń wszystko
