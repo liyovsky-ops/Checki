@@ -7,118 +7,276 @@ groups:
         code: |
           git config --global user.name "Łukasz"
           git config --global user.email "ty@email.com"
-      - desc: Ustaw domyślny edytor (VSCode)
-        code: git config --global core.editor "code --wait"
-      - desc: Ustaw pull z rebase (zalecane)
-        code: git config --global pull.rebase true
-      - desc: Wyświetl całą konfigurację
-        code: git config --global --list
-      - desc: Alias — krótkie komendy
-        code: |
-          git config --global alias.st status
-          git config --global alias.lg "log --oneline --graph --all"
-          git config --global alias.last "log -1 HEAD"
+      - cmd: 'git config --global core.editor "code --wait"'
+        desc: Ustaw domyślny edytor (VSCode)
+        detail:
+          what: Ustawia VS Code jako edytor dla git commit, git rebase -i i rozwiązywania konfliktów.
+          how: "--wait sprawia że Git czeka na zamknięcie okna VS Code przed kontynuowaniem."
+          tips:
+            - 'Alternatywy — vim: git config --global core.editor vim'
+            - 'Sprawdź aktualny: git config --global core.editor'
+      - cmd: git config --global pull.rebase true
+        desc: Ustaw pull z rebase (zalecane)
+        detail:
+          what: Zmienia domyślne zachowanie git pull — zamiast merge robi rebase. Liniowa historia.
+          how: "Bez tej opcji git pull = fetch + merge. Z nią: fetch + rebase."
+          tips:
+            - Możesz ustawić per-repo — pomiń --global
+            - 'Jednorazowy merge: git pull --no-rebase'
+      - cmd: git config --global --list
+        desc: Wyświetl całą konfigurację globalną
+        detail:
+          what: Pokazuje wszystkie klucze i wartości z globalnej konfiguracji Gita (plik ~/.gitconfig).
+          how: Git ma 3 poziomy konfiguracji — system, global (user), local (repo). --list pokazuje wszystkie.
+          tips:
+            - 'git config --list --show-origin — skąd pochodzi każde ustawienie'
+            - 'git config user.name — sprawdź konkretną wartość'
 
   - name: Podstawy codzienne
     icon: "📋"
     commands:
-      - desc: Stan repozytorium
-        code: git status
-      - desc: Historia commitów (czytelna)
-        code: git log --oneline --graph --all
-      - desc: Co się zmieniło (nie staging)
-        code: git diff
-      - desc: Co trafi do commita (staging)
-        code: git diff --staged
-      - desc: Dodaj wszystko do staging
-        code: git add .
-      - desc: Dodaj konkretny plik
-        code: git add src/main.py
-      - desc: Interaktywny staging (wybierz hunki)
-        code: git add -p
-      - desc: Commit z wiadomością
-        code: |
-          git commit -m "feat: dodaj funkcję X"
-      - desc: Amend ostatniego commita (przed pushem)
-        code: git commit --amend --no-edit
+      - cmd: git status
+        desc: Stan repozytorium
+        detail:
+          what: Pokazuje co się zmieniło — modified, staged, untracked pliki i aktualny branch.
+          how: Uruchamiaj bardzo często — przed add, przed commit, po pull. Git podpowiada komendy w output.
+          tips:
+            - 'git status -s — skrócony format: M=modified, A=added, ??=untracked'
+            - Czyste repo = brak outputu
+      - cmd: git log --oneline --graph --all
+        desc: Historia commitów (czytelna)
+        detail:
+          what: Pokazuje historię jako ASCII drzewo — widać branche, merge commity i tagi.
+          how: "--oneline = jeden wiersz per commit. --graph = drzewo. --all = wszystkie branche."
+          tips:
+            - "Dodaj alias: git config --global alias.lg 'log --oneline --graph --all'"
+            - 'git log -10 — tylko ostatnie 10 commitów'
+      - cmd: git diff
+        desc: Co się zmieniło (nie w staging)
+        detail:
+          what: Pokazuje różnice między working directory a staging area — zmiany które jeszcze nie są w staging.
+          how: Czerwony = usunięte linie, zielony = dodane. Porównuje pliki z indeksem.
+          tips:
+            - 'git diff --staged — pokaż co trafi do commita (staged vs last commit)'
+            - 'git diff main..feature — różnice między branchami'
+      - cmd: git diff --staged
+        desc: Co trafi do commita (staging)
+        detail:
+          what: Pokazuje różnice między staging area a ostatnim commitem — dokładnie to co wejdzie do commita.
+          how: Alias dla git diff --cached. Uruchom przed git commit żeby sprawdzić co commitujesz.
+          tips:
+            - Dobry nawyk — zawsze sprawdź staged diff przed commitem
+            - Możesz wtedy dodać lub usunąć pliki ze staging
+      - cmd: git add .
+        desc: Dodaj wszystkie zmiany do staging
+        detail:
+          what: Dodaje wszystkie zmienione i nowe pliki z bieżącego katalogu do staging area.
+          how: "Staging = obszar przygotowania commita. Tylko to co jest w staging trafi do commitu."
+          tips:
+            - 'git add plik.py — dodaj konkretny plik'
+            - 'git add -p — interaktywnie wybierz które fragmenty dodać (patch mode)'
+      - cmd: git add -p
+        desc: Interaktywny staging (wybierz hunki)
+        detail:
+          what: Otwiera interaktywny tryb gdzie możesz wybrać które fragmenty zmian dodać do staging.
+          how: "y = dodaj hunk, n = pomiń, s = podziel hunk, e = edytuj ręcznie, q = zakończ."
+          tips:
+            - Idealny gdy chcesz zrobić kilka małych commitów z jednej sesji pracy
+            - Każdy commit powinien być logicznie spójną zmianą
+      - cmd: 'git commit -m "feat: opis"'
+        desc: Commit z wiadomością
+        detail:
+          what: Zapisuje snapshot staging area jako nowy commit z podaną wiadomością.
+          how: "Conventional Commits: feat/fix/refactor/docs/chore/test/build. SHA-1 hash = unikalny ID."
+          tips:
+            - 'git commit --amend --no-edit — popraw ostatni commit (tylko przed push!)'
+            - 'git commit -am "msg" — add + commit wszystkich tracked plików naraz'
+      - cmd: git commit --amend --no-edit
+        desc: Popraw ostatni commit (przed pushem)
+        detail:
+          what: Modyfikuje ostatni commit — dodaje staged zmiany bez zmiany wiadomości. Tworzy nowy SHA.
+          how: "NIGDY po push na shared branch — przepisuje historię i złamie innym repo."
+          tips:
+            - 'git commit --amend -m "nowa wiadomosc" — zmień tylko treść commita'
+            - Bezpieczne tylko jeśli commit jest lokalny i nie był pushowany
 
   - name: Branche
     icon: "🌿"
     commands:
-      - desc: Nowy branch i przejdź na niego
-        code: git switch -c feature/nowa-funkcja
-      - desc: Przełącz branch
-        code: git switch main
-      - desc: Lista wszystkich branchy
-        code: git branch -a
-      - desc: Usuń branch po merge
-        code: git branch -d feature/nowa-funkcja
-      - desc: Merge feature do main
-        code: |
-          git switch main
-          git merge --no-ff feature/nowa-funkcja
-      - desc: Rebase feature na main
-        code: |
-          git switch feature/nowa-funkcja
-          git rebase main
-      - desc: Interaktywny rebase (edytuj historię)
-        code: git rebase -i HEAD~3
+      - cmd: git switch -c feature/nowa-funkcja
+        desc: Nowy branch i przejdź na niego
+        detail:
+          what: "Tworzy nowy branch z aktualnego HEAD i od razu go przełącza. switch -c = create."
+          how: Branch to lekki wskaźnik na commit — tworzenie jest natychmiastowe, nie kopiuje plików.
+          tips:
+            - 'git switch main — wróć na main'
+            - 'git switch - — wróć na poprzedni branch (jak cd - w terminalu)'
+      - cmd: git switch main
+        desc: Przełącz na branch main
+        detail:
+          what: Przełącza HEAD na wskazany branch i aktualizuje working directory do jego stanu.
+          how: Git sprawdza czy masz niezacommitowane zmiany — jeśli tak, ostrzeże lub odmówi.
+          tips:
+            - 'git stash — odłóż zmiany jeśli nie chcesz ich commitować przed switch'
+            - 'git switch - — wróć na poprzedni branch'
+      - cmd: git branch -a
+        desc: Lista wszystkich branchy
+        detail:
+          what: Pokazuje wszystkie lokalne i zdalne branche. Aktualny branch zaznaczony gwiazdką.
+          how: "-a = all (lokalne + zdalne). Zdalne mają prefix remotes/origin/."
+          tips:
+            - 'git branch -d feature/nazwa — usuń branch po merge (bezpieczne)'
+            - 'git branch -D feature/nazwa — force delete (nawet bez merge)'
+      - cmd: git merge --no-ff feature/nowa-funkcja
+        desc: Merge feature brancha z merge commitem
+        detail:
+          what: Łączy feature branch do aktualnego. --no-ff wymusza merge commit nawet przy fast-forward.
+          how: "Najpierw: git switch main, potem merge. Merge commit = dowód że feature był osobnym branchem."
+          flags:
+            - flag: --no-ff
+              desc: Zawsze twórz merge commit (widoczny w historii)
+            - flag: --squash
+              desc: Połącz wszystkie commity feature w jeden przed merge
+          tips:
+            - 'git merge --abort — przerwij merge przy konflikcie i wróć do stanu sprzed'
+            - 'Po merge: git branch -d feature/nowa-funkcja — posprzątaj'
+      - cmd: git rebase -i HEAD~3
+        desc: Interaktywny rebase — edytuj historię
+        detail:
+          what: Otwiera edytor z listą ostatnich N commitów — możesz squash, reword, drop, reorder.
+          how: "pick = zostaw, squash = połącz z poprzednim, reword = zmień opis, drop = usuń commit."
+          tips:
+            - Używaj do porządkowania historii przed push/PR — czyste commity to dobra dokumentacja
+            - 'git rebase -i HEAD~5 — edytuj ostatnie 5 commitów'
 
   - name: Zdalne repozytoria
     icon: "☁️"
     commands:
-      - desc: Klonuj repo
-        code: git clone https://github.com/user/repo.git
-      - desc: Dodaj remote origin
-        code: git remote add origin https://github.com/user/repo.git
-      - desc: Wyślij branch (pierwszy raz)
-        code: git push -u origin feature/login
-      - desc: Wyślij (kolejne razy)
-        code: git push
-      - desc: Pobierz zmiany (bez merge)
-        code: git fetch origin
-      - desc: Pobierz i merguj
-        code: git pull --rebase origin main
-      - desc: Usuń zdalny branch
-        code: git push origin --delete feature/stary-branch
+      - cmd: git clone https://github.com/user/repo.git
+        desc: Sklonuj zdalne repozytorium
+        detail:
+          what: Pobiera pełne repo z całą historią, branchami i tagami do lokalnego folderu.
+          how: Tworzy folder o nazwie repo, inicjalizuje .git i ustawia origin jako remote automatycznie.
+          tips:
+            - 'git clone URL moj-folder — klonuj do konkretnej nazwy folderu'
+            - 'git clone --depth 1 URL — tylko ostatni commit (szybciej dla dużych repo)'
+      - cmd: git push -u origin feature/login
+        desc: Wyślij branch na zdalne repo (pierwszy raz)
+        detail:
+          what: Pushuje lokalny branch na GitHub/GitLab i ustawia tracking (upstream).
+          how: "-u = --set-upstream. Po tym git push/pull bez argumentów wie gdzie wysyłać/pobierać."
+          tips:
+            - 'Kolejne push na ten branch: wystarczy git push (bez argumentów)'
+            - 'git push --force-with-lease — bezpieczny force push (nie nadpisze cudzej pracy)'
+      - cmd: git push
+        desc: Wyślij zmiany (kolejne razy)
+        detail:
+          what: Wysyła lokalne commity na skonfigurowany upstream branch (po wcześniejszym git push -u).
+          how: Git wie gdzie pushować dzięki tracking ustawionemu przez git push -u lub git clone.
+          tips:
+            - 'Jeśli upstream nie ustawiony: git push -u origin nazwa-brancha'
+            - 'git push --tags — pushuj też tagi (domyślnie pomijane)'
+      - cmd: git fetch origin
+        desc: Pobierz zmiany (bez merge)
+        detail:
+          what: Pobiera nowe commity, branche i tagi z remote — ale nie modyfikuje Twoich lokalnych plików.
+          how: Aktualizuje origin/main, origin/feature itp. Możesz sprawdzić co przyszło przed merge.
+          tips:
+            - 'git log origin/main..main — porównaj lokalne vs zdalne po fetch'
+            - 'git fetch --all — pobierz ze wszystkich remote'
+      - cmd: git pull --rebase origin main
+        desc: Pobierz zmiany i zrób rebase
+        detail:
+          what: Pobiera nowe commity z remote i aplikuje Twoje lokalne commity na ich wierzch.
+          how: "Lepsze niż git pull (merge) — daje liniową historię bez merge commitów."
+          tips:
+            - 'Przy konflikcie: rozwiąż, git add, git rebase --continue'
+            - 'git fetch origin + git rebase origin/main — to samo w dwóch krokach (więcej kontroli)'
+      - cmd: git push origin --delete feature/stary-branch
+        desc: Usuń zdalny branch
+        detail:
+          what: Usuwa branch ze zdalnego repozytorium (GitHub/GitLab). Lokalny branch zostaje.
+          how: Wysyła pusty ref na serwer dla tego brancha — serwer interpretuje jako delete.
+          tips:
+            - 'Lokalny odpowiednik: git branch -d feature/stary-branch'
+            - Na GitHubie możesz też usunąć przez UI po merge PR
 
   - name: Cofanie i naprawianie
     icon: "↩️"
     commands:
-      - desc: Odrzuć zmiany w pliku (working dir)
-        code: git restore plik.py
-      - desc: Usuń plik ze staging
-        code: git restore --staged plik.py
-      - desc: Cofnij ostatni commit (zachowaj zmiany w staging)
-        code: git reset --soft HEAD~1
-      - desc: Cofnij commit (zachowaj w plikach, usuń ze staging)
-        code: git reset HEAD~1
-      - desc: Bezpieczne cofnięcie commita (tworzy revert commit)
-        code: git revert a1b2c3d
-      - desc: Odłóż bieżące zmiany na stos
-        code: |
-          git stash push -m "wip: opis"
-      - desc: Przywróć ostatni stash
-        code: git stash pop
+      - cmd: git restore plik.py
+        desc: Odrzuć zmiany w pliku (working dir)
+        detail:
+          what: Przywraca plik do stanu z ostatniego commita — kasuje niezapisane zmiany bezpowrotnie.
+          how: "Uwaga: destrukcyjna operacja — zmiany w working dir są stracone bezpowrotnie."
+          tips:
+            - 'git restore --staged plik.py — wyjmij plik ze staging (zmiany zostają w pliku)'
+            - 'git restore . — odrzuć wszystkie zmiany w working directory'
+      - cmd: git reset --soft HEAD~1
+        desc: Cofnij ostatni commit (zachowaj staging)
+        detail:
+          what: Cofa ostatni commit — zmiany wracają do staging area gotowe do ponownego commita.
+          how: "--soft = tylko cofnij commit pointer. Pliki i staging bez zmian."
+          flags:
+            - flag: --soft
+              desc: "Cofnij commit, zachowaj staging i working dir"
+            - flag: --mixed
+              desc: "Cofnij commit i staging, zachowaj working dir (domyślnie)"
+            - flag: --hard
+              desc: "Cofnij commit, staging i working dir (DESTRUKCYJNE)"
+          tips:
+            - 'NIGDY git reset --hard na pushowanych commitach — przepisuje historię dla innych'
+            - 'HEAD~2 = cofnij 2 commity, HEAD~3 = 3 itd.'
+      - cmd: git revert a1b2c3d
+        desc: Bezpieczne cofnięcie commita
+        detail:
+          what: Tworzy nowy commit który odwraca zmiany z podanego commita. Historia jest zachowana.
+          how: Bezpieczne dla publicznych branchy — nie przepisuje historii, tylko dodaje nowy commit.
+          tips:
+            - 'Preferuj revert nad reset na publicznych/shared branchach'
+            - 'git revert HEAD — cofnij ostatni commit'
+      - cmd: 'git stash push -m "wip: opis"'
+        desc: Odłóż bieżące zmiany na stos
+        detail:
+          what: Zapisuje niezacommitowane zmiany na stosie i czyści working directory.
+          how: Stash to stos (LIFO) — wiele stashy można mieć naraz. pop zdejmuje ostatni.
+          tips:
+            - 'git stash pop — przywróć ostatni stash i usuń z listy'
+            - 'git stash list — pokaż wszystkie stashe'
+            - 'git stash -u — uwzględnij też untracked pliki'
 
   - name: Analiza i szukanie
     icon: "🔍"
     commands:
-      - desc: Kto napisał tę linię?
-        code: git blame -L 10,20 plik.py
-      - desc: Kiedy pojawił się ten tekst w historii?
-        code: git log -S "nazwa_funkcji" --oneline
-      - desc: Wszystkie commity dla pliku
-        code: git log --follow -- plik.py
-      - desc: Znajdź commit który wprowadził bug (bisect)
-        code: |
-          git bisect start
-          git bisect bad          # aktualna wersja ma bug
-          git bisect good v1.0.0  # ta wersja działała
-          # Git automatycznie wybiera commit do przetestowania
-          # Po teście: git bisect good/bad
-          # Na koniec: git bisect reset
-      - desc: Pokaż zawartość commita
-        code: git show a1b2c3d
-      - desc: Znajdź usuniętą funkcję w historii
-        code: git log -G "def stara_funkcja" --patch
+      - cmd: git blame -L 10,20 plik.py
+        desc: Kto napisał daną linię?
+        detail:
+          what: Pokazuje dla każdej linii kto ją napisał, kiedy i w którym commicie.
+          how: "-L 10,20 = tylko linie 10-20. Bez -L pokaże cały plik."
+          tips:
+            - 'W VS Code GitLens robi to samo graficznie po najechaniu na linię'
+            - 'git log --follow -- plik.py — cała historia zmian pliku'
+      - cmd: 'git log -S "nazwa_funkcji" --oneline'
+        desc: Kiedy dany tekst pojawił się w historii
+        detail:
+          what: Szuka commitów które dodały lub usunęły podany tekst w kodzie — pickaxe search.
+          how: "-S szuka dokładnego stringa. -G szuka przez regex."
+          tips:
+            - 'Przydatne gdy szukasz kiedy konkretna funkcja lub zmienna była dodana lub usunięta'
+            - 'git log -G "def.*funkcja" --oneline — szukaj przez regex'
+      - cmd: git bisect start
+        desc: Znajdź commit który wprowadził bug
+        detail:
+          what: Uruchamia binarne wyszukiwanie w historii — Git automatycznie wybiera środkowy commit do przetestowania.
+          how: "Po start: oznacz bad (aktualna wersja ma bug), good (działająca wersja), testuj każdy wskazany."
+          tips:
+            - 'Po znalezieniu: git bisect reset — wróć do HEAD'
+            - 'git bisect run ./test.sh — automatyczny bisect z testem skryptu'
+      - cmd: git show a1b2c3d
+        desc: Pokaż zawartość commita
+        detail:
+          what: Wyświetla informacje o commicie — autor, data, wiadomość i diff zmian.
+          how: Podaj pierwsze 7 znaków SHA (git log --oneline je pokazuje).
+          tips:
+            - 'git show HEAD — pokaż ostatni commit'
+            - 'git show HEAD:plik.py — pokaż plik w stanie z ostatniego commita'

@@ -2,13 +2,17 @@ import { escFwd } from './fw-detail-renderers.js';
 
 export let FW_CMD_GROUPS_REF = null;
 
-export function setFwCmdGroups(groups) {
-  FW_CMD_GROUPS_REF = groups;
+export function setFwCmdGroups(data) {
+  // normalize: accept array or {title, groups:[]} wrapper
+  FW_CMD_GROUPS_REF = Array.isArray(data) ? data : (data && data.groups ? data.groups : data);
 }
 
 export function openCmdModal(groupIdx, itemIdx) {
   if (!FW_CMD_GROUPS_REF) return;
-  const item = FW_CMD_GROUPS_REF[groupIdx].items[itemIdx];
+  const group = FW_CMD_GROUPS_REF[groupIdx];
+  if (!group) return;
+  const entries = group.items || group.commands || [];
+  const item = entries[itemIdx];
   if (!item || !item.detail) return;
   const d = item.detail;
 
@@ -23,7 +27,7 @@ export function openCmdModal(groupIdx, itemIdx) {
 
   const modal = document.getElementById('fwd-cmd-modal');
   if (!modal) return;
-  modal.querySelector('.fwd-cmd-modal-cmd-text').textContent = item.cmd;
+  modal.querySelector('.fwd-cmd-modal-cmd-text').textContent = item.cmd || item.code || '';
   modal.querySelector('.fwd-cmd-modal-body').innerHTML =
     '<div class="fwd-cmd-modal-section"><div class="fwd-cmd-modal-label">📌 Co robi</div><div class="fwd-cmd-modal-text">' + d.what + '</div></div>' +
     '<div class="fwd-cmd-modal-section"><div class="fwd-cmd-modal-label">⚡ Jak działa</div><div class="fwd-cmd-modal-text">' + d.how + '</div></div>' +

@@ -4,81 +4,192 @@ groups:
   - name: Instalacja
     icon: "📦"
     commands:
-      - desc: Zainstaluj FastAPI z uvicorn
-        code: pip install "fastapi[standard]"
-      - desc: Zainstaluj ręcznie z extras
-        code: pip install fastapi uvicorn[standard] pydantic
-      - desc: Zainstaluj dodatkowe narzędzia
-        code: pip install httpx pytest pytest-asyncio
+      - cmd: 'pip install "fastapi[standard]"'
+        desc: Zainstaluj FastAPI z uvicorn
+        detail:
+          what: Instaluje FastAPI wraz z uvicorn, pydantic i wszystkimi standardowymi zależnościami.
+          how: "[standard] to extras — zawiera uvicorn[standard], httpx, python-multipart, email-validator."
+          tips:
+            - 'Alternatywnie ręcznie: pip install fastapi uvicorn[standard] pydantic'
+            - FastAPI wymaga Pydantic v2 od wersji 0.100+
+      - cmd: pip install httpx pytest pytest-asyncio
+        desc: Narzędzia testowe dla FastAPI
+        detail:
+          what: httpx to async HTTP client (do testowania endpointów), pytest + pytest-asyncio do testów async.
+          how: FastAPI TestClient jest oparty na httpx. pytest-asyncio pozwala pisać async def test_...().
+          tips:
+            - 'Dodaj do pyproject.toml: asyncio_mode = "auto" żeby nie dekorować każdego async testu'
+            - httpx zastępuje requests w środowiskach async
 
   - name: Uruchamianie
     icon: "▶️"
     commands:
-      - desc: Uruchom z hot-reload (development)
-        code: uvicorn main:app --reload
-      - desc: Uruchom na konkretnym porcie i hoście
-        code: uvicorn main:app --host 0.0.0.0 --port 8080
-      - desc: Uruchom z wieloma workerami (produkcja)
-        code: uvicorn main:app --workers 4
-      - desc: Uruchom przez fastapi CLI (od v0.100)
-        code: fastapi dev main.py
-      - desc: Uruchom przez fastapi CLI (produkcja)
-        code: fastapi run main.py
+      - cmd: uvicorn main:app --reload
+        desc: Uruchom z hot-reload (development)
+        detail:
+          what: Uruchamia serwer ASGI na porcie 8000 z automatycznym przeładowaniem przy zmianie kodu.
+          how: "main = nazwa pliku (main.py), app = nazwa instancji FastAPI(). --reload śledzi zmiany plików."
+          tips:
+            - 'Zmień port: uvicorn main:app --reload --port 8080'
+            - '--reload działa tylko w dev — w produkcji używaj gunicorn lub fastapi run'
+      - cmd: uvicorn main:app --host 0.0.0.0 --port 8080
+        desc: Uruchom na konkretnym porcie i hoście
+        detail:
+          what: Uruchamia serwer dostępny z zewnątrz (0.0.0.0 = wszystkie interfejsy sieciowe), port 8080.
+          how: "Domyślnie: 127.0.0.1:8000 (tylko localhost). 0.0.0.0 = dostępny w sieci lokalnej i przez Docker."
+          tips:
+            - Konieczne w Dockerze żeby kontener był dostępny z hosta
+            - 'W produkcji za reverse proxy (nginx) zwykle zostawiasz 127.0.0.1'
+      - cmd: uvicorn main:app --workers 4
+        desc: Uruchom z wieloma workerami (produkcja)
+        detail:
+          what: Uruchamia 4 procesy uvicorn — każdy obsługuje requesty niezależnie. Lepsza przepustowość.
+          how: Optymalna liczba workerów to 2 × liczba CPU + 1. Każdy worker to osobny proces Python.
+          tips:
+            - 'Nie używaj --reload z --workers — reload nie działa poprawnie z wieloma procesami'
+            - Alternatywa produkcyjna — gunicorn z UvicornWorker
+      - cmd: fastapi dev main.py
+        desc: Uruchom przez fastapi CLI (development)
+        detail:
+          what: Nowszy sposób uruchamiania FastAPI — CLI od FastAPI 0.100+. Automatycznie ustawia reload i port.
+          how: "Skrót dla uvicorn main:app --reload. Działa też z fastapi run main.py dla produkcji."
+          tips:
+            - 'fastapi run main.py — produkcja (bez reload)'
+            - Wymaga pip install "fastapi[standard]"
 
   - name: Testowanie
     icon: "🧪"
     commands:
-      - desc: Testy z pytest
-        code: pytest tests/ -v
-      - desc: Testy z coverage
-        code: pytest --cov=app tests/
-      - desc: Wyślij request testowy przez httpie
-        code: http GET localhost:8000/items/1
-      - desc: Wyślij POST przez curl
-        code: "curl -X POST localhost:8000/items/ -H 'Content-Type: application/json' -d '{\"name\": \"test\"}'"
+      - cmd: pytest tests/ -v
+        desc: Uruchom testy FastAPI z verbose output
+        detail:
+          what: Uruchamia wszystkie testy w katalogu tests/ z rozszerzonym outputem (nazwa każdego testu).
+          how: FastAPI TestClient symuluje requesty HTTP bez uruchamiania serwera — szybkie testy.
+          tips:
+            - 'pytest tests/ -v -x — zatrzymaj po pierwszym błędzie'
+            - 'pytest tests/test_users.py::test_create_user — jeden test'
+      - cmd: pytest --cov=app tests/
+        desc: Testy z coverage raportem
+        detail:
+          what: Uruchamia testy i mierzy pokrycie kodu przez testy w katalogu app/.
+          how: Wymaga pip install pytest-cov. Pokazuje które linie nie są pokryte testami.
+          tips:
+            - 'pytest --cov=app --cov-report=html tests/ — raport HTML w htmlcov/'
+            - Cel: minimum 80% coverage dla kodu produkcyjnego
+      - cmd: http GET localhost:8000/items/1
+        desc: Wyślij test request przez httpie
+        detail:
+          what: httpie to przyjazny curl — czytelny output z kolorowaniem JSON i nagłówków.
+          how: Wymaga pip install httpie. Automatycznie parsuje i koloruje odpowiedź JSON.
+          tips:
+            - 'http POST localhost:8000/items name="test" price:=9.99 — POST z JSON body'
+            - 'Sprawdź Swagger UI: otwórz http://localhost:8000/docs w przeglądarce'
 
-  - name: Pydantic
+  - name: Pydantic i schema
     icon: "🔒"
     commands:
-      - desc: Sprawdź wersję Pydantic
-        code: python -c "import pydantic; print(pydantic.VERSION)"
-      - desc: Wygeneruj JSON Schema z modelu
-        code: python -c "from app.models import Item; print(Item.model_json_schema())"
-      - desc: Zmigruj kod Pydantic v1 → v2
-        code: pip install bump-pydantic && bump-pydantic app/
+      - cmd: python -c "import pydantic; print(pydantic.VERSION)"
+        desc: Sprawdź wersję Pydantic
+        detail:
+          what: Drukuje wersję Pydantic — ważne bo FastAPI 0.100+ wymaga Pydantic v2.
+          how: FastAPI używa Pydantic do walidacji request body, response models i query params.
+          tips:
+            - Upewnij się że masz Pydantic 2.x — v1 ma inne API
+            - 'pip show pydantic — pełne info o paczce'
+      - cmd: pip install bump-pydantic && bump-pydantic app/
+        desc: Zmigruj kod Pydantic v1 do v2
+        detail:
+          what: Automatycznie migruje kod Pydantic v1 do v2 — zmienia validator na field_validator, .dict() na .model_dump() itd.
+          how: Używa libCST do bezpiecznej transformacji kodu. Nie migruje 100% przypadków — sprawdź diff.
+          tips:
+            - Uruchom na gałęzi testowej przed mergem do main
+            - 'Po migracji przetestuj: pytest tests/ -v'
 
   - name: Baza danych (Alembic)
     icon: "🗄️"
     commands:
-      - desc: Zainicjuj Alembic
-        code: alembic init alembic
-      - desc: Wygeneruj migrację automatycznie
-        code: alembic revision --autogenerate -m "opis zmian"
-      - desc: Zastosuj wszystkie migracje
-        code: alembic upgrade head
-      - desc: Cofnij ostatnią migrację
-        code: alembic downgrade -1
-      - desc: Sprawdź aktualną wersję DB
-        code: alembic current
+      - cmd: alembic init alembic
+        desc: Zainicjuj Alembic w projekcie
+        detail:
+          what: Tworzy katalog alembic/ z plikami konfiguracyjnymi i plik alembic.ini w rootu projektu.
+          how: 'Po inicjalizacji edytuj alembic/env.py — dodaj: from app.models import Base; target_metadata = Base.metadata'
+          tips:
+            - Uruchom raz na początku projektu — katalog alembic/ commituj do gita
+            - 'alembic.ini — zmień sqlalchemy.url na adres Twojej bazy'
+      - cmd: alembic revision --autogenerate -m "opis zmian"
+        desc: Wygeneruj migrację automatycznie
+        detail:
+          what: Porównuje aktualny stan bazy z modelami SQLAlchemy i generuje plik migracji z różnicami.
+          how: Wymaga target_metadata w env.py. Generuje upgrade() i downgrade() funkcje.
+          tips:
+            - Zawsze przejrzyj wygenerowany plik przed aplikowaniem
+            - 'alembic upgrade head — zastosuj migrację'
+      - cmd: alembic upgrade head
+        desc: Zastosuj wszystkie migracje
+        detail:
+          what: Stosuje wszystkie niezastosowane migracje do najnowszej wersji schematu.
+          how: Alembic śledzi aktualną wersję w tabeli alembic_version w bazie.
+          tips:
+            - Uruchamiaj w CI/CD przed deployem
+            - 'alembic current — sprawdź aktualną wersję'
+      - cmd: alembic downgrade -1
+        desc: Cofnij ostatnią migrację
+        detail:
+          what: Cofa ostatnio zastosowaną migrację — wywołuje funkcję downgrade().
+          how: Destrukcyjna operacja — może usuwać tabele i kolumny z danymi.
+          flags:
+            - flag: "-1"
+              desc: Cofnij jedną migrację wstecz
+            - flag: base
+              desc: Cofnij WSZYSTKIE migracje (czysta baza)
+          tips:
+            - Zawsze sprawdź co robi downgrade() przed uruchomieniem na produkcji
+            - 'alembic history — sprawdź historię migracji'
 
   - name: Deployment
     icon: "🚀"
     commands:
-      - desc: Uruchom przez Gunicorn + Uvicorn worker
-        code: gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker
-      - desc: Zbuduj Docker image
-        code: docker build -t myapi .
-      - desc: Uruchom kontener z API
-        code: docker run -p 8000:8000 myapi
+      - cmd: gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker
+        desc: Uruchom przez Gunicorn z Uvicorn workers
+        detail:
+          what: Gunicorn jako process manager + Uvicorn workers do obsługi ASGI. Standardowy setup produkcyjny.
+          how: "-w 4 = 4 workery. -k = klasa workera. Gunicorn zarządza procesami, Uvicorn obsługuje ASGI."
+          tips:
+            - 'Optymalna liczba workerów: 2 × CPU + 1'
+            - 'pip install gunicorn — potrzebny osobno'
+      - cmd: docker build -t myapi .
+        desc: Zbuduj Docker image z aplikacją
+        detail:
+          what: Buduje Docker image na podstawie Dockerfile w bieżącym katalogu.
+          how: "Typowy Dockerfile FastAPI: FROM python:3.12-slim, COPY requirements.txt, RUN pip install, COPY . ., CMD uvicorn..."
+          tips:
+            - 'docker run -p 8000:8000 myapi — uruchom kontener lokalnie'
+            - 'Użyj .dockerignore żeby nie kopiować .venv, .git, __pycache__'
 
   - name: Narzędzia dev
     icon: "🔧"
     commands:
-      - desc: Sformatuj kod Pythonem
-        code: ruff format .
-      - desc: Sprawdź typy przez mypy
-        code: mypy app/ --ignore-missing-imports
-      - desc: Otwórz Swagger UI w przeglądarce
-        code: open http://localhost:8000/docs
-      - desc: Pobierz OpenAPI JSON schema
-        code: curl localhost:8000/openapi.json | python3 -m json.tool
+      - cmd: ruff format .
+        desc: Sformatuj kod
+        detail:
+          what: Ruff to ultraszybki formatter i linter dla Pythona — zastępuje black + flake8.
+          how: Formatuje wszystkie .py pliki w bieżącym katalogu zgodnie z konfiguracją.
+          tips:
+            - 'pip install ruff — instalacja'
+            - 'ruff check . — tylko sprawdź błędy bez formatowania'
+      - cmd: mypy app/ --ignore-missing-imports
+        desc: Sprawdź typy przez mypy
+        detail:
+          what: Statyczna analiza typów — wykrywa błędy typów bez uruchamiania kodu.
+          how: "--ignore-missing-imports pomija błędy dla bibliotek bez stubów typów."
+          tips:
+            - FastAPI i Pydantic są w pełni typowane — mypy świetnie z nimi współpracuje
+            - 'pip install mypy — instalacja'
+      - cmd: open http://localhost:8000/docs
+        desc: Otwórz Swagger UI w przeglądarce
+        detail:
+          what: FastAPI automatycznie generuje Swagger UI pod /docs — interaktywna dokumentacja API.
+          how: Możesz testować endpointy bezpośrednio z przeglądarki bez curl/httpie.
+          tips:
+            - '/redoc — alternatywna dokumentacja w stylu ReDoc'
+            - '/openapi.json — surowy OpenAPI schema (do integracji z innymi narzędziami)'

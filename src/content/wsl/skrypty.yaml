@@ -1,0 +1,194 @@
+title: Skrypty i automatyzacja
+
+items:
+  - name: Bash — konfiguracja środowiska
+    icon: "🔧"
+    desc: >
+      ~/.bashrc to serce konfiguracji bash w WSL — aliases, funkcje, zmienne środowiskowe,
+      PATH, prompt. Załaduj raz — działa przy każdym otwarciu terminala.
+      Zsh z Oh My Zsh to popularniejsza alternatywa.
+    code: |
+      # Edytuj ~/.bashrc
+      nano ~/.bashrc
+
+      # --- Aliases ---
+      alias ll='ls -alh --color=auto'
+      alias la='ls -A'
+      alias gs='git status'
+      alias gp='git push'
+      alias gl='git log --oneline --graph --decorate --all'
+      alias ..='cd ..'
+      alias ...='cd ../..'
+
+      # Szybkie projekty
+      alias proj='cd ~/projekty'
+      alias api='cd ~/projekty/api && source .venv/bin/activate && uvicorn main:app --reload'
+
+      # --- Zmienne środowiskowe ---
+      export PATH="$HOME/.local/bin:$HOME/.pyenv/bin:$PATH"
+      export PYTHONDONTWRITEBYTECODE=1
+      export EDITOR="code --wait"
+      export LANG="en_US.UTF-8"
+
+      # --- Funkcje ---
+      # Utwórz katalog i wejdź do niego
+      mkcd() { mkdir -p "$1" && cd "$1"; }
+
+      # Aktywuj venv jeśli istnieje
+      venv() {
+        if [ -f ".venv/bin/activate" ]; then
+          source .venv/bin/activate
+        elif [ -f "venv/bin/activate" ]; then
+          source venv/bin/activate
+        else
+          echo "Brak venv — tworzę .venv..."
+          python3 -m venv .venv && source .venv/bin/activate
+        fi
+      }
+
+      # Git — szybki commit
+      gc() { git add -A && git commit -m "$1"; }
+
+      # Załaduj zmiany bez restartu
+      source ~/.bashrc
+
+  - name: Zsh + Oh My Zsh
+    icon: "⚡"
+    desc: >
+      Zsh z Oh My Zsh to najpopularniejsza konfiguracja shella w środowisku deweloperskim.
+      Autocomplete, podpowiedzi git, kolorowanie składni, tematy. Starship to lekka
+      alternatywa dla promptu działająca z bash i zsh.
+    code: |
+      # Instalacja Zsh
+      sudo apt install -y zsh
+
+      # Ustaw zsh jako domyślny shell
+      chsh -s $(which zsh)
+      # Zamknij i otwórz terminal ponownie
+
+      # Oh My Zsh
+      sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+
+      # ~/.zshrc — konfiguracja
+
+      # Motyw (powerlevel10k wymaga Nerd Font)
+      ZSH_THEME="robbyrussell"
+      # Lub: ZSH_THEME="agnoster"
+
+      # Pluginy Oh My Zsh
+      plugins=(
+        git
+        python
+        docker
+        docker-compose
+        npm
+        sudo           # podwójne Esc dodaje sudo na początku
+        z              # szybka nawigacja (z projekty)
+        zsh-autosuggestions
+        zsh-syntax-highlighting
+      )
+
+      # Zainstaluj pluginy spoza Oh My Zsh
+      git clone https://github.com/zsh-users/zsh-autosuggestions \
+        ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
+
+      git clone https://github.com/zsh-users/zsh-syntax-highlighting.git \
+        ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
+
+      # Starship — minimalistyczny prompt (bash i zsh)
+      curl -sS https://starship.rs/install.sh | sh
+      # Dodaj do ~/.bashrc lub ~/.zshrc:
+      eval "$(starship init bash)"
+      # Lub: eval "$(starship init zsh)"
+
+  - name: Systemd i serwisy
+    icon: "⚙️"
+    desc: >
+      WSL 2 (kernel 5.15+) wspiera systemd — możesz używać systemctl jak na prawdziwym Linuxie.
+      Włącz w /etc/wsl.conf. Bez systemd używaj service lub uruchamiaj procesy ręcznie.
+    code: |
+      # Włącz systemd w /etc/wsl.conf
+      sudo nano /etc/wsl.conf
+      # Dodaj:
+      # [boot]
+      # systemd = true
+
+      # Zrestartuj WSL
+      # W PowerShell:
+      # wsl --terminate Ubuntu
+      # wsl
+
+      # Weryfikacja
+      systemctl --version
+      systemctl list-units --type=service --state=running
+
+      # Zarządzanie serwisami z systemd
+      sudo systemctl start postgresql
+      sudo systemctl enable postgresql   # auto-start
+      sudo systemctl status postgresql
+      sudo systemctl restart nginx
+
+      # Bez systemd — starszy sposób
+      sudo service postgresql start
+      sudo service nginx start
+      sudo service --status-all
+
+      # Własny serwis systemd (np. FastAPI)
+      sudo nano /etc/systemd/system/myapi.service
+
+      # [Unit]
+      # Description=My FastAPI Service
+      # After=network.target
+      #
+      # [Service]
+      # User=lukasz
+      # WorkingDirectory=/home/lukasz/projekty/api
+      # ExecStart=/home/lukasz/projekty/api/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+      # Restart=always
+      # RestartSec=3
+      #
+      # [Install]
+      # WantedBy=multi-user.target
+
+      sudo systemctl daemon-reload
+      sudo systemctl enable myapi
+      sudo systemctl start myapi
+
+  - name: Automatyzacja i cron
+    icon: "⏰"
+    desc: >
+      Cron w WSL działa — ale wymaga włączonego cron serwisu. Crony uruchamiają się
+      dopóki WSL działa. Do zadań przy starcie Windows użyj Task Schedulera
+      lub wpisu w [boot] sekcji /etc/wsl.conf.
+    code: |
+      # Uruchom cron (systemd lub service)
+      sudo systemctl start cron
+      # Lub: sudo service cron start
+
+      # Edytuj crontab
+      crontab -e
+
+      # Przykłady wpisów cron
+      # min  godz  dzien  mies  dzien-tyg  komenda
+
+      # Backup co noc o 2:00
+      0 2 * * * tar -czf /mnt/d/backup/projekty-$(date +%Y%m%d).tar.gz ~/projekty/
+
+      # Sync plików co godzinę
+      0 * * * * rsync -av ~/projekty/api/ /mnt/c/Users/lukasz/backup/api/
+
+      # Skrypt Python co 15 minut
+      */15 * * * * /home/lukasz/projekty/.venv/bin/python /home/lukasz/skrypty/check_api.py
+
+      # Uruchom WSL przy starcie Windows + ustaw serwisy
+      # Utwórz skrypt PowerShell: C:\Users\lukasz\start-wsl.ps1
+      # wsl -d Ubuntu -- bash -c "sudo service cron start; sudo service postgresql start"
+
+      # Dodaj do Task Scheduler Windows:
+      # Trigger: At startup
+      # Action: powershell.exe -File C:\Users\lukasz\start-wsl.ps1
+
+      # Sprawdź logi cron
+      grep CRON /var/log/syslog | tail -20
+      # Lub z journalctl (systemd):
+      journalctl -u cron --since today

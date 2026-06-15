@@ -4,185 +4,648 @@ groups:
   - name: Instalacja i uruchamianie
     icon: "📦"
     commands:
-      - desc: Zainstaluj Redis (Ubuntu/Debian)
-        code: sudo apt install redis-server
-      - desc: Zainstaluj Redis przez Docker
-        code: docker run -d --name redis -p 6379:6379 redis:7
-      - desc: Redis Stack (z modułami JSON, Search)
-        code: docker run -d --name redis-stack -p 6379:6379 redis/redis-stack-server:latest
-      - desc: Redis z persistencją przez Docker
-        code: "docker run -d --name redis -p 6379:6379 -v redis_data:/data redis:7 redis-server --appendonly yes"
-      - desc: Uruchom / zatrzymaj Redis (systemd)
-        code: sudo systemctl start redis-server && sudo systemctl status redis-server
-      - desc: Uruchom Redis z konfiguracją
-        code: redis-server /etc/redis/redis.conf
-      - desc: Sprawdź wersję
-        code: redis-server --version
+      - cmd: sudo apt install redis-server
+        desc: Zainstaluj Redis (Ubuntu/Debian)
+        detail:
+          what: Instaluje Redis server i klienta na Ubuntu/Debian/WSL — gotowy do użycia od razu.
+          how: Po instalacji Redis startuje automatycznie jako usługa systemd na porcie 6379.
+          tips:
+            - 'redis-cli ping — sprawdź czy Redis odpowiada (powinien zwrócić PONG)'
+            - 'sudo systemctl status redis-server — sprawdź status usługi'
+      - cmd: docker run -d --name redis -p 6379:6379 redis:7
+        desc: Zainstaluj Redis przez Docker
+        detail:
+          what: Uruchamia Redis 7 w kontenerze Docker — szybki start bez instalacji systemowej.
+          how: -d = detached (w tle). -p 6379:6379 = port hosta:kontenera. redis:7 = wersja 7.
+          tips:
+            - 'docker exec -it redis redis-cli — wejdź do redis-cli w kontenerze'
+            - 'Dane nie przeżyją restart kontenera — dodaj -v redis_data:/data dla persistencji'
+      - cmd: docker run -d --name redis-stack -p 6379:6379 redis/redis-stack-server:latest
+        desc: Redis Stack (z modułami JSON, Search)
+        detail:
+          what: Uruchamia Redis Stack — Redis z dodatkowymi modułami JSON, Search, Graph, TimeSeries.
+          how: redis-stack-server = pełny zestaw. Użyj gdy potrzebujesz RedisJSON lub RediSearch.
+          tips:
+            - 'JSON.SET doc $ ''{"name":"Jan"}'' — składnia RedisJSON'
+            - 'FT.CREATE myindex ON JSON SCHEMA $.name TEXT — full-text search po JSON'
+      - cmd: "docker run -d --name redis -p 6379:6379 -v redis_data:/data redis:7 redis-server --appendonly yes"
+        desc: Redis z persistencją przez Docker
+        detail:
+          what: Uruchamia Redis z AOF persistencją i named volume — dane przetrwają restart kontenera.
+          how: --appendonly yes = Append Only File (każda operacja zapisywana na dysk). -v = named volume.
+          tips:
+            - 'AOF = bezpieczniejsze niż RDB (snapshot) — mniejsze ryzyko utraty danych'
+            - 'docker volume ls — sprawdź czy volume redis_data istnieje'
+      - cmd: sudo systemctl start redis-server && sudo systemctl status redis-server
+        desc: Uruchom / zatrzymaj Redis (systemd)
+        detail:
+          what: Uruchamia Redis jako usługę systemd i sprawdza czy działa.
+          how: systemctl start = uruchom. status = sprawdź. enable = uruchamiaj automatycznie po restarcie.
+          tips:
+            - 'sudo systemctl enable redis-server — autostart po restarcie systemu'
+            - 'sudo systemctl restart redis-server — restart po zmianie konfiguracji'
+      - cmd: redis-server /etc/redis/redis.conf
+        desc: Uruchom Redis z konfiguracją
+        detail:
+          what: Uruchamia Redis z konkretnym plikiem konfiguracyjnym zamiast domyślnych ustawień.
+          how: Plik konfiguracyjny pozwala ustawić hasło, maxmemory, persistencję, bind address.
+          tips:
+            - 'requirepass twoje_haslo — dodaj hasło w redis.conf'
+            - 'maxmemory 512mb i maxmemory-policy allkeys-lru — ogranicz pamięć'
+      - cmd: redis-server --version
+        desc: Sprawdź wersję
+        detail:
+          what: Wyświetla zainstalowaną wersję Redis server.
+          how: Przydatne do sprawdzenia czy masz Redis 7.x (z nowymi funkcjami jak LMPOP, ZMPOP).
+          tips:
+            - 'redis-cli --version — wersja klienta'
+            - 'INFO server — wersja z poziomu redis-cli (więcej szczegółów)'
 
   - name: Połączenie (redis-cli)
     icon: "🔌"
     commands:
-      - desc: Połącz lokalnie
-        code: redis-cli
-      - desc: Połącz przez URL
-        code: "redis-cli -u redis://localhost:6379"
-      - desc: Połącz z hasłem
-        code: "redis-cli -a hasło"
-      - desc: Połącz z innym hostem i portem
-        code: redis-cli -h db.example.com -p 6380
-      - desc: Połącz przez Docker
-        code: docker exec -it redis redis-cli
-      - desc: Wykonaj jedną komendę i wyjdź
-        code: redis-cli GET user:1:name
-      - desc: Połącz z klastrem
-        code: redis-cli -c -h 192.168.1.10
+      - cmd: redis-cli
+        desc: Połącz lokalnie
+        detail:
+          what: Uruchamia interaktywny klient Redis połączony z localhost:6379.
+          how: Otwiera REPL gdzie możesz wpisywać komendy Redis bezpośrednio.
+          tips:
+            - 'PING — sprawdź połączenie (powinien zwrócić PONG)'
+            - 'redis-cli --no-auth-warning -a haslo — połącz z hasłem (unikaj —auth-warning w skryptach)'
+      - cmd: "redis-cli -u redis://localhost:6379"
+        desc: Połącz przez URL
+        detail:
+          what: Łączy się podając URL Redis zamiast osobnych flag — wygodne dla URL z zmiennej środowiskowej.
+          how: "Format: redis://[:haslo@]host:port[/db_numer]"
+          tips:
+            - 'redis://haslo@localhost:6379/0 — URL z hasłem i bazą 0'
+            - 'Ustaw jako REDIS_URL w .env — standardowy format dla bibliotek'
+      - cmd: redis-cli -a haslo
+        desc: Połącz z hasłem
+        detail:
+          what: Łączy się z Redis wymagającym uwierzytelnienia.
+          how: "-a = auth (hasło). Hasło jest widoczne w historii bash — lepiej użyć REDISCLI_AUTH env var."
+          tips:
+            - 'export REDISCLI_AUTH=haslo — ustaw przez env zamiast -a'
+            - 'AUTH haslo — uwierzytelnij po połączeniu (wewnątrz redis-cli)'
+      - cmd: redis-cli -h db.example.com -p 6380
+        desc: Połącz z innym hostem i portem
+        detail:
+          what: Łączy się z Redis na zdalnym serwerze i niestandardowym porcie.
+          how: "-h = host. -p = port (domyślnie 6379)."
+          tips:
+            - 'redis-cli -h db.example.com -p 6380 -a haslo — z hasłem'
+            - 'Upewnij się że port 6380 jest otwarty w firewall serwera'
+      - cmd: docker exec -it redis redis-cli
+        desc: Połącz przez Docker
+        detail:
+          what: Otwiera redis-cli wewnątrz kontenera Docker z Redis.
+          how: docker exec -it = interactive terminal. Nazwa kontenera musi się zgadzać z --name.
+          tips:
+            - 'docker exec -it redis redis-cli -a haslo — jeśli Redis ma hasło'
+            - 'docker exec redis redis-cli INFO — wykonaj komendę jednorazowo'
+      - cmd: redis-cli GET user:1:name
+        desc: Wykonaj jedną komendę i wyjdź
+        detail:
+          what: Wykonuje komendę GET i wypisuje wynik — bez wchodzenia w tryb interaktywny.
+          how: Przydatne w skryptach bash. redis-cli zwraca wynik na stdout.
+          tips:
+            - 'redis-cli --no-auth-warning -a haslo GET klucz — z hasłem w skrypcie'
+            - 'VALUE=$(redis-cli GET config:setting) — przypisz wynik do zmiennej bash'
+      - cmd: redis-cli -c -h 192.168.1.10
+        desc: Połącz z klastrem
+        detail:
+          what: Łączy się z Redis Cluster w trybie cluster (-c) — automatycznie przekierowuje do właściwego węzła.
+          how: Bez -c redis-cli nie obsługuje MOVED/ASK redirect (błąd przy multi-node operacjach).
+          tips:
+            - 'CLUSTER INFO — sprawdź stan klastra'
+            - 'CLUSTER NODES — lista węzłów w klastrze'
 
   - name: Kluczowe operacje
     icon: "🔑"
     commands:
-      - desc: Ustaw klucz
-        code: SET klucz wartość
-      - desc: Ustaw z TTL (sekundy)
-        code: SET session:abc "user:42" EX 3600
-      - desc: Pobierz wartość
-        code: GET klucz
-      - desc: Usuń klucz
-        code: DEL klucz1 klucz2
-      - desc: Sprawdź czy klucz istnieje
-        code: EXISTS klucz
-      - desc: Ustaw TTL na istniejący klucz (sekundy)
-        code: EXPIRE klucz 3600
-      - desc: Sprawdź pozostały TTL
-        code: TTL klucz
-      - desc: Usuń TTL (klucz trwały)
-        code: PERSIST klucz
-      - desc: Zmień nazwę klucza
-        code: RENAME stary_klucz nowy_klucz
-      - desc: Typ wartości klucza
-        code: TYPE klucz
-      - desc: Znajdź klucze wzorcem (unikaj na produkcji!)
-        code: KEYS user:*
-      - desc: Iteracja kluczy (bezpieczna alternatywa KEYS)
-        code: SCAN 0 MATCH user:* COUNT 100
+      - cmd: SET klucz wartość
+        desc: Ustaw klucz
+        detail:
+          what: Ustawia wartość klucza. Jeśli klucz istnieje — nadpisuje wartość.
+          how: Redis akceptuje binary-safe strings jako klucze i wartości (też JSON, liczby).
+          tips:
+            - 'SET klucz wartość EX 3600 — ustaw z TTL 1 godzina (zamiast osobnego EXPIRE)'
+            - 'SET klucz wartość NX — ustaw tylko jeśli klucz nie istnieje'
+      - cmd: 'SET session:abc "user:42" EX 3600'
+        desc: Ustaw z TTL (sekundy)
+        detail:
+          what: Ustawia klucz z automatycznym TTL (Time To Live) — klucz wygaśnie po 3600 sekundach.
+          how: "EX = sekundy. PX = milisekundy. Klucz automatycznie usunięty po upływie TTL."
+          flags:
+            - flag: EX 3600
+              desc: Wygaśnij po 3600 sekundach (1 godzina)
+            - flag: PX 60000
+              desc: Wygaśnij po 60000 milisekundach (1 minuta)
+            - flag: EXAT 1893456000
+              desc: Wygaśnij w konkretnym Unix timestamp
+          tips:
+            - 'Idealny pattern dla sesji, cache i tymczasowych tokenów'
+            - 'TTL klucz — sprawdź ile czasu zostało'
+      - cmd: GET klucz
+        desc: Pobierz wartość
+        detail:
+          what: Zwraca wartość klucza lub nil jeśli klucz nie istnieje.
+          how: Dla typów innych niż string (hash, list, set) — użyj HGET, LRANGE, SMEMBERS.
+          tips:
+            - 'nil = klucz nie istnieje (nie to samo co pusty string "")'
+            - 'MGET klucz1 klucz2 klucz3 — pobierz wiele kluczy jedną operacją'
+      - cmd: DEL klucz1 klucz2
+        desc: Usuń klucz
+        detail:
+          what: Usuwa jeden lub wiele kluczy. Zwraca liczbę usuniętych kluczy.
+          how: Nieistniejące klucze są ignorowane. O(1) dla każdego klucza.
+          tips:
+            - 'DEL klucz1 klucz2 klucz3 — usuń wiele kluczy jednym poleceniem'
+            - 'UNLINK klucz — asynchroniczne usunięcie (nie blokuje serwera dla dużych wartości)'
+      - cmd: EXISTS klucz
+        desc: Sprawdź czy klucz istnieje
+        detail:
+          what: Zwraca 1 jeśli klucz istnieje, 0 jeśli nie.
+          how: EXISTS klucz1 klucz2 — sprawdź wiele kluczy. Zwraca sumę istniejących.
+          tips:
+            - 'EXISTS user:1 user:2 user:3 — sprawdź wiele kluczy (zwraca 0-3)'
+            - 'Nie używaj GET + sprawdzenia nil — EXISTS jest wyraźniejsze i szybsze'
+      - cmd: EXPIRE klucz 3600
+        desc: Ustaw TTL na istniejący klucz (sekundy)
+        detail:
+          what: Ustawia czas życia dla istniejącego klucza — wygaśnie po 3600 sekundach.
+          how: Jeśli klucz nie istnieje — zwraca 0 (brak akcji). Nadpisuje poprzedni TTL.
+          tips:
+            - 'EXPIREAT klucz 1893456000 — wygaśnij w konkretnym Unix timestamp'
+            - 'PEXPIRE klucz 60000 — TTL w milisekundach'
+      - cmd: TTL klucz
+        desc: Sprawdź pozostały TTL
+        detail:
+          what: Zwraca pozostałe sekundy do wygaśnięcia klucza. -1 = bez TTL (trwały). -2 = nie istnieje.
+          how: PTTL klucz — TTL w milisekundach (precyzyjniejszy).
+          tips:
+            - '-1 = klucz istnieje ale bez TTL (trwały)'
+            - '-2 = klucz nie istnieje'
+            - 'PTTL klucz — w milisekundach dla precyzji'
+      - cmd: PERSIST klucz
+        desc: Usuń TTL (klucz trwały)
+        detail:
+          what: Usuwa TTL z klucza — klucz staje się trwały (nie wygaśnie automatycznie).
+          how: Przydatne gdy chcesz zachować wartość która miała wygasnąć.
+          tips:
+            - 'PERSIST zwraca 1 jeśli TTL był i został usunięty, 0 jeśli klucz nie miał TTL'
+            - 'Odwrotność EXPIRE — zamień tymczasowy klucz w trwały'
+      - cmd: RENAME stary_klucz nowy_klucz
+        desc: Zmień nazwę klucza
+        detail:
+          what: Zmienia nazwę klucza. Jeśli nowa nazwa już istnieje — nadpisuje ją.
+          how: Operacja atomowa. Zachowuje TTL ze starego klucza.
+          tips:
+            - 'RENAMENX stary nowy — zmień nazwę tylko jeśli nowy klucz nie istnieje'
+            - 'Przydatne przy atomowym "commit" wyników — ustaw pod tymczasową nazwą, potem RENAME'
+      - cmd: TYPE klucz
+        desc: Typ wartości klucza
+        detail:
+          what: Zwraca typ danych klucza — string, list, set, zset, hash lub stream.
+          how: Ważne przed użyciem odpowiedniej komendy — GET działa tylko dla string.
+          tips:
+            - 'Użyj właściwych komend dla każdego typu: HGET dla hash, LRANGE dla list, etc.'
+            - 'OBJECT ENCODING klucz — wewnętrzna reprezentacja (ziplist, hashtable, skiplist)'
+      - cmd: KEYS user:*
+        desc: Znajdź klucze wzorcem (unikaj na produkcji!)
+        detail:
+          what: Zwraca wszystkie klucze pasujące do wzorca. Blokuje serwer podczas wyszukiwania.
+          how: "Wildcards: * = dowolne znaki, ? = jeden znak, [ae] = jeden z podanych znaków."
+          tips:
+            - 'NIGDY nie używaj KEYS na produkcji — blokuje Redis dla wszystkich klientów'
+            - 'Użyj SCAN zamiast KEYS — iteracyjne, nie blokuje'
+      - cmd: SCAN 0 MATCH user:* COUNT 100
+        desc: Iteracja kluczy (bezpieczna alternatywa KEYS)
+        detail:
+          what: Iteracyjnie przeszukuje klucze pasujące do wzorca bez blokowania serwera.
+          how: 'Pierwsze wywołanie cursor=0. Kolejne: użyj kursora z poprzedniego wyniku. Koniec gdy cursor=0.'
+          tips:
+            - 'COUNT 100 = podpowiedź ile kluczy na iterację (nie gwarancja)'
+            - 'W pętli bash: while [ "$cursor" != "0" ]; do result=$(redis-cli SCAN $cursor MATCH pattern); done'
 
   - name: Strings i liczniki
     icon: "🔢"
     commands:
-      - desc: Inkrementuj licznik
-        code: INCR page:views
-      - desc: Inkrementuj o wartość
-        code: INCRBY counter 10
-      - desc: Dekrementuj
-        code: DECR counter
-      - desc: Ustaw wiele kluczy naraz
-        code: "MSET a 1 b 2 c 3"
-      - desc: Pobierz wiele kluczy naraz
-        code: MGET a b c
-      - desc: Ustaw tylko jeśli nie istnieje
-        code: SET lock:job NX EX 30
-      - desc: Pobierz i usuń
-        code: GETDEL klucz
+      - cmd: INCR page:views
+        desc: Inkrementuj licznik
+        detail:
+          what: Atomowo inkrementuje wartość klucza o 1. Jeśli klucz nie istnieje — tworzy go z wartością 1.
+          how: Atomowy — bezpieczny w środowisku wielowątkowym. Nie wymaga READ-MODIFY-WRITE.
+          tips:
+            - 'Idealny dla liczników pageviews, API rate limiting, kolejkowania'
+            - 'INCR counter na nieistniejącym kluczu = tworzy z wartością 1 automatycznie'
+      - cmd: INCRBY counter 10
+        desc: Inkrementuj o wartość
+        detail:
+          what: Atomowo dodaje podaną wartość do licznika.
+          how: "INCRBY działa też z ujemnymi: INCRBY counter -5 = dekrementuj o 5."
+          tips:
+            - 'INCRBYFLOAT counter 1.5 — dodaj liczbę zmiennoprzecinkową'
+            - 'DECRBY counter 10 — dedykowana komenda do dekrementacji'
+      - cmd: DECR counter
+        desc: Dekrementuj
+        detail:
+          what: Atomowo dekrementuje wartość o 1. Może dać ujemne wartości.
+          how: Przydatne dla limitów, slotów, zasobów.
+          tips:
+            - 'DECRBY counter 5 — dekrementuj o konkretną wartość'
+            - 'Możesz sprawdzić wynik: IF DECR returns < 0 — limit przekroczony'
+      - cmd: "MSET a 1 b 2 c 3"
+        desc: Ustaw wiele kluczy naraz
+        detail:
+          what: Atomowo ustawia wiele kluczy jednym poleceniem — szybciej niż kilka SET.
+          how: 'Format: MSET klucz1 wartość1 klucz2 wartość2 ... Operacja atomowa.'
+          tips:
+            - 'MSETNX a 1 b 2 — ustaw wiele tylko jeśli ŻADEN nie istnieje (atomowe)'
+            - 'O(N) gdzie N = liczba kluczy — wydajniejsze niż wiele SET w pętli'
+      - cmd: MGET a b c
+        desc: Pobierz wiele kluczy naraz
+        detail:
+          what: Pobiera wartości wielu kluczy jednym poleceniem — oszczędza round-tripy.
+          how: Zwraca listę wartości w tej samej kolejności co klucze. nil dla nieistniejących.
+          tips:
+            - 'Zamiast N × GET w pętli — jeden MGET. Znacznie szybsze dla wielu kluczy'
+            - 'W Python redis-py: r.mget(["klucz1", "klucz2"]) — zwraca listę'
+      - cmd: SET lock:job NX EX 30
+        desc: Ustaw tylko jeśli nie istnieje
+        detail:
+          what: Ustawia klucz tylko jeśli nie istnieje (NX) z TTL 30 sekund — pattern na distributed lock.
+          how: "NX = Not eXists. Atomowe — bezpieczne do implementacji locka w środowisku wieloprocesorowym."
+          tips:
+            - 'Zwraca OK jeśli lock uzyskany, nil jeśli ktoś inny ma lock'
+            - 'EX 30 = automatyczne zwolnienie po 30s jeśli proces się zawiesi'
+            - 'Redlock = bardziej zaawansowany algorytm dla klastrów Redis'
+      - cmd: GETDEL klucz
+        desc: Pobierz i usuń
+        detail:
+          what: Zwraca wartość klucza i atomowo go usuwa — atomowe GET + DEL.
+          how: Przydatne dla jednorazowych tokenów, kodów weryfikacyjnych.
+          tips:
+            - 'Atomowe — między GET a DEL nikt inny nie może odczytać klucza'
+            - 'GETEX klucz EX 3600 — pobierz i odśwież TTL (atomowe)'
 
   - name: Hash
     icon: "🗂️"
     commands:
-      - desc: Ustaw pola hashu
-        code: "HSET user:42 name \"Jan\" email \"jan@example.com\""
-      - desc: Pobierz jedno pole
-        code: HGET user:42 name
-      - desc: Pobierz wszystkie pola
-        code: HGETALL user:42
-      - desc: Pobierz wiele pól
-        code: HMGET user:42 name email role
-      - desc: Sprawdź czy pole istnieje
-        code: HEXISTS user:42 phone
-      - desc: Inkrementuj pole liczbowe
-        code: HINCRBY user:42 login_count 1
-      - desc: Usuń pole
-        code: HDEL user:42 phone
-      - desc: Liczba pól w hashu
-        code: HLEN user:42
+      - cmd: "HSET user:42 name \"Jan\" email \"jan@example.com\""
+        desc: Ustaw pola hashu
+        detail:
+          what: Ustawia jedno lub wiele pól obiektu Hash. Hash = mapa pól do wartości.
+          how: "Idealne do przechowywania obiektów: użytkownik, produkt, konfiguracja."
+          tips:
+            - 'HSET user:42 name "Jan" age 30 city "Warsaw" — wiele pól naraz'
+            - 'Każde pole HSET jest atomowe — bezpieczne w środowisku wieloprocesorowym'
+      - cmd: HGET user:42 name
+        desc: Pobierz jedno pole
+        detail:
+          what: Zwraca wartość konkretnego pola hashu.
+          how: Zwraca nil jeśli pole lub cały klucz nie istnieje.
+          tips:
+            - 'HMGET user:42 name email age — pobierz wiele pól naraz'
+            - 'Nie pobieraj całego hashu HGETALL jeśli potrzebujesz tylko kilka pól'
+      - cmd: HGETALL user:42
+        desc: Pobierz wszystkie pola
+        detail:
+          what: Zwraca wszystkie pola i wartości hashu jako flat listę [pole, wartość, pole, wartość...].
+          how: "W Python: dict(zip(r.hgetall('user:42').items())) — lub r.hgetall zwraca dict."
+          tips:
+            - 'Ostrożnie z dużymi hashami — HGETALL pobiera wszystko naraz'
+            - 'HSCAN user:42 0 — iteracyjne pobieranie pól dla dużych hashów'
+      - cmd: HMGET user:42 name email role
+        desc: Pobierz wiele pól
+        detail:
+          what: Pobiera kilka konkretnych pól z hashu jednym poleceniem.
+          how: Zwraca listę wartości w tej samej kolejności co podane pola. nil dla nieistniejących.
+          tips:
+            - 'Efektywniejsze niż wielokrotne HGET — jeden round-trip do Redis'
+            - 'Zwraca nil dla pól które nie istnieją (nie zgłasza błędu)'
+      - cmd: HEXISTS user:42 phone
+        desc: Sprawdź czy pole istnieje
+        detail:
+          what: Zwraca 1 jeśli pole phone istnieje w hashu user:42, 0 jeśli nie.
+          how: Nie pobiera wartości — tylko sprawdza istnienie.
+          tips:
+            - 'Szybsze niż HGET + sprawdzanie nil'
+            - 'Przydatne przed HSET jeśli chcesz uniknąć nadpisania'
+      - cmd: HINCRBY user:42 login_count 1
+        desc: Inkrementuj pole liczbowe
+        detail:
+          what: Atomowo inkrementuje wartość liczbowego pola hashu o podaną wartość.
+          how: Działa jak INCRBY ale dla pól hashu. Pole musi zawierać liczbę całkowitą.
+          tips:
+            - 'HINCRBYFLOAT user:42 balance 10.50 — dla liczb zmiennoprzecinkowych'
+            - 'Jeśli pole nie istnieje — tworzy je z wartością 0 i inkrementuje'
+      - cmd: HDEL user:42 phone
+        desc: Usuń pole
+        detail:
+          what: Usuwa jedno lub wiele pól z hashu. Zwraca liczbę usuniętych pól.
+          how: Jeśli pole nie istnieje — ignoruje (nie zgłasza błędu).
+          tips:
+            - 'HDEL user:42 phone address temp_field — usuń wiele pól naraz'
+            - 'DEL user:42 — usuwa cały hash'
+      - cmd: HLEN user:42
+        desc: Liczba pól w hashu
+        detail:
+          what: Zwraca liczbę pól w hashu user:42.
+          how: Przydatne do sprawdzenia czy hash jest pusty lub ma oczekiwaną strukturę.
+          tips:
+            - 'HKEYS user:42 — lista wszystkich nazw pól (bez wartości)'
+            - 'HVALS user:42 — lista wszystkich wartości (bez nazw pól)'
 
   - name: List
     icon: "📋"
     commands:
-      - desc: Dodaj do końca listy (tail)
-        code: RPUSH kolejka "zadanie1" "zadanie2"
-      - desc: Dodaj do początku listy (head)
-        code: LPUSH stos "element"
-      - desc: Pobierz wszystkie elementy
-        code: LRANGE lista 0 -1
-      - desc: Zdejmij z początku (consumer)
-        code: LPOP kolejka
-      - desc: Zdejmij z końca
-        code: RPOP kolejka
-      - desc: Blokujące pobranie (czekaj na element)
-        code: BLPOP kolejka 30
-      - desc: Długość listy
-        code: LLEN kolejka
-      - desc: Przytnij do N elementów
-        code: LTRIM lista 0 999
+      - cmd: 'RPUSH kolejka "zadanie1" "zadanie2"'
+        desc: Dodaj do końca listy (tail)
+        detail:
+          what: Dodaje elementy na koniec listy (prawy koniec). Tworzy listę jeśli nie istnieje.
+          how: RPUSH + LPOP = kolejka FIFO (pierwszy wchodzi, pierwszy wychodzi).
+          tips:
+            - 'RPUSH kolejka "zadanie1" "zadanie2" "zadanie3" — dodaj wiele naraz'
+            - 'Zwraca nową długość listy po dodaniu'
+      - cmd: LPUSH stos "element"
+        desc: Dodaj do początku listy (head)
+        detail:
+          what: Dodaje element na początek listy (lewy koniec).
+          how: LPUSH + LPOP = stos LIFO (ostatni wchodzi, pierwszy wychodzi).
+          tips:
+            - 'LPUSH stos "a" "b" "c" — kolejność w liście: c, b, a (odwrócona)'
+            - 'LPUSH + LRANGE = log ostatnich N wydarzeń'
+      - cmd: LRANGE lista 0 -1
+        desc: Pobierz wszystkie elementy
+        detail:
+          what: Pobiera elementy od indeksu 0 do -1 (ostatni) — czyli całą listę.
+          how: "Indeksy: 0 = pierwszy, -1 = ostatni, -2 = przedostatni."
+          tips:
+            - 'LRANGE lista 0 9 — pierwsze 10 elementów'
+            - 'LRANGE lista -10 -1 — ostatnie 10 elementów'
+      - cmd: LPOP kolejka
+        desc: Zdejmij z początku (consumer)
+        detail:
+          what: Usuwa i zwraca element z początku listy — wzorzec consumer dla kolejki.
+          how: Zwraca nil jeśli lista jest pusta.
+          tips:
+            - 'LPOP kolejka 5 — zdejmij 5 elementów naraz (Redis 6.2+)'
+            - 'BLPOP kolejka 30 — blokujące LPOP — czeka max 30 sekund na element'
+      - cmd: RPOP kolejka
+        desc: Zdejmij z końca
+        detail:
+          what: Usuwa i zwraca element z końca listy.
+          how: RPOP + RPUSH = deque (double-ended queue). RPOP + LPUSH = rotacja.
+          tips:
+            - 'BRPOP kolejka 30 — blokujące RPOP (czeka na element)'
+            - 'LMOVE src dst LEFT RIGHT — atomowe przeniesienie elementu między listami'
+      - cmd: BLPOP kolejka 30
+        desc: Blokujące pobranie (czekaj na element)
+        detail:
+          what: Czeka max 30 sekund na element w kolejce — zwraca od razu jeśli lista nie jest pusta.
+          how: Idealny dla workerów — nie wymaga aktywnego pollingu (nie obciąża CPU).
+          tips:
+            - 'BLPOP kolejka1 kolejka2 30 — czekaj na element z KTÓREJKOLWIEK z list'
+            - '0 jako timeout = czekaj w nieskończoność'
+            - 'Lepsze niż pętla: while True: el = LPOP; if el: process(el); else: sleep(0.1)'
+      - cmd: LLEN kolejka
+        desc: Długość listy
+        detail:
+          what: Zwraca liczbę elementów w liście.
+          how: O(1) — bardzo szybka operacja niezależnie od rozmiaru listy.
+          tips:
+            - 'Sprawdzaj regularnie w monitoringu — zbyt długa kolejka = worker nie nadąża'
+            - 'LLEN lista > 1000 może wskazywać na problem z przetwarzaniem'
+      - cmd: LTRIM lista 0 999
+        desc: Przytnij do N elementów
+        detail:
+          what: Zachowuje tylko elementy od indeksu 0 do 999 — usuwa resztę.
+          how: Atomowe. Przydatne do utrzymania listy ostatnich N wydarzeń.
+          tips:
+            - 'RPUSH log entry; LTRIM log 0 999 — zachowaj ostatnie 1000 wpisów'
+            - 'Uruchamiaj po każdym RPUSH żeby lista nie rosła bez ograniczeń'
 
   - name: Set
     icon: "🎯"
     commands:
-      - desc: Dodaj elementy do setu
-        code: "SADD tagi \"electronics\" \"sale\" \"new\""
-      - desc: Wszystkie elementy setu
-        code: SMEMBERS tagi
-      - desc: Sprawdź czy element w secie
-        code: SISMEMBER tagi "sale"
-      - desc: Liczba elementów
-        code: SCARD tagi
-      - desc: Usuń element
-        code: SREM tagi "old"
-      - desc: Suma dwóch setów
-        code: SUNION set1 set2
-      - desc: Część wspólna
-        code: SINTER set1 set2
-      - desc: Różnica
-        code: SDIFF set1 set2
+      - cmd: "SADD tagi \"electronics\" \"sale\" \"new\""
+        desc: Dodaj elementy do setu
+        detail:
+          what: Dodaje elementy do setu (unikalnego zbioru). Duplikaty są ignorowane.
+          how: Set = nieuporządkowany zbiór unikalnych wartości. Idealne dla tagów, uprawnień, listy ID.
+          tips:
+            - 'SADD tagi "a" "b" "a" — wynik: {a, b} (duplikat ignorowany)'
+            - 'Zwraca liczbę NOWYCH elementów (nie dodaje duplikatów)'
+      - cmd: SMEMBERS tagi
+        desc: Wszystkie elementy setu
+        detail:
+          what: Zwraca wszystkie elementy setu.
+          how: Ostrożnie na dużych setach — SMEMBERS pobiera wszystko naraz. Użyj SSCAN dla dużych.
+          tips:
+            - 'SSCAN tagi 0 — iteracyjne pobieranie (bezpieczne dla dużych setów)'
+            - 'Kolejność elementów jest nielosowa (wewnętrzny hash) — nie zakładaj kolejności'
+      - cmd: SISMEMBER tagi "sale"
+        desc: Sprawdź czy element w secie
+        detail:
+          what: Zwraca 1 jeśli element "sale" jest w secie, 0 jeśli nie.
+          how: O(1) — bardzo szybkie wyszukiwanie niezależnie od rozmiaru setu.
+          tips:
+            - 'SMISMEMBER tagi "sale" "new" "old" — sprawdź wiele elementów naraz (Redis 6.2+)'
+            - 'Idealny dla sprawdzania uprawnień, bloklisty, aktywnych sesji'
+      - cmd: SCARD tagi
+        desc: Liczba elementów
+        detail:
+          what: Zwraca liczbę elementów w secie (cardinality).
+          how: O(1) — szybka operacja.
+          tips:
+            - 'SCARD zwraca 0 dla nieistniejącego setu (nie błąd)'
+            - 'Przydatne do monitorowania rozmiaru zbiorów (np. aktywni użytkownicy)'
+      - cmd: SREM tagi "old"
+        desc: Usuń element
+        detail:
+          what: Usuwa element z setu. Zwraca 1 jeśli usunięto, 0 jeśli element nie istniał.
+          how: Nieistniejący element = 0 (nie błąd).
+          tips:
+            - 'SREM tagi "old" "deprecated" — usuń wiele elementów naraz'
+            - 'SPOP tagi — usuń i zwróć losowy element (przydatne przy loteri, losowaniu)'
+      - cmd: SUNION set1 set2
+        desc: Suma dwóch setów
+        detail:
+          what: Zwraca unię (sumę logiczną) dwóch lub więcej setów — wszystkie unikalne elementy.
+          how: Wynik = elementy z set1 LUB set2 (bez duplikatów).
+          tips:
+            - 'SUNIONSTORE wynik set1 set2 — zapisz wynik do nowego setu'
+            - 'SUNION tag:python tag:django — wszystkie posty z tagami python lub django'
+      - cmd: SINTER set1 set2
+        desc: Część wspólna
+        detail:
+          what: Zwraca iloczyn (część wspólną) dwóch lub więcej setów — tylko elementy w OBU setach.
+          how: Wynik = elementy w set1 I set2.
+          tips:
+            - 'SINTERSTORE wynik set1 set2 — zapisz część wspólną do setu'
+            - 'SINTER friends:user1 friends:user2 — wspólni znajomi (jak Facebook)'
+      - cmd: SDIFF set1 set2
+        desc: Różnica
+        detail:
+          what: Zwraca różnicę — elementy z set1 które NIE są w set2.
+          how: 'Kolejność ma znaczenie: SDIFF set1 set2 ≠ SDIFF set2 set1.'
+          tips:
+            - 'SDIFFSTORE wynik set1 set2 — zapisz różnicę do setu'
+            - 'SDIFF wszystkie_produkty zakupione — produkty których użytkownik jeszcze nie kupił'
 
   - name: Sorted Set
     icon: "🏆"
     commands:
-      - desc: Dodaj z wynikiem
-        code: "ZADD leaderboard 2300 \"alice\" 1800 \"bob\""
-      - desc: TOP 10 (malejąco z punktami)
-        code: ZRANGE leaderboard 0 9 REV WITHSCORES
-      - desc: Pozycja gracza (malejąco)
-        code: ZREVRANK leaderboard "alice"
-      - desc: Punkty gracza
-        code: ZSCORE leaderboard "alice"
-      - desc: Dodaj do punktów
-        code: ZINCRBY leaderboard 100 "alice"
-      - desc: Liczba graczy
-        code: ZCARD leaderboard
-      - desc: Usuń gracza
-        code: ZREM leaderboard "alice"
-      - desc: Zdejmij najwyżej punktującego
-        code: ZPOPMAX leaderboard
+      - cmd: "ZADD leaderboard 2300 \"alice\" 1800 \"bob\""
+        desc: Dodaj z wynikiem
+        detail:
+          what: Dodaje elementy do Sorted Set z punktami (score). Automatycznie posortowane po score.
+          how: 'Jeśli element istnieje — aktualizuje score. Format: ZADD klucz score element.'
+          tips:
+            - 'ZADD leaderboard NX 2300 "charlie" — dodaj tylko nowe (nie aktualizuj istniejących)'
+            - 'ZADD leaderboard XX INCR 100 "alice" — inkrementuj score istniejącego elementu'
+      - cmd: ZRANGE leaderboard 0 9 REV WITHSCORES
+        desc: TOP 10 (malejąco z punktami)
+        detail:
+          what: Zwraca top 10 elementów posortowanych malejąco (REV) z ich punktami (WITHSCORES).
+          how: REV = odwrócona kolejność (najwyższe score pierwsze). WITHSCORES = dołącz punkty.
+          tips:
+            - 'ZRANGE leaderboard 0 9 WITHSCORES — rosnąco (najniższe score pierwsze)'
+            - 'ZRANGE leaderboard 0 -1 REV WITHSCORES — cały ranking malejąco'
+      - cmd: ZREVRANK leaderboard "alice"
+        desc: Pozycja gracza (malejąco)
+        detail:
+          what: Zwraca pozycję (0-based) gracza w rankingu malejącym — 0 = najwyższe score.
+          how: "ZREVRANK = pozycja w malejącym rankingu. ZRANK = rosnącym (najniższy score = 0)."
+          tips:
+            - 'Pozycja 0-based — dodaj 1 żeby pokazać użytkownikowi'
+            - 'ZREVRANK + WITHSCORE zwraca pozycję i score (Redis 7.2+)'
+      - cmd: ZSCORE leaderboard "alice"
+        desc: Punkty gracza
+        detail:
+          what: Zwraca punkty (score) konkretnego elementu w Sorted Set.
+          how: Zwraca nil jeśli element nie istnieje. Wartość jako string (liczba zmiennoprzecinkowa).
+          tips:
+            - 'Użyj do pokazania aktualnych punktów gracza bez pobierania całego rankingu'
+            - 'ZSCORE możesz wywołać bez znania pozycji gracza'
+      - cmd: ZINCRBY leaderboard 100 "alice"
+        desc: Dodaj do punktów
+        detail:
+          what: Atomowo dodaje 100 do punktów alice w Sorted Set. Zwraca nowy score.
+          how: Jeśli element nie istnieje — tworzy go z podanym score.
+          tips:
+            - 'Atomowe — bezpieczne w środowisku wieloprocesorowym'
+            - 'ZINCRBY leaderboard -50 "alice" — odbierz punkty (ujemna wartość)'
+      - cmd: ZCARD leaderboard
+        desc: Liczba graczy
+        detail:
+          what: Zwraca liczbę elementów w Sorted Set (cardinality).
+          how: O(1) — szybka operacja.
+          tips:
+            - 'ZCOUNT leaderboard 1000 2000 — liczba elementów z score w przedziale'
+            - 'Używaj do paginacji rankingu: ZRANGE leaderboard start end REV'
+      - cmd: ZREM leaderboard "alice"
+        desc: Usuń gracza
+        detail:
+          what: Usuwa element z Sorted Set. Zwraca 1 jeśli usunięto, 0 jeśli nie istniał.
+          how: Usuwa element wraz ze score.
+          tips:
+            - 'ZREM leaderboard "alice" "bob" — usuń wiele elementów naraz'
+            - 'ZREMRANGEBYSCORE leaderboard -inf 0 — usuń wszystkich z score ≤ 0'
+      - cmd: ZPOPMAX leaderboard
+        desc: Zdejmij najwyżej punktującego
+        detail:
+          what: Usuwa i zwraca element z najwyższym score z Sorted Set.
+          how: Zwraca [element, score]. Przydatne dla priority queue.
+          tips:
+            - 'ZPOPMAX leaderboard 3 — zdejmij top 3 naraz'
+            - 'ZPOPMIN leaderboard — zdejmij element z najniższym score'
+            - 'BZPOPMAX kolejka 30 — blokujące ZPOPMAX (czeka max 30s)'
 
   - name: Administracja
     icon: "🔧"
     commands:
-      - desc: Informacje o serwerze
-        code: INFO
-      - desc: Użycie pamięci
-        code: INFO memory
-      - desc: Liczba kluczy w aktualnej DB
-        code: DBSIZE
-      - desc: Wybierz bazę (domyślnie 0)
-        code: SELECT 1
-      - desc: Konfiguracja na żywo
-        code: CONFIG SET maxmemory 512mb
-      - desc: Sprawdź konfigurację
-        code: CONFIG GET maxmemory
-      - desc: Podejrzyj wszystkie komendy (debug tylko!)
-        code: MONITOR
-      - desc: Wolne zapytania
-        code: SLOWLOG GET 10
-      - desc: Wyczyść aktualną bazę (UWAGA!)
-        code: FLUSHDB ASYNC
-      - desc: Benchmark wydajności
-        code: redis-benchmark -n 100000 -c 50 -q
+      - cmd: INFO
+        desc: Informacje o serwerze
+        detail:
+          what: Wyświetla szczegółowe informacje o serwerze Redis — wersję, użycie pamięci, klientów, statystyki.
+          how: Duży output — podzielony na sekcje (server, clients, memory, stats, replication, keyspace).
+          tips:
+            - 'INFO memory — tylko sekcja pamięci'
+            - 'INFO keyspace — statystyki kluczy dla każdej bazy'
+            - 'INFO server — wersja, uptime, tryb'
+      - cmd: INFO memory
+        desc: Użycie pamięci
+        detail:
+          what: Pokazuje szczegółowe informacje o użyciu pamięci — used_memory, maxmemory, fragmentation ratio.
+          how: "Kluczowe: used_memory_human (aktualne), maxmemory_human (limit), mem_fragmentation_ratio."
+          tips:
+            - 'mem_fragmentation_ratio > 1.5 = dużo fragmentacji — warto restart'
+            - 'CONFIG SET maxmemory 512mb — ustaw limit pamięci bez restartu'
+      - cmd: DBSIZE
+        desc: Liczba kluczy w aktualnej DB
+        detail:
+          what: Zwraca liczbę kluczy w aktualnie wybranej bazie Redis.
+          how: Redis ma 16 baz (0-15). Domyślnie używana baza 0.
+          tips:
+            - 'SELECT 1 — przełącz na bazę 1'
+            - 'INFO keyspace — statystyki dla wszystkich baz jednocześnie'
+      - cmd: SELECT 1
+        desc: Wybierz bazę (domyślnie 0)
+        detail:
+          what: Przełącza na bazę danych o podanym numerze (0-15).
+          how: "Redis ma 16 logicznych baz. Każda ma osobny namespace kluczy, ale dzielą pamięć."
+          tips:
+            - 'Unikaj wielobazowego podejścia w nowych projektach — użyj prefiksów kluczy'
+            - 'SELECT 0 — wróć do domyślnej bazy'
+      - cmd: CONFIG SET maxmemory 512mb
+        desc: Konfiguracja na żywo
+        detail:
+          what: Ustawia limit pamięci Redis na 512MB bez restartu serwera.
+          how: Większość opcji można zmienić przez CONFIG SET bez restartu.
+          tips:
+            - 'CONFIG SET maxmemory-policy allkeys-lru — wyrzucaj LRU klucze gdy pamięć pełna'
+            - 'CONFIG REWRITE — zapisz zmiany do pliku redis.conf'
+      - cmd: CONFIG GET maxmemory
+        desc: Sprawdź konfigurację
+        detail:
+          what: Pokazuje aktualną wartość opcji konfiguracyjnej maxmemory.
+          how: Zwraca listę [nazwa, wartość]. Używaj po CONFIG SET żeby zweryfikować.
+          tips:
+            - 'CONFIG GET * — pokaż CAŁĄ konfigurację (bardzo długi output)'
+            - 'CONFIG GET max* — wszystkie opcje zaczynające się od max'
+      - cmd: MONITOR
+        desc: Podejrzyj wszystkie komendy (debug tylko!)
+        detail:
+          what: Streamuje w czasie rzeczywistym wszystkie komendy wysyłane do Redis przez wszystkich klientów.
+          how: Ogromne obciążenie serwera — używaj tylko przez kilka sekund do debugowania.
+          tips:
+            - 'NIGDY nie używaj MONITOR na produkcji dłużej niż kilka sekund — degraduje wydajność'
+            - 'Ctrl+C — przerwij MONITOR'
+      - cmd: SLOWLOG GET 10
+        desc: Wolne zapytania
+        detail:
+          what: Pokazuje ostatnie 10 zapytań które przekroczyły próg slow log (domyślnie 10ms).
+          how: "Każdy wpis: unikalny ID, timestamp, czas wykonania w mikrosekundach, komenda."
+          tips:
+            - 'CONFIG SET slowlog-log-slower-than 1000 — loguj komendy wolniejsze niż 1ms (1000 mikrosekund)'
+            - 'SLOWLOG LEN — liczba wpisów w slow logu'
+            - 'SLOWLOG RESET — wyczyść slow log'
+      - cmd: FLUSHDB ASYNC
+        desc: Wyczyść aktualną bazę (UWAGA!)
+        detail:
+          what: Usuwa wszystkie klucze z aktualnej bazy Redis asynchronicznie — nieodwracalne.
+          how: ASYNC = usuwa w tle (nie blokuje). SYNC = blokuje do zakończenia.
+          tips:
+            - 'FLUSHALL ASYNC — usuwa klucze z WSZYSTKICH baz — bardzo destrukcyjne'
+            - 'Nigdy nie uruchamiaj na produkcji przypadkowo — nie ma cofnięcia'
+      - cmd: redis-benchmark -n 100000 -c 50 -q
+        desc: Benchmark wydajności
+        detail:
+          what: Uruchamia benchmark Redis — 100000 requestów z 50 równoległymi klientami.
+          how: "-n = liczba requestów. -c = równoległe klienty. -q = quiet (tylko wyniki/s)."
+          tips:
+            - 'redis-benchmark -n 100000 -c 50 -t get,set -q — tylko GET i SET'
+            - 'Dobre do weryfikacji konfiguracji sieci i serwera'

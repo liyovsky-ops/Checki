@@ -4,79 +4,199 @@ groups:
   - name: Instalacja
     icon: "📦"
     commands:
-      - desc: Zainstaluj pytest
-        code: pip install pytest
-      - desc: Zainstaluj z pluginami
-        code: pip install pytest pytest-asyncio pytest-cov pytest-mock
-      - desc: Sprawdź wersję
-        code: pytest --version
+      - cmd: pip install pytest
+        desc: Zainstaluj pytest
+        detail:
+          what: Instaluje pytest — najpopularniejszy framework testowy dla Pythona.
+          how: Po instalacji komenda pytest jest dostępna w terminalu. Automatycznie wykrywa pliki test_*.py.
+          tips:
+            - 'pip install pytest pytest-asyncio pytest-cov pytest-mock — pełny zestaw'
+            - 'pytest --version — sprawdź wersję'
+      - cmd: pip install pytest pytest-asyncio pytest-cov pytest-mock
+        desc: Zainstaluj z pluginami
+        detail:
+          what: Instaluje pytest z najpopularniejszymi pluginami — async testy, coverage i mockowanie.
+          how: "pytest-asyncio = async def test_...(), pytest-cov = coverage, pytest-mock = mocker fixture."
+          tips:
+            - 'W pyproject.toml dodaj: [tool.pytest.ini_options] asyncio_mode = "auto"'
+            - pytest-mock to wrapper nad unittest.mock — wygodniejszy interfejs
+      - cmd: pytest --version
+        desc: Sprawdź wersję pytest
+        detail:
+          what: Wyświetla wersję pytest i zainstalowanych pluginów.
+          how: Przydatne do weryfikacji instalacji i diagnozowania problemów z kompatybilnością.
+          tips:
+            - Pokazuje też zainstalowane pluginy i ich wersje
+            - 'pip show pytest — pełne info o paczce'
 
   - name: Uruchamianie
     icon: "▶️"
     commands:
-      - desc: Uruchom wszystkie testy
-        code: pytest
-      - desc: Uruchom z verbose output
-        code: pytest -v
-      - desc: Uruchom konkretny plik
-        code: pytest tests/test_users.py
-      - desc: Uruchom konkretną funkcję
-        code: pytest tests/test_users.py::test_create_user
-      - desc: Uruchom testy w klasie
-        code: pytest tests/test_users.py::TestUserAPI
-      - desc: Zatrzymaj po pierwszym błędzie
-        code: pytest -x
-      - desc: Zatrzymaj po N błędach
-        code: pytest --maxfail=3
+      - cmd: pytest
+        desc: Uruchom wszystkie testy
+        detail:
+          what: Odkrywa i uruchamia wszystkie testy w bieżącym katalogu i podkatalogach.
+          how: "Szuka plików test_*.py lub *_test.py, funkcji test_* i klas Test*."
+          tips:
+            - 'pytest tests/ — tylko w katalogu tests/'
+            - 'pytest -v — verbose: pokazuje nazwę każdego testu'
+      - cmd: pytest -v
+        desc: Uruchom z verbose output
+        detail:
+          what: Pokazuje pełną nazwę każdego testu i jego wynik (PASSED/FAILED/SKIPPED).
+          how: Bez -v widzisz tylko kropki i F-ki. Z -v — pełne ścieżki i nazwy testów.
+          tips:
+            - 'pytest -v --tb=short — verbose + krótki traceback przy błędzie'
+            - 'pytest -v -x — zatrzymaj po pierwszym błędzie'
+      - cmd: pytest tests/test_users.py::test_create_user
+        desc: Uruchom konkretną funkcję testową
+        detail:
+          what: Uruchamia pojedynczy test przez podanie ścieżki i nazwy funkcji po ::.
+          how: "Format: plik.py::funkcja lub plik.py::Klasa::metoda."
+          tips:
+            - 'pytest tests/test_users.py — cały plik'
+            - 'pytest tests/test_users.py::TestUserAPI — cała klasa'
+      - cmd: pytest -x
+        desc: Zatrzymaj po pierwszym błędzie
+        detail:
+          what: Uruchamia testy i natychmiast zatrzymuje się przy pierwszym FAILED lub ERROR.
+          how: Przydatne przy TDD — szybka pętla fail-fix-pass zamiast czekania na wszystkie testy.
+          tips:
+            - 'pytest -x --tb=short — krótszy traceback dla szybszego debugowania'
+            - 'pytest --maxfail=3 — zatrzymaj po 3 błędach zamiast po 1'
+      - cmd: pytest --maxfail=3
+        desc: Zatrzymaj po N błędach
+        detail:
+          what: Uruchamia testy ale zatrzymuje się po osiągnięciu podanej liczby błędów.
+          how: Kompromis między -x (zatrzymaj od razu) a pełnym uruchomieniem wszystkich testów.
+          tips:
+            - Dobre w CI gdy chcesz zobaczyć kilka błędów naraz zamiast jednego
+            - 'pytest --maxfail=1 — to samo co pytest -x'
 
   - name: Filtrowanie
     icon: "🔍"
     commands:
-      - desc: Uruchom testy pasujące do wzorca
-        code: pytest -k "test_user"
-      - desc: Uruchom przez marker
-        code: pytest -m slow
-      - desc: Pomiń testy z markerem
-        code: pytest -m "not slow"
-      - desc: Uruchom w wielu procesach
-        code: pytest -n auto
+      - cmd: pytest -k "test_user"
+        desc: Uruchom testy pasujące do wzorca
+        detail:
+          what: Filtruje testy po nazwie — uruchamia tylko te których nazwa zawiera podany string.
+          how: "-k przyjmuje wyrażenia: -k 'user and not admin' lub -k 'create or delete'."
+          tips:
+            - 'pytest -k "not slow" — pomiń testy z "slow" w nazwie'
+            - 'pytest -k "test_create or test_delete" — kilka wzorców'
+      - cmd: pytest -m slow
+        desc: Uruchom testy z markerem
+        detail:
+          what: Uruchamia tylko testy oznaczone dekoratorem @pytest.mark.slow.
+          how: "Markery definiujesz w pyproject.toml [tool.pytest.ini_options] markers = ['slow: wolne testy']."
+          tips:
+            - 'pytest -m "not slow" — pomiń wolne testy (np. w szybkim CI)'
+            - 'pytest --markers — lista wszystkich zarejestrowanych markerów'
+      - cmd: pytest -n auto
+        desc: Uruchom testy równolegle
+        detail:
+          what: Uruchamia testy równolegle w wielu procesach — dramatycznie przyspiesza duże zestawy testów.
+          how: "-n auto = tyle procesów ile CPU. Wymaga pip install pytest-xdist."
+          tips:
+            - 'pip install pytest-xdist — wymagany plugin'
+            - 'Uwaga: testy muszą być izolowane — nie mogą dzielić stanu'
 
   - name: Output i raporty
     icon: "📊"
     commands:
-      - desc: Pokaż print() w testach
-        code: pytest -s
-      - desc: Pokaż najwolniejsze testy
-        code: pytest --durations=10
-      - desc: Coverage report
-        code: pytest --cov=app --cov-report=term-missing
-      - desc: Coverage HTML
-        code: pytest --cov=app --cov-report=html
-      - desc: Zapisz wyniki do pliku XML (CI)
-        code: pytest --junitxml=results.xml
+      - cmd: pytest -s
+        desc: Pokaż print() w testach
+        detail:
+          what: Wyłącza przechwytywanie output — print() i logi są widoczne w terminalu podczas testu.
+          how: "Domyślnie pytest przechwytuje stdout/stderr. -s = --capture=no."
+          tips:
+            - 'Użyj tylko do debugowania — w CI lepiej nie używać -s'
+            - 'Możesz też: import logging; logging.debug("msg") i pytest --log-cli-level=DEBUG'
+      - cmd: pytest --durations=10
+        desc: Pokaż najwolniejsze testy
+        detail:
+          what: Wyświetla 10 najwolniejszych testów i setup/teardown na końcu raportu.
+          how: Świetne do identyfikowania testów które spowalniają cały suite.
+          tips:
+            - 'pytest --durations=0 — pokaż wszystkie testy posortowane po czasie'
+            - Wolny test = kandydat do mockowania lub pytest.mark.slow
+      - cmd: pytest --cov=app --cov-report=term-missing
+        desc: Coverage z informacją o brakujących liniach
+        detail:
+          what: Mierzy pokrycie kodu i pokazuje które linie nie są objęte testami.
+          how: "--cov=app = mierz pokrycie w katalogu app/. term-missing = pokaż numery linii bez testów."
+          tips:
+            - 'pip install pytest-cov — wymagany plugin'
+            - 'pytest --cov=app --cov-report=html — raport HTML w htmlcov/index.html'
+      - cmd: pytest --junitxml=results.xml
+        desc: Zapisz wyniki do XML (CI)
+        detail:
+          what: Generuje raport XML w formacie JUnit — kompatybilny z Jenkins, GitLab CI, GitHub Actions.
+          how: CI systemy importują ten plik żeby pokazać wyniki testów w UI pipeline.
+          tips:
+            - 'W GitHub Actions: uses: actions/upload-artifact z tym plikiem'
+            - 'Możesz łączyć: pytest --junitxml=results.xml --cov=app'
 
   - name: Konfiguracja
     icon: "⚙️"
     commands:
-      - desc: Pokaż konfigurację pytest
-        code: pytest --co -q
-      - desc: Listuj dostępne fixtures
-        code: pytest --fixtures
-      - desc: Pokaż markery
-        code: pytest --markers
-      - desc: Sprawdź czy testy by się znalazły (dry-run)
-        code: pytest --collect-only
+      - cmd: pytest --collect-only
+        desc: Sprawdź jakie testy zostałyby uruchomione (dry-run)
+        detail:
+          what: Listuje wszystkie wykryte testy bez ich uruchamiania. Przydatne do weryfikacji konfiguracji.
+          how: Pokazuje hierarchię plik → klasa → funkcja. Sprawdź czy pytest widzi Twoje testy.
+          tips:
+            - 'pytest --collect-only -q — krótszy format'
+            - Jeśli test nie jest na liście — sprawdź naming convention (test_*.py, def test_*)'
+      - cmd: pytest --fixtures
+        desc: Listuj dostępne fixtures
+        detail:
+          what: Wyświetla wszystkie dostępne fixtures — wbudowane pytest, z pluginów i z conftest.py.
+          how: Fixtures to funkcje przygotowujące dane dla testów. Wstrzykiwane przez parametry funkcji testowej.
+          tips:
+            - 'pytest --fixtures -v — pokaż też docstring każdej fixture'
+            - 'conftest.py — plik gdzie definiujesz własne fixtures'
+      - cmd: pytest --markers
+        desc: Pokaż dostępne markery
+        detail:
+          what: Lista wszystkich zarejestrowanych markerów pytest — wbudowanych i własnych.
+          how: Markery to etykiety na testach. Filtruj przez pytest -m nazwa_markera.
+          tips:
+            - 'Zarejestruj własne w pyproject.toml: markers = ["slow: wolne testy integracyjne"]'
+            - Niezarejestrowane markery generują warning — zawsze je rejestruj
 
-  - name: Debug
+  - name: Debugowanie
     icon: "🔧"
     commands:
-      - desc: Wejdź do debuggera przy błędzie
-        code: pytest --pdb
-      - desc: Verbose traceback
-        code: pytest --tb=long
-      - desc: Krótki traceback
-        code: pytest --tb=short
-      - desc: Uruchom poprzednio nieudane testy
-        code: pytest --lf
-      - desc: Uruchom poprzednio nieudane, potem resztę
-        code: pytest --ff
+      - cmd: pytest --pdb
+        desc: Wejdź do debuggera przy błędzie
+        detail:
+          what: Przy pierwszym FAILED lub ERROR automatycznie otwiera pdb (Python debugger).
+          how: "W pdb: n = next, s = step into, c = continue, p zmienna = print, q = quit."
+          tips:
+            - 'breakpoint() w kodzie testu — zatrzymaj w konkretnym miejscu'
+            - 'pip install pdbpp — lepszy debugger (kolorowanie, historia)'
+      - cmd: pytest --tb=short
+        desc: Krótki traceback przy błędach
+        detail:
+          what: Pokazuje skróconą wersję traceback — tylko ostatnie linie zamiast pełnego stosu wywołań.
+          how: "Opcje: --tb=long (domyślnie), --tb=short, --tb=line (jedna linia), --tb=no (brak)."
+          tips:
+            - '--tb=short najlepszy balans między informacją a czytelnością'
+            - 'W CI często używa się --tb=long żeby mieć pełny kontekst błędu'
+      - cmd: pytest --lf
+        desc: Uruchom tylko poprzednio nieudane testy
+        detail:
+          what: "Uruchamia tylko testy które FAILED lub ERROR w poprzednim uruchomieniu."
+          how: pytest zapamiętuje wyniki w .pytest_cache/. --lf = --last-failed.
+          tips:
+            - 'pytest --ff — najpierw nieudane, potem reszta (--failed-first)'
+            - 'Świetne do TDD: fix błąd, pytest --lf, sprawdź czy fixed'
+      - cmd: pytest --ff
+        desc: Najpierw nieudane testy, potem reszta
+        detail:
+          what: Uruchamia poprzednio nieudane testy jako pierwsze, potem wszystkie pozostałe.
+          how: "Kombincja --lf i normalnego uruchomienia. --ff = --failed-first."
+          tips:
+            - Dobre dla CI gdzie chcesz szybko zobaczyć czy poprzednie błędy są naprawione
+            - 'pytest --lf --tb=short — szybka pętla fix-verify'

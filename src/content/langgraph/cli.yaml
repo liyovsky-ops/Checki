@@ -1,0 +1,354 @@
+title: Komendy LangGraph
+
+groups:
+  - name: Instalacja i setup
+    icon: "📦"
+    commands:
+      - cmd: pip install langgraph langchain-anthropic
+        desc: Zainstaluj LangGraph z LangChain i Anthropic
+        detail:
+          what: Instaluje LangGraph (framework grafów agentów) i langchain-anthropic (binding do Claude).
+          how: langchain-anthropic dostarcza ChatAnthropic — model który wpisujesz do węzłów grafu.
+          tips:
+            - 'pip install langgraph langchain-anthropic langchain-core — pełny zestaw'
+            - 'pip show langgraph — sprawdź wersję (zmiany API są częste)'
+      - cmd: pip install langgraph-cli
+        desc: Zainstaluj LangGraph CLI (lokalny dev server)
+        detail:
+          what: Instaluje CLI do lokalnego developmentu LangGraph — komenda langgraph dev/build/run.
+          how: CLI uruchamia lokalny serwer LangGraph z API kompatybilnym z LangGraph Platform.
+          tips:
+            - 'langgraph dev — hot-reload dev server z LangGraph Studio UI'
+            - 'Wymaga pliku langgraph.json z konfiguracją projektu'
+      - cmd: pip install langsmith
+        desc: Zainstaluj LangSmith (observability)
+        detail:
+          what: Instaluje LangSmith SDK do tracingu wywołań LLM — debuguj co robi agent krok po kroku.
+          how: Po ustawieniu LANGCHAIN_TRACING_V2=true każde wywołanie jest logowane do LangSmith.
+          tips:
+            - 'Bezpłatny tier LangSmith wystarczy do developmentu'
+            - 'Tracing działa automatycznie po ustawieniu env vars — bez zmian w kodzie'
+      - cmd: pip install langchain-tavily
+        desc: Zainstaluj Tavily Search dla agentów
+        detail:
+          what: Instaluje binding do Tavily Search API — narzędzie do przeszukiwania internetu dla agentów.
+          how: Tavily zwraca wyniki przeszukiwania w formacie przyjaznym dla LLM (skrócone, bez HTML).
+          tips:
+            - 'Potrzebny klucz API: export TAVILY_API_KEY="tvly-..."'
+            - 'Alternatywy: DuckDuckGo (bezpłatne, pip install duckduckgo-search)'
+      - cmd: pip install langgraph-supervisor langgraph-swarm
+        desc: Zainstaluj pakiety multi-agent
+        detail:
+          what: Instaluje langgraph-supervisor (wzorzec supervisor/agent) i langgraph-swarm (sieć agentów peer-to-peer).
+          how: "Supervisor: jeden agent zarządza innymi. Swarm: agenty przekazują sobie zadania bezpośrednio."
+          tips:
+            - 'Supervisor = prostszy, bardziej przewidywalny. Swarm = elastyczny, trudniejszy do debugowania'
+            - 'Zacznij od supervisora — swarm dopiero gdy potrzebujesz dynamicznego przekazywania'
+      - cmd: pip install langgraph-checkpoint-sqlite
+        desc: Zainstaluj checkpointer SQLite
+        detail:
+          what: Instaluje checkpointer SQLite — pozwala zapisywać stan grafu do pliku SQLite między sesjami.
+          how: "Użyj: AsyncSqliteSaver.from_conn_string('checkpoints.db') w lifespan kontekście."
+          tips:
+            - 'Idealny dla development i małych projektów — zero konfiguracji'
+            - 'CHECKPOINTER = None w module-level — inicjalizuj w lifespan (wymaga async context)'
+      - cmd: pip install langgraph-checkpoint-postgres psycopg
+        desc: Zainstaluj checkpointer PostgreSQL
+        detail:
+          what: Instaluje checkpointer PostgreSQL do produkcyjnego przechowywania stanu agenta.
+          how: "AsyncPostgresSaver z połączeniem do PostgreSQL — skaluje się na wiele instancji."
+          tips:
+            - 'Wymagany do produkcji gdy uruchamiasz wiele instancji agenta równolegle'
+            - 'psycopg3 (nowa wersja) — nie mylić z psycopg2'
+      - cmd: pip install langgraph-sdk
+        desc: Zainstaluj SDK do LangGraph Platform API
+        detail:
+          what: Instaluje SDK do komunikacji z LangGraph Platform (cloud lub self-hosted) przez REST API.
+          how: Pozwala wywoływać zdeployowane grafy i zarządzać wątkami przez Python client.
+          tips:
+            - 'from langgraph_sdk import get_client — klient do Platform API'
+            - 'Używaj gdy Twój agent jest zdeployowany na LangGraph Platform lub lokalnym serwerze'
+
+  - name: LangGraph CLI — lokalny dev
+    icon: "🚀"
+    commands:
+      - cmd: langgraph dev
+        desc: Uruchom lokalny serwer deweloperski z hot-reload
+        detail:
+          what: Uruchamia lokalny serwer LangGraph z hot-reload i otwiera LangGraph Studio UI w przeglądarce.
+          how: Serwer nasłuchuje na localhost:2024. Studio UI pozwala wizualnie testować graf i przeglądać stany.
+          tips:
+            - 'Wymaga pliku langgraph.json — uruchom langgraph new żeby go stworzyć'
+            - 'LangGraph Studio działa w przeglądarce — kliknij link z terminala'
+      - cmd: langgraph dev --port 8080
+        desc: Uruchom dev server na konkretnym porcie
+        detail:
+          what: Uruchamia dev server LangGraph na porcie 8080 zamiast domyślnego 2024.
+          how: Przydatne gdy port 2024 jest zajęty lub masz wiele projektów LangGraph działających równolegle.
+          tips:
+            - 'export LANGGRAPH_API_URL=http://localhost:8080 — zaktualizuj env var'
+            - 'Klient SDK automatycznie używa LANGGRAPH_API_URL z env'
+      - cmd: langgraph build -t my-agent:latest
+        desc: Zbuduj Docker image agenta
+        detail:
+          what: Buduje Docker image z agentem LangGraph gotowy do deployu na LangGraph Platform lub self-hosted.
+          how: Czyta konfigurację z langgraph.json i tworzy produkcyjny obraz z wszystkimi zależnościami.
+          tips:
+            - 'Wymaga Dockera działającego lokalnie'
+            - 'langgraph build --no-cache -t my-agent:latest — fresh build bez cache'
+      - cmd: docker run -p 8123:8080 my-agent:latest
+        desc: Uruchom zbudowany obraz lokalnie
+        detail:
+          what: Uruchamia zbudowany Docker image agenta lokalnie na porcie 8123.
+          how: Wewnętrzny port kontenera to 8080 — mapujemy go na 8123 hosta.
+          tips:
+            - 'curl http://localhost:8123/health — sprawdź czy serwer działa'
+            - 'docker run -e ANTHROPIC_API_KEY=... -p 8123:8080 my-agent:latest — przekaż klucz API'
+      - cmd: langgraph --help
+        desc: Pokaż pomoc dla langgraph CLI
+        detail:
+          what: Wyświetla dostępne komendy LangGraph CLI z opisami i opcjami.
+          how: 'Skróty: langgraph dev --help — szczegółowa pomoc dla konkretnej komendy.'
+          tips:
+            - 'langgraph dev --help — opcje dev server'
+            - 'langgraph build --help — opcje budowania image'
+      - cmd: langgraph new
+        desc: Zainicjuj projekt LangGraph (tworzy langgraph.json)
+        detail:
+          what: Tworzy nowy projekt LangGraph z podstawową strukturą plików i langgraph.json.
+          how: langgraph.json = konfiguracja projektu — definiuje który graf jest serwerem i zależności.
+          tips:
+            - 'langgraph.json zawiera: graphs (ścieżki do grafów), dependencies, env'
+            - 'Przykładowe langgraph.json: {"graphs": {"agent": "./agent.py:graph"}}'
+
+  - name: Uruchamianie i testowanie grafu
+    icon: "▶️"
+    commands:
+      - cmd: 'result = graph.invoke({"messages": [("human", "Cześć")]})'
+        desc: Invoke synchroniczny (bloking)
+        detail:
+          what: Uruchamia graf synchronicznie i czeka na pełny wynik — blokuje wątek do zakończenia.
+          how: Przekazujesz input state jako dict. Klucz "messages" to lista tupli (rola, treść).
+          tips:
+            - 'Użyj tylko w skryptach — w FastAPI/async kodzie użyj ainvoke'
+            - 'config = {"configurable": {"thread_id": "1"}} — dodaj thread_id dla pamięci'
+      - cmd: 'result = await graph.ainvoke({"messages": [("human", "Cześć")]})'
+        desc: Invoke asynchroniczny
+        detail:
+          what: Uruchamia graf asynchronicznie — nie blokuje event loop. Użyj w aplikacjach async.
+          how: await czeka na zakończenie grafu. Wynik to dict ze stanem końcowym grafu.
+          tips:
+            - 'FastAPI: await graph.ainvoke(input, config=config) w async def endpoint'
+            - 'Thread ID w config umożliwia pamięć między wywołaniami (wymaga checkpointera)'
+      - cmd: 'for chunk in graph.stream(input, stream_mode="updates"): print(chunk)'
+        desc: Stream aktualizacji stanu
+        detail:
+          what: Streamuje aktualizacje stanu po każdym węźle grafu — otrzymujesz wynik w miarę postępu.
+          how: stream_mode="updates" = tylko delta (co się zmieniło). "values" = pełny stan po każdym kroku.
+          tips:
+            - 'stream_mode="messages" — streamuj tokeny LLM na bieżąco (jak w ChatGPT)'
+            - 'Idealny do UI gdzie chcesz pokazywać progress agenta użytkownikowi'
+      - cmd: 'async for event in graph.astream_events(input, version="v2"): ...'
+        desc: Stream tokenów LLM (async)
+        detail:
+          what: Streamuje zdarzenia z grafu asynchronicznie — tokeny LLM, wywołania narzędzi, aktualizacje stanu.
+          how: version="v2" = nowsza wersja API zdarzeń. Filtruj po event["event"] żeby dostać to co chcesz.
+          tips:
+            - 'event["event"] == "on_chat_model_stream" — zdarzenie tokenu LLM'
+            - 'event["data"]["chunk"].content — tekst tokenu'
+      - cmd: 'state = graph.get_state({"configurable": {"thread_id": "id"}})'
+        desc: Pobierz aktualny stan wątku
+        detail:
+          what: Czyta aktualny stan wątku z checkpointera — wszystko co graf zapisał dla tego thread_id.
+          how: Wymaga checkpointera (SQLite, PostgreSQL). Bez checkpointera — stan nie jest zapisywany.
+          tips:
+            - 'state.values — aktualny stan jako dict'
+            - 'state.next — które węzły będą następne (jeśli graf jest zatrzymany)'
+      - cmd: history = list(graph.get_state_history(config))
+        desc: Historia checkpointów wątku
+        detail:
+          what: Zwraca listę wszystkich zapisanych stanów wątku — każdy checkpoint to jeden element listy.
+          how: Chronologicznie od najnowszego do najstarszego. Każdy element ma .values i .config.
+          tips:
+            - 'Przydatne do time travel — cofnij się do starszego stanu'
+            - 'history[0] — najnowszy stan, history[-1] — najstarszy'
+      - cmd: 'graph.update_state(config, {"messages": [("human", "nowa")]})'
+        desc: Zaktualizuj stan ręcznie (time travel)
+        detail:
+          what: Modyfikuje stan wątku bezpośrednio — pozwala cofnąć się w czasie lub naprawić błąd agenta.
+          how: "Łączy podane wartości z obecnym stanem (merge). Następnie możesz wywołać graph.invoke ponownie."
+          tips:
+            - 'Time travel: pobierz stary checkpoint z history i zaktualizuj stan — powtórz od tamtego miejsca'
+            - 'Przydatne w Human-in-the-Loop — człowiek poprawia stan i pozwala agentowi kontynuować'
+
+  - name: Zmienne środowiskowe
+    icon: "🔑"
+    commands:
+      - cmd: 'export ANTHROPIC_API_KEY="sk-ant-..."'
+        desc: Klucz API Anthropic (wymagany)
+        detail:
+          what: Ustawia klucz API Anthropic — wymagany przez ChatAnthropic do wywołania Claude.
+          how: export ustawia zmienną dla bieżącej sesji. Dodaj do .env i wczytuj przez python-dotenv.
+          tips:
+            - 'Klucz znajdziesz na console.anthropic.com'
+            - 'Nigdy nie commituj klucza do git — dodaj .env do .gitignore'
+      - cmd: 'export LANGCHAIN_TRACING_V2="true"'
+        desc: Włącz tracing LangSmith
+        detail:
+          what: Włącza automatyczne logowanie wywołań LLM i kroków agenta do LangSmith.
+          how: Po włączeniu każde graph.invoke() jest automatycznie tracowane — bez zmian w kodzie.
+          tips:
+            - 'Wymaga też LANGCHAIN_API_KEY — bez niego tracing nie zadziała'
+            - 'Sprawdź trace na smith.langchain.com po uruchomieniu agenta'
+      - cmd: 'export LANGCHAIN_API_KEY="ls__..."'
+        desc: Klucz API LangSmith
+        detail:
+          what: Klucz API do LangSmith — wymagany do wysyłania trace danych.
+          how: Znajdziesz na smith.langchain.com w ustawieniach konta (Settings > API Keys).
+          tips:
+            - 'ls__ — prefix klucza LangSmith (nie mylić z sk-ant- który jest Anthropic)'
+            - 'Bezpłatny tier LangSmith = 5000 trace/miesiąc'
+      - cmd: 'export LANGCHAIN_PROJECT="moj-projekt"'
+        desc: Nazwa projektu w LangSmith
+        detail:
+          what: Grupuje trace pod konkretną nazwą projektu w LangSmith — łatwiejsze filtrowanie.
+          how: Bez tej zmiennej trace trafiają do projektu "default".
+          tips:
+            - 'Ustaw osobny projekt dla każdego agenta — łatwiej śledzić i debugować'
+            - 'LANGCHAIN_PROJECT="dev-agent" vs "prod-agent" — rozdziel środowiska'
+      - cmd: 'export TAVILY_API_KEY="tvly-..."'
+        desc: Klucz Tavily Search
+        detail:
+          what: Klucz API do Tavily Search — narzędzia do przeszukiwania internetu dla agentów.
+          how: Bezpłatny tier = 1000 requestów/miesiąc. Wystarczy do developmentu.
+          tips:
+            - 'Zarejestruj się na tavily.com — klucz dostępny natychmiast'
+            - 'DuckDuckGo jako alternatywa: pip install duckduckgo-search (bezpłatne, bez klucza)'
+      - cmd: 'export LANGGRAPH_API_URL="http://localhost:2024"'
+        desc: URL LangGraph Platform (self-hosted)
+        detail:
+          what: Adres lokalnego lub self-hosted serwera LangGraph Platform.
+          how: SDK automatycznie używa tej zmiennej do łączenia się z serwerem.
+          tips:
+            - 'Domyślnie: http://localhost:2024 gdy używasz langgraph dev'
+            - 'Zmień na adres produkcyjny gdy deployujesz na własnym serwerze'
+      - cmd: "echo 'ANTHROPIC_API_KEY=sk-ant-...' >> .env"
+        desc: Zapisz zmienne do pliku .env
+        detail:
+          what: Dodaje zmienną środowiskową do pliku .env — do wczytania przez python-dotenv.
+          how: "W kodzie: from dotenv import load_dotenv; load_dotenv() — wczytaj przed użyciem."
+          tips:
+            - 'pip install python-dotenv — wymagany do load_dotenv()'
+            - 'Zawsze dodaj .env do .gitignore — nie commituj kluczy API'
+
+  - name: Debugowanie
+    icon: "🐛"
+    commands:
+      - cmd: graph.get_graph().print_ascii()
+        desc: Rysuj graf jako ASCII (wymaga grandalf)
+        detail:
+          what: Drukuje wizualizację struktury grafu jako ASCII art w terminalu.
+          how: Pokazuje węzły i krawędzie — przydatne żeby zweryfikować że graf ma właściwą strukturę.
+          tips:
+            - 'pip install grandalf — wymagana biblioteka do renderowania ASCII'
+            - 'Uruchom po zbudowaniu grafu (graph = builder.compile()) żeby sprawdzić strukturę'
+      - cmd: print(graph.get_graph().draw_mermaid())
+        desc: Pobierz Mermaid diagram grafu
+        detail:
+          what: Generuje kod Mermaid dla diagramu grafu — wklej na mermaid.live żeby zobaczyć wizualizację.
+          how: Mermaid to format do diagramów w tekście — zrozumiały przez GitHub, Notion, VS Code.
+          tips:
+            - 'Wklej output na mermaid.live — renderuje diagram interaktywnie'
+            - 'GitHub Markdown automatycznie renderuje bloki ```mermaid'
+      - cmd: graph.get_graph().draw_mermaid_png(output_file_path="graph.png")
+        desc: Zapisz diagram do pliku PNG (wymaga Pillow, pygments)
+        detail:
+          what: Generuje diagram grafu jako plik PNG — dobry do dokumentacji i PR opisów.
+          how: Używa wewnętrznie API Mermaid do renderowania. Wymaga Pillow i pygments.
+          tips:
+            - 'pip install Pillow pygments — zainstaluj zależności'
+            - 'Alternatywa: skopiuj draw_mermaid() output i renderuj online'
+      - cmd: 'from langchain.globals import set_verbose; set_verbose(True)'
+        desc: Włącz verbose logging LangChain
+        detail:
+          what: Włącza szczegółowe logowanie LangChain — wypisuje prompty, odpowiedzi i kroki agenta.
+          how: Działa globalnie dla wszystkich wywołań LangChain w sesji. Wyłącz set_verbose(False).
+          tips:
+            - 'Przydatne do debugowania co dokładnie jest wysyłane do LLM'
+            - 'LangSmith daje lepszy wgląd — użyj verbose tylko gdy LangSmith niedostępny'
+      - cmd: 'from langchain.globals import set_debug; set_debug(True)'
+        desc: Włącz debug logging
+        detail:
+          what: Włącza bardzo szczegółowy debug logging — więcej niż verbose, pokazuje internals LangChain.
+          how: Zwykle za dużo informacji — użyj verbose najpierw, debug dopiero gdy to nie wystarcza.
+          tips:
+            - 'set_debug(False) — wyłącz gdy skończysz debugować'
+            - 'LANGCHAIN_VERBOSE=true — alternatywnie przez zmienną środowiskową'
+      - cmd: 'print(graph.get_graph().nodes, graph.get_graph().edges)'
+        desc: Wylistuj węzły i krawędzie grafu
+        detail:
+          what: Drukuje listę wszystkich węzłów i krawędzi grafu — przydatne do weryfikacji struktury.
+          how: nodes = dict z węzłami. edges = lista krawędzi z source i target.
+          tips:
+            - 'Sprawdź czy wszystkie oczekiwane węzły są w grafie po kompilacji'
+            - 'graph.get_graph().to_json() — pełny graf jako JSON (bardziej czytelny)'
+      - cmd: pip show langgraph langchain-anthropic langchain-core
+        desc: Sprawdź wersje bibliotek
+        detail:
+          what: Wyświetla wersje zainstalowanych bibliotek LangGraph — ważne bo API zmienia się często.
+          how: pip show bez połączenia z internetem — sprawdza lokalne pakiety.
+          tips:
+            - 'pip install --upgrade langgraph langchain-anthropic — zaktualizuj wszystko naraz'
+            - 'Sprawdź CHANGELOG LangGraph przed upgrade — breaking changes są częste'
+
+  - name: Zarządzanie zależnościami
+    icon: "📋"
+    commands:
+      - cmd: python -m venv .venv && source .venv/bin/activate
+        desc: Stwórz środowisko wirtualne i aktywuj
+        detail:
+          what: Tworzy izolowane środowisko Python i aktywuje je — zależności nie mieszają się z systemem.
+          how: "Na Windows: .venv\\Scripts\\activate zamiast source .venv/bin/activate."
+          tips:
+            - 'Zawsze używaj venv dla projektów LangGraph — zależności między wersjami są wrażliwe'
+            - 'VS Code automatycznie wykrywa .venv i używa go jako interpreter'
+      - cmd: pip install -r requirements.txt
+        desc: Zainstaluj zależności z requirements.txt
+        detail:
+          what: Instaluje wszystkie zależności projektu zdefiniowane w pliku requirements.txt.
+          how: Każda linia w requirements.txt to jeden pakiet (z opcjonalnym pinem wersji).
+          tips:
+            - 'pip install -r requirements.txt -r requirements-dev.txt — kilka plików naraz'
+            - 'Pinuj wersje w requirements.txt — np. langgraph==0.2.x — dla reprodukowalności'
+      - cmd: pip freeze > requirements.txt
+        desc: Zapisz zależności do pliku
+        detail:
+          what: Zapisuje wszystkie zainstalowane pakiety z dokładnymi wersjami do requirements.txt.
+          how: Freezes environment — gwarantuje że inni dostają identyczne wersje.
+          tips:
+            - 'pip freeze zapisuje WSZYSTKIE pakiety — może być za dużo. Lepiej: pip-compile (pip-tools)'
+            - 'pip install pip-tools && pip-compile — generuje requirements z pyproject.toml'
+      - cmd: uv pip install langgraph langchain-anthropic
+        desc: Zainstaluj przez uv (szybszy pip)
+        detail:
+          what: uv to ultraszybki instalator pakietów Python — 10-100x szybszy niż pip.
+          how: "uv pip = identyczne CLI jak pip ale znacznie szybsze. uv też tworzy venv: uv venv."
+          tips:
+            - 'pip install uv — zainstaluj uv'
+            - 'uv pip install -r requirements.txt — instalacja z pliku (szybsza niż pip)'
+      - cmd: pytest tests/ -v
+        desc: Uruchom testy
+        detail:
+          what: Uruchamia wszystkie testy z folderu tests/ z verbose output — każdy test na osobnej linii.
+          how: "-v = verbose (nazwy testów). Bez -v pytest wypisuje tylko kropki i F dla failed."
+          tips:
+            - 'pytest tests/ -v -k "test_agent" — uruchom tylko testy z "agent" w nazwie'
+            - 'pytest tests/ --tb=short — krótsze traceback przy błędach'
+      - cmd: pytest tests/ --cov=src --cov-report=html
+        desc: Uruchom testy z pokryciem
+        detail:
+          what: Uruchamia testy i generuje raport coverage HTML — pokazuje które linie kodu są przetestowane.
+          how: Raport trafia do htmlcov/index.html — otwórz w przeglądarce.
+          tips:
+            - 'pip install pytest-cov — wymagany plugin'
+            - 'pytest tests/ --cov=src --cov-report=term-missing — pokaż niepokryte linie w terminalu'

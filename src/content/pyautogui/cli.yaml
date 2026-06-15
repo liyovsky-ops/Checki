@@ -3,18 +3,54 @@ groups:
   - name: Instalacja i setup
     icon: "📦"
     commands:
-      - desc: Zainstaluj PyAutoGUI
-        code: pip install pyautogui
-      - desc: Pełny zestaw automatyzacji GUI
-        code: pip install pyautogui pyperclip opencv-python pytesseract
-      - desc: Dodatkowe dla Linux (wymagane)
-        code: sudo apt-get install scrot python3-tk python3-dev python3-xlib
-      - desc: Dodatkowe dla Mac (wymagane)
-        code: pip install pyobjc-framework-Quartz pyobjc-core pyobjc
-      - desc: Sprawdź czy działa poprawnie
-        code: python -c "import pyautogui; print(pyautogui.size())"
-      - desc: Interaktywny debugger pozycji myszy
-        code: pip install mouseinfo && python -m mouseinfo
+      - cmd: pip install pyautogui
+        desc: Zainstaluj PyAutoGUI
+        detail:
+          what: Instaluje PyAutoGUI — bibliotekę do automatyzacji GUI (mysz, klawiatura, screenshoty).
+          how: Działa na Windows, Mac i Linux. Na Linux i Mac wymagane są dodatkowe zależności.
+          tips:
+            - 'pip install pyautogui pyperclip — dodaj pyperclip do kopiowania do schowka'
+            - 'python -c "import pyautogui; print(pyautogui.size())" — test po instalacji'
+      - cmd: pip install pyautogui pyperclip opencv-python pytesseract
+        desc: Pełny zestaw automatyzacji GUI
+        detail:
+          what: Instaluje PyAutoGUI z narzędziami do rozpoznawania obrazów (OpenCV) i tekstu (Tesseract OCR).
+          how: opencv-python — do locateOnScreen z confidence. pytesseract — do czytania tekstu z ekranu.
+          tips:
+            - 'pytesseract wymaga też binarki: sudo apt install tesseract-ocr (Linux)'
+            - 'locateOnScreen() bez OpenCV nie obsługuje parametru confidence'
+      - cmd: sudo apt-get install scrot python3-tk python3-dev python3-xlib
+        desc: Dodatkowe dla Linux (wymagane)
+        detail:
+          what: Instaluje systemowe zależności wymagane przez PyAutoGUI na Ubuntu/Debian.
+          how: scrot — do screenshotów. python3-xlib — do kontroli myszy/klawiatury w X11.
+          tips:
+            - 'Bez tych pakietów PyAutoGUI zgłosi błąd przy imporcie na Linux'
+            - 'Na WSL2 PyAutoGUI nie działa — brak pełnego środowiska graficznego X11'
+      - cmd: pip install pyobjc-framework-Quartz pyobjc-core pyobjc
+        desc: Dodatkowe dla Mac (wymagane)
+        detail:
+          what: Instaluje bridge Python-ObjC wymagany przez PyAutoGUI do komunikacji z macOS APIs.
+          how: PyAutoGUI na Mac używa Quartz/CoreGraphics do kontroli myszy i klawiatury.
+          tips:
+            - 'Wymagane uprawnienia "Accessibility" w System Preferences > Security & Privacy'
+            - 'Na Apple Silicon (M1/M2) może być potrzebne: arch -arm64 pip install pyobjc'
+      - cmd: python -c "import pyautogui; print(pyautogui.size())"
+        desc: Sprawdź czy działa poprawnie
+        detail:
+          what: Importuje PyAutoGUI i wypisuje rozdzielczość ekranu — potwierdza że instalacja jest poprawna.
+          how: Jeśli wypisze np. Size(width=1920, height=1080) — działa. Błąd = brakujące zależności.
+          tips:
+            - 'Błąd "Xlib.error.DisplayNameError" na Linux = brak DISPLAY (WSL bez X server)'
+            - 'Błąd "moduleNotFoundError: Quartz" na Mac = pip install pyobjc'
+      - cmd: pip install mouseinfo && python -m mouseinfo
+        desc: Interaktywny debugger pozycji myszy
+        detail:
+          what: Instaluje i uruchamia MouseInfo — narzędzie GUI pokazujące pozycję kursora i kolor piksela w czasie rzeczywistym.
+          how: Okno odświeża się co chwilę pokazując X, Y, RGB pod kursorem — idealne do znajdowania współrzędnych.
+          tips:
+            - 'Uruchom na boku i ustaw kursor na elemencie żeby odczytać współrzędne'
+            - 'python -m mouseinfo — uruchom ponownie po instalacji'
 
   - name: Diagnostyka i pozycja myszy
     icon: "🖱️"
@@ -27,18 +63,42 @@ groups:
               print(pyautogui.position())
               time.sleep(1)
           "
-      - desc: Pokaż rozdzielczość ekranu
-        code: python -c "import pyautogui; print(pyautogui.size())"
-      - desc: Kolor piksela na ekranie
-        code: python -c "import pyautogui; print(pyautogui.pixel(500, 300))"
-      - desc: Interaktywny debugger (mouseinfo)
-        code: python -m mouseinfo
+      - cmd: python -c "import pyautogui; print(pyautogui.size())"
+        desc: Pokaż rozdzielczość ekranu
+        detail:
+          what: Zwraca rozdzielczość głównego monitora jako Size(width=..., height=...).
+          how: Przydatne do obliczania środka ekranu lub skrajnych pozycji dla moveTo().
+          tips:
+            - 'w, h = pyautogui.size() — rozpakuj do zmiennych'
+            - 'Na wielomonitorowych setupach zwraca rozmiar głównego ekranu'
+      - cmd: python -c "import pyautogui; print(pyautogui.pixel(500, 300))"
+        desc: Kolor piksela na ekranie
+        detail:
+          what: Zwraca kolor RGB piksela na pozycji (500, 300) jako tuple (R, G, B).
+          how: Przydatne do weryfikacji czy dany element jest na ekranie po kolorze.
+          tips:
+            - 'pyautogui.pixelMatchesColor(x, y, (R,G,B)) — sprawdź czy piksel ma konkretny kolor'
+            - 'Użyj MouseInfo żeby łatwiej odczytać kolor — pokazuje RGB pod kursorem na żywo'
+      - cmd: python -m mouseinfo
+        desc: Interaktywny debugger (mouseinfo)
+        detail:
+          what: Uruchamia GUI narzędzie MouseInfo pokazujące pozycję kursora i kolor piksela na bieżąco.
+          how: Wyświetla X, Y, RGB — kliknij "Copy All" żeby skopiować dane do schowka.
+          tips:
+            - 'pip install mouseinfo — zainstaluj najpierw'
+            - 'Zostaw okno obok i ustaw kursor na elemencie żeby odczytać współrzędne'
 
   - name: Screenshoty i obrazki
     icon: "📸"
     commands:
-      - desc: Screenshot całego ekranu
-        code: python -c "import pyautogui; pyautogui.screenshot('screen.png')"
+      - cmd: python -c "import pyautogui; pyautogui.screenshot('screen.png')"
+        desc: Screenshot całego ekranu
+        detail:
+          what: Robi screenshot całego ekranu i zapisuje do screen.png.
+          how: "Zwraca też obiekt PIL Image: img = pyautogui.screenshot() — możesz dalej przetwarzać."
+          tips:
+            - 'pyautogui.screenshot() bez argumentu — zwraca PIL Image bez zapisywania'
+            - 'Wymaga Pillow: pip install Pillow'
       - desc: Screenshot fragmentu ekranu
         code: |
           python -c "
@@ -46,16 +106,36 @@ groups:
           img = pyautogui.screenshot(region=(0,0,800,600))
           img.save('fragment.png')
           "
-      - desc: Sprawdź czy obrazek jest na ekranie
-        code: python -c "import pyautogui; print(pyautogui.locateOnScreen('button.png', confidence=0.9))"
+      - cmd: python -c "import pyautogui; print(pyautogui.locateOnScreen('button.png', confidence=0.9))"
+        desc: Sprawdź czy obrazek jest na ekranie
+        detail:
+          what: Szuka podanego obrazku na ekranie i zwraca jego pozycję (Box) lub None jeśli nie znaleziono.
+          how: confidence=0.9 = 90% dopasowanie (toleruje drobne różnice). Wymaga opencv-python.
+          tips:
+            - 'pyautogui.click(pyautogui.locateOnScreen("button.png")) — znajdź i kliknij'
+            - 'Obniż confidence do 0.8 jeśli ekran ma inne DPI niż zdjęcie przycisku'
+            - 'Zrób screenshot przycisku gdy jest w normalnym stanie (nie hover)'
 
   - name: Szybkie testy
     icon: "⚡"
     commands:
-      - desc: Pokaż pulpit (Win+D)
-        code: python -c "import pyautogui; pyautogui.hotkey('win', 'd')"
-      - desc: Wpisz tekst w aktywnym polu
-        code: python -c "import pyautogui; pyautogui.typewrite('hello', interval=0.05)"
+      - cmd: python -c "import pyautogui; pyautogui.hotkey('win', 'd')"
+        desc: Pokaż pulpit (Win+D)
+        detail:
+          what: Symuluje naciśnięcie kombinacji klawiszy Win+D — minimalizuje wszystkie okna i pokazuje pulpit.
+          how: hotkey() wysyła wszystkie klawisze jednocześnie (jak prawdziwy skrót klawiaturowy).
+          tips:
+            - "pyautogui.hotkey('ctrl', 'c') — Ctrl+C (kopiuj)"
+            - "pyautogui.hotkey('alt', 'tab') — przełącz okno"
+            - "pyautogui.hotkey('ctrl', 'shift', 'esc') — menedżer zadań"
+      - cmd: python -c "import pyautogui; pyautogui.typewrite('hello', interval=0.05)"
+        desc: Wpisz tekst w aktywnym polu
+        detail:
+          what: Wpisuje tekst znak po znaku symulując naciskanie klawiszy. interval=0.05 = 50ms między klawiszami.
+          how: Aktywne okno musi mieć fokus na polu tekstowym przed uruchomieniem.
+          tips:
+            - 'typewrite() nie obsługuje polskich znaków — użyj pyperclip.copy() + hotkey("ctrl","v")'
+            - 'interval=0 — maksymalna prędkość (może gubić znaki w niektórych aplikacjach)'
       - desc: Przesuń mysz do środka ekranu
         code: |
           python -c "
@@ -63,10 +143,23 @@ groups:
           w,h = pyautogui.size()
           pyautogui.moveTo(w//2, h//2, duration=0.5)
           "
-      - desc: Kliknij w podanej pozycji
-        code: python -c "import pyautogui; pyautogui.click(500, 300)"
-      - desc: Zrób screenshot i znajdź element
-        code: python -c "import pyautogui; print(pyautogui.locateOnScreen('icon.png'))"
+      - cmd: python -c "import pyautogui; pyautogui.click(500, 300)"
+        desc: Kliknij w podanej pozycji
+        detail:
+          what: Przesuwa kursor do pozycji (500, 300) i klika lewym przyciskiem myszy.
+          how: "Domyślnie: lewy przycisk, jedno kliknięcie. Współrzędne od lewego górnego rogu ekranu."
+          tips:
+            - "pyautogui.click(500, 300, button='right') — prawy klik"
+            - "pyautogui.doubleClick(500, 300) — podwójne kliknięcie"
+            - 'pyautogui.PAUSE = 1.0 — dodaj 1s pause po każdej operacji dla wolniejszych systemów'
+      - cmd: python -c "import pyautogui; print(pyautogui.locateOnScreen('icon.png'))"
+        desc: Zrób screenshot i znajdź element
+        detail:
+          what: Szuka obrazku icon.png na ekranie i wypisuje jego pozycję (Box namedtuple) lub None.
+          how: Box(left, top, width, height) — możesz przekazać do click() lub center() żeby kliknąć środek.
+          tips:
+            - 'pyautogui.center(pyautogui.locateOnScreen("icon.png")) — środek znalezionego elementu'
+            - 'Bez opencv-python confidence nie działa — zainstaluj pip install opencv-python'
 
   - name: Skrypty pomocnicze
     icon: "🛠️"
@@ -90,5 +183,11 @@ groups:
           img.save('element.png')
           print('Zapisano element.png')
           "
-      - desc: Lista wszystkich klawiszy specjalnych
-        code: python -c "import pyautogui; print(pyautogui.KEYBOARD_KEYS)"
+      - cmd: python -c "import pyautogui; print(pyautogui.KEYBOARD_KEYS)"
+        desc: Lista wszystkich klawiszy specjalnych
+        detail:
+          what: Wypisuje listę wszystkich nazw klawiszy specjalnych które możesz używać w press() i hotkey().
+          how: "Np. 'enter', 'tab', 'esc', 'f1'-'f12', 'pagedown', 'home', 'end', 'delete'."
+          tips:
+            - "pyautogui.press('enter') — naciśnij Enter"
+            - "pyautogui.press(['tab', 'tab', 'enter']) — lista klawiszy do naciśnięcia kolejno"

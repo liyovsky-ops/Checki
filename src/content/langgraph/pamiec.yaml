@@ -1,0 +1,214 @@
+title: Pamięć i checkpointing
+
+items:
+  - name: MemorySaver — checkpointing w RAM
+    icon: "💾"
+    desc: >
+      MemorySaver przechowuje stan grafu w pamięci RAM — idealny do prototypowania
+      i testów. Każdy thread_id to oddzielna sesja z własną historią.
+      Dane giną po restarcie — do produkcji używaj SqliteSaver lub PostgresSaver.
+    code: |
+      from langgraph.graph import StateGraph, START, END
+      from langgraph.checkpoint.memory import MemorySaver
+      from langgraph.graph.message import add_messages
+      from langchain_anthropic import ChatAnthropic
+      from typing import TypedDict, Annotated
+
+      class State(TypedDict):
+          messages: Annotated[list, add_messages]
+
+      llm = ChatAnthropic(model="claude-sonnet-4-6")
+
+      def chat(state: State):
+          return {"messages": [llm.invoke(state["messages"])]}
+
+      builder = StateGraph(State)
+      builder.add_node("chat", chat)
+      builder.add_edge(START, "chat")
+      builder.add_edge("chat", END)
+
+      # Kompiluj z checkpointerem
+      memory = MemorySaver()
+      graph = builder.compile(checkpointer=memory)
+
+      # Thread ID — identyfikator sesji/rozmowy
+      config = {"configurable": {"thread_id": "user-123"}}
+
+      # Pierwsza wiadomość
+      result = graph.invoke(
+          {"messages": [("human", "Mam na imię Łukasz")]},
+          config
+      )
+      print(result["messages"][-1].content)
+
+      # Kolejna wiadomość — agent pamięta kontekst!
+      result = graph.invoke(
+          {"messages": [("human", "Jak mam na imię?")]},
+          config
+      )
+      print(result["messages"][-1].content)  # Łukasz
+
+      # Odczytaj stan wątku
+      state = graph.get_state(config)
+      print(f"Liczba wiadomości: {len(state.values['messages'])}")
+
+      # Historia checkpoint'ów
+      for checkpoint in graph.get_state_history(config):
+          print(f"Step: {checkpoint.metadata.get('step')}, ts: {checkpoint.created_at}")
+
+  - name: SqliteSaver i PostgresSaver
+    icon: "🗄️"
+    desc: >
+      Persistentne backendowe do checkpointów. SQLite do lokalnego devu i małych deploymentów,
+      PostgreSQL do produkcji. Dane przeżywają restart aplikacji — agent wraca
+      do przerwanej rozmowy po ponownym uruchomieniu.
+    code: |
+      # SQLite — lokalny plik, brak zależności zewnętrznych
+      from langgraph.checkpoint.sqlite import SqliteSaver
+      import sqlite3
+
+      conn = sqlite3.connect("checkpoints.db", check_same_thread=False)
+      sqlite_saver = SqliteSaver(conn)
+
+      graph = builder.compile(checkpointer=sqlite_saver)
+
+      # Async SQLite (aiosqlite)
+      from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+      async def build_async_graph():
+          async with AsyncSqliteSaver.from_conn_string("checkpoints.db") as saver:
+              graph = builder.compile(checkpointer=saver)
+              result = await graph.ainvoke(
+                  {"messages": [("human", "Cześć")]},
+                  {"configurable": {"thread_id": "session-1"}}
+              )
+
+      # PostgreSQL — produkcja
+      # pip install langgraph-checkpoint-postgres psycopg
+      from langgraph.checkpoint.postgres import PostgresSaver
+
+      DB_URL = "postgresql://user:password@localhost:5432/langgraph_checkpoints"
+      with PostgresSaver.from_conn_string(DB_URL) as pg_saver:
+          # Utwórz tabele przy pierwszym użyciu
+          pg_saver.setup()
+          graph = builder.compile(checkpointer=pg_saver)
+
+          # Różne sesje w tej samej bazie
+          for user_id in ["user-1", "user-2", "user-3"]:
+              config = {"configurable": {"thread_id": user_id}}
+              graph.invoke({"messages": [("human", "Cześć")]}, config)
+
+      # Async PostgreSQL
+      from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+
+      async def run():
+          async with AsyncPostgresSaver.from_conn_string(DB_URL) as saver:
+              await saver.setup()
+              graph = builder.compile(checkpointer=saver)
+              result = await graph.ainvoke(
+                  {"messages": [("human", "Hej")]},
+                  {"configurable": {"thread_id": "async-session"}}
+              )
+
+  - name: Long-term memory — InMemoryStore
+    icon: "🧠"
+    desc: >
+      Checkpointing = pamięć wątku (per conversation). Long-term memory = pamięć
+      przekrojowa między wątkami — fakty o użytkowniku, preferencje, historia projektów.
+      Store to klucz-wartość lub semantyczne wyszukiwanie między sesjami.
+    code: |
+      from langgraph.store.memory import InMemoryStore
+      from langgraph.graph import StateGraph, START, END
+      from langgraph.checkpoint.memory import MemorySaver
+      from langgraph.graph.message import add_messages
+      from langchain_anthropic import ChatAnthropic
+      from typing import TypedDict, Annotated
+      import uuid
+
+      class State(TypedDict):
+          messages: Annotated[list, add_messages]
+          user_id: str
+
+      llm = ChatAnthropic(model="claude-sonnet-4-6")
+
+      # Store — pamięć długoterminowa
+      store = InMemoryStore()
+
+      def chat_with_memory(state: State, *, store):
+          user_id = state.get("user_id", "anonymous")
+
+          # Pobierz wspomnienia użytkownika
+          items = store.search(("user_profile", user_id))
+          memories = "\n".join(f"- {item.value['fact']}" for item in items)
+
+          # Przygotuj kontekst z pamięcią
+          system = f"Pamiętasz o użytkowniku:\n{memories}" if memories else "Brak wspomnień."
+
+          from langchain_core.messages import SystemMessage
+          messages = [SystemMessage(system)] + state["messages"]
+          response = llm.invoke(messages)
+
+          # Zapisz nowe fakty do pamięci (uproszczone — w praktyce LLM ekstrahuje fakty)
+          last_human = [m for m in state["messages"] if m[0] == "human"]
+          if last_human and "nazywam się" in last_human[-1][1].lower():
+              store.put(
+                  ("user_profile", user_id),
+                  str(uuid.uuid4()),
+                  {"fact": f"Imię: {last_human[-1][1].split('nazywam się')[-1].strip()}"}
+              )
+
+          return {"messages": [response]}
+
+      builder = StateGraph(State)
+      builder.add_node("chat", chat_with_memory)
+      builder.add_edge(START, "chat")
+      builder.add_edge("chat", END)
+
+      graph = builder.compile(
+          checkpointer=MemorySaver(),
+          store=store
+      )
+
+  - name: Time Travel — debugowanie historii
+    icon: "⏪"
+    desc: >
+      LangGraph pozwala cofnąć się do dowolnego checkpointu i uruchomić graf
+      od tego miejsca z innymi danymi. Kluczowe do debugowania i eksperymentowania —
+      nie musisz zaczynać od zera gdy coś pójdzie nie tak.
+    code: |
+      from langgraph.checkpoint.memory import MemorySaver
+      from langgraph.types import Command
+
+      memory = MemorySaver()
+      graph = builder.compile(checkpointer=memory)
+      config = {"configurable": {"thread_id": "debug-session"}}
+
+      # Uruchom kilka kroków
+      graph.invoke({"messages": [("human", "Krok 1")]}, config)
+      graph.invoke({"messages": [("human", "Krok 2")]}, config)
+      graph.invoke({"messages": [("human", "Krok 3")]}, config)
+
+      # Wylistuj historię checkpointów
+      history = list(graph.get_state_history(config))
+      for i, checkpoint in enumerate(history):
+          print(f"{i}. step={checkpoint.metadata.get('step')}, "
+                f"messages={len(checkpoint.values.get('messages', []))}")
+
+      # Wróć do checkpointu nr 1 (po kroku 1)
+      checkpoint_to_restore = history[-2]  # przedostatni = po kroku 1
+      restore_config = {
+          "configurable": {
+              "thread_id": "debug-session",
+              "checkpoint_id": checkpoint_to_restore.config["configurable"]["checkpoint_id"]
+          }
+      }
+
+      # Uruchom od tego punktu z nowym inputem
+      result = graph.invoke(
+          {"messages": [("human", "Alternatywny krok 2")]},
+          restore_config
+      )
+
+      # Przełącz stan na inny checkpoint i kontynuuj
+      graph.update_state(config, {"messages": [("human", "Poprawiona wiadomość")]})
+      result = graph.invoke(None, config)  # None = kontynuuj od aktualnego stanu

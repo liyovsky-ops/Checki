@@ -1,0 +1,201 @@
+title: Środowisko deweloperskie w WSL
+
+items:
+  - name: VS Code Remote WSL
+    icon: "💻"
+    desc: >
+      VS Code z rozszerzeniem Remote WSL łączy się z distro przez socket —
+      edytor działa na Windows, ale serwer VS Code, linter, debugger i terminal
+      działają bezpośrednio w Linux. Zero konfiguracji path, zero problemów z line endings.
+    code: |
+      # 1. Zainstaluj VS Code na Windows (code.visualstudio.com)
+      # 2. Zainstaluj rozszerzenie "WSL" (ms-vscode-remote.remote-wsl)
+
+      # Otwórz folder z WSL w VS Code
+      # Wejdź do WSL i wpisz:
+      code .
+      # VS Code automatycznie instaluje serwer w distro i otwiera się na Windows
+
+      # Otwórz konkretny plik
+      code /home/lukasz/projekt/main.py
+
+      # Otwórz nowe okno VS Code połączone z WSL
+      code --remote wsl+Ubuntu /home/lukasz/projekt
+
+      # W VS Code (po połączeniu z WSL):
+      # - Terminal otwiera bash/zsh w Linux
+      # - Python interpreter wskazuje na /usr/bin/python3
+      # - Rozszerzenia instalowane "po stronie Server" działają na Linux
+      # - Git, linter, formatter — wszystko native Linux
+
+      # Status połączenia widoczny w lewym dolnym rogu: ">< WSL: Ubuntu"
+
+      # Rekomendowane rozszerzenia do zainstalowania w WSL:
+      # - Python (ms-python.python)
+      # - Pylance (ms-python.vscode-pylance)
+      # - GitLens (eamodio.gitlens)
+      # - Docker (ms-azuretools.vscode-docker)
+
+  - name: Git w WSL
+    icon: "🌿"
+    desc: >
+      Git w WSL działa niezależnie od Git for Windows. Konfiguracja SSH kluczy,
+      GPG signing i credential managera wspólna z Windows — dzięki interopowi
+      możesz używać Windows Credential Manager z WSL.
+    code: |
+      # Instalacja Git w WSL
+      sudo apt install -y git
+
+      # Konfiguracja podstawowa
+      git config --global user.name "Lukasz Nowak"
+      git config --global user.email "lukasz@firma.pl"
+      git config --global init.defaultBranch main
+      git config --global core.editor "code --wait"
+
+      # --- Credential Manager (Windows) ---
+      # Użyj Windows Credential Manager z WSL (zero hasła za każdym razem)
+      git config --global credential.helper "/mnt/c/Program\ Files/Git/mingw64/bin/git-credential-manager.exe"
+      # Lub nowszy manager:
+      git config --global credential.helper "/mnt/c/Program\ Files/Git/mingw64/libexec/git-core/git-credential-manager.exe"
+
+      # --- SSH klucze ---
+      # Generuj klucz SSH w WSL
+      ssh-keygen -t ed25519 -C "lukasz@firma.pl"
+
+      # Uruchom ssh-agent
+      eval "$(ssh-agent -s)"
+      ssh-add ~/.ssh/id_ed25519
+
+      # Skopiuj klucz do schowka (wymaga xclip lub clip.exe)
+      cat ~/.ssh/id_ed25519.pub | clip.exe
+      # Wklej na github.com/settings/keys
+
+      # Testuj połączenie
+      ssh -T git@github.com
+
+      # --- Line endings ---
+      # Unikaj problemów CRLF — pliki Linux mają LF
+      git config --global core.autocrlf false
+      # Lub per-repo w .gitattributes:
+      echo "* text=auto eol=lf" > .gitattributes
+
+  - name: Python i virtualenv
+    icon: "🐍"
+    desc: >
+      Python w WSL działa jak native Linux — pip, venv, pyenv bez żadnych problemów.
+      Unikaj instalowania pakietów przez pip globalnie — zawsze używaj virtualenv
+      lub conda. pyenv do zarządzania wersjami Python.
+    code: |
+      # Instalacja Python (Ubuntu)
+      sudo apt install -y python3 python3-pip python3-venv python3-dev
+
+      # pyenv — zarządzanie wersjami Python
+      curl https://pyenv.run | bash
+
+      # Dodaj do ~/.bashrc lub ~/.zshrc:
+      export PYENV_ROOT="$HOME/.pyenv"
+      export PATH="$PYENV_ROOT/bin:$PATH"
+      eval "$(pyenv init -)"
+
+      # Zainstaluj konkretną wersję Python
+      pyenv install 3.12.3
+      pyenv global 3.12.3
+      python --version   # Python 3.12.3
+
+      # Virtualenv
+      python -m venv .venv
+      source .venv/bin/activate
+      pip install fastapi uvicorn
+
+      # Deactivate
+      deactivate
+
+      # uv — superszybki menedżer pakietów Python (Rust)
+      curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      # uv zamiast pip
+      uv pip install fastapi uvicorn
+      uv venv
+      source .venv/bin/activate
+
+      # Uruchom projekt FastAPI
+      cd /home/lukasz/projekt
+      source .venv/bin/activate
+      uvicorn main:app --reload --host 0.0.0.0 --port 8000
+      # Dostępny z Windows: http://localhost:8000
+
+  - name: Node.js i nvm
+    icon: "🟩"
+    desc: >
+      Node.js przez nvm (Node Version Manager) — najlepsza praktyka w WSL.
+      Unikaj sudo npm install -g — wszystkie globalne pakiety przez nvm bez uprawnień root.
+    code: |
+      # Instalacja nvm
+      curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+
+      # Dodaj do ~/.bashrc (instalator robi to automatycznie):
+      export NVM_DIR="$HOME/.nvm"
+      [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+      # Załaduj konfigurację
+      source ~/.bashrc
+
+      # Instalacja Node
+      nvm install --lts          # najnowszy LTS
+      nvm install 20.11.0        # konkretna wersja
+      nvm use 20.11.0
+      nvm alias default 20.11.0
+
+      # Sprawdź
+      node --version   # v20.11.0
+      npm --version    # 10.x.x
+
+      # Projekt Next.js / Vite
+      npm create vite@latest moj-projekt
+      cd moj-projekt
+      npm install
+      npm run dev
+      # Dostępny z Windows: http://localhost:5173
+
+      # Globalne narzędzia (bez sudo!)
+      npm install -g pnpm
+      npm install -g typescript
+      npm install -g pm2
+
+  - name: Docker Desktop z WSL 2
+    icon: "🐳"
+    desc: >
+      Docker Desktop używa WSL 2 jako backendu — kontenery działają bezpośrednio
+      w Linux, bez Hyper-V overhead. Komenda docker dostępna w każdej distro WSL.
+    code: |
+      # Instalacja Docker Desktop na Windows (docs.docker.com/desktop/windows/)
+      # W ustawieniach Docker Desktop:
+      # Settings -> General -> Use WSL 2 based engine (zaznacz)
+      # Settings -> Resources -> WSL Integration -> włącz dla swojej distro
+
+      # Weryfikacja w WSL (bez sudo!)
+      docker --version
+      docker run hello-world
+
+      # Docker Compose
+      docker compose version
+
+      # Przykład — uruchom PostgreSQL
+      docker run -d \
+        --name postgres-dev \
+        -e POSTGRES_PASSWORD=secret \
+        -e POSTGRES_DB=mydb \
+        -p 5432:5432 \
+        postgres:16-alpine
+
+      # Połączenie z kontenera do hosta WSL
+      # host.docker.internal lub 172.17.0.1 (bridge network)
+
+      # Sprawdź kontenery
+      docker ps
+      docker logs postgres-dev
+
+      # Jeśli nie chcesz Docker Desktop (tylko CLI)
+      sudo apt install docker.io docker-compose-plugin
+      sudo usermod -aG docker $USER
+      # Wyloguj i zaloguj ponownie — docker bez sudo

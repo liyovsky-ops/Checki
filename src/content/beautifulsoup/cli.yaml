@@ -3,14 +3,38 @@ groups:
   - name: Instalacja
     icon: "📦"
     commands:
-      - desc: Zainstaluj BeautifulSoup4
-        code: pip install beautifulsoup4
-      - desc: Pełny zestaw scrapingowy
-        code: pip install beautifulsoup4 requests lxml html5lib
-      - desc: Z pandas do tabel HTML
-        code: pip install beautifulsoup4 requests lxml pandas openpyxl
-      - desc: Sprawdź wersję
-        code: python -c "import bs4; print(bs4.__version__)"
+      - cmd: pip install beautifulsoup4
+        desc: Zainstaluj BeautifulSoup4
+        detail:
+          what: Instaluje BeautifulSoup4 — bibliotekę do parsowania HTML i XML w Pythonie.
+          how: Sama BS4 wymaga parsera — domyślnie html.parser (z biblioteki standardowej), lxml jest szybszy.
+          tips:
+            - 'pip install beautifulsoup4 lxml — zainstaluj z szybszym parserem'
+            - 'from bs4 import BeautifulSoup — importuj jako BeautifulSoup (nie bs4)'
+      - cmd: pip install beautifulsoup4 requests lxml html5lib
+        desc: Pełny zestaw scrapingowy
+        detail:
+          what: Instaluje BS4 ze wszystkimi parserami (lxml, html5lib) i requests do pobierania stron.
+          how: "lxml — najszybszy, nie toleruje błędów HTML. html5lib — wolny ale obsługuje każdy HTML."
+          tips:
+            - 'html.parser (stdlib) — wystarczy dla czystego HTML, bez dodatkowych instalacji'
+            - "lxml — wybierz dla szybkości. html5lib — dla źle napisanych stron."
+      - cmd: pip install beautifulsoup4 requests lxml pandas openpyxl
+        desc: Z pandas do tabel HTML
+        detail:
+          what: Dodaje pandas i openpyxl — pozwala parsować tabele HTML do DataFrame i eksportować do Excel.
+          how: "pd.read_html(url) — automatycznie parsuje wszystkie tabele na stronie bez BS4."
+          tips:
+            - 'pd.read_html("https://...") — najszybszy sposób na tabele HTML, bez pisania BS4 kodu'
+            - 'df.to_excel("tabela.xlsx") — wymaga openpyxl'
+      - cmd: python -c "import bs4; print(bs4.__version__)"
+        desc: Sprawdź wersję
+        detail:
+          what: Wypisuje zainstalowaną wersję BeautifulSoup4.
+          how: Aktualna stabilna wersja to 4.12.x — sprawdź przed projektem.
+          tips:
+            - 'pip show beautifulsoup4 — więcej info: lokalizacja, zależności'
+            - 'pip install --upgrade beautifulsoup4 — aktualizuj do najnowszej'
 
   - name: Szybkie parsowanie
     icon: "⚡"

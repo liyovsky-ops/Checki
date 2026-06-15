@@ -4,93 +4,191 @@ groups:
   - name: Tworzenie projektu
     icon: "🚀"
     commands:
-      - desc: Nowy projekt React + Vite (zalecane)
-        code: npm create vite@latest my-app -- --template react
-      - desc: React + TypeScript + Vite
-        code: npm create vite@latest my-app -- --template react-ts
-      - desc: Next.js — full-stack React
-        code: npx create-next-app@latest my-app --typescript
-      - desc: Vite z pnpm (najszybszy PM)
-        code: pnpm create vite my-app --template react-ts
+      - cmd: npm create vite@latest my-app -- --template react
+        desc: Nowy projekt React + Vite (zalecane)
+        detail:
+          what: Tworzy nowy projekt React z Vite jako bundlerem — najszybszy setup na 2024+.
+          how: Vite = ultraszybki dev server z HMR. Znacznie szybszy od Create React App (CRA).
+          tips:
+            - 'npm create vite@latest my-app -- --template react-ts — wersja z TypeScript'
+            - 'CRA jest deprecated — używaj Vite lub Next.js'
+      - cmd: npm create vite@latest my-app -- --template react-ts
+        desc: React + TypeScript + Vite
+        detail:
+          what: Tworzy projekt React z TypeScript — pełne type safety od pierwszej linii kodu.
+          how: Skonfigurowany tsconfig.json, vite.config.ts i podstawowe typy React już w projekcie.
+          tips:
+            - 'Zalecane dla nowych projektów — TypeScript łapie błędy zanim uruchomisz kod'
+            - 'npx tsc --noEmit — sprawdź typy bez generowania JS'
+      - cmd: npx create-next-app@latest my-app --typescript
+        desc: Next.js — full-stack React
+        detail:
+          what: Tworzy projekt Next.js z TypeScript — React z SSR, SSG, App Router i API routes.
+          how: Next.js = React + routing + SSR + API routes + optymalizacja obrazów. Pełny stack.
+          tips:
+            - 'Wybierz App Router (nowy) zamiast Pages Router przy tworzeniu projektu'
+            - 'Vercel (twórcy Next.js) oferuje hosting z zero-config dla Next.js'
 
   - name: Development
     icon: "⚙️"
     commands:
-      - desc: Uruchom dev server Vite (HMR)
-        code: npm run dev
-      - desc: Vite na konkretnym porcie
-        code: npm run dev -- --port 3000
-      - desc: Vite dostępny w LAN (telefon)
-        code: npm run dev -- --host
-      - desc: Zbuduj produkcyjną wersję
-        code: npm run build
-      - desc: Podejrzyj build lokalnie
-        code: npm run preview
+      - cmd: npm run dev
+        desc: Uruchom dev server Vite (HMR)
+        detail:
+          what: Uruchamia Vite dev server z Hot Module Replacement — zmiany w kodzie widoczne natychmiast w przeglądarce.
+          how: "Vite HMR zastępuje tylko zmieniony moduł bez przeładowania strony — stan komponentów zachowany."
+          tips:
+            - 'Domyślnie na http://localhost:5173 — inny port niż CRA (3000)'
+            - 'npm run dev -- --port 3000 — zmień port'
+      - cmd: npm run dev -- --host
+        desc: Vite dostępny w sieci LAN (telefon/tablet)
+        detail:
+          what: Udostępnia dev server w sieci lokalnej — możesz testować na telefonie/tablecie.
+          how: "--host = 0.0.0.0 (wszystkie interfejsy). Vite wypisze adres IP do użycia na telefonie."
+          tips:
+            - 'Vite wypisze Network: http://192.168.x.x:5173 — wpisz na telefonie'
+            - 'Przydatne do testowania responsywności na prawdziwym urządzeniu'
+      - cmd: npm run build
+        desc: Zbuduj produkcyjną wersję
+        detail:
+          what: Buduje zoptymalizowaną wersję aplikacji do folderu dist/ — minifikacja, tree-shaking, chunking.
+          how: Vite używa Rollup do bundlowania produkcji — znacznie mniejsze pliki niż w dev.
+          tips:
+            - 'npm run preview — sprawdź build lokalnie zanim deploy'
+            - 'Sprawdź rozmiar: ls -lh dist/assets/'
+      - cmd: npm run preview
+        desc: Podejrzyj build lokalnie
+        detail:
+          what: Uruchamia statyczny serwer plików z folderu dist/ — symuluje produkcję lokalnie.
+          how: Pozwala sprawdzić czy produkcyjny build działa poprawnie przed deployem.
+          tips:
+            - 'Zawsze uruchom preview po build żeby wykryć błędy produkcyjne'
+            - 'Różni się od dev — brak HMR, zminifikowane pliki'
 
   - name: TypeScript
     icon: "🔷"
     commands:
-      - desc: Sprawdź typy (bez generowania JS)
-        code: npx tsc --noEmit
-      - desc: Type check w trybie ciągłym
-        code: npx tsc --watch
-      - desc: Dodaj typy React do projektu
-        code: npm install -D typescript @types/react @types/react-dom
+      - cmd: npx tsc --noEmit
+        desc: Sprawdź typy (bez generowania JS)
+        detail:
+          what: Uruchamia TypeScript type checker bez generowania plików .js — tylko szuka błędów typów.
+          how: "--noEmit = sprawdź ale nie pisz. Szybkie i bezpieczne do sprawdzania w CI."
+          tips:
+            - 'Dodaj do CI pipeline: npx tsc --noEmit && npm test'
+            - 'npx tsc --watch — sprawdzaj typy na bieżąco podczas pisania kodu'
+      - cmd: npm install -D typescript @types/react @types/react-dom
+        desc: Dodaj TypeScript do istniejącego projektu
+        detail:
+          what: Instaluje TypeScript i typy dla React — pozwala dodać TS do projektu który zaczął jako JS.
+          how: "-D = devDependency (tylko w development). @types/* = pliki z definicjami typów."
+          tips:
+            - 'Zmień pliki .jsx na .tsx i .js na .ts stopniowo'
+            - 'Vite automatycznie obsługuje TypeScript — nie potrzebujesz ts-loader'
 
   - name: Testy
     icon: "🧪"
     commands:
-      - desc: Uruchom Vitest (dev)
-        code: npx vitest
-      - desc: Vitest jednorazowo (CI)
-        code: npx vitest run
-      - desc: Vitest z coverage
-        code: npx vitest --coverage
-      - desc: Vitest z graficznym UI
-        code: npx vitest --ui
-      - desc: Zainstaluj Vitest + Testing Library
-        code: npm install -D vitest @testing-library/react @testing-library/jest-dom jsdom
+      - cmd: npx vitest
+        desc: Uruchom Vitest w trybie watch (dev)
+        detail:
+          what: Uruchamia Vitest — ultraszybki test runner od twórców Vite — w trybie ciągłym.
+          how: Vitest automatycznie re-uruchamia testy przy zmianie pliku. Blazing fast thanks to Vite.
+          tips:
+            - 'npm install -D vitest @testing-library/react @testing-library/jest-dom jsdom — instalacja'
+            - 'npx vitest run — jednorazowo (CI)'
+      - cmd: npx vitest run
+        desc: Uruchom testy jednorazowo (CI)
+        detail:
+          what: Uruchamia wszystkie testy raz i kończy — idealne dla CI/CD pipeline.
+          how: Bez trybu watch — uruchom, sprawdź wyniki, wyjdź z kodem 0 (OK) lub 1 (błąd).
+          tips:
+            - 'npx vitest run --coverage — z raportem coverage'
+            - 'GitHub Actions: run: npx vitest run'
+      - cmd: npx vitest --ui
+        desc: Vitest z graficznym UI
+        detail:
+          what: Otwiera graficzny interfejs Vitest w przeglądarce — wizualne wyniki testów, coverage, logi.
+          how: Uruchamia dev server z UI na http://localhost:51204 — piękniejszy widok niż terminal.
+          tips:
+            - 'npm install -D @vitest/ui — wymagany dodatkowy pakiet'
+            - Świetne do przeglądania które testy fail i dlaczego
 
   - name: Zarządzanie paczkami
     icon: "📦"
     commands:
-      - desc: Zainstaluj wszystkie zależności
-        code: npm install
-      - desc: Dodaj React Router
-        code: npm install react-router-dom
-      - desc: Dodaj TanStack Query
-        code: npm install @tanstack/react-query
-      - desc: Dodaj Zustand
-        code: npm install zustand
-      - desc: Dodaj Tailwind CSS
-        code: npm install tailwindcss @tailwindcss/vite
-      - desc: Sprawdź przestarzałe paczki
-        code: npm outdated
-      - desc: Skanuj luki bezpieczeństwa
-        code: npm audit
+      - cmd: npm install
+        desc: Zainstaluj wszystkie zależności
+        detail:
+          what: Instaluje wszystkie zależności z package.json do node_modules/.
+          how: Czyta package-lock.json żeby zainstalować dokładnie te wersje co autor projektu.
+          tips:
+            - 'npm ci — szybsza, czysta instalacja dla CI (wymaga package-lock.json)'
+            - 'Jeśli node_modules ma problemy: rm -rf node_modules && npm install'
+      - cmd: npm install react-router-dom
+        desc: Dodaj React Router
+        detail:
+          what: Instaluje React Router v6 — do obsługi routingu (nawigacji między stronami) w SPA.
+          how: Dodaje do dependencies w package.json. v6 ma inny API niż v5 — używaj Routes i Route.
+          tips:
+            - 'v6 API: <Routes><Route path="/" element={<Home/>}/></Routes>'
+            - 'Alternatywa: TanStack Router — bardziej typowany'
+      - cmd: npm install @tanstack/react-query
+        desc: Dodaj TanStack Query (React Query)
+        detail:
+          what: TanStack Query to biblioteka do zarządzania stanem serwera — fetching, caching, synchronizacja.
+          how: Zastępuje useEffect+useState do fetchowania danych. Automatyczny cache, refetch, loading states.
+          tips:
+            - 'useQuery + useMutation = 90% potrzeb fetching danych'
+            - 'Devtools: npm install @tanstack/react-query-devtools'
+      - cmd: npm install zustand
+        desc: Dodaj Zustand (global state)
+        detail:
+          what: Zustand to minimalistyczny global state manager — prostszy niż Redux, potężniejszy niż Context.
+          how: "create() tworzy store. Używasz go jak hook: const count = useStore(s => s.count)."
+          tips:
+            - 'Tylko 1KB gzip — bez boilerplate, bez reducerów, bez action creators'
+            - Świetny dla małych i średnich projektów — Redux dla dużych enterprise apps
+      - cmd: npm install tailwindcss @tailwindcss/vite
+        desc: Dodaj Tailwind CSS
+        detail:
+          what: Instaluje Tailwind CSS — utility-first CSS framework i plugin Vite do integracji.
+          how: "Po instalacji dodaj plugin do vite.config.ts i @import 'tailwindcss' do main CSS."
+          tips:
+            - 'Tailwind v4 (2024+) — konfiguracja przez CSS, nie tailwind.config.js'
+            - 'npm install tailwindcss @tailwindcss/vite — Tailwind v4 dla Vite'
+      - cmd: npm audit
+        desc: Skanuj luki bezpieczeństwa
+        detail:
+          what: Sprawdza zależności pod kątem znanych luk bezpieczeństwa i raportuje je.
+          how: npm porównuje zainstalowane pakiety z bazą CVE na npmjs.com.
+          tips:
+            - 'npm audit fix — automatycznie napraw luki jeśli możliwe'
+            - 'npm audit --audit-level=high — zgłaszaj tylko poważne luki'
 
   - name: Deploy
     icon: "🚢"
     commands:
-      - desc: Deploy preview na Vercel
-        code: npx vercel
-      - desc: Deploy produkcyjny na Vercel
-        code: npx vercel --prod
-      - desc: Deploy na Netlify
-        code: npx netlify deploy --prod --dir dist
-      - desc: GitHub Pages — opublikuj dist
-        code: npx gh-pages -d dist
-
-  - name: Jakość kodu
-    icon: "🔧"
-    commands:
-      - desc: ESLint — znajdź problemy
-        code: npm run lint
-      - desc: ESLint z auto-naprawą
-        code: npx eslint . --fix
-      - desc: Prettier — sformatuj cały projekt
-        code: npx prettier --write .
-      - desc: Prettier — sprawdź formatowanie (CI)
-        code: npx prettier --check .
-      - desc: Analiza rozmiaru bundla (Vite)
-        code: npm install -D rollup-plugin-visualizer
+      - cmd: npx vercel
+        desc: Deploy preview na Vercel
+        detail:
+          what: Deployuje projekt na Vercel jako preview — unikalny URL dla każdego deployu.
+          how: Vercel automatycznie wykrywa React/Vite i buduje projekt. Preview = środowisko testowe.
+          tips:
+            - 'npx vercel --prod — deploy produkcyjny na główny URL'
+            - 'Pierwsze uruchomienie pyta o konfigurację — odpowiedz na pytania'
+      - cmd: npx vercel --prod
+        desc: Deploy produkcyjny na Vercel
+        detail:
+          what: Deployuje na produkcję — aktualizuje główny URL projektu na Vercel.
+          how: Vercel buduje dist/ i serwuje statyczne pliki z globalnego CDN.
+          tips:
+            - 'Połącz repo z Vercel przez UI — automatyczny deploy przy każdym push do main'
+            - 'vercel env add REACT_APP_API_URL — dodaj zmienne środowiskowe'
+      - cmd: npx netlify deploy --prod --dir dist
+        desc: Deploy produkcyjny na Netlify
+        detail:
+          what: Deployuje folder dist/ na Netlify — hosting statycznych stron z CDN.
+          how: "Najpierw npm run build, potem deploy. --dir dist = folder z buildem."
+          tips:
+            - 'npm install -g netlify-cli — zainstaluj CLI globalnie'
+            - 'netlify.toml — plik konfiguracyjny dla automatycznych deployów'

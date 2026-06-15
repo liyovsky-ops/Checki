@@ -1,0 +1,230 @@
+title: Multi-agent i subgrafy
+
+items:
+  - name: Supervisor — orchestrator
+    icon: "🎯"
+    desc: >
+      Supervisor to agent-koordynator który deleguje zadania do wyspecjalizowanych agentów-workerów.
+      Supervisor wywołuje LLM który decyduje któremu workerowi przekazać zadanie. Po zakończeniu
+      worker zwraca wynik do supervisora który decyduje co dalej lub kończy.
+    code: |
+      from langgraph.graph import StateGraph, START, END
+      from langgraph.graph.message import add_messages
+      from langgraph_supervisor import create_supervisor
+      from langchain_anthropic import ChatAnthropic
+      from langchain_core.tools import tool
+      from typing import TypedDict, Annotated
+      # pip install langgraph-supervisor
+
+      # Wyspecjalizowane narzędzia per agent
+      @tool
+      def search_code(query: str) -> str:
+          """Wyszukaj w bazie kodu — symbole, funkcje, klasy."""
+          return f"Kod dla: {query} — znaleziono w src/api/main.py:45"
+
+      @tool
+      def run_tests(test_file: str) -> str:
+          """Uruchom testy i zwróć wyniki."""
+          return f"Testy {test_file} — 23/24 passed, 1 failed"
+
+      @tool
+      def review_security(code: str) -> str:
+          """Sprawdź kod pod kątem podatności bezpieczeństwa."""
+          return "Brak krytycznych podatności. SQL injection ryzyko w linii 45."
+
+      llm = ChatAnthropic(model="claude-sonnet-4-6")
+
+      # Agenci-workerzy
+      from langgraph.prebuilt import create_react_agent
+
+      code_agent = create_react_agent(llm, [search_code], name="code_analyst")
+      test_agent = create_react_agent(llm, [run_tests], name="test_runner")
+      security_agent = create_react_agent(llm, [review_security], name="security_reviewer")
+
+      # Supervisor łączący agentów
+      supervisor = create_supervisor(
+          agents=[code_agent, test_agent, security_agent],
+          model=llm,
+          prompt="Jesteś koordynatorem code review. Deleguj zadania do odpowiednich agentów."
+      )
+
+      app = supervisor.compile()
+      result = app.invoke({
+          "messages": [("human", "Zrób pełne code review pliku src/api/main.py")]
+      })
+
+  - name: Subgrafy — hierarchia grafów
+    icon: "🔲"
+    desc: >
+      Subgraf to kompletny StateGraph skompilowany i użyty jako węzeł w grafie nadrzędnym.
+      Pozwala rozbić złożony system na moduły — każdy subgraf ma swój stan wewnętrzny.
+      Nadrzędny stan jest mapowany do stanu subgrafu przez wspólne klucze.
+    code: |
+      from langgraph.graph import StateGraph, START, END
+      from langgraph.graph.message import add_messages
+      from typing import TypedDict, Annotated
+
+      # Subgraf 1 — analiza
+      class AnalysisState(TypedDict):
+          messages: Annotated[list, add_messages]
+          data: str
+          analysis_result: str
+
+      def analyze(state: AnalysisState) -> dict:
+          return {"analysis_result": f"Analiza: {state['data'][:50]}"}
+
+      def format_result(state: AnalysisState) -> dict:
+          return {"messages": [("ai", f"Wynik: {state['analysis_result']}")]}
+
+      analysis_builder = StateGraph(AnalysisState)
+      analysis_builder.add_node("analyze", analyze)
+      analysis_builder.add_node("format", format_result)
+      analysis_builder.add_edge(START, "analyze")
+      analysis_builder.add_edge("analyze", "format")
+      analysis_builder.add_edge("format", END)
+      analysis_subgraph = analysis_builder.compile()
+
+      # Subgraf 2 — raport
+      class ReportState(TypedDict):
+          messages: Annotated[list, add_messages]
+          report: str
+
+      def generate_report(state: ReportState) -> dict:
+          last_ai = [m for m in state["messages"] if hasattr(m, "type") and m.type == "ai"]
+          content = last_ai[-1].content if last_ai else "brak danych"
+          return {"report": f"RAPORT: {content}"}
+
+      report_builder = StateGraph(ReportState)
+      report_builder.add_node("generate", generate_report)
+      report_builder.add_edge(START, "generate")
+      report_builder.add_edge("generate", END)
+      report_subgraph = report_builder.compile()
+
+      # Główny graf — używa subgrafów jako węzłów
+      class MainState(TypedDict):
+          messages: Annotated[list, add_messages]
+          data: str
+          analysis_result: str
+          report: str
+
+      main_builder = StateGraph(MainState)
+      main_builder.add_node("analysis", analysis_subgraph)  # subgraf jako węzeł
+      main_builder.add_node("reporting", report_subgraph)
+      main_builder.add_edge(START, "analysis")
+      main_builder.add_edge("analysis", "reporting")
+      main_builder.add_edge("reporting", END)
+
+      app = main_builder.compile()
+      result = app.invoke({"messages": [], "data": "Dane do analizy...", "analysis_result": "", "report": ""})
+
+  - name: Parallelizm — Send API
+    icon: "⚡"
+    desc: >
+      Send API pozwala uruchomić wiele kopii węzła równolegle z różnymi danymi —
+      map-reduce pattern. Idealny gdy masz listę zadań do równoległego przetworzenia.
+      Wyniki są zbierane i agregowane w węźle reduce.
+    code: |
+      from langgraph.graph import StateGraph, START, END
+      from langgraph.types import Send
+      from typing import TypedDict, Annotated
+      import operator
+
+      # Stan główny
+      class OverallState(TypedDict):
+          topics: list[str]
+          summaries: Annotated[list[str], operator.add]  # zbierz wyniki
+
+      # Stan dla każdego równoległego worka
+      class TopicState(TypedDict):
+          topic: str
+          summaries: list[str]
+
+      def summarize_topic(state: TopicState) -> dict:
+          # W praktyce — wywołanie LLM
+          summary = f"Podsumowanie '{state['topic']}': krótki opis tematu."
+          return {"summaries": [summary]}
+
+      # Fanout — generuj Send dla każdego tematu
+      def fanout_topics(state: OverallState) -> list[Send]:
+          return [
+              Send("summarize", {"topic": topic, "summaries": []})
+              for topic in state["topics"]
+          ]
+
+      # Reduce — zbierz wyniki
+      def reduce_summaries(state: OverallState) -> dict:
+          combined = "\n".join(state["summaries"])
+          return {"summaries": [f"COMBINED:\n{combined}"]}
+
+      builder = StateGraph(OverallState)
+      builder.add_node("summarize", summarize_topic)
+      builder.add_node("reduce", reduce_summaries)
+
+      # Conditional edge wysyła Send zamiast stringa — parallelizm
+      builder.add_conditional_edges(START, fanout_topics, ["summarize"])
+      builder.add_edge("summarize", "reduce")
+      builder.add_edge("reduce", END)
+
+      graph = builder.compile()
+      result = graph.invoke({
+          "topics": ["AI", "Python", "DevOps", "LangGraph"],
+          "summaries": []
+      })
+      print(result["summaries"])  # 5 elementów (4 + 1 combined)
+
+  - name: LangGraph Platform — wdrożenie
+    icon: "🚀"
+    desc: >
+      LangGraph Platform (dawniej LangGraph Cloud) to hosted runtime do wdrażania
+      agentów — persystencja, skalowanie, API REST, streaming. Alternatywa
+      to self-hosting przez langgraph-cli z gotowym Docker image.
+    code: |
+      # Struktura projektu dla LangGraph Platform
+      # langgraph.json        -- konfiguracja deploymentu
+      # src/agent.py          -- definicja grafu
+      # pyproject.toml        -- zależności
+
+      # langgraph.json
+      # {
+      #   "dependencies": ["."],
+      #   "graphs": {
+      #     "agent": "./src/agent.py:graph"
+      #   },
+      #   "env": ".env"
+      # }
+
+      # Lokalny development server
+      # pip install langgraph-cli
+      # langgraph dev
+      # -> http://localhost:2024/docs (Swagger UI)
+      # -> http://localhost:2024/studio (LangGraph Studio UI)
+
+      # Buduj Docker image
+      # langgraph build -t my-agent:latest
+
+      # Uruchom lokalnie przez Docker
+      # docker run -p 8123:8080 my-agent:latest
+
+      # Klient Python do API
+      from langgraph_sdk import get_client
+
+      client = get_client(url="http://localhost:2024")
+
+      # Utwórz wątek
+      thread = client.threads.create()
+
+      # Uruchom agenta przez API
+      run = client.runs.create(
+          thread_id=thread["thread_id"],
+          assistant_id="agent",
+          input={"messages": [{"role": "human", "content": "Cześć!"}]}
+      )
+
+      # Streaming przez API
+      for chunk in client.runs.stream(
+          thread_id=thread["thread_id"],
+          assistant_id="agent",
+          input={"messages": [{"role": "human", "content": "Hej"}]},
+          stream_mode="updates"
+      ):
+          print(chunk)

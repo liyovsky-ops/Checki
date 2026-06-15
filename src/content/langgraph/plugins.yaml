@@ -1,0 +1,237 @@
+title: Ekosystem LangChain / LangGraph
+
+items:
+  - name: LangChain Core
+    icon: "🦜"
+    desc: >
+      Podstawowa biblioteka całego ekosystemu — Message types, BaseTool, Runnable,
+      LCEL (LangChain Expression Language). LangGraph zależy od LangChain Core.
+      Używasz core gdy definiujesz narzędzia, wiadomości i integracje z LLM.
+    code: |
+      from langchain_core.messages import (
+          HumanMessage,
+          AIMessage,
+          SystemMessage,
+          ToolMessage,
+      )
+      from langchain_core.tools import tool, BaseTool
+      from langchain_core.runnables import RunnableLambda, RunnablePassthrough
+
+      # Definiowanie narzędzia (decorator)
+      @tool
+      def search(query: str) -> str:
+          """Wyszukaj informacje w internecie."""
+          return f"Wyniki dla: {query}"
+
+      # Narzędzie jako klasa
+      class WeatherTool(BaseTool):
+          name: str = "get_weather"
+          description: str = "Pobierz pogodę dla miasta"
+
+          def _run(self, city: str) -> str:
+              return f"{city}: 20°C"
+
+          async def _arun(self, city: str) -> str:
+              return self._run(city)
+
+      # LCEL — chain składni pipe
+      from langchain_anthropic import ChatAnthropic
+      from langchain_core.output_parsers import StrOutputParser
+      from langchain_core.prompts import ChatPromptTemplate
+
+      prompt = ChatPromptTemplate.from_messages([
+          ("system", "Odpowiadaj po polsku."),
+          ("human", "{question}")
+      ])
+      llm = ChatAnthropic(model="claude-sonnet-4-6")
+      parser = StrOutputParser()
+
+      chain = prompt | llm | parser
+      result = chain.invoke({"question": "Co to jest Python?"})
+
+  - name: langchain-anthropic
+    icon: "🟣"
+    desc: >
+      Oficjalna integracja Anthropic z LangChain — ChatAnthropic wrapper wokół Anthropic API.
+      Obsługuje wszystkie modele Claude, streaming, tool_use, system prompts, caching.
+      Używaj zamiast bezpośredniego anthropic SDK gdy pracujesz z LangGraph.
+    code: |
+      from langchain_anthropic import ChatAnthropic
+      from langchain_core.messages import HumanMessage, SystemMessage
+
+      # Podstawowe użycie
+      llm = ChatAnthropic(
+          model="claude-sonnet-4-6",
+          temperature=0.7,
+          max_tokens=4096,
+          # api_key="..." -- lub z env ANTHROPIC_API_KEY
+      )
+
+      # Invoke
+      response = llm.invoke([
+          SystemMessage("Odpowiadaj krótko i po polsku."),
+          HumanMessage("Co to jest LangGraph?")
+      ])
+      print(response.content)
+
+      # Bind tools — agent może wywoływać narzędzia
+      from langchain_core.tools import tool
+
+      @tool
+      def calculator(expr: str) -> str:
+          """Oblicz wyrażenie matematyczne."""
+          return str(eval(expr, {}, {}))
+
+      llm_with_tools = llm.bind_tools([calculator])
+
+      # Streaming
+      for chunk in llm.stream([HumanMessage("Wymień 5 planet")]):
+          print(chunk.content, end="", flush=True)
+
+      # Prompt caching (Anthropic Claude)
+      from langchain_core.messages import SystemMessage
+      from langchain_anthropic.chat_models import convert_to_anthropic_tool
+
+      # Cache system prompt dla długich kontekstów
+      llm_cached = ChatAnthropic(
+          model="claude-sonnet-4-6",
+          model_kwargs={
+              "system": [{"type": "text", "text": "Bardzo długi system prompt...",
+                          "cache_control": {"type": "ephemeral"}}]
+          }
+      )
+
+  - name: LangSmith — observability
+    icon: "🔍"
+    desc: >
+      LangSmith to platforma do monitorowania, debugowania i ewaluacji agentów LangChain/LangGraph.
+      Każde wywołanie LLM, narzędzia i węzła grafu jest logowane z pełnym kontekstem —
+      input, output, latency, tokeny, koszty. Bezpłatny plan do 5k tracesów/miesiąc.
+    code: |
+      # Konfiguracja LangSmith (zmienne środowiskowe w .env)
+      # LANGCHAIN_TRACING_V2=true
+      # LANGCHAIN_API_KEY=ls__...
+      # LANGCHAIN_PROJECT=moj-projekt
+
+      import os
+      os.environ["LANGCHAIN_TRACING_V2"] = "true"
+      os.environ["LANGCHAIN_PROJECT"] = "langgraph-dev"
+
+      # Od teraz każde invoke/stream jest automatycznie logowane
+      from langgraph.prebuilt import create_react_agent
+      from langchain_anthropic import ChatAnthropic
+      from langchain_core.tools import tool
+
+      @tool
+      def search(q: str) -> str:
+          """Szukaj informacji."""
+          return f"Wyniki: {q}"
+
+      agent = create_react_agent(ChatAnthropic(model="claude-sonnet-4-6"), [search])
+
+      # Invoke — trace pojawi się w app.smith.langchain.com
+      result = agent.invoke({"messages": [("human", "Czym jest Python?")]})
+
+      # Ręczne tworzenie trace
+      from langsmith import traceable
+
+      @traceable(name="moja_funkcja")
+      def process_data(data: str) -> str:
+          return data.upper()
+
+      # Ewaluacja — porównaj wyniki z oczekiwanymi
+      from langsmith.evaluation import evaluate
+
+      def accuracy_evaluator(run, example):
+          correct = example.outputs["answer"].lower() in run.outputs["output"].lower()
+          return {"score": 1.0 if correct else 0.0, "key": "accuracy"}
+
+  - name: Tavily Search
+    icon: "🔎"
+    desc: >
+      Tavily to Search API zoptymalizowane dla agentów AI — zwraca przetworzone,
+      gotowe do użycia wyniki zamiast surowych linków. Oficjalnie rekomendowane przez
+      LangChain dla narzędzi wyszukiwania w agentach.
+    code: |
+      # pip install langchain-tavily
+      from langchain_tavily import TavilySearch
+
+      # Narzędzie wyszukiwania gotowe do użycia z LangGraph
+      search_tool = TavilySearch(
+          max_results=5,
+          topic="general",
+          # api_key="..." -- lub TAVILY_API_KEY w env
+      )
+
+      # Bezpośrednie użycie
+      results = search_tool.invoke({"query": "LangGraph 2024 updates"})
+      print(results)
+
+      # Integracja z agentem
+      from langgraph.prebuilt import create_react_agent
+      from langchain_anthropic import ChatAnthropic
+
+      agent = create_react_agent(
+          ChatAnthropic(model="claude-sonnet-4-6"),
+          tools=[search_tool],
+      )
+
+      result = agent.invoke({
+          "messages": [("human", "Jakie są najnowsze zmiany w Python 3.13?")]
+      })
+      print(result["messages"][-1].content)
+
+  - name: langgraph-supervisor i langgraph-swarm
+    icon: "🤝"
+    desc: >
+      Oficjalne pakiety do multi-agent patterns — supervisor (hierarchical) i swarm
+      (peer-to-peer handoffs). Budowane przez LangChain team jako reference implementations.
+    code: |
+      # Supervisor — hierarchical multi-agent
+      # pip install langgraph-supervisor
+      from langgraph_supervisor import create_supervisor
+      from langgraph.prebuilt import create_react_agent
+      from langchain_anthropic import ChatAnthropic
+      from langchain_core.tools import tool
+
+      llm = ChatAnthropic(model="claude-sonnet-4-6")
+
+      @tool
+      def write_code(task: str) -> str:
+          """Napisz kod dla podanego zadania."""
+          return f"```python\n# Kod dla: {task}\npass\n```"
+
+      @tool
+      def review_code(code: str) -> str:
+          """Przejrzyj kod i podaj feedback."""
+          return f"Code review: brak błędów w {len(code)} znakach"
+
+      developer = create_react_agent(llm, [write_code], name="developer")
+      reviewer = create_react_agent(llm, [review_code], name="reviewer")
+
+      supervisor = create_supervisor(
+          agents=[developer, reviewer],
+          model=llm,
+          prompt="Koordynuj development i code review."
+      ).compile()
+
+      # Swarm — peer-to-peer handoffs
+      # pip install langgraph-swarm
+      from langgraph_swarm import create_swarm, create_handoff_tool
+
+      # Agent może przekazać kontrolę innemu agentowi
+      handoff_to_reviewer = create_handoff_tool(
+          agent_name="reviewer",
+          description="Przekaż kod do code review"
+      )
+
+      developer_with_handoff = create_react_agent(
+          llm,
+          [write_code, handoff_to_reviewer],
+          name="developer"
+      )
+
+      swarm = create_swarm(
+          agents=[developer_with_handoff, reviewer],
+          default_active_agent="developer"
+      ).compile()

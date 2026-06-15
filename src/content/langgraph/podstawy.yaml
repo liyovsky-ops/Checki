@@ -1,0 +1,98 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać LangGraph?
+  firstComponent: Pierwszy agent
+  firstComponentLang: python
+
+intro:
+  title: Czym jest LangGraph?
+  desc: >
+    LangGraph to biblioteka do budowania agentów AI i aplikacji wieloagentowych jako grafów stanów.
+    Każdy węzeł grafu to krok agenta (wywołanie LLM, narzędzia, logika), krawędzie to przejścia
+    między krokami — w tym warunkowe. W przeciwieństwie do prostych chain LangChain,
+    LangGraph daje pętlę sterowania — agent może sprawdzać wyniki, podejmować decyzje,
+    wywoływać narzędzia wielokrotnie, aż osiągnie cel. Checkpointing, streaming, human-in-the-loop —
+    wszystko wbudowane. Integracja z LangSmith do pełnego monitoringu wywołań.
+
+concepts:
+  - title: StateGraph
+    desc: >
+      Główny budulec LangGraph. Graf stanów gdzie każdy węzeł (node) to funkcja przyjmująca stan
+      i zwracająca aktualizację stanu. Krawędzie (edges) definiują przepływ — normalne
+      (zawsze przejdź do X) i warunkowe (na podstawie wartości stanu). Stan to TypedDict
+      z adnotacjami — każde pole to fragment informacji przekazywanej przez graf.
+    icon: "🕸️"
+  - title: State
+    desc: >
+      Centralny obiekt przepływający przez cały graf. Definiujesz go jako TypedDict
+      z opcjonalnymi adnotacjami Annotated — np. Annotated[list, add_messages] znaczy
+      że pole messages jest listą dołączaną (nie nadpisywaną) przy każdej aktualizacji.
+      Każdy węzeł widzi pełny stan i zwraca tylko to co chce zaktualizować.
+    icon: "📦"
+  - title: Nodes i Edges
+    desc: >
+      Node to dowolna funkcja Python — asynchroniczna lub synchroniczna — przyjmująca
+      stan i zwracająca dict z aktualizacjami. Edge to połączenie między węzłami.
+      Conditional edge to krawędź z funkcją routowania zwracającą nazwę następnego węzła.
+      START i END to specjalne węzły — punkt wejścia i zakończenia grafu.
+    icon: "🔗"
+  - title: Checkpointing
+    desc: >
+      Wbudowany mechanizm zapisywania stanu grafu w dowolnym momencie — po każdym węźle.
+      Umożliwia wznowienie po błędzie, human-in-the-loop (pauza i czekanie na input człowieka),
+      time-travel debugging (cofnij do dowolnego punktu) i długoterminowe konwersacje.
+      Backend — MemorySaver (RAM), SqliteSaver, PostgresSaver.
+    icon: "💾"
+
+whenToUse:
+  - Agenci z pętlą sterowania — LLM podejmuje decyzje, wywołuje narzędzia, weryfikuje wyniki
+  - Wieloetapowe workflow z warunkami — nie da się wyrazić prostym chain lub prompt
+  - Human-in-the-loop — agent pyta człowieka o potwierdzenie przed akcją
+  - Multi-agent systems — orchestrator deleguje zadania do wyspecjalizowanych agentów
+  - Long-running tasks z resumption — zadania które trwają długo i mogą się urwać
+  - ReAct pattern — Reason + Act w pętli do osiągnięcia celu
+  - RAG z dynamicznym routingiem — agent decyduje co przeszukać i jak użyć wyników
+
+firstComponent: |
+  from langgraph.graph import StateGraph, START, END
+  from langgraph.prebuilt import ToolNode
+  from langchain_anthropic import ChatAnthropic
+  from langchain_core.tools import tool
+  from typing import TypedDict, Annotated
+  from langgraph.graph.message import add_messages
+
+  # 1. Definiuj stan
+  class State(TypedDict):
+      messages: Annotated[list, add_messages]
+
+  # 2. LLM i narzędzia
+  @tool
+  def get_weather(city: str) -> str:
+      """Zwróć aktualną pogodę dla miasta."""
+      return f"Pogoda w {city}: 22°C, słonecznie"
+
+  tools = [get_weather]
+  llm = ChatAnthropic(model="claude-sonnet-4-6").bind_tools(tools)
+
+  # 3. Węzły grafu
+  def agent(state: State):
+      return {"messages": [llm.invoke(state["messages"])]}
+
+  def should_continue(state: State) -> str:
+      last = state["messages"][-1]
+      return "tools" if last.tool_calls else END
+
+  # 4. Zbuduj graf
+  graph = StateGraph(State)
+  graph.add_node("agent", agent)
+  graph.add_node("tools", ToolNode(tools))
+
+  graph.add_edge(START, "agent")
+  graph.add_conditional_edges("agent", should_continue)
+  graph.add_edge("tools", "agent")
+
+  app = graph.compile()
+
+  # 5. Uruchom
+  result = app.invoke({"messages": [("human", "Jaka jest pogoda w Warszawie?")]})
+  print(result["messages"][-1].content)

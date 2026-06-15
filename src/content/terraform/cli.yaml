@@ -4,139 +4,481 @@ groups:
   - name: Podstawowy workflow
     icon: "🚀"
     commands:
-      - desc: Zainicjuj katalog roboczy (pobierz providery i moduły)
-        code: terraform init
-      - desc: Zaktualizuj providery i moduły
-        code: terraform init -upgrade
-      - desc: Sprawdź poprawność składni HCL
-        code: terraform validate
-      - desc: Sformatuj wszystkie pliki .tf (auto-indent, wyrównanie)
-        code: terraform fmt
-      - desc: Sprawdź formatowanie bez zmian (do CI)
-        code: terraform fmt -check -recursive
-      - desc: Pokaż plan zmian (co zostanie stworzone/zmienione/zniszczone)
-        code: terraform plan
-      - desc: Zastosuj zmiany (zapyta o potwierdzenie)
-        code: terraform apply
-      - desc: Zniszcz wszystkie zarządzane zasoby
-        code: terraform destroy
+      - cmd: terraform init
+        desc: Zainicjuj katalog roboczy (pobierz providery i moduły)
+        detail:
+          what: Inicjalizuje katalog roboczy Terraform — pobiera providery i moduły zdefiniowane w plikach .tf.
+          how: Tworzy katalog .terraform/ z providerami i plik .terraform.lock.hcl z dokładnymi wersjami.
+          tips:
+            - 'Uruchamiaj po każdym dodaniu nowego providera lub modułu'
+            - 'terraform init -reconfigure — zresetuj backend konfigurację'
+      - cmd: terraform init -upgrade
+        desc: Zaktualizuj providery i moduły
+        detail:
+          what: Aktualizuje pobrane providery i moduły do najnowszych wersji zgodnych z constraints.
+          how: Bez -upgrade Terraform używa wersji z .terraform.lock.hcl (nie sprawdza nowszych).
+          tips:
+            - 'Uruchamiaj po aktualizacji constraint wersji w required_providers'
+            - 'Sprawdź .terraform.lock.hcl po upgrade — commituj do git'
+      - cmd: terraform validate
+        desc: Sprawdź poprawność składni HCL
+        detail:
+          what: Waliduje składnię i strukturę plików .tf — bez połączenia z providerem (szybkie).
+          how: Sprawdza czy HCL jest poprawny składniowo i logicznie (np. referencje do zasobów).
+          tips:
+            - 'Szybsze niż terraform plan — użyj w pre-commit hook'
+            - 'Nie sprawdza poprawności wartości (np. czy region "eu-west-1" istnieje)'
+      - cmd: terraform fmt
+        desc: Sformatuj wszystkie pliki .tf (auto-indent, wyrównanie)
+        detail:
+          what: Automatycznie formatuje pliki .tf zgodnie z oficjalnym stylem Terraform (indent, wyrównanie =).
+          how: Modyfikuje pliki w miejscu. Używaj zawsze przed commitem.
+          tips:
+            - 'terraform fmt -recursive — formatuj też podkatalogi (moduły)'
+            - 'Dodaj do pre-commit hook: terraform fmt -check || exit 1'
+      - cmd: terraform fmt -check -recursive
+        desc: Sprawdź formatowanie bez zmian (do CI)
+        detail:
+          what: Sprawdza czy pliki .tf są poprawnie sformatowane — wychodzi z kodem 1 jeśli nie.
+          how: -check = tylko sprawdź (nie modyfikuj). Idealne do CI pipeline.
+          tips:
+            - 'W GitHub Actions: run: terraform fmt -check -recursive'
+            - 'Wyjście != 0 = pipeline fail — wymusza formatowanie'
+      - cmd: terraform plan
+        desc: Pokaż plan zmian (co zostanie stworzone/zmienione/zniszczone)
+        detail:
+          what: Pokazuje co Terraform zrobi przy apply — bez wprowadzania żadnych zmian.
+          how: "+ = create, ~ = update, - = destroy. Zawsze uruchamiaj przed apply."
+          tips:
+            - 'terraform plan -out=tfplan — zapisz plan do pliku (deterministyczny apply)'
+            - 'Sprawdź uważnie co jest oznaczone "-" (destroy) — może być nieoczekiwane'
+      - cmd: terraform apply
+        desc: Zastosuj zmiany (zapyta o potwierdzenie)
+        detail:
+          what: Tworzy/modyfikuje/usuwa zasoby zgodnie z plikami .tf. Pyta o potwierdzenie przed wykonaniem.
+          how: Wpisz "yes" żeby potwierdzić. Zawsze uruchamiaj plan przed apply.
+          tips:
+            - 'terraform apply tfplan — zastosuj wcześniej sprawdzony plan (bezpieczniejsze)'
+            - 'terraform apply -auto-approve — bez pytania (CI/CD, ostrożnie!)'
+      - cmd: terraform destroy
+        desc: Zniszcz wszystkie zarządzane zasoby
+        detail:
+          what: Usuwa wszystkie zasoby zarządzane przez Terraform w tym workspace. Nieodwracalne.
+          how: Pyta o potwierdzenie. Odwrotność apply — usuwa zasoby w odwrotnej kolejności zależności.
+          flags:
+            - flag: -auto-approve
+              desc: Bez pytania o potwierdzenie (niebezpieczne!)
+            - flag: -target=aws_instance.web
+              desc: Usuń tylko konkretny zasób
+          tips:
+            - 'terraform destroy -target=aws_instance.web — usuń tylko jeden zasób'
+            - 'Nigdy nie uruchamiaj na produkcji bez sprawdzenia co będzie zniszczone'
 
   - name: Plan i Apply
     icon: "📋"
     commands:
-      - desc: Zapisz plan do pliku (deterministyczny apply)
-        code: terraform plan -out=tfplan
-      - desc: Zastosuj wcześniej zapisany plan (bez pytania o potwierdzenie)
-        code: terraform apply tfplan
-      - desc: Apply bez pytania o potwierdzenie (CI/CD)
-        code: terraform apply -auto-approve
-      - desc: Plan tylko dla konkretnego zasobu
-        code: terraform plan -target=aws_instance.web
-      - desc: Apply tylko konkretnego zasobu
-        code: terraform apply -target=module.vpc
-      - desc: Przekaż zmienną przez CLI
-        code: terraform plan -var="environment=prod"
-      - desc: Użyj pliku zmiennych
-        code: terraform apply -var-file="prod.tfvars"
-      - desc: Zniszcz konkretny zasób
-        code: terraform destroy -target=aws_instance.web
-      - desc: Plan ze zwięzłymi ostrzeżeniami
-        code: terraform plan -compact-warnings
-      - desc: Plan w trybie JSON (do parsowania)
-        code: terraform plan -json | jq '.resource_changes[].change.actions'
+      - cmd: terraform plan -out=tfplan
+        desc: Zapisz plan do pliku (deterministyczny apply)
+        detail:
+          what: Generuje plan i zapisuje go do pliku tfplan — apply z tym plikiem wykona dokładnie ten plan.
+          how: Plik tfplan = binarny. Zawiera dokładnie co ma zostać wykonane (bez ryzyka dryftu).
+          tips:
+            - 'Użyj w CI/CD: plan w jednym etapie, apply (po review) w drugim'
+            - 'terraform show tfplan — podejrzyj plan w czytelnym formacie'
+      - cmd: terraform apply tfplan
+        desc: Zastosuj wcześniej zapisany plan (bez pytania o potwierdzenie)
+        detail:
+          what: Stosuje plan z pliku tfplan — gwarantuje że apply wykona dokładnie to co pokazał plan.
+          how: Nie pyta o potwierdzenie gdy podajesz plik planu. Plik planu jest jednorazowego użytku.
+          tips:
+            - 'Bezpieczniejszy niż terraform apply — nie ma ryzyka że coś się zmieniło między plan a apply'
+            - 'Po użyciu plik tfplan jest już nieważny — wygeneruj nowy przy kolejnym deployu'
+      - cmd: terraform apply -auto-approve
+        desc: Apply bez pytania o potwierdzenie (CI/CD)
+        detail:
+          what: Stosuje zmiany bez interaktywnego potwierdzenia — wymagane w automatycznych pipeline.
+          how: Używaj tylko gdy wcześniej dokładnie zreviewowałeś plan. Nieodwracalne działania bez ostrzeżenia.
+          tips:
+            - 'Zawsze poprzedź: terraform plan -out=tfplan && terraform apply -auto-approve tfplan'
+            - 'W produkcji wymagaj manualnego approval nawet w CI — nie używaj -auto-approve bez review'
+      - cmd: terraform plan -target=aws_instance.web
+        desc: Plan tylko dla konkretnego zasobu
+        detail:
+          what: Generuje plan ograniczony do wskazanego zasobu i jego zależności.
+          how: Przydatne gdy chcesz przetestować zmiany jednego zasobu bez wpływu na resztę.
+          tips:
+            - 'Możesz podać wiele: -target=res1 -target=res2'
+            - 'Unikaj -target regularnie — prowadzi do dryftu. Używaj tylko do debugowania'
+      - cmd: terraform apply -target=module.vpc
+        desc: Apply tylko konkretnego zasobu
+        detail:
+          what: Stosuje zmiany tylko dla wskazanego modułu/zasobu i jego zależności.
+          how: Przydatne do częściowego deployu gdy coś się nie powodzi i chcesz retry tylko tej części.
+          tips:
+            - '-target=module.vpc stosuje zmiany dla wszystkich zasobów w module vpc'
+            - 'Po -target apply — uruchom pełny apply bez -target żeby wyrównać state'
+      - cmd: terraform plan -var="environment=prod"
+        desc: Przekaż zmienną przez CLI
+        detail:
+          what: Przekazuje wartość zmiennej bezpośrednio przez CLI — nadpisuje wartość z tfvars.
+          how: "-var jest przetwarzane jako ostatnie — nadpisuje wszystkie inne źródła zmiennej."
+          tips:
+            - 'terraform apply -var="region=eu-west-1" -var="env=prod"'
+            - 'Dla sekretów: nie używaj -var w CLI (widoczne w historii). Użyj TF_VAR_name env'
+      - cmd: terraform apply -var-file="prod.tfvars"
+        desc: Użyj pliku zmiennych
+        detail:
+          what: Wczytuje zmienne z pliku prod.tfvars — osobny zestaw zmiennych dla każdego środowiska.
+          how: ".tfvars = HCL lub JSON z wartościami zmiennych. Możesz użyć kilku plików naraz."
+          tips:
+            - 'Pliki *.tfvars nie są automatycznie wczytywane — musisz je podać przez -var-file'
+            - 'Wyjątek: terraform.tfvars i *.auto.tfvars są wczytywane automatycznie'
+      - cmd: terraform destroy -target=aws_instance.web
+        desc: Zniszcz konkretny zasób
+        detail:
+          what: Usuwa tylko wskazany zasób — nie rusza reszty infrastruktury.
+          how: Pyta o potwierdzenie. Przydatne gdy chcesz odtworzyć jeden zasób od zera.
+          tips:
+            - 'Po destroy - apply odtworzy zasób'
+            - 'Terraform state rm resource — usuń ze state bez niszczenia rzeczywistego zasobu'
+      - cmd: terraform plan -compact-warnings
+        desc: Plan ze zwięzłymi ostrzeżeniami
+        detail:
+          what: Uruchamia plan z krótkimi ostrzeżeniami zamiast pełnych opisów — mniej verbose output.
+          how: Przydatne gdy masz wiele ostrzeżeń o deprecated features ale chcesz skupić na zmianach.
+          tips:
+            - 'Używaj podczas codziennej pracy gdy ostrzeżenia już znasz'
+            - 'Bez -compact-warnings — pełne opisy wszystkich ostrzeżeń (domyślne)'
+      - cmd: terraform plan -json | jq '.resource_changes[].change.actions'
+        desc: Plan w trybie JSON (do parsowania)
+        detail:
+          what: Generuje plan w formacie JSON i filtruje przez jq — lista planowanych akcji (create/update/delete).
+          how: JSON output przydatny do automatycznej analizy planu (np. sprawdź czy są destroy).
+          tips:
+            - 'terraform plan -json | jq ''[.resource_changes[] | select(.change.actions[] == "delete")]'''
+            - 'Używaj do policy-as-code: blokuj deploy jeśli plan zawiera "delete"'
 
   - name: State management
     icon: "🗂️"
     commands:
-      - desc: Lista wszystkich zasobów w state
-        code: terraform state list
-      - desc: Szczegóły konkretnego zasobu ze state
-        code: terraform state show aws_instance.web
-      - desc: Przenieś zasób w state (rename bez destroy/create)
-        code: terraform state mv aws_instance.old aws_instance.new
-      - desc: Przenieś zasób do modułu
-        code: terraform state mv aws_instance.web module.compute.aws_instance.web
-      - desc: Usuń zasób ze state (Terraform przestaje nim zarządzać)
-        code: terraform state rm aws_instance.web
-      - desc: Pobierz state jako JSON
-        code: terraform state pull
-      - desc: Wymuś aktualizację state z rzeczywistości (deprecated w 1.6, używaj plan -refresh-only)
-        code: terraform refresh
-      - desc: Plan który tylko odświeża state (nie zmienia zasobów)
-        code: terraform plan -refresh-only
-      - desc: Odblokuj zablokowany state
-        code: terraform force-unlock LOCK_ID
+      - cmd: terraform state list
+        desc: Lista wszystkich zasobów w state
+        detail:
+          what: Wyświetla wszystkie zasoby zarządzane przez Terraform — nazwy zasobów w formacie type.name.
+          how: Przydatne do znalezienia nazwy zasobu przed state show, mv lub rm.
+          tips:
+            - 'terraform state list | grep ec2 — filtruj po typie zasobu'
+            - 'Długa lista? Używasz -target — state ma tylko zasoby z ostatniego apply'
+      - cmd: terraform state show aws_instance.web
+        desc: Szczegóły konkretnego zasobu ze state
+        detail:
+          what: Pokazuje aktualne atrybuty zasobu zapisane w state — to co Terraform "wie" o zasobie.
+          how: Przydatne do debugowania — porównaj z rzeczywistym stanem w AWS/GCP/Azure.
+          tips:
+            - 'Różnica między state show a rzeczywistością = drift (niebezpieczne)'
+            - 'terraform refresh — (deprecated) aktualizuj state z rzeczywistości'
+      - cmd: terraform state mv aws_instance.old aws_instance.new
+        desc: Przenieś zasób w state (rename bez destroy/create)
+        detail:
+          what: Zmienia nazwę zasobu w state bez niszczenia i tworzenia rzeczywistego zasobu.
+          how: Użyj gdy refaktoryzujesz kod Terraform i zmieniasz nazwy zasobów.
+          tips:
+            - 'Bez state mv: Terraform by zniszczył old i stworzył new (przerwa w działaniu!)'
+            - 'terraform plan po state mv — sprawdź czy plan jest pusty (no changes)'
+      - cmd: terraform state mv aws_instance.web module.compute.aws_instance.web
+        desc: Przenieś zasób do modułu
+        detail:
+          what: Przenosi zasób do modułu w state — używane przy refaktoryzacji kodu do modułów.
+          how: Zasób pozostaje niezmieniony, tylko state jest aktualizowany.
+          tips:
+            - 'Typowe przy wyodrębnianiu zasobów do re-używalnych modułów'
+            - 'Sprawdź plan po state mv — powinien pokazać "No changes"'
+      - cmd: terraform state rm aws_instance.web
+        desc: Usuń zasób ze state (Terraform przestaje nim zarządzać)
+        detail:
+          what: Usuwa zasób z state Terraform — rzeczywisty zasób nadal istnieje, ale Terraform go nie widzi.
+          how: Przydatne gdy chcesz żeby Terraform przestał zarządzać zasobem (np. przekazujesz do innego state).
+          tips:
+            - 'Zasób nadal istnieje w chmurze — tylko Terraform go nie zarządza'
+            - 'terraform import — odwrotność (importuj zasób do state)'
+      - cmd: terraform state pull
+        desc: Pobierz state jako JSON
+        detail:
+          what: Wyświetla pełny stan Terraform jako JSON — użyteczne do backupu i analizy.
+          how: Dla remote backends pobiera z S3/GCS/Terraform Cloud.
+          tips:
+            - 'terraform state pull > backup.tfstate — zrób backup state'
+            - 'terraform state pull | jq ''.resources[] | .type'' — lista typów zasobów'
+      - cmd: terraform refresh
+        desc: Wymuś aktualizację state z rzeczywistości (deprecated w 1.6, używaj plan -refresh-only)
+        detail:
+          what: Synchronizuje state z rzeczywistym stanem zasobów w chmurze — aktualizuje drift.
+          how: Deprecated w Terraform 1.6 — używaj terraform plan -refresh-only.
+          tips:
+            - 'terraform plan -refresh-only — bezpieczniejszy zamiennik'
+            - 'Nie stosuje żadnych zmian — tylko aktualizuje state'
+      - cmd: terraform plan -refresh-only
+        desc: Plan który tylko odświeża state (nie zmienia zasobów)
+        detail:
+          what: Pokazuje różnice między state Terraform a rzeczywistym stanem zasobów (drift detection).
+          how: Nie planuje żadnych zmian w infrastrukturze — tylko aktualizuje state.
+          tips:
+            - 'terraform apply -refresh-only — zastosuj odświeżenie state'
+            - 'Użyj do wykrywania driftu: zmiany wprowadzone ręcznie poza Terraform'
+      - cmd: terraform force-unlock LOCK_ID
+        desc: Odblokuj zablokowany state
+        detail:
+          what: Usuwa lock z state Terraform — używane gdy poprzedni apply się zawiesił.
+          how: LOCK_ID znajdziesz w komunikacie błędu "Error acquiring the state lock".
+          tips:
+            - 'Używaj ostrożnie — upewnij się że żaden inny terraform nie działa'
+            - 'Lock ID to UUID widoczny w błędzie: "ID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"'
 
   - name: Import i migracja
     icon: "📥"
     commands:
-      - desc: Importuj istniejący zasób AWS do state
-        code: terraform import aws_instance.web i-0abc123def456
-      - desc: Importuj bucket S3
-        code: terraform import aws_s3_bucket.logs my-bucket-name
-      - desc: Importuj zasób z for_each (cudzysłowy wokół klucza)
-        code: "terraform import 'aws_iam_user.team[\"alice\"]' alice"
-      - desc: Importuj zasób z count
-        code: "terraform import 'aws_instance.workers[0]' i-0abc123"
-      - desc: Generuj konfigurację z importu (Terraform 1.6+)
-        code: terraform plan -generate-config-out=generated.tf
-      - desc: Zamień provider w state (migracja)
-        code: terraform state replace-provider registry.terraform.io/hashicorp/aws registry.terraform.io/hashicorp/aws
+      - cmd: terraform import aws_instance.web i-0abc123def456
+        desc: Importuj istniejący zasób AWS do state
+        detail:
+          what: Importuje istniejący zasób AWS do Terraform state — Terraform zaczyna nim zarządzać.
+          how: "Wymaga żebyś najpierw napisał blok resource {} w .tf, potem import go wypełni state."
+          tips:
+            - 'Najpierw napisz konfigurację resource w .tf, potem terraform import'
+            - 'Po import — terraform plan powinien pokazać "No changes" jeśli konfiguracja zgadza się z rzeczywistością'
+      - cmd: terraform import aws_s3_bucket.logs my-bucket-name
+        desc: Importuj bucket S3
+        detail:
+          what: Importuje bucket S3 o podanej nazwie do Terraform state.
+          how: ID zasobu = nazwa bucketu (różne dla różnych zasobów — sprawdź dokumentację providera).
+          tips:
+            - 'Format ID zależy od zasobu — sprawdź terraform.io/docs dla każdego zasobu'
+            - 'Dla RDS: aws_db_instance.db db-identifier'
+      - cmd: "terraform import 'aws_iam_user.team[\"alice\"]' alice"
+        desc: Importuj zasób z for_each (cudzysłowy wokół klucza)
+        detail:
+          what: Importuje zasób z for_each gdzie kluczem jest "alice" — wymaga cudzysłowów w bashu.
+          how: "for_each tworzy zasoby z nawiasami: resource[\"key\"]. Cudzysłowy wymagają escapowania w bash."
+          tips:
+            - 'Cudzysłowy w bashu: otocz całość apostrofami i używaj \"\"'
+            - 'terraform state list — sprawdź pełną nazwę zasobu z for_each'
+      - cmd: "terraform import 'aws_instance.workers[0]' i-0abc123"
+        desc: Importuj zasób z count
+        detail:
+          what: Importuje zasób tworzony przez count — gdzie indeks to 0.
+          how: "count tworzy zasoby z indeksem: resource[0], resource[1] etc."
+          tips:
+            - 'terraform state list | grep workers — znajdź dokładne nazwy zasobów z count'
+            - 'Importuj po kolei każdy indeks osobno'
+      - cmd: terraform plan -generate-config-out=generated.tf
+        desc: Generuj konfigurację z importu (Terraform 1.6+)
+        detail:
+          what: Automatycznie generuje konfigurację HCL dla zaimportowanych zasobów — Terraform 1.6+.
+          how: 'Nowy workflow: import block w .tf + plan -generate-config-out zamiast ręcznego pisania.'
+          tips:
+            - 'Nowy workflow: dodaj import { to = ... id = "..." } w .tf, potem plan -generate-config-out'
+            - 'Wygenerowany kod wymaga czyszczenia — nie wszystkie atrybuty są potrzebne'
+      - cmd: terraform state replace-provider registry.terraform.io/hashicorp/aws registry.terraform.io/hashicorp/aws
+        desc: Zamień provider w state (migracja)
+        detail:
+          what: Zmienia źródło providera w state — używane przy migracji między registry lub fork providera.
+          how: Przydatne przy migracji z Terraform 0.12 na 0.13+ lub między providerami community.
+          tips:
+            - 'Używaj gdy zmieniasz required_providers source w konfiguracji'
+            - 'terraform init -upgrade po zmianie providera'
 
   - name: Workspace
     icon: "🗂️"
     commands:
-      - desc: Lista wszystkich workspace'ów
-        code: terraform workspace list
-      - desc: Utwórz i przełącz na nowy workspace
-        code: terraform workspace new dev
-      - desc: Przełącz na istniejący workspace
-        code: terraform workspace select prod
-      - desc: Pokaż aktualny workspace
-        code: terraform workspace show
-      - desc: Usuń workspace (musi być pusty)
-        code: terraform workspace delete dev
+      - cmd: terraform workspace list
+        desc: Lista wszystkich workspace'ów
+        detail:
+          what: Pokazuje wszystkie workspace'y z zaznaczonym aktywnym (gwiazdka *).
+          how: "Domyślnie jeden workspace: default. Każdy workspace ma osobny state."
+          tips:
+            - 'Workspace = osobny state file dla tej samej konfiguracji'
+            - 'Dobry dla: dev/staging/prod z tą samą konfiguracją i różnymi zmiennymi'
+      - cmd: terraform workspace new dev
+        desc: Utwórz i przełącz na nowy workspace
+        detail:
+          what: Tworzy nowy workspace o nazwie "dev" i automatycznie na niego przełącza.
+          how: Nowy workspace ma pusty state — zasoby z innych workspace'ów są niewidoczne.
+          tips:
+            - 'terraform.workspace — zmienna HCL z nazwą aktualnego workspace'
+            - 'Użyj w konfiguracji: name = "app-${terraform.workspace}"'
+      - cmd: terraform workspace select prod
+        desc: Przełącz na istniejący workspace
+        detail:
+          what: Przełącza aktywny workspace na "prod" — kolejne komendy operują na state prod.
+          how: Nie zmienia plików .tf — tylko który state jest używany.
+          tips:
+            - 'terraform workspace show — sprawdź aktualny workspace przed apply'
+            - 'Pamiętaj w którym workspace jesteś — łatwo o błąd!'
+      - cmd: terraform workspace show
+        desc: Pokaż aktualny workspace
+        detail:
+          what: Wypisuje nazwę aktualnie aktywnego workspace.
+          how: Prosta komenda do szybkiego sprawdzenia kontekstu.
+          tips:
+            - 'Dodaj do PS1 (prompt): $(terraform workspace show 2>/dev/null) — widoczny w terminalu'
+            - 'Zawsze sprawdź workspace przed terraform apply na produkcji'
+      - cmd: terraform workspace delete dev
+        desc: Usuń workspace (musi być pusty)
+        detail:
+          what: Usuwa workspace dev — wymaga że workspace ma pusty state (terraform destroy wcześniej).
+          how: Nie można usunąć aktywnego workspace ani "default".
+          tips:
+            - 'terraform destroy && terraform workspace select default && terraform workspace delete dev'
+            - 'terraform workspace delete -force dev — wymuś usunięcie (nawet z zasobami w state — niebezpieczne)'
 
   - name: Debugging
     icon: "🐛"
     commands:
-      - desc: Włącz debug logging (TRACE/DEBUG/INFO/WARN/ERROR)
-        code: TF_LOG=DEBUG terraform plan
-      - desc: Zapisz logi do pliku
-        code: TF_LOG=DEBUG TF_LOG_PATH=./terraform.log terraform apply
-      - desc: Interaktywna konsola do testowania wyrażeń
-        code: terraform console
-      - desc: Pokaż graf zależności (format DOT)
-        code: terraform graph
-      - desc: Wizualizuj graf (wymaga graphviz)
-        code: terraform graph | dot -Tsvg > graph.svg
-      - desc: Pokaż outputy
-        code: terraform output
-      - desc: Pokaż konkretny output jako raw string
-        code: terraform output -raw vpc_id
-      - desc: Outputy jako JSON
-        code: terraform output -json
-      - desc: Pokaż wersję Terraform i providerów
-        code: terraform version
-      - desc: Pokaż dostawców używanych w projekcie
-        code: terraform providers
+      - cmd: TF_LOG=DEBUG terraform plan
+        desc: Włącz debug logging (TRACE/DEBUG/INFO/WARN/ERROR)
+        detail:
+          what: Uruchamia terraform plan z verbose logowaniem — pokazuje API calls, parsowanie, decyzje.
+          how: "Poziomy (od najgłośniejszego): TRACE, DEBUG, INFO, WARN, ERROR. DEBUG = zwykle wystarczy."
+          tips:
+            - 'TF_LOG=TRACE — maksymalne logowanie (bardzo dużo outputu)'
+            - 'TF_LOG=DEBUG terraform apply 2>debug.log — przekieruj logi do pliku'
+      - cmd: TF_LOG=DEBUG TF_LOG_PATH=./terraform.log terraform apply
+        desc: Zapisz logi do pliku
+        detail:
+          what: Zapisuje debug logi do pliku terraform.log zamiast stderr.
+          how: TF_LOG_PATH = ścieżka do pliku logów. Przydatne gdy logi są za długie na terminal.
+          tips:
+            - 'grep "Error" terraform.log — filtruj tylko błędy'
+            - 'Plik logów może być duży — usuń po debugowaniu'
+      - cmd: terraform console
+        desc: Interaktywna konsola do testowania wyrażeń
+        detail:
+          what: Otwiera interaktywną konsolę gdzie możesz testować wyrażenia HCL i funkcje Terraform.
+          how: Czyta aktualny state i zmienne — możesz testować interpolacje przed użyciem w kodzie.
+          tips:
+            - '"hello ${var.environment}" — testuj string interpolation'
+            - 'length(["a","b","c"]) — testuj wbudowane funkcje Terraform'
+            - 'toset(["a","b","a"]) — sprawdź jak funkcje przetwarzają dane'
+      - cmd: terraform graph
+        desc: Pokaż graf zależności (format DOT)
+        detail:
+          what: Generuje graf zależności między zasobami w formacie DOT (Graphviz).
+          how: Wyjście to kod DOT — przekaż do dot lub Graphviz żeby wygenerować wizualizację.
+          tips:
+            - 'terraform graph | dot -Tsvg > graph.svg — wizualizacja jako SVG'
+            - 'https://dreampuf.github.io/GraphvizOnline — wklej online (bez instalacji dot)'
+      - cmd: terraform graph | dot -Tsvg > graph.svg
+        desc: Wizualizuj graf (wymaga graphviz)
+        detail:
+          what: Generuje SVG z grafem zależności Terraform — otwórz w przeglądarce.
+          how: dot to narzędzie z pakietu Graphviz. Format DOT → SVG.
+          tips:
+            - 'sudo apt install graphviz — zainstaluj Graphviz'
+            - 'terraform graph -type=plan | dot -Tpng > plan.png — wizualizacja planu'
+      - cmd: terraform output
+        desc: Pokaż outputy
+        detail:
+          what: Wyświetla wszystkie zdefiniowane outputy (output {}) z aktualnego state.
+          how: Outputy są dostępne po terraform apply — wartości zdefiniowane w output blokach.
+          tips:
+            - 'terraform output -json — wszystkie outputy jako JSON (do skryptów)'
+            - 'terraform output database_url — konkretny output'
+      - cmd: terraform output -raw vpc_id
+        desc: Pokaż konkretny output jako raw string
+        detail:
+          what: Wypisuje wartość outputu vpc_id bez cudzysłowów — gotowe do użycia w skryptach bash.
+          how: "-raw = plain text bez cudzysłowów i formatowania. Idealne do przypisania do zmiennej bash."
+          tips:
+            - 'VPC_ID=$(terraform output -raw vpc_id) — przypisz do zmiennej bash'
+            - 'Bez -raw — wartość string jest w cudzysłowach'
+      - cmd: terraform output -json
+        desc: Outputy jako JSON
+        detail:
+          what: Wypisuje wszystkie outputy jako JSON — wygodne do parsowania w skryptach i pipeline.
+          how: 'Format: {"output_name": {"value": ..., "type": ...}}. Parsuj przez jq.'
+          tips:
+            - 'terraform output -json | jq .database_url.value — konkretny output przez jq'
+            - 'W CI/CD: terraform output -json > outputs.json — zapisz do pliku'
+      - cmd: terraform version
+        desc: Pokaż wersję Terraform i providerów
+        detail:
+          what: Wyświetla wersję Terraform i wszystkich zainstalowanych providerów.
+          how: Sprawdź przed pracą z projektem — wersja Terraform i providerów ma znaczenie.
+          tips:
+            - 'Zdefiniuj required_version w terraform {} bloku — lock wersja Terraform'
+            - 'tfenv use 1.6.6 — przełącz wersję jeśli projekt wymaga innej'
+      - cmd: terraform providers
+        desc: Pokaż dostawców używanych w projekcie
+        detail:
+          what: Wyświetla drzewo providerów wymaganych przez konfigurację i moduły.
+          how: Pokazuje source i version constraint dla każdego providera.
+          tips:
+            - 'terraform providers schema -json — pełne schematy providerów (do debugowania)'
+            - 'terraform providers lock — odśwież .terraform.lock.hcl dla wszystkich platform'
 
   - name: Instalacja
     icon: "💿"
     commands:
-      - desc: Zainstaluj tfenv (menedżer wersji Terraform)
-        code: brew install tfenv
-      - desc: Lista dostępnych wersji Terraform
-        code: tfenv list-remote
-      - desc: Zainstaluj konkretną wersję przez tfenv
-        code: tfenv install 1.6.6
-      - desc: Użyj konkretnej wersji przez tfenv
-        code: tfenv use 1.6.6
-      - desc: Zainstaluj przez asdf (multi-runtime manager)
-        code: asdf plugin add terraform && asdf install terraform 1.6.6
-      - desc: Zainstaluj na Ubuntu/Debian przez apt
-        code: "wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg && sudo apt install terraform"
-      - desc: Zainstaluj OpenTofu (open-source fork)
-        code: brew install opentofu
-      - desc: Zainstaluj Terragrunt
-        code: brew install terragrunt
+      - cmd: brew install tfenv
+        desc: Zainstaluj tfenv (menedżer wersji Terraform)
+        detail:
+          what: Instaluje tfenv — menedżer wersji Terraform podobny do pyenv/nvm.
+          how: tfenv pozwala mieć wiele wersji Terraform i przełączać między nimi per-projekt.
+          tips:
+            - '.terraform-version w katalogu projektu — automatycznie używa tej wersji'
+            - 'tfenv install latest — zainstaluj najnowszą wersję'
+      - cmd: tfenv list-remote
+        desc: Lista dostępnych wersji Terraform
+        detail:
+          what: Pobiera i wyświetla listę wszystkich dostępnych wersji Terraform do zainstalowania.
+          how: Wymaga połączenia z internetem. Pokazuje od najnowszej.
+          tips:
+            - 'tfenv install 1.6.6 — zainstaluj konkretną wersję'
+            - 'tfenv list — lista zainstalowanych wersji (nie wszystkich dostępnych)'
+      - cmd: tfenv install 1.6.6
+        desc: Zainstaluj konkretną wersję przez tfenv
+        detail:
+          what: Pobiera i instaluje Terraform w konkretnej wersji.
+          how: Wersja jest dostępna globalnie i przez tfenv use/local.
+          tips:
+            - 'tfenv install latest — zainstaluj najnowszą stabilną'
+            - 'tfenv install min-required — zainstaluj wersję z .terraform-version pliku'
+      - cmd: tfenv use 1.6.6
+        desc: Użyj konkretnej wersji przez tfenv
+        detail:
+          what: Przełącza aktywną wersję Terraform na 1.6.6 globalnie.
+          how: Modyfikuje symlink. Działa dla całego systemu.
+          tips:
+            - 'Stwórz .terraform-version w projekcie — tfenv automatycznie przełącza'
+            - 'tfenv list — sprawdź zainstalowane wersje'
+      - cmd: asdf plugin add terraform && asdf install terraform 1.6.6
+        desc: Zainstaluj przez asdf (multi-runtime manager)
+        detail:
+          what: Instaluje Terraform przez asdf — jeśli już używasz asdf do zarządzania innymi narzędziami.
+          how: asdf = jeden manager dla Python, Node, Terraform, kubectl i 500+ innych narzędzi.
+          tips:
+            - '.tool-versions w projekcie: terraform 1.6.6 — automatyczny switch'
+            - 'Jeśli już masz asdf — użyj zamiast tfenv (jeden mniej manager)'
+      - cmd: "wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg && sudo apt install terraform"
+        desc: Zainstaluj na Ubuntu/Debian przez apt
+        detail:
+          what: Instaluje oficjalne repo HashiCorp i instaluje Terraform przez apt.
+          how: Dodaje klucz GPG HashiCorp, repo apt i instaluje terraform.
+          tips:
+            - 'Pełna instrukcja na developer.hashicorp.com/terraform/install'
+            - 'Po instalacji przez apt: sudo apt upgrade terraform — aktualizacje przez apt'
+      - cmd: brew install opentofu
+        desc: Zainstaluj OpenTofu (open-source fork)
+        detail:
+          what: Instaluje OpenTofu — w pełni open-source fork Terraform (z przed zmiany licencji BSL).
+          how: OpenTofu jest fork z wersji 1.5 — kompatybilny z większością konfiguracji Terraform.
+          tips:
+            - 'OpenTofu = drop-in replacement dla Terraform do wersji 1.5'
+            - 'Używaj jeśli masz obawy co do licencji BSL HashiCorp'
+      - cmd: brew install terragrunt
+        desc: Zainstaluj Terragrunt
+        detail:
+          what: Instaluje Terragrunt — wrapper nad Terraform do zarządzania wieloma modułami.
+          how: Terragrunt rozwiązuje DRY dla konfiguracji Terraform w dużych projektach.
+          tips:
+            - 'Terragrunt.hcl zamiast backend.tf w każdym module — centralna konfiguracja'
+            - 'terragrunt run-all plan — plan dla wszystkich modułów naraz'

@@ -1,0 +1,223 @@
+title: Agenci i narzędzia
+
+items:
+  - name: ReAct Agent — Reason + Act
+    icon: "🤖"
+    desc: >
+      ReAct (Reasoning + Acting) to najpopularniejszy pattern agenta — LLM decyduje
+      jakie narzędzie wywołać, ToolNode je wywołuje, wynik wraca do LLM. Pętla trwa
+      dopóki LLM nie zwróci odpowiedzi bez tool_calls. create_react_agent to gotowy
+      skrót — jedno wywołanie buduje kompletnego agenta.
+    code: |
+      from langgraph.prebuilt import create_react_agent
+      from langchain_anthropic import ChatAnthropic
+      from langchain_core.tools import tool
+      import httpx
+
+      # Zdefiniuj narzędzia
+      @tool
+      def search_web(query: str) -> str:
+          """Przeszukaj internet w poszukiwaniu informacji."""
+          # W praktyce — Tavily, SerpAPI, itp.
+          return f"Wyniki wyszukiwania dla: {query}"
+
+      @tool
+      def get_weather(city: str) -> str:
+          """Pobierz aktualną pogodę dla podanego miasta."""
+          return f"{city}: 18°C, zachmurzenie 60%"
+
+      @tool
+      def calculate(expression: str) -> str:
+          """Oblicz wyrażenie matematyczne (Python eval)."""
+          try:
+              return str(eval(expression, {"__builtins__": {}}, {}))
+          except Exception as e:
+              return f"Błąd: {e}"
+
+      # Utwórz agenta jedną linią
+      llm = ChatAnthropic(model="claude-sonnet-4-6")
+      agent = create_react_agent(
+          model=llm,
+          tools=[search_web, get_weather, calculate],
+          # Opcjonalny system prompt
+          state_modifier="Jesteś pomocnym asystentem. Używaj narzędzi gdy potrzebujesz aktualnych danych.",
+      )
+
+      # Uruchom
+      result = agent.invoke({
+          "messages": [("human", "Jaka jest pogoda w Krakowie i ile to 1234 * 5678?")]
+      })
+      for msg in result["messages"]:
+          print(f"{msg.type}: {msg.content[:100]}")
+
+  - name: ToolNode — węzeł narzędzi
+    icon: "🔧"
+    desc: >
+      ToolNode to gotowy węzeł do wykonywania narzędzi — parsuje tool_calls z ostatniej
+      wiadomości, wywołuje narzędzia równolegle, zwraca ToolMessage z wynikami.
+      Używaj razem z should_continue do budowania pętli agent -> tools -> agent.
+    code: |
+      from langgraph.graph import StateGraph, START, END
+      from langgraph.prebuilt import ToolNode
+      from langgraph.graph.message import add_messages
+      from langchain_anthropic import ChatAnthropic
+      from langchain_core.tools import tool
+      from typing import TypedDict, Annotated
+
+      @tool
+      def read_file(path: str) -> str:
+          """Odczytaj zawartość pliku."""
+          try:
+              with open(path) as f:
+                  return f.read()
+          except FileNotFoundError:
+              return f"Plik {path} nie istnieje"
+
+      @tool
+      def write_file(path: str, content: str) -> str:
+          """Zapisz treść do pliku."""
+          with open(path, "w") as f:
+              f.write(content)
+          return f"Zapisano {len(content)} znaków do {path}"
+
+      tools = [read_file, write_file]
+      llm = ChatAnthropic(model="claude-sonnet-4-6").bind_tools(tools)
+      tool_node = ToolNode(tools)
+
+      class State(TypedDict):
+          messages: Annotated[list, add_messages]
+
+      def agent(state: State):
+          return {"messages": [llm.invoke(state["messages"])]}
+
+      def should_continue(state: State) -> str:
+          last = state["messages"][-1]
+          # Jeśli LLM chce wywołać narzędzia — idź do tool_node
+          if hasattr(last, "tool_calls") and last.tool_calls:
+              return "tools"
+          return END
+
+      builder = StateGraph(State)
+      builder.add_node("agent", agent)
+      builder.add_node("tools", tool_node)
+      builder.add_edge(START, "agent")
+      builder.add_conditional_edges("agent", should_continue)
+      builder.add_edge("tools", "agent")  # pętla
+
+      graph = builder.compile()
+
+  - name: Human-in-the-loop — interrupt
+    icon: "🛑"
+    desc: >
+      Interrupt pozwala zatrzymać graf przed węzłem i czekać na input człowieka.
+      Agent może zapytać o potwierdzenie przed wykonaniem destruktywnej akcji,
+      poprosić o dodatkowe informacje lub pokazać plan do akceptacji.
+    code: |
+      from langgraph.graph import StateGraph, START, END
+      from langgraph.checkpoint.memory import MemorySaver
+      from langgraph.types import interrupt, Command
+      from typing import TypedDict, Annotated
+      from langgraph.graph.message import add_messages
+
+      class State(TypedDict):
+          messages: Annotated[list, add_messages]
+          approved: bool
+
+      def agent(state: State):
+          # ... agent planuje akcję
+          return {"messages": [("ai", "Planuję usunąć 500 plików. Czy zatwierdzasz?")]}
+
+      def human_review(state: State):
+          # interrupt() zatrzymuje graf i czeka na Resume
+          user_input = interrupt("Zatwierdź akcję? (tak/nie)")
+          approved = user_input.lower() in ["tak", "yes", "t", "y"]
+          return {"approved": approved}
+
+      def execute_action(state: State):
+          if state["approved"]:
+              return {"messages": [("ai", "Akcja zatwierdzona — wykonuję.")]}
+          return {"messages": [("ai", "Akcja anulowana przez użytkownika.")]}
+
+      def route_after_review(state: State) -> str:
+          return "execute" if state["approved"] else END
+
+      builder = StateGraph(State)
+      builder.add_node("agent", agent)
+      builder.add_node("human_review", human_review)
+      builder.add_node("execute", execute_action)
+
+      builder.add_edge(START, "agent")
+      builder.add_edge("agent", "human_review")
+      builder.add_conditional_edges("human_review", route_after_review)
+      builder.add_edge("execute", END)
+
+      # Checkpointer wymagany do interrupt!
+      memory = MemorySaver()
+      graph = builder.compile(checkpointer=memory)
+
+      config = {"configurable": {"thread_id": "session-1"}}
+
+      # Uruchom — zatrzyma się przy interrupt()
+      for event in graph.stream({"messages": [("human", "Wyczyść stare pliki")]}, config):
+          print(event)
+
+      # Wznów z odpowiedzią człowieka
+      for event in graph.stream(Command(resume="tak"), config):
+          print(event)
+
+  - name: Narzędzia asynchroniczne
+    icon: "⚡"
+    desc: >
+      LangGraph obsługuje async narzędzia i węzły — ToolNode wywołuje je równolegle.
+      Używaj async gdy narzędzia robią I/O — API calls, bazy danych, pliki.
+      Pełna aplikacja async to lepsza przepustowość przy wielu równoczesnych agentach.
+    code: |
+      import asyncio
+      import httpx
+      from langchain_core.tools import tool
+      from langgraph.prebuilt import create_react_agent
+      from langchain_anthropic import ChatAnthropic
+
+      # Async tool — HTTP request bez blokowania
+      @tool
+      async def fetch_url(url: str) -> str:
+          """Pobierz zawartość strony internetowej."""
+          async with httpx.AsyncClient(timeout=10) as client:
+              response = await client.get(url)
+              return response.text[:500]
+
+      @tool
+      async def query_database(sql: str) -> str:
+          """Wykonaj zapytanie SQL do bazy danych."""
+          # W praktyce — asyncpg, databases, SQLAlchemy async
+          await asyncio.sleep(0.1)  # symulacja I/O
+          return f"Wyniki zapytania: {sql}"
+
+      @tool
+      async def send_notification(message: str) -> str:
+          """Wyślij powiadomienie przez API."""
+          async with httpx.AsyncClient() as client:
+              # await client.post("https://api.slack.com/...", json={"text": message})
+              return f"Powiadomienie wysłane: {message}"
+
+      llm = ChatAnthropic(model="claude-sonnet-4-6")
+      agent = create_react_agent(llm, tools=[fetch_url, query_database, send_notification])
+
+      # Użycie async — ToolNode wywołuje narzędzia równolegle
+      async def main():
+          result = await agent.ainvoke({
+              "messages": [("human", "Pobierz dane z httpbin.org/get i wyślij powiadomienie")]
+          })
+          print(result["messages"][-1].content)
+
+      asyncio.run(main())
+
+      # Lub przez astream dla streamingu
+      async def stream():
+          async for chunk in agent.astream(
+              {"messages": [("human", "Sprawdź API")]},
+              stream_mode="updates"
+          ):
+              print(chunk)
+
+      asyncio.run(stream())

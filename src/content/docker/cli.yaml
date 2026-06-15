@@ -3,99 +3,209 @@ groups:
   - name: Kontenery
     icon: "📦"
     commands:
-      - desc: Uruchom kontener w tle z portem i nazwą
-        code: docker run -d -p 8000:8000 --name api moja-apka
-      - desc: Lista działających kontenerów
-        code: docker ps
-      - desc: Lista wszystkich kontenerów (łącznie z zatrzymanymi)
-        code: docker ps -a
-      - desc: Wejdź do działającego kontenera
-        code: docker exec -it kontener bash
-      - desc: Wejdź do kontenera alpine (bez bash)
-        code: docker exec -it kontener sh
-      - desc: Śledź logi kontenera na żywo
-        code: docker logs -f kontener
-      - desc: Ostatnie 100 linii logów
-        code: docker logs --tail 100 kontener
-      - desc: Zatrzymaj kontener (graceful)
-        code: docker stop kontener
-      - desc: Zatrzymaj i usuń kontener
-        code: docker stop kontener && docker rm kontener
-      - desc: Zużycie CPU i RAM na żywo
-        code: docker stats
-      - desc: Pełne metadane kontenera (JSON)
-        code: docker inspect kontener
-      - desc: Kopiuj plik z kontenera na hosta
-        code: docker cp kontener:/app/log.txt ./log.txt
+      - cmd: docker run -d -p 8000:8000 --name api moja-apka
+        desc: Uruchom kontener w tle z portem i nazwą
+        detail:
+          what: Uruchamia kontener w tle (-d = detached) z mapowaniem portu i nadaną nazwą.
+          how: "-p host:kontener — mapuj port. --name — nazwij kontener zamiast losowego ID."
+          flags:
+            - flag: -d
+              desc: Detached — uruchom w tle
+            - flag: "-p 8000:8000"
+              desc: Mapuj port hosta na port kontenera
+            - flag: --name
+              desc: Nadaj nazwę kontenerowi
+          tips:
+            - 'docker run --rm -it moja-apka bash — uruchom interaktywnie i usuń po wyjściu'
+            - 'docker run -e DATABASE_URL=... moja-apka — przekaż zmienne środowiskowe'
+      - cmd: docker ps
+        desc: Lista działających kontenerów
+        detail:
+          what: Pokazuje wszystkie aktualnie działające kontenery z ID, obrazem, portem i statusem.
+          how: "Kolumny: CONTAINER ID, IMAGE, COMMAND, CREATED, STATUS, PORTS, NAMES."
+          tips:
+            - 'docker ps -a — pokaż też zatrzymane kontenery'
+            - 'docker ps -q — tylko ID (do skryptów, np. docker stop $(docker ps -q))'
+      - cmd: docker exec -it kontener bash
+        desc: Wejdź do działającego kontenera
+        detail:
+          what: Otwiera interaktywną sesję bash wewnątrz działającego kontenera.
+          how: "-it = interactive + tty. exec uruchamia komendę w działającym kontenerze (nie startuje nowego)."
+          tips:
+            - 'docker exec -it kontener sh — dla obrazów alpine (bez bash)'
+            - 'docker exec kontener cat /etc/hosts — jednorazowa komenda bez sesji'
+      - cmd: docker logs -f kontener
+        desc: Śledź logi kontenera na żywo
+        detail:
+          what: Wyświetla logi kontenera i śledzi nowe wyjście na żywo (-f = follow).
+          how: "Kontenery zapisują stdout/stderr jako logi. docker logs czyta je bez wchodzenia do kontenera."
+          tips:
+            - 'docker logs --tail 100 kontener — ostatnie 100 linii bez follow'
+            - 'docker logs --since 1h kontener — logi z ostatniej godziny'
+      - cmd: docker stop kontener
+        desc: Zatrzymaj kontener (graceful)
+        detail:
+          what: Wysyła SIGTERM do procesu w kontenerze — daje mu czas na graceful shutdown (domyślnie 10s).
+          how: "Po 10 sekundach jeśli kontener nadal działa — Docker wysyła SIGKILL."
+          tips:
+            - 'docker stop -t 30 kontener — daj 30 sekund na shutdown zamiast 10'
+            - 'docker kill kontener — natychmiastowy SIGKILL bez czekania'
+      - cmd: docker stats
+        desc: Zużycie CPU i RAM na żywo
+        detail:
+          what: Pokazuje live statystyki wszystkich działających kontenerów — CPU, RAM, sieć, I/O.
+          how: "Odświeża co sekundę. Kolumny: CPU%, MEM USAGE/LIMIT, NET I/O, BLOCK I/O."
+          tips:
+            - 'docker stats kontener — tylko jeden kontener'
+            - 'docker stats --no-stream — jednorazowy snapshot bez live update'
+      - cmd: docker inspect kontener
+        desc: Pełne metadane kontenera (JSON)
+        detail:
+          what: Zwraca pełne metadane kontenera jako JSON — sieć, zmienne środowiskowe, wolumeny, config.
+          how: Ogromny JSON output — użyj jq do filtrowania konkretnych pól.
+          tips:
+            - "docker inspect kontener | python3 -m json.tool | grep -A5 'IPAddress'"
+            - 'docker inspect --format "{{.NetworkSettings.IPAddress}}" kontener — tylko IP'
+      - cmd: docker cp kontener:/app/log.txt ./log.txt
+        desc: Kopiuj plik z kontenera na hosta
+        detail:
+          what: Kopiuje plik lub katalog między kontenerem a hostem — działa też dla zatrzymanych kontenerów.
+          how: "Format: kontener:ścieżka_w_kontenerze ścieżka_na_hoście (lub odwrotnie)."
+          tips:
+            - 'docker cp ./config.py kontener:/app/ — kopiuj z hosta do kontenera'
+            - 'Działa też dla zatrzymanych kontenerów — pomocne przy debugowaniu'
 
   - name: Images
     icon: "🖼️"
     commands:
-      - desc: Zbuduj image z Dockerfile w bieżącym folderze
-        code: docker build -t moja-apka:latest .
-      - desc: Buduj bez cache (fresh rebuild)
-        code: docker build --no-cache -t moja-apka:latest .
-      - desc: Buduj z konkretnym Dockerfile
-        code: docker build -f Dockerfile.prod -t moja-apka:prod .
-      - desc: Lista lokalnych images
-        code: docker images
-      - desc: Pobierz image z Docker Hub
-        code: docker pull python:3.12-slim
-      - desc: Usuń lokalny image
-        code: docker rmi moja-apka:latest
-      - desc: Tag image do Docker Hub
-        code: docker tag moja-apka:latest username/moja-apka:v1.0
-      - desc: Push image do registry
-        code: docker push username/moja-apka:v1.0
-      - desc: Sprawdź warstwy image i ich rozmiar
-        code: docker history moja-apka:latest
+      - cmd: docker build -t moja-apka:latest .
+        desc: Zbuduj image z bieżącego katalogu
+        detail:
+          what: Buduje Docker image na podstawie Dockerfile w bieżącym katalogu (.= kontekst budowania).
+          how: Docker wysyła kontekst (pliki) do demona i wykonuje każdą instrukcję z Dockerfile jako warstwę.
+          flags:
+            - flag: -t moja-apka:latest
+              desc: Tag — nazwa i wersja image
+            - flag: --no-cache
+              desc: Buduj od zera bez warstw cache
+            - flag: -f Dockerfile.prod
+              desc: Użyj konkretnego pliku Dockerfile
+          tips:
+            - 'Stwórz .dockerignore żeby nie kopiować .venv, .git, __pycache__ do kontekstu'
+            - 'docker build --no-cache -t moja-apka:latest . — fresh build gdy podejrzewasz cache'
+      - cmd: docker images
+        desc: Lista lokalnych images
+        detail:
+          what: Pokazuje wszystkie lokalnie dostępne Docker images z tagiem, rozmiarem i datą.
+          how: "Kolumny: REPOSITORY, TAG, IMAGE ID, CREATED, SIZE."
+          tips:
+            - 'docker images --filter dangling=true — pokaż tylko nieoznakowane (dangling) images'
+            - 'docker image prune — usuń nieużywane dangling images'
+      - cmd: docker pull python:3.12-slim
+        desc: Pobierz image z Docker Hub
+        detail:
+          what: Pobiera wskazany image z Docker Hub (lub innego registry) do lokalnego cache.
+          how: Docker pobiera tylko brakujące warstwy — jeśli masz starszą wersję pobierze tylko diff.
+          tips:
+            - 'python:3.12-slim — znacznie mniejszy niż python:3.12 (nie ma dev tools)'
+            - 'docker pull --platform linux/amd64 image — wymuś architekturę (np. na Apple M1)'
+      - cmd: docker push username/moja-apka:v1.0
+        desc: Push image do Docker Hub
+        detail:
+          what: Wysyła lokalny image do Docker Hub (lub innego registry) pod podanym tagiem.
+          how: "Najpierw: docker login, potem docker tag moja-apka username/moja-apka:v1.0, potem push."
+          tips:
+            - 'docker login — zaloguj się do Docker Hub przed push'
+            - 'docker tag moja-apka:latest username/moja-apka:latest — przygotuj tag przed push'
 
   - name: Docker Compose
     icon: "🎼"
     commands:
-      - desc: Uruchom stack (w tle z rebuildem)
-        code: docker compose up -d --build
-      - desc: Zatrzymaj stack (zachowaj wolumeny)
-        code: docker compose down
-      - desc: Zatrzymaj stack i usuń wolumeny (reset DB)
-        code: docker compose down -v
-      - desc: Logi konkretnego serwisu (live)
-        code: docker compose logs -f api
-      - desc: Wejdź do kontenera serwisu
-        code: docker compose exec api bash
-      - desc: Uruchom jednorazową komendę
-        code: docker compose run --rm api python manage.py migrate
-      - desc: Status serwisów
-        code: docker compose ps
-      - desc: Restart konkretnego serwisu
-        code: docker compose restart api
+      - cmd: docker compose up -d --build
+        desc: Uruchom stack z rebuildem w tle
+        detail:
+          what: Uruchamia wszystkie serwisy z docker-compose.yml w tle i przebudowuje images przed startem.
+          how: "--build = zawsze przebuduj images. -d = detached (w tle). Bez -d logi wiszą w terminalu."
+          tips:
+            - 'docker compose up -d — bez --build (używa cache, szybciej)'
+            - 'docker compose up api db — uruchom tylko wybrane serwisy'
+      - cmd: docker compose down
+        desc: Zatrzymaj stack (zachowaj wolumeny)
+        detail:
+          what: Zatrzymuje i usuwa kontenery, sieci ale zachowuje named volumes (dane DB).
+          how: "Kontenery są usuwane — przy następnym up będą nowe (ale dane w wolumenach zostają)."
+          tips:
+            - 'docker compose down -v — usuń też wolumeny (reset bazy danych!)'
+            - 'docker compose stop — tylko zatrzymaj bez usuwania kontenerów'
+      - cmd: docker compose logs -f api
+        desc: Logi konkretnego serwisu (live)
+        detail:
+          what: Wyświetla logi serwisu api i śledzi nowe wpisy na żywo.
+          how: "Bez nazwy serwisu: docker compose logs -f — logi wszystkich serwisów naraz."
+          tips:
+            - 'docker compose logs --tail 50 api — ostatnie 50 linii'
+            - 'docker compose logs -f api db — logi dwóch serwisów naraz'
+      - cmd: docker compose exec api bash
+        desc: Wejdź do kontenera serwisu
+        detail:
+          what: Otwiera bash w działającym kontenerze serwisu api.
+          how: "Odpowiednik docker exec -it <id_kontenera> bash — ale przez nazwę serwisu."
+          tips:
+            - 'docker compose exec db psql -U postgres — wejdź do bazy PostgreSQL'
+            - 'docker compose exec api python manage.py shell — Django/Flask shell'
+      - cmd: docker compose run --rm api python manage.py migrate
+        desc: Uruchom jednorazową komendę w serwisie
+        detail:
+          what: Tworzy nowy kontener dla serwisu api, uruchamia komendę i usuwa kontener po zakończeniu.
+          how: "--rm = usuń kontener po wyjściu. Nie wpływa na działający kontener serwisu api."
+          tips:
+            - 'Użyj do migracji, seedowania DB, jednorazowych skryptów admin'
+            - 'docker compose run --rm --no-deps api pytest — uruchom testy bez startowania zależności'
 
   - name: Sieć i wolumeny
     icon: "🔌"
     commands:
-      - desc: Lista sieci Docker
-        code: docker network ls
-      - desc: Szczegóły sieci (podłączone kontenery)
-        code: docker network inspect moja-siec
-      - desc: Utwórz własną sieć
-        code: docker network create moja-siec
-      - desc: Lista wolumenów
-        code: docker volume ls
-      - desc: Szczegóły wolumenu (lokalizacja na hoście)
-        code: docker volume inspect postgres_data
+      - cmd: docker network ls
+        desc: Lista sieci Docker
+        detail:
+          what: Pokazuje wszystkie sieci Docker — bridge (domyślna), host, none i niestandardowe.
+          how: "Kontenery w tej samej sieci mogą się komunikować po nazwie kontenera jako hostname."
+          tips:
+            - 'docker compose tworzy automatycznie sieć dla każdego projektu'
+            - 'docker network inspect moja-siec — pokaż podłączone kontenery i IP'
+      - cmd: docker volume inspect postgres_data
+        desc: Szczegóły wolumenu (lokalizacja na hoście)
+        detail:
+          what: Pokazuje metadane wolumenu — gdzie są dane na hoście, kiedy stworzony, jaki driver.
+          how: Named volumes są zarządzane przez Docker i zachowują dane między restartami kontenerów.
+          tips:
+            - '"Mountpoint" w output = ścieżka na hoście gdzie są faktyczne dane'
+            - 'docker volume ls — lista wszystkich wolumenów'
 
   - name: Czyszczenie
     icon: "🧹"
     commands:
-      - desc: Sprawdź ile miejsca zajmuje Docker
-        code: docker system df
-      - desc: Usuń zatrzymane kontenery i nieużywane images
-        code: docker system prune
-      - desc: Usuń WSZYSTKO nieużywane (ostrożnie)
-        code: docker system prune -af
-      - desc: Usuń nieużywane wolumeny
-        code: docker volume prune
-      - desc: Usuń dangling images (bez tagu)
-        code: docker image prune
-      - desc: Usuń wszystkie nieużywane images
-        code: docker image prune -a
+      - cmd: docker system df
+        desc: Sprawdź ile miejsca zajmuje Docker
+        detail:
+          what: Pokazuje ile miejsca zajmują images, kontenery, wolumeny i build cache.
+          how: "Kolumny: TYPE, TOTAL, ACTIVE, SIZE, RECLAIMABLE (do odzyskania przez prune)."
+          tips:
+            - Uruchom zanim zaczniesz prune żeby zobaczyć co można odzyskać
+            - 'docker system df -v — szczegółowy widok z każdym image i kontenerem'
+      - cmd: docker system prune
+        desc: Usuń nieużywane kontenery i images
+        detail:
+          what: Usuwa zatrzymane kontenery, nieużywane sieci i dangling images (bez tagu).
+          how: "Pyta o potwierdzenie przed usunięciem. Bezpieczne — nie usuwa named volumes ani używanych images."
+          tips:
+            - 'docker system prune -af — usuń też nieużywane images (nie tylko dangling)'
+            - 'docker system prune --volumes — usuń też nieużywane wolumeny (OSTROŻNIE)'
+      - cmd: docker system prune -af
+        desc: Usuń WSZYSTKO nieużywane
+        detail:
+          what: Usuwa wszystkie nieużywane images (nie tylko dangling), kontenery i sieci. Agresywne czyszczenie.
+          how: "-a = all images (nie tylko dangling). -f = force (bez pytania o potwierdzenie)."
+          tips:
+            - 'Ostrożnie — usuwa images które możesz potrzebować ale nie mają działającego kontenera'
+            - 'Po tym docker pull lub docker build pobierze wszystko od nowa (wolniejszy start)'

@@ -1,0 +1,92 @@
+title: WSL vs alternatywy
+
+items:
+  - name: Dual Boot Linux
+    icon: "🔄"
+    color: "#FF6B35"
+    tagline: "Natywny Linux na osobnej partycji — maksymalna wydajność"
+    pros:
+      - Pełna wydajność sprzętowa — brak overheadu wirtualizacji
+      - Pełne wsparcie hardware — sterowniki Linux bezpośrednio do GPU, USB, Bluetooth
+      - Izolacja od Windows — bezpieczniejsze środowisko produkcyjne
+      - Dowolna dystrybucja bez ograniczeń Microsoft Store
+      - Systemd, snap, flatpak — wszystko bez kompromisów
+    cons:
+      - Restart wymagany do zmiany systemu — nieefektywne przy codziennym przełączaniu
+      - Konfiguracja GRUB i partycji — ryzyko przy nieprawidłowym setup
+      - Brak dostępu do Windows aplikacji podczas pracy na Linux
+      - Shared pliki między systemami przez NTFS — wymaga dodatkowej konfiguracji
+      - Utrata miejsca na dysku na osobną partycję systemową
+    vs: WSL gdy pracujesz na Windows i potrzebujesz Linux toolchainu — przełączasz się bez restartu, masz dostęp do obu środowisk. Dual boot gdy potrzebujesz pełnej wydajności i pracujesz głównie na Linux.
+
+  - name: VMware / VirtualBox
+    icon: "📦"
+    color: "#607078"
+    tagline: "Pełna maszyna wirtualna — maksymalna izolacja i konfigurowalność"
+    pros:
+      - Pełna izolacja — osobny OS ze swoim sieciowaniem i dyskiem
+      - Snapshots — cofnij VM do poprzedniego stanu
+      - Dowolny OS — Linux, BSD, Windows Server, macOS
+      - Konfiguracja hardware VM — RAM, CPU, sieć, USB pass-through
+      - GUI desktopów Linux (GNOME, KDE) bez dodatkowej konfiguracji
+    cons:
+      - Duże zużycie RAM — VM rezerwuje pamięć na stałe
+      - Wolniejszy niż WSL 2 dla I/O i sieci
+      - Licencja VMware Workstation Pro jest płatna
+      - Zimny start VM — kilkanaście sekund
+      - Brak integracji z Windows jak WSL
+    vs: WSL dla codziennej deweloperki — lżejszy, szybszy, zintegrowany. VMware/VirtualBox gdy potrzebujesz pełnej izolacji, testowania instalacji OS lub środowisk z GUI desktopem.
+
+  - name: Docker Desktop (bez WSL)
+    icon: "🐳"
+    color: "#2496ED"
+    tagline: "Kontenery zamiast pełnego Linuxa — izolacja aplikacji, nie środowiska"
+    pros:
+      - Kontenery — izolowane środowiska per projekt, zero konfliktów zależności
+      - Docker Desktop na Windows działa bez WSL (Hyper-V backend)
+      - Docker Hub — miliony gotowych obrazów
+      - Docker Compose — multi-container environments jedną komendą
+      - Przenośność — ten sam kontener na Windows, Linux, macOS, CI
+    cons:
+      - Kontenery to nie shell — brak interaktywnego środowiska deweloperskiego
+      - Docker Desktop Hyper-V backend wolniejszy niż WSL 2 backend
+      - Wymaga Docker Desktop lub ręcznej instalacji Dockera
+      - Bind mount Windows -> kontener wolne (Hyper-V bez WSL)
+      - Licencja Docker Desktop płatna dla firm powyżej 250 pracowników
+    vs: WSL jako środowisko deweloperskie + Docker Desktop z WSL 2 backend to najlepsze combo. Docker nie zastępuje WSL — to narzędzie do uruchamiania serwisów (bazy, serwery), nie do pisania kodu.
+
+  - name: Git Bash / MSYS2
+    icon: "🟠"
+    color: "#F05032"
+    tagline: "Minimal Linux tools na Windows — bash, git, grep bez pełnego Linuxa"
+    pros:
+      - Lekki — instalacja kilkanaście MB, brak VM
+      - Zintegrowany z instalacją Git for Windows
+      - Bash, grep, awk, sed, curl, ssh — podstawowe narzędzia
+      - Działa na starych Windows (7, 8.1)
+      - Brak wymagań na Windows 10 2004+
+    cons:
+      - Brak menedżera pakietów apt/yum — brak pip, npm, kubectl natywnie
+      - Brak pełnej kompatybilności syscalls — niektóre skrypty nie działają
+      - Ścieżki Windows i Unix mieszają się — bug-prone
+      - Brak procesów Linux — cron, systemd, daemons
+      - MSYS2 ma pacman, ale ekosystem mały vs Ubuntu apt
+    vs: Git Bash jeśli potrzebujesz tylko bash i git na legacy Windows. WSL dla prawdziwego środowiska Linux — apt, Python, Node, Docker, pełny toolchain. Git Bash to nie zamiennik WSL.
+
+  - name: Cygwin
+    icon: "🔵"
+    color: "#3E6A8A"
+    tagline: "Warstwa POSIX na Windows — emulacja Linux API od 1995"
+    pros:
+      - Działa na każdej wersji Windows (XP, 7, 10, 11)
+      - Duże repozytorium pakietów przez setup-x86_64.exe
+      - Dojrzały projekt — 30 lat stabilności
+      - Kompilacja programów POSIX dla Windows
+      - Brak wymagań na Hyper-V lub wirtualizację
+    cons:
+      - Emulacja API — brak prawdziwego kernela Linux, problemy z nowymi programami
+      - Wolny I/O i uruchamianie procesów vs WSL 2
+      - Stary design — brak integracji z Windows 10/11 featurami
+      - Brak Docker, brak GPU support
+      - Mniejsza społeczność i mniej tutoriali niż WSL
+    vs: WSL 2 dla każdego nowego projektu — prawdziwe jądro Linux, szybszy, lepiej zintegrowany. Cygwin tylko jeśli musisz działać na starym Windows bez Hyper-V lub potrzebujesz kompilacji natywnych Windows binariów z POSIX API.

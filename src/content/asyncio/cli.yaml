@@ -3,101 +3,115 @@ groups:
   - name: Instalacja bibliotek async
     icon: "📦"
     commands:
-      - desc: Async HTTP client (zamiennik requests)
-        code: pip install httpx
-      - desc: Async I/O plików
-        code: pip install aiofiles
-      - desc: Async driver PostgreSQL
-        code: pip install asyncpg
-      - desc: Async Redis client
-        code: pip install "redis[asyncio]"
-      - desc: Async HTTP client i serwer (aiohttp)
-        code: pip install aiohttp
-      - desc: Testowanie kodu async z pytest
-        code: pip install pytest-asyncio
-      - desc: Retry z exponential backoff
-        code: pip install tenacity
+      - cmd: pip install httpx
+        desc: Async HTTP client (zamiennik requests)
+        detail:
+          what: httpx to w pełni async HTTP client z identycznym API jak requests — drop-in replacement.
+          how: Obsługuje zarówno sync jak i async — możesz używać httpx.get() (sync) i await client.get() (async).
+          tips:
+            - 'async with httpx.AsyncClient() as client: r = await client.get(url)'
+            - httpx obsługuje też HTTP/2 — requests tylko HTTP/1.1
+      - cmd: pip install aiofiles
+        desc: Async I/O plików
+        detail:
+          what: aiofiles pozwala czytać i pisać pliki asynchronicznie — nie blokuje event loop.
+          how: "async with aiofiles.open('plik.txt') as f: content = await f.read()"
+          tips:
+            - Konieczne gdy czytasz duże pliki w aplikacji async — normalny open() blokuje event loop
+            - 'pip install aiofiles — lekka biblioteka, tylko 1 zależność'
+      - cmd: pip install asyncpg
+        desc: Async driver PostgreSQL
+        detail:
+          what: asyncpg to najszybszy async driver do PostgreSQL — napisany w Cython.
+          how: Używany przez SQLAlchemy async (postgresql+asyncpg://) i bezpośrednio w asyncio apps.
+          tips:
+            - '3-4x szybszy niż psycopg2 przy async workloadach'
+            - 'SQLAlchemy: create_async_engine("postgresql+asyncpg://user:pass@host/db")'
+      - cmd: 'pip install "redis[asyncio]"'
+        desc: Async Redis client
+        detail:
+          what: Instaluje redis-py z async support — pozwala używać Redis w aplikacjach asyncio.
+          how: 'import redis.asyncio as redis; r = redis.Redis(); await r.set("key", "val")'
+          tips:
+            - '[asyncio] extra instaluje hiredis — szybszy parser odpowiedzi Redis'
+            - 'Działa z asyncio, aiohttp, FastAPI — natywny async/await'
+      - cmd: pip install aiohttp
+        desc: Async HTTP client i serwer
+        detail:
+          what: aiohttp to async HTTP client i framework serwera web — alternatywa dla httpx i FastAPI.
+          how: Starszy niż httpx, ma własne API. Popularny w projektach gdzie aiohttp jest już zależnością.
+          tips:
+            - 'Do nowych projektów preferuj httpx (prostsze API, kompatybilne z requests)'
+            - 'aiohttp.ClientSession() = async odpowiednik requests.Session()'
+      - cmd: pip install pytest-asyncio
+        desc: Testowanie kodu async z pytest
+        detail:
+          what: Pozwala pisać testy jako async def test_...() i uruchamiać je przez pytest.
+          how: "Wymaga konfiguracji w pyproject.toml: [tool.pytest.ini_options] asyncio_mode = 'auto'"
+          tips:
+            - 'Bez asyncio_mode = "auto" każdy test async wymaga @pytest.mark.asyncio'
+            - 'pip install pytest-asyncio pytest-httpx — do testowania async HTTP klientów'
+      - cmd: pip install tenacity
+        desc: Retry z exponential backoff
+        detail:
+          what: Tenacity to biblioteka do retry logic — idealna dla niestabilnych async API calls.
+          how: "@retry(wait=wait_exponential(min=1, max=10), stop=stop_after_attempt(3)) nad funkcją async."
+          tips:
+            - Działa zarówno z sync jak i async funkcjami
+            - 'retry=retry_if_exception_type(httpx.HTTPStatusError) — retry tylko na konkretne błędy'
 
   - name: Uruchamianie korutyn
     icon: "▶️"
     commands:
-      - desc: Uruchom korutynę — jedyny prawidłowy punkt wejścia
-        code: asyncio.run(main())
-      - desc: Uruchom wiele korutyn równolegle
-        code: wyniki = await asyncio.gather(f1(), f2(), f3())
-      - desc: Gather z obsługą błędów
-        code: wyniki = await asyncio.gather(*tasks, return_exceptions=True)
-      - desc: Utwórz Task — startuje natychmiast
-        code: task = asyncio.create_task(coro())
-      - desc: Async sleep — nie blokuje event loop
-        code: await asyncio.sleep(1.0)
-      - desc: Oddaj kontrolę event loop bez czekania
-        code: await asyncio.sleep(0)
-
-  - name: Synchronizacja
-    icon: "🔒"
-    commands:
-      - desc: Async mutex — wyłączny dostęp do zasobu
-        code: |
-          lock = asyncio.Lock()
-          async with lock:
-              # sekcja krytyczna
-      - desc: Ogranicz współbieżność do N równoległych
-        code: |
-          sem = asyncio.Semaphore(10)
-          async with sem:
-              await do_work()
-      - desc: Limit czasu na korutynę (Python 3.11+)
-        code: |
-          async with asyncio.timeout(5.0):
-              await wolna_operacja()
-      - desc: Limit czasu — starsza składnia
-        code: await asyncio.wait_for(coro(), timeout=5.0)
-      - desc: Sygnalizacja między korutynami
-        code: |
-          event = asyncio.Event()
-          await event.wait()   # czekaj
-          event.set()          # sygnalizuj
-      - desc: Async kolejka producer-consumer
-        code: |
-          queue = asyncio.Queue(maxsize=100)
-          await queue.put(item)
-          item = await queue.get()
-
-  - name: Tasks i TaskGroup
-    icon: "🎯"
-    commands:
-      - desc: Grupuj Tasks — Python 3.11+ (zalecany)
-        code: |
-          async with asyncio.TaskGroup() as tg:
-              t1 = tg.create_task(f1())
-              t2 = tg.create_task(f2())
-      - desc: Czekaj na pierwszy gotowy task
-        code: |
-          done, pending = await asyncio.wait(
-              tasks, return_when=asyncio.FIRST_COMPLETED)
-      - desc: Anuluj task
-        code: |
-          task.cancel()
-          try:
-              await task
-          except asyncio.CancelledError:
-              pass
-      - desc: Lista aktywnych tasks
-        code: asyncio.all_tasks()
+      - cmd: asyncio.run(main())
+        desc: Uruchom korutynę — punkt wejścia
+        detail:
+          what: Uruchamia korutynę main() w nowym event loop — jedyny prawidłowy sposób startu async programu.
+          how: Tworzy event loop, uruchamia korutynę do końca, czyści zasoby. Użyj zawsze jako if __name__ == "__main__".
+          tips:
+            - 'NIE używaj loop.run_until_complete() — asyncio.run() to nowszy, czystszy sposób'
+            - 'asyncio.run(main(), debug=True) — włącz debug mode dla diagnostyki'
+      - cmd: wyniki = await asyncio.gather(f1(), f2(), f3())
+        desc: Uruchom wiele korutyn równolegle
+        detail:
+          what: Uruchamia podane korutyny równolegle i zwraca listę wyników w tej samej kolejności.
+          how: gather() czeka aż wszystkie korutyny się zakończą. Jeśli jedna rzuci wyjątek — gather też rzuca.
+          tips:
+            - 'return_exceptions=True — zbierz wyjątki zamiast rzucać (sprawdź wynik ręcznie)'
+            - 'asyncio.TaskGroup (Python 3.11+) — nowszy, bezpieczniejszy sposób'
+      - cmd: await asyncio.sleep(1.0)
+        desc: Async sleep — nie blokuje event loop
+        detail:
+          what: Czeka podaną liczbę sekund bez blokowania event loop — inne korutyny mogą działać w tym czasie.
+          how: "W odróżnieniu od time.sleep(), asyncio.sleep() oddaje kontrolę event loop na czas oczekiwania."
+          tips:
+            - 'NIGDY nie używaj time.sleep() w kodzie async — blokuje cały event loop'
+            - 'await asyncio.sleep(0) — oddaj kontrolę bez czekania (yield do event loop)'
 
   - name: Debugowanie
     icon: "🐛"
     commands:
-      - desc: Uruchom z trybem debug
-        code: asyncio.run(main(), debug=True)
-      - desc: Włącz debug przez zmienną środowiskową
-        code: PYTHONASYNCIODEBUG=1 python script.py
-      - desc: Lista wszystkich aktywnych Tasks
-        code: |
-          for task in asyncio.all_tasks():
-              print(task.get_name(), task.get_coro())
-      - desc: Uruchom sync kod w threadpool (nie blokuje event loop)
-        code: |
-          loop = asyncio.get_event_loop()
-          wynik = await loop.run_in_executor(None, sync_func, arg)
+      - cmd: asyncio.run(main(), debug=True)
+        desc: Uruchom z trybem debug
+        detail:
+          what: Włącza debug mode — wykrywa długo działające korutyny, loguje więcej informacji diagnostycznych.
+          how: Debug mode wykrywa korutyny które blokują event loop dłużej niż 0.1s i wypisuje warning.
+          tips:
+            - 'PYTHONASYNCIODEBUG=1 python script.py — alternatywnie przez zmienną środowiskową'
+            - 'Spowalnia aplikację — używaj tylko w development'
+      - cmd: PYTHONASYNCIODEBUG=1 python script.py
+        desc: Włącz async debug przez zmienną środowiskową
+        detail:
+          what: Włącza asyncio debug mode bez zmiany kodu — wykrywa blokujące operacje i nieoczekiwane błędy.
+          how: Zmienna środowiskowa włącza debug dla całego procesu. Przydatne gdy nie kontrolujesz jak uruchamia się kod.
+          tips:
+            - 'Pokazuje warning gdy korutyna wykonuje się dłużej niż 0.1s bez yield'
+            - Możesz też ustawić w .env i wczytać przez python-dotenv
+      - cmd: asyncio.all_tasks()
+        desc: Lista aktywnych tasks
+        detail:
+          what: Zwraca set wszystkich aktualnie działających Task obiektów w event loop.
+          how: Przydatne do debugowania — sprawdź ile tasks działa i jakie mają nazwy/korutyny.
+          tips:
+            - 'asyncio.create_task(coro(), name="moj-task") — nadaj nazwę dla lepszego debugowania'
+            - 'task.cancel() — anuluj konkretny task'

@@ -1,0 +1,197 @@
+title: Dystrybucje i narzędzia WSL
+
+items:
+  - name: Ubuntu (domyślna)
+    icon: "🟠"
+    desc: >
+      Najpopularniejsza i najlepiej wspierana distro w WSL. Microsoft i Canonical
+      współpracują — Ubuntu jest dostępne domyślnie z wsl --install.
+      LTS co 2 lata, ogromne repozytorium apt, najlepsza dokumentacja.
+    code: |
+      # Instalacja
+      wsl --install -d Ubuntu-24.04
+
+      # Aktualizacja systemu
+      sudo apt update && sudo apt upgrade -y
+
+      # Podstawowe narzędzia
+      sudo apt install -y \
+        build-essential curl git wget unzip \
+        python3 python3-pip python3-venv python3-dev \
+        ripgrep fd-find bat jq tree htop
+
+      # fd — nowoczesne find (fd zamiast find)
+      # bat — nowoczesne cat z kolorowaniem składni
+      # ripgrep (rg) — szybkie grep przez kod
+
+      # Wersja Ubuntu
+      lsb_release -a
+      cat /etc/os-release
+
+  - name: Debian
+    icon: "🔴"
+    desc: >
+      Stabilna i minimalistyczna alternatywa dla Ubuntu. Mniejszy obraz startowy,
+      ten sam apt/dpkg ekosystem. Dobra gdy chcesz świeżą, czystą instalację
+      bez Ubuntu-specific zusatz.
+    code: |
+      # Instalacja
+      wsl --install -d Debian
+
+      # Debian jest minimalny — doinstaluj co potrzebujesz
+      sudo apt update && sudo apt install -y \
+        curl git wget build-essential \
+        python3 python3-pip
+
+      # Wersja Debian
+      cat /etc/debian_version
+
+  - name: Kali Linux
+    icon: "🖤"
+    desc: >
+      Dystrybucja dla security researchers i pentesterów. W WSL ma pełen dostęp
+      do narzędzi Kali (nmap, metasploit, burpsuite) bez oddzielnej maszyny.
+      Win-kex dostarcza desktopowe GUI Kali przez WSL.
+    code: |
+      # Instalacja
+      wsl --install -d kali-linux
+
+      # Zainstaluj meta-pakiet z popularnymi narzędziami
+      sudo apt install -y kali-linux-default
+
+      # Win-KeX — Kali GUI przez WSL (XFCE desktop)
+      sudo apt install -y kali-win-kex
+      kex --win -s         # Okno Win-KeX
+      kex --esm --ip -s    # Enhanced Session Mode
+
+      # Podstawowe narzędzia security
+      sudo apt install -y nmap gobuster ffuf sqlmap
+
+      # Aktualizacja bazy Kali
+      sudo apt update && sudo apt full-upgrade -y
+
+  - name: Arch Linux
+    icon: "🔵"
+    desc: >
+      Arch Linux w WSL przez ArchWSL — rolling release, AUR (Arch User Repository),
+      pacman. Dla zaawansowanych użytkowników chcących najnowszych pakietów.
+      Wymaga ręcznej instalacji z GitHub.
+    code: |
+      # ArchWSL — instalacja
+      # Pobierz Arch.zip z github.com/yuk7/ArchWSL
+      # Wypakuj do D:\WSL\Arch\
+      # Uruchom Arch.exe — rejestruje distro
+
+      # Pierwsza konfiguracja
+      # Ustaw hasło root
+      passwd
+
+      # Utwórz użytkownika
+      useradd -m -G wheel lukasz
+      passwd lukasz
+
+      # Włącz sudo dla grupy wheel
+      EDITOR=nano visudo
+      # Odkomentuj: %wheel ALL=(ALL) ALL
+
+      # Ustaw domyślnego użytkownika (poza WSL, w PowerShell)
+      # Arch.exe config --default-user lukasz
+
+      # Aktualizacja systemu
+      sudo pacman -Syu
+
+      # AUR helper (yay)
+      sudo pacman -S --needed git base-devel
+      git clone https://aur.archlinux.org/yay.git /tmp/yay
+      cd /tmp/yay && makepkg -si
+
+      # Instalacja przez AUR
+      yay -S visual-studio-code-bin
+
+  - name: Starship — prompt
+    icon: "🚀"
+    desc: >
+      Starship to szybki, konfigurowalny prompt napisany w Rust — działa z bash, zsh,
+      fish i innymi shellami. Pokazuje branch git, wersję Python/Node/Go, status cmd.
+    code: |
+      # Instalacja (WSL)
+      curl -sS https://starship.rs/install.sh | sh
+
+      # Dodaj do ~/.bashrc lub ~/.zshrc
+      eval "$(starship init bash)"
+      # eval "$(starship init zsh)"
+
+      # Konfiguracja ~/.config/starship.toml
+      mkdir -p ~/.config
+      cat > ~/.config/starship.toml << 'EOF'
+      format = """
+      $username$hostname$directory$git_branch$git_status$python$nodejs$cmd_duration
+      $character"""
+
+      [directory]
+      truncation_length = 3
+      truncate_to_repo = true
+
+      [git_branch]
+      symbol = " "
+      style = "bold purple"
+
+      [git_status]
+      style = "bold red"
+
+      [python]
+      symbol = "🐍 "
+      detect_extensions = ["py"]
+
+      [nodejs]
+      symbol = "⬢ "
+      detect_files = ["package.json"]
+
+      [cmd_duration]
+      min_time = 2_000
+      format = "took [$duration](bold yellow) "
+      EOF
+
+      source ~/.bashrc
+
+  - name: lsd, bat, ripgrep — modern CLI
+    icon: "🛠️"
+    desc: >
+      Nowoczesne zamienniki klasycznych narzędzi — szybsze, z kolorowaniem i ikonami.
+      Zainstaluj raz, używaj codziennie. Warto skonfigurować aliasy w ~/.bashrc.
+    code: |
+      # Instalacja narzędzi
+      sudo apt install -y ripgrep fd-find bat jq tree htop
+
+      # lsd — nowoczesne ls z ikonami (wymaga Nerd Font)
+      sudo apt install -y lsd
+      # Lub przez cargo:
+      # cargo install lsd
+
+      # Aliasy (dodaj do ~/.bashrc)
+      alias ls='lsd'
+      alias ll='lsd -alh'
+      alias la='lsd -A'
+      alias lt='lsd --tree'
+      alias cat='bat'
+      alias find='fd'
+      alias grep='rg'
+
+      # ripgrep — szybkie przeszukiwanie kodu
+      rg "def main" ~/projekty/     # znajdź "def main" rekursywnie
+      rg -t py "import fastapi"     # tylko pliki .py
+      rg -l "TODO"                  # tylko nazwy plików
+
+      # fd — nowoczesne find
+      fd -e py main                 # pliki .py zawierające "main" w nazwie
+      fd --hidden .env              # znajdź .env w ukrytych folderach
+      fd -t f -e yaml               # wszystkie pliki YAML
+
+      # bat — cat z kolorowaniem
+      bat main.py                   # wyświetl z numerami linii
+      bat --plain main.py           # bez dekoracji (jak cat)
+      bat -l json config.json       # force format JSON
+
+      # jq — parsuj JSON
+      curl -s api.github.com/users/microsoft | jq '.name,.public_repos'
+      cat data.json | jq '.items[] | select(.active == true) | .name'

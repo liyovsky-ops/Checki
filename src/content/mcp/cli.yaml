@@ -3,71 +3,152 @@ groups:
   - name: Instalacja i setup
     icon: "📦"
     commands:
-      - desc: Zainstaluj Python SDK dla MCP
-        code: pip install mcp
-      - desc: MCP z narzędziami CLI (mcp dev, mcp run)
-        code: pip install "mcp[cli]"
-      - desc: Pełny stack MCP + HTTP + env vars
-        code: pip install "mcp[cli]" httpx python-dotenv
-      - desc: Sprawdź zainstalowaną wersję
-        code: python -c "import mcp; print(mcp.__version__)"
-      - desc: Sprawdź czy MCP jest zainstalowany
-        code: python -c "from mcp.server.fastmcp import FastMCP; print('MCP OK')"
+      - cmd: pip install mcp
+        desc: Zainstaluj Python SDK dla MCP
+        detail:
+          what: Instaluje oficjalny Python SDK dla Model Context Protocol — do budowania serwerów MCP.
+          how: MCP SDK zawiera FastMCP (dekoratorowy API), typy i transport SSE/stdio.
+          tips:
+            - 'pip install "mcp[cli]" — instaluj z CLI tools (mcp dev, mcp run)'
+            - 'python -c "import mcp; print(mcp.__version__)" — sprawdź wersję'
+      - cmd: 'pip install "mcp[cli]"'
+        desc: MCP z narzędziami CLI
+        detail:
+          what: Instaluje MCP SDK wraz z narzędziami mcp dev i mcp run do lokalnego testowania serwerów.
+          how: "mcp dev server.py — uruchom serwer z MCP Inspector (UI do testowania). mcp run — bez UI."
+          tips:
+            - 'pip install "mcp[cli]" httpx python-dotenv — pełny zestaw do developmentu'
+            - mcp dev otwiera Inspector UI w przeglądarce — możesz testować tools i resources
+      - cmd: python -c "from mcp.server.fastmcp import FastMCP; print('MCP OK')"
+        desc: Sprawdź czy MCP jest zainstalowany
+        detail:
+          what: Importuje FastMCP — główną klasę do tworzenia serwerów MCP. Jeśli wypisze MCP OK — działa.
+          how: FastMCP to decorator-based API — prostszy niż niskopoziomowy MCP Server.
+          tips:
+            - 'Jeśli błąd ImportError — pip install "mcp[cli]" ponownie'
+            - 'python -c "import mcp; print(mcp.__version__)" — sprawdź wersję'
 
   - name: Rozwój i testowanie
     icon: "🛠️"
     commands:
-      - desc: Uruchom serwer z MCP Inspector (UI debugger)
-        code: mcp dev server.py
-      - desc: Uruchom serwer z dodatkowymi zależnościami
-        code: mcp dev server.py --with httpx --with pandas
-      - desc: Uruchom serwer bez Inspectora (jak robi Claude Desktop)
-        code: mcp run server.py
-      - desc: Uruchom serwer z transportem SSE (HTTP, wielu klientów)
-        code: mcp dev server.py --transport sse
+      - cmd: mcp dev server.py
+        desc: Uruchom serwer z MCP Inspector
+        detail:
+          what: Uruchamia serwer MCP i otwiera MCP Inspector — graficzny UI do testowania tools i resources.
+          how: Inspector pozwala ręcznie wywoływać tools, przeglądać resources i debugować bez Claude Desktop.
+          tips:
+            - 'mcp dev server.py --with httpx — dodaj zależność runtime'
+            - Idealne do TDD — testuj każdy tool zanim podłączysz do Claude
+      - cmd: mcp dev server.py --with httpx --with pandas
+        desc: Uruchom serwer z dodatkowymi zależnościami
+        detail:
+          what: Instaluje podane pakiety tymczasowo na czas sesji deweloperskiej i uruchamia serwer.
+          how: "--with instaluje pakiet w izolowanym środowisku dla tego uruchomienia."
+          tips:
+            - Alternatywa — zainstaluj zależności w venv i uruchom mcp dev bez --with
+            - 'mcp dev server.py --with httpx --with "anthropic>=0.30"'
+      - cmd: mcp run server.py
+        desc: Uruchom serwer bez Inspectora (jak Claude Desktop)
+        detail:
+          what: Uruchamia serwer MCP w trybie stdio — dokładnie tak jak uruchamia go Claude Desktop.
+          how: Bez UI Inspector — serwer czeka na input przez stdin i odpowiada przez stdout.
+          tips:
+            - 'Użyj do testowania jak serwer zachowuje się z Claude Desktop'
+            - 'python server.py 2>debug.log — przekieruj stderr do pliku dla logów'
+      - cmd: mcp dev server.py --transport sse
+        desc: Uruchom serwer z transportem SSE (HTTP)
+        detail:
+          what: Uruchamia serwer MCP przez Server-Sent Events zamiast stdio — obsługuje wielu klientów.
+          how: SSE transport = serwer HTTP na porcie 8000. Klienci łączą się przez HTTP.
+          flags:
+            - flag: "--transport sse"
+              desc: Server-Sent Events — serwer HTTP, wielu klientów
+            - flag: "--transport stdio"
+              desc: Stdio — jeden klient (domyślne, dla Claude Desktop)
+          tips:
+            - 'claude mcp add --transport sse nazwa http://localhost:8000/sse — podłącz do Claude'
+            - Stdio = jeden klient. SSE = wiele klientów przez sieć
 
   - name: Claude Code — zarządzanie serwerami
     icon: "🤖"
     commands:
-      - desc: Dodaj serwer MCP do Claude Code
-        code: claude mcp add nazwa python /path/to/server.py
-      - desc: Dodaj serwer z zmienną środowiskową
-        code: claude mcp add nazwa python server.py -e API_KEY=abc
-      - desc: Dodaj serwer globalnie (wszystkie projekty)
-        code: claude mcp add --scope global nazwa python server.py
-      - desc: Pokaż skonfigurowane serwery
-        code: claude mcp list
-      - desc: Szczegóły konkretnego serwera
-        code: claude mcp get nazwa
-      - desc: Usuń serwer MCP
-        code: claude mcp remove nazwa
+      - cmd: claude mcp add nazwa python /path/to/server.py
+        desc: Dodaj serwer MCP do Claude Code
+        detail:
+          what: Rejestruje lokalny serwer MCP w Claude Code — będzie dostępny w następnej sesji.
+          how: Claude Code uruchamia serwer jako subprocess i komunikuje się przez stdio.
+          tips:
+            - 'claude mcp list — sprawdź zarejestrowane serwery'
+            - 'claude mcp add nazwa python server.py -e API_KEY=abc — z env var'
+      - cmd: claude mcp add --scope global nazwa python server.py
+        desc: Dodaj serwer MCP globalnie (wszystkie projekty)
+        detail:
+          what: Rejestruje serwer MCP globalnie — dostępny we wszystkich projektach Claude Code.
+          how: "Bez --scope global: serwer lokalny dla bieżącego projektu (zapisany w .mcp.json)."
+          tips:
+            - 'Globalne: narzędzia których używasz wszędzie (wyszukiwanie, notatki)'
+            - 'Lokalne: specifyczne dla projektu (DB, API specifyczne dla repo)'
+      - cmd: claude mcp list
+        desc: Pokaż skonfigurowane serwery MCP
+        detail:
+          what: Wyświetla listę wszystkich zarejestrowanych serwerów MCP — lokalnych i globalnych.
+          how: Czyta konfigurację z .mcp.json (lokalny) i ~/.claude/settings.json (globalny).
+          tips:
+            - 'claude mcp get nazwa — szczegóły konkretnego serwera'
+            - 'claude mcp remove nazwa — usuń serwer'
+      - cmd: claude mcp remove nazwa
+        desc: Usuń serwer MCP
+        detail:
+          what: Usuwa rejestrację serwera MCP z konfiguracji Claude Code.
+          how: Usuwa wpis z .mcp.json lub globalnej konfiguracji. Nie usuwa pliku serwera.
+          tips:
+            - 'claude mcp list — sprawdź nazwy przed usunięciem'
+            - Po usunięciu restart Claude Code żeby zmiany weszły w życie
 
   - name: Diagnoza i debugowanie
     icon: "🐛"
     commands:
-      - desc: Uruchom serwer i zapisz logi do pliku
-        code: python server.py 2>debug.log
-      - desc: Śledź logi serwera na żywo
-        code: tail -f debug.log
-      - desc: Podejrzyj konfigurację Claude Code
-        code: cat ~/.claude/settings.json | python3 -m json.tool
-      - desc: Loguj do stderr w serwerze (nie do stdout)
-        code: |
-          import sys
-          print("debug info", file=sys.stderr)
+      - cmd: python server.py 2>debug.log
+        desc: Uruchom serwer i zapisz logi do pliku
+        detail:
+          what: Uruchamia serwer i przekierowuje stderr (logi) do pliku debug.log.
+          how: MCP serwery komunikują się przez stdout — loguj do stderr żeby nie zaburzać protokołu MCP.
+          tips:
+            - 'tail -f debug.log — śledź logi na żywo w osobnym terminalu'
+            - 'import sys; print("debug", file=sys.stderr) — loguj do stderr w kodzie serwera'
+      - cmd: tail -f debug.log
+        desc: Śledź logi serwera na żywo
+        detail:
+          what: Wyświetla nowe linie z pliku debug.log na bieżąco — idealne do debugowania serwera.
+          how: "-f = follow. tail czeka na nowe linie zamiast kończyć po odczytaniu pliku."
+          tips:
+            - 'tail -f debug.log | grep ERROR — filtruj tylko błędy'
+            - 'Ctrl+C — przerwij śledzenie'
+      - cmd: cat ~/.claude/settings.json | python3 -m json.tool
+        desc: Podejrzyj konfigurację Claude Code
+        detail:
+          what: Czyta i ładnie formatuje plik konfiguracyjny Claude Code — widać zarejestrowane MCP serwery.
+          how: python3 -m json.tool = wbudowany JSON formatter. Sekcja "mcpServers" zawiera Twoje serwery.
+          tips:
+            - 'Na Mac: ~/.claude/settings.json'
+            - 'Na Windows: %APPDATA%\Claude\settings.json'
 
   - name: Środowisko i konfiguracja
     icon: "⚙️"
     commands:
-      - desc: Ustaw API key dla serwera używającego Claude
-        code: export ANTHROPIC_API_KEY="sk-ant-..."
-      - desc: Wczytaj zmienne z pliku .env w serwerze
-        code: |
-          from dotenv import load_dotenv
-          load_dotenv()
-          import os
-          key = os.environ["API_KEY"]
-      - desc: Sprawdź lokalizację konfiguracji Claude Desktop (Mac)
-        code: ls "~/Library/Application Support/Claude/"
-      - desc: Sprawdź lokalizację konfiguracji Claude Desktop (Windows)
-        code: ls "$env:APPDATA\Claude\"
+      - cmd: 'export ANTHROPIC_API_KEY="sk-ant-..."'
+        desc: Ustaw API key dla serwera używającego Claude
+        detail:
+          what: Ustawia zmienną środowiskową z kluczem API Anthropic — używana przez serwery MCP które wywołują Claude.
+          how: export ustawia zmienną dla bieżącej sesji terminala i procesów potomnych (w tym mcp dev).
+          tips:
+            - 'Dodaj do ~/.bashrc lub ~/.zshrc żeby była zawsze dostępna'
+            - 'Klucze API znajdziesz na console.anthropic.com'
+      - cmd: 'ls "~/Library/Application Support/Claude/"'
+        desc: Sprawdź konfigurację Claude Desktop (Mac)
+        detail:
+          what: Pokazuje pliki konfiguracyjne Claude Desktop na Macu — w tym claude_desktop_config.json.
+          how: Claude Desktop czyta listę MCP serwerów z claude_desktop_config.json przy starcie.
+          tips:
+            - 'claude_desktop_config.json — dodaj tam serwery MCP dla Claude Desktop'
+            - 'Na Windows: %APPDATA%\Claude\claude_desktop_config.json'

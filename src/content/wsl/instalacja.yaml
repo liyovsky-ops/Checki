@@ -1,0 +1,199 @@
+title: Instalacja i konfiguracja WSL
+
+items:
+  - name: Instalacja distro
+    icon: "📥"
+    desc: >
+      WSL 2 instalujesz jedną komendą z PowerShell. Możesz wybrać konkretną dystrybucję
+      lub zainstalować ich kilka. Microsoft Store i wsl --install obsługują najpopularniejsze.
+    code: |
+      # Instalacja domyślna (Ubuntu)
+      wsl --install
+
+      # Lista dostępnych distro
+      wsl --list --online
+
+      # Instalacja konkretnej distro
+      wsl --install -d Ubuntu-22.04
+      wsl --install -d Debian
+      wsl --install -d kali-linux
+      wsl --install -d openSUSE-Leap-15.5
+
+      # Ustawienie domyślnej distro
+      wsl --set-default Ubuntu-22.04
+
+      # Zmiana wersji WSL dla istniejącej distro
+      wsl --set-version Ubuntu 2
+
+      # Eksport distro do pliku (backup)
+      wsl --export Ubuntu C:\backup\ubuntu.tar
+
+      # Import distro z pliku (restore / przeniesienie na inny dysk)
+      wsl --import Ubuntu D:\WSL\Ubuntu C:\backup\ubuntu.tar
+
+      # Rejestracja distro w innej lokalizacji (lepszy dysk)
+      wsl --import UbuntuFast D:\WSL\Ubuntu C:\backup\ubuntu.tar --version 2
+
+      # Usunięcie distro
+      wsl --unregister Ubuntu
+
+  - name: .wslconfig — limity zasobów
+    icon: "⚙️"
+    desc: >
+      Plik .wslconfig w katalogu użytkownika Windows kontroluje zasoby
+      maszyny wirtualnej WSL 2. Kluczowe — bez konfiguracji WSL może
+      przejąć cały RAM systemu. Po zmianie wymagane wsl --shutdown.
+    code: |
+      # Lokalizacja: C:\Users\TwojeImie\.wslconfig
+      # (utwórz jeśli nie istnieje)
+
+      [wsl2]
+      # Limit RAM — bez tego WSL 2 bierze 50% całego RAM
+      memory=6GB
+
+      # Limit rdzeni CPU
+      processors=4
+
+      # Rozmiar swap (plik stronicowania WSL)
+      swap=2GB
+
+      # Wyłącz swap (jeśli masz dużo RAM)
+      # swap=0
+
+      # Lokalizacja pliku swap
+      # swapFile=C:\\WSL\\wsl-swap.vhdx
+
+      # DNS — użyj systemowego Windows (domyślnie generowany automatycznie)
+      # dnsTunneling=true
+
+      # Włącz networking mirrored (WSL 2.0+, lepszy dostęp do localhost)
+      networkingMode=mirrored
+
+      # Lokalizacja VHD (przenieś na szybszy dysk)
+      # defaultVhdSize=1099511627776    # 1TB domyślnie
+
+      # Po zmianie — w PowerShell:
+      # wsl --shutdown
+      # wsl    # uruchom ponownie
+
+  - name: /etc/wsl.conf — config per-distro
+    icon: "📝"
+    desc: >
+      Lokalny plik konfiguracyjny wewnątrz distro. Kontroluje automount,
+      systemd, domyślny user i interop z Windows.
+      Zmiana wymaga wsl --terminate DISTRO lub wsl --shutdown.
+    code: |
+      # Edytuj wewnątrz WSL:
+      sudo nano /etc/wsl.conf
+
+      # Pełna konfiguracja
+      [automount]
+      # Montuj dyski Windows pod /mnt/
+      enabled = true
+      # Domyślny mountpoint
+      root = /mnt/
+      # Opcje montowania (metadata umożliwia chmod na plikach Windows)
+      options = "metadata,umask=22,fmask=11"
+      # Montuj /mnt/c przy starcie
+      mountFsTab = true
+
+      [network]
+      # Hostname distro
+      hostname = wsl-dev
+      # Generuj /etc/hosts automatycznie
+      generateHosts = true
+      # Generuj /etc/resolv.conf (DNS)
+      generateResolvConf = true
+
+      [interop]
+      # Zezwól na uruchamianie programów Windows z WSL
+      enabled = true
+      # Dodaj ścieżki Windows do $PATH w WSL
+      appendWindowsPath = true
+
+      [user]
+      # Domyślny użytkownik przy starcie
+      default = lukasz
+
+      [boot]
+      # Włącz systemd (WSL 2, kernel 5.15+)
+      systemd = true
+      # Komenda wykonywana przy starcie distro
+      # command = /usr/bin/env bash -c 'service ssh start'
+
+      # --- Po edycji ---
+      # W PowerShell:
+      # wsl --terminate Ubuntu
+      # wsl    # uruchom ponownie
+
+  - name: Windows Terminal — konfiguracja
+    icon: "🖥️"
+    desc: >
+      Windows Terminal to najlepszy terminal dla WSL — obsługuje wiele zakładek, profili,
+      konfigurowalny wygląd. Zainstaluj z Microsoft Store. WSL distro pojawia się
+      automatycznie jako profil.
+    code: |
+      # Zainstaluj Windows Terminal
+      # Otwórz Microsoft Store, wyszukaj "Windows Terminal"
+      # Lub przez winget:
+      winget install Microsoft.WindowsTerminal
+
+      # Konfiguracja w settings.json (Ctrl+, → Open JSON file)
+      # Przykładowy profil Ubuntu z dostosowaniem
+      {
+        "profiles": {
+          "list": [
+            {
+              "name": "Ubuntu",
+              "source": "Windows.Terminal.Wsl",
+              "startingDirectory": "//wsl$/Ubuntu/home/lukasz",
+              "colorScheme": "One Half Dark",
+              "font": {
+                "face": "CaskaydiaCove Nerd Font",
+                "size": 13
+              },
+              "opacity": 95,
+              "useAcrylic": true
+            }
+          ]
+        },
+        "defaultProfile": "{GUID Ubuntu}"
+      }
+
+      # Nerd Fonts — ikony w terminalu (do starship, lsd, etc.)
+      # Pobierz z: nerdfonts.com (np. CaskaydiaCove NF lub JetBrains Mono NF)
+      # Zainstaluj w Windows, ustaw jako font w Windows Terminal
+
+  - name: Przeniesienie WSL na inny dysk
+    icon: "💾"
+    desc: >
+      Domyślnie WSL trzyma dysk wirtualny (VHD) na dysku C. Jeśli C jest mały
+      lub wolny, warto przenieść distro na dysk D lub SSD NVMe.
+    code: |
+      # 1. Zamknij WSL
+      wsl --shutdown
+
+      # 2. Eksportuj distro (PowerShell)
+      wsl --export Ubuntu C:\temp\ubuntu-backup.tar
+
+      # 3. Odrejestruj starą instalację (USUWA dane z C!)
+      wsl --unregister Ubuntu
+
+      # 4. Utwórz katalog docelowy
+      New-Item -ItemType Directory -Path "D:\WSL\Ubuntu" -Force
+
+      # 5. Importuj na nowy dysk
+      wsl --import Ubuntu D:\WSL\Ubuntu C:\temp\ubuntu-backup.tar
+
+      # 6. Ustaw domyślnego użytkownika (import resetuje do root)
+      # Uruchom Ubuntu i dodaj do /etc/wsl.conf:
+      # [user]
+      # default = twoja_nazwa
+      wsl -d Ubuntu
+
+      # Sprawdź rozmiar VHD po przeniesieniu
+      # D:\WSL\Ubuntu\ext4.vhdx
+
+      # Kompresja VHD (odzyskaj miejsce po usunięciu plików)
+      # W PowerShell jako Admin:
+      Optimize-VHD -Path "D:\WSL\Ubuntu\ext4.vhdx" -Mode Full

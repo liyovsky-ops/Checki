@@ -15,6 +15,8 @@ import { FW_POSTGRESQL_DATA } from '../data/fw_postgresql.js';
 import { FW_REDIS_DATA }      from '../data/fw_redis.js';
 import { FW_TERRAFORM_DATA }  from '../data/fw_terraform.js';
 import { FW_CICD_DATA }       from '../data/fw_cicd.js';
+import { FW_WSL_DATA }        from '../data/fw_wsl.js';
+import { FW_LANGGRAPH_DATA }  from '../data/fw_langgraph.js';
 
 let activeTab = 'podstawy';
 let activeFw  = 'react';
@@ -25,6 +27,7 @@ const FW_DATA_MAP = {
   git: FW_GIT_DATA, docker: FW_DOCKER_DATA, pyautogui: FW_PYAUTOGUI_DATA, mcp: FW_MCP_DATA,
   aws: FW_AWS_DATA, postgresql: FW_POSTGRESQL_DATA, redis: FW_REDIS_DATA,
   terraform: FW_TERRAFORM_DATA, cicd: FW_CICD_DATA,
+  wsl: FW_WSL_DATA, langgraph: FW_LANGGRAPH_DATA,
 };
 
 export function openFramework(fw) {

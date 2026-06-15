@@ -4,92 +4,135 @@ groups:
   - name: Instalacja
     icon: "📦"
     commands:
-      - desc: Zainstaluj requests
-        code: pip install requests
-      - desc: requests + httpx (async) razem
-        code: pip install requests httpx
-      - desc: requests z SOCKS proxy support
-        code: pip install requests[socks]
-      - desc: Cache HTTP requestów
-        code: pip install requests-cache
-      - desc: Losowe User-Agent do scrapingu
-        code: pip install fake-useragent
+      - cmd: pip install requests
+        desc: Zainstaluj requests
+        detail:
+          what: Instaluje bibliotekę requests — najpopularniejszy HTTP client dla Pythona.
+          how: Dostarcza proste API dla GET, POST, PUT, DELETE i innych metod HTTP.
+          tips:
+            - 'pip install requests httpx — zainstaluj też httpx (async HTTP client)'
+            - 'pip show requests — sprawdź wersję'
+      - cmd: pip install requests httpx
+        desc: requests + httpx (async) razem
+        detail:
+          what: Instaluje requests (sync) i httpx (async) — httpx ma identyczne API ale obsługuje async/await.
+          how: httpx jest drop-in replacement dla requests w środowiskach async (FastAPI, asyncio).
+          tips:
+            - 'httpx.AsyncClient() — async wersja requests.Session()'
+            - httpx obsługuje też HTTP/2 — requests tylko HTTP/1.1
+      - cmd: pip install requests-cache
+        desc: Cache HTTP requestów
+        detail:
+          what: Dodaje cache do requests — powtórzone requesty do tego samego URL zwracają zapisaną odpowiedź.
+          how: Przydatne przy scrapingu i developmencie żeby nie spamować API podczas testowania.
+          tips:
+            - 'import requests_cache; requests_cache.install_cache("api_cache") — włącz globalnie'
+            - 'Cache na dysku (SQLite) lub w Redis — configurowalny backend'
 
   - name: Podstawowe HTTP
     icon: "🌐"
     commands:
-      - desc: GET — pobierz dane
-        code: "requests.get(url, timeout=10)"
-      - desc: POST JSON — wyślij dane
-        code: "requests.post(url, json={'key': 'val'}, timeout=10)"
-      - desc: PUT — zamień zasób
-        code: "requests.put(url, json=data, timeout=10)"
-      - desc: DELETE — usuń zasób
-        code: "requests.delete(url, timeout=10)"
-      - desc: Sprawdź status i parsuj JSON
-        code: |
-          r = requests.get(url, timeout=10)
-          r.raise_for_status()
-          data = r.json()
+      - cmd: "requests.get(url, timeout=10)"
+        desc: GET — pobierz dane
+        detail:
+          what: Wysyła HTTP GET request pod podany URL. Zwraca obiekt Response.
+          how: "timeout=10 = czekaj max 10 sekund. Bez timeout request może wisieć w nieskończoność."
+          tips:
+            - 'ZAWSZE podawaj timeout — brak timeout to częsty błąd w produkcji'
+            - "r.json() — parsuj JSON, r.text — tekst, r.status_code — kod statusu"
+      - cmd: "requests.post(url, json={'key': 'val'}, timeout=10)"
+        desc: POST JSON — wyślij dane
+        detail:
+          what: Wysyła HTTP POST z JSON body. Parametr json= automatycznie serializuje dict i ustawia Content-Type.
+          how: "json= = automatyczny Content-Type: application/json. data= = form data."
+          tips:
+            - "Nie używaj json=json.dumps(data) — to zbędne. Przekaż dict bezpośrednio do json="
+            - "r.raise_for_status() — rzuć wyjątek jeśli status 4xx/5xx"
+      - cmd: r.raise_for_status()
+        desc: Rzuć wyjątek dla 4xx i 5xx
+        detail:
+          what: Sprawdza status code odpowiedzi i rzuca HTTPError jeśli jest błąd (4xx lub 5xx).
+          how: "Bez tego requests.get() nie rzuca wyjątku nawet przy 404 czy 500 — trzeba sprawdzać ręcznie."
+          tips:
+            - 'Dobry pattern: r = requests.get(url); r.raise_for_status(); data = r.json()'
+            - 'HTTPError ma .response.status_code i .response.text dla debugowania'
 
   - name: Session i nagłówki
     icon: "🔐"
     commands:
-      - desc: Utwórz sesję z retry
-        code: |
-          from requests.adapters import HTTPAdapter
-          from urllib3.util.retry import Retry
-          s = requests.Session()
-          s.mount("https://", HTTPAdapter(max_retries=Retry(total=3)))
-      - desc: Ustaw nagłówek Bearer token
-        code: "session.headers.update({'Authorization': 'Bearer TOKEN'})"
-      - desc: Timeout połączenia i odczytu
-        code: "requests.get(url, timeout=(3, 10))"
-      - desc: Rzuć wyjątek dla 4xx/5xx
-        code: "r.raise_for_status()"
+      - cmd: "session.headers.update({'Authorization': 'Bearer TOKEN'})"
+        desc: Ustaw nagłówek Bearer token
+        detail:
+          what: Dodaje nagłówek Authorization do wszystkich requestów wysłanych przez tę sesję.
+          how: "requests.Session() reuses connection pool i zachowuje headers, cookies między requestami."
+          tips:
+            - 'session = requests.Session() — stwórz sesję raz, używaj wielokrotnie'
+            - 'session.headers.update({}) — aktualizacja istniejących nagłówków (nie nadpisuje)'
+      - cmd: "requests.get(url, timeout=(3, 10))"
+        desc: Timeout połączenia i odczytu osobno
+        detail:
+          what: Tuple timeout — pierwsza wartość = timeout na połączenie, druga = timeout na odczyt danych.
+          how: "(3, 10) = max 3 sekundy na connect, max 10 sekund na odczyt. Lepsze niż jeden timeout."
+          tips:
+            - 'Scalar timeout (np. 10) = dotyczy odczytu, nie połączenia osobno'
+            - 'Connect timeout chroni przed wiszącymi połączeniami do niedostępnych hostów'
 
   - name: Testowanie requestów
     icon: "🧪"
     commands:
-      - desc: Test endpoint przez httpie
-        code: http GET https://httpbin.org/get
-      - desc: Test POST przez httpie
-        code: "http POST https://httpbin.org/post key=value"
-      - desc: Test przez curl (verbose)
-        code: "curl -v -X GET https://httpbin.org/get"
-      - desc: Zainstaluj mockowanie requestów
-        code: pip install responses
-      - desc: Test z mockiem requests
-        code: |
-          @responses.activate
-          def test_api():
-              responses.add(responses.GET, url, json={...})
-              r = requests.get(url)
+      - cmd: http GET https://httpbin.org/get
+        desc: Test request przez httpie
+        detail:
+          what: httpie to przyjazny curl z kolorowym outputem i automatycznym parsowaniem JSON.
+          how: Składnia uproszczona — nie trzeba podawać nagłówków dla JSON, httpie ogarnia.
+          tips:
+            - 'pip install httpie — instalacja'
+            - 'http POST https://httpbin.org/post key=value — POST z JSON body'
+      - cmd: pip install responses
+        desc: Zainstaluj mockowanie requestów
+        detail:
+          what: Biblioteka responses pozwala mockować requests.get/post w testach bez prawdziwych HTTP calls.
+          how: "Dekorujesz test przez @responses.activate i konfigurujesz oczekiwane odpowiedzi."
+          tips:
+            - 'responses.add(responses.GET, url, json={...}, status=200) — dodaj mock'
+            - Alternatywa dla httpx — pytest-httpx do mockowania requestów httpx
 
   - name: Debugging i monitoring
     icon: "🔍"
     commands:
-      - desc: Sprawdź wersję requests
-        code: python -c "import requests; print(requests.__version__)"
-      - desc: Włącz pełne logi HTTP
-        code: |
-          import logging
-          logging.basicConfig(level=logging.DEBUG)
-      - desc: Sprawdź informacje o pakiecie
-        code: pip show requests
-      - desc: Lista zainstalowanych paczek HTTP
-        code: pip list | grep -i request
+      - cmd: python -c "import requests; print(requests.__version__)"
+        desc: Sprawdź wersję requests
+        detail:
+          what: Drukuje zainstalowaną wersję biblioteki requests.
+          how: Importuje moduł i odczytuje atrybut __version__.
+          tips:
+            - 'pip show requests — więcej info: autor, zależności, lokalizacja'
+            - 'pip list | grep requests — wszystkie zainstalowane pakiety requests-*'
+      - cmd: pip show requests
+        desc: Informacje o pakiecie requests
+        detail:
+          what: Pokazuje metadane pakietu — wersję, autora, zależności, lokalizację plików.
+          how: pip show odpyta lokalną bazę paczek bez połączenia z internetem.
+          tips:
+            - 'pip show requests httpx urllib3 — kilka pakietów naraz'
+            - Przydatne do sprawdzenia czy masz właściwe zależności w środowisku
 
   - name: Produkcja i scraping
     icon: "🚀"
     commands:
-      - desc: Retry z backoff (profesjonalnie)
-        code: pip install tenacity
-      - desc: Rate limiting dekoratorem
-        code: pip install ratelimit
-      - desc: Rotate User-Agent automatycznie
-        code: pip install fake-useragent
-      - desc: Sprawdź httpbin.org endpoint echo
-        code: curl https://httpbin.org/anything
-      - desc: httpbin delay (test timeout)
-        code: curl "https://httpbin.org/delay/5"
+      - cmd: pip install tenacity
+        desc: Retry z backoff (profesjonalnie)
+        detail:
+          what: Tenacity to biblioteka do retry logic z exponential backoff — idealna dla niestabilnych API.
+          how: "Dekorujesz funkcję: @retry(wait=wait_exponential(min=1, max=10), stop=stop_after_attempt(3))."
+          tips:
+            - 'Znacznie lepsza niż ręczna pętla while z time.sleep()'
+            - 'Obsługuje retry na konkretne wyjątki: retry=retry_if_exception_type(HTTPError)'
+      - cmd: pip install fake-useragent
+        desc: Rotate User-Agent automatycznie
+        detail:
+          what: Biblioteka z bazą prawdziwych User-Agent stringów — losuje je żeby udawać prawdziwą przeglądarkę.
+          how: "from fake_useragent import UserAgent; ua = UserAgent(); headers={'User-Agent': ua.random}."
+          tips:
+            - Przydatne przy scrapingu gdzie strony blokują requestów z user-agent requests/2.x.x
+            - 'Połącz z requests.Session() dla spójnych headerów'

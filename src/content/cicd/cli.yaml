@@ -4,149 +4,528 @@ groups:
   - name: GitHub CLI (gh)
     icon: "🐙"
     commands:
-      - desc: Lista ostatnich workflow runs
-        code: gh run list
-      - desc: Lista runs konkretnego workflow
-        code: gh run list --workflow=ci.yml
-      - desc: Podgląd szczegółów runa
-        code: gh run view 1234567890
-      - desc: Śledź logi runa na żywo
-        code: gh run watch 1234567890
-      - desc: Pobierz logi konkretnego joba
-        code: gh run view 1234567890 --log
-      - desc: Ręcznie uruchom workflow
-        code: gh workflow run ci.yml
-      - desc: Uruchom workflow z parametrem
-        code: gh workflow run deploy.yml -f environment=staging
-      - desc: Lista wszystkich workflows w repo
-        code: gh workflow list
-      - desc: Wyłącz workflow
-        code: gh workflow disable ci.yml
-      - desc: Ustaw sekret w repo
-        code: gh secret set MY_SECRET
-      - desc: Ustaw sekret z pliku
-        code: gh secret set MY_SECRET < secret.txt
-      - desc: Lista sekretów (bez wartości)
-        code: gh secret list
-      - desc: Usuń sekret
-        code: gh secret delete MY_SECRET
-      - desc: Ustaw zmienną środowiskową (nie sekret)
-        code: gh variable set MY_VAR --body "value"
+      - cmd: gh run list
+        desc: Lista ostatnich workflow runs
+        detail:
+          what: Pokazuje ostatnie uruchomienia wszystkich workflow w bieżącym repozytorium.
+          how: Wymaga zainstalowanego i zalogowanego gh CLI (gh auth login).
+          tips:
+            - 'gh run list --limit 20 — ostatnie 20 runów'
+            - 'gh run list --status failure — tylko nieudane runy'
+      - cmd: gh run list --workflow=ci.yml
+        desc: Lista runs konkretnego workflow
+        detail:
+          what: Filtruje runy tylko dla workflow ci.yml — przejrzysta historia konkretnego pipeline.
+          how: Podaj nazwę pliku workflow z .github/workflows/ (bez ścieżki).
+          tips:
+            - 'gh run list --workflow=ci.yml --branch=main — tylko dla brancha main'
+            - 'gh workflow list — sprawdź nazwy dostępnych workflow'
+      - cmd: gh run view 1234567890
+        desc: Podgląd szczegółów runa
+        detail:
+          what: Pokazuje szczegóły konkretnego run ID — status jobów, czas, błędy.
+          how: Run ID znajdziesz w gh run list lub w URL GitHub Actions.
+          tips:
+            - 'gh run view 1234567890 --log — pełne logi wszystkich kroków'
+            - 'gh run view — bez ID = ostatni run (interaktywny wybór)'
+      - cmd: gh run watch 1234567890
+        desc: Śledź logi runa na żywo
+        detail:
+          what: Podgląda postęp runa w czasie rzeczywistym — odświeża status jobów na bieżąco.
+          how: Zakończy się gdy run się skończy (success/failure).
+          tips:
+            - 'gh run watch — bez ID = watchuj ostatni run'
+            - 'Ctrl+C — przerwij śledzenie (run nadal działa w tle)'
+      - cmd: gh run view 1234567890 --log
+        desc: Pobierz logi konkretnego joba
+        detail:
+          what: Wyświetla pełne logi wszystkich kroków z podanego runa.
+          how: Może być dużo outputu — przekieruj do pliku lub filtruj przez grep.
+          tips:
+            - 'gh run view 1234567890 --log | grep -i error — filtruj błędy'
+            - 'gh run view 1234567890 --log > run.log — zapisz do pliku'
+      - cmd: gh workflow run ci.yml
+        desc: Ręcznie uruchom workflow
+        detail:
+          what: Ręcznie wyzwala workflow ci.yml z domyślnymi wartościami inputs.
+          how: Wymaga że workflow ma trigger workflow_dispatch w pliku YAML.
+          tips:
+            - 'gh workflow run ci.yml --ref feature/my-branch — uruchom na konkretnym branchu'
+            - 'gh run list --workflow=ci.yml — sprawdź czy run wystartował'
+      - cmd: gh workflow run deploy.yml -f environment=staging
+        desc: Uruchom workflow z parametrem
+        detail:
+          what: Wyzwala workflow deploy.yml i przekazuje input "environment" z wartością "staging".
+          how: "-f key=value = workflow_dispatch input. Inputs muszą być zdefiniowane w workflow YAML."
+          tips:
+            - 'gh workflow run deploy.yml -f env=prod -f version=v1.2.3 — wiele inputów'
+            - 'Sprawdź jakie inputs akceptuje workflow w pliku .github/workflows/deploy.yml'
+      - cmd: gh workflow list
+        desc: Lista wszystkich workflows w repo
+        detail:
+          what: Pokazuje wszystkie zdefiniowane workflow z ich stanem (aktywny/wyłączony).
+          how: Wypisuje nazwę, ID i status każdego workflow.
+          tips:
+            - 'gh workflow view ci.yml — szczegóły konkretnego workflow'
+            - 'gh workflow enable ci.yml — włącz wyłączony workflow'
+      - cmd: gh workflow disable ci.yml
+        desc: Wyłącz workflow
+        detail:
+          what: Wyłącza workflow ci.yml — nie będzie uruchamiany przy triggerach (push, PR etc.).
+          how: Przydatne gdy chcesz tymczasowo wyłączyć CI podczas pracy nad konfiguracją.
+          tips:
+            - 'gh workflow enable ci.yml — włącz ponownie'
+            - 'Wyłączone workflow nie znikają — tylko nie uruchamiają się automatycznie'
+      - cmd: gh secret set MY_SECRET
+        desc: Ustaw sekret w repo
+        detail:
+          what: Dodaje lub aktualizuje sekret repozytorium — pyta o wartość interaktywnie.
+          how: Sekrety są zaszyfrowane i dostępne w GitHub Actions przez ${{ secrets.MY_SECRET }}.
+          tips:
+            - 'echo "value" | gh secret set MY_SECRET — ustaw bez interaktywnego promptu'
+            - 'gh secret set MY_SECRET --env production — sekret dla konkretnego środowiska'
+      - cmd: gh secret set MY_SECRET < secret.txt
+        desc: Ustaw sekret z pliku
+        detail:
+          what: Wczytuje wartość sekretu z pliku secret.txt — przydatne dla kluczy, certyfikatów.
+          how: Przekierowanie stdin z pliku. Bezpieczniejsze niż wklejanie w terminal.
+          tips:
+            - 'cat ~/.ssh/id_rsa | gh secret set SSH_PRIVATE_KEY — ustaw klucz SSH'
+            - 'Nie commituj secret.txt do git — dodaj do .gitignore'
+      - cmd: gh secret list
+        desc: Lista sekretów (bez wartości)
+        detail:
+          what: Pokazuje nazwy zdefiniowanych sekretów — bez ich wartości (nie można odczytać po ustawieniu).
+          how: GitHub nie pozwala odczytać wartości sekretu po zapisaniu — możesz tylko nadpisać.
+          tips:
+            - 'gh secret list --env production — sekrety konkretnego środowiska'
+            - 'gh secret list --org — sekrety organizacji (jeśli jesteś adminem)'
+      - cmd: gh secret delete MY_SECRET
+        desc: Usuń sekret
+        detail:
+          what: Usuwa sekret z repozytorium.
+          how: Nieodwracalne — workflow które używały tego sekretu będą fail do czasu dodania nowego.
+          tips:
+            - 'Sprawdź które workflow używają sekretu zanim usuniesz'
+            - 'gh secret set MY_SECRET — dodaj nową wartość zamiast usuwać i dodawać od nowa'
+      - cmd: gh variable set MY_VAR --body "value"
+        desc: Ustaw zmienną środowiskową (nie sekret)
+        detail:
+          what: Ustawia zmienną (nie sekret) — widoczna w logach Actions w przeciwieństwie do sekretów.
+          how: Zmienne dostępne przez ${{ vars.MY_VAR }}. Sekrety przez ${{ secrets.MY_SECRET }}.
+          tips:
+            - 'Używaj zmiennych dla nie-poufnych konfiguracji (URL, nazwy środowisk)'
+            - 'gh variable list — lista zmiennych'
 
   - name: GitLab CLI (glab)
     icon: "🦊"
     commands:
-      - desc: Podgląd pipeline dla bieżącego brancha
-        code: glab ci view
-      - desc: Lista pipeline'ów
-        code: glab pipeline list
-      - desc: Status konkretnego pipeline
-        code: glab pipeline status 12345
-      - desc: Uruchom pipeline ręcznie
-        code: glab ci run
-      - desc: Uruchom pipeline na konkretnym branchu
-        code: glab ci run --branch main
-      - desc: Śledź logi joba na żywo
-        code: glab ci trace
-      - desc: Retry nieudanego pipeline
-        code: glab pipeline retry 12345
-      - desc: Anuluj pipeline
-        code: glab pipeline cancel 12345
-      - desc: Ustaw zmienną CI/CD
-        code: glab variable set MY_VAR value
-      - desc: Ustaw zmienną masked (ukryta w logach)
-        code: glab variable set MY_SECRET secret_val --masked
-      - desc: Lista zmiennych CI/CD
-        code: glab variable list
-      - desc: Usuń zmienną
-        code: glab variable delete MY_VAR
+      - cmd: glab ci view
+        desc: Podgląd pipeline dla bieżącego brancha
+        detail:
+          what: Otwiera interaktywny widok pipeline dla aktualnego brancha w terminalu.
+          how: Wymaga zainstalowanego glab CLI (brew install glab lub sudo apt install glab).
+          tips:
+            - 'glab auth login — zaloguj się do GitLab przed użyciem'
+            - 'glab ci view --branch main — pipeline dla innego brancha'
+      - cmd: glab pipeline list
+        desc: Lista pipeline'ów
+        detail:
+          what: Pokazuje listę ostatnich pipeline'ów dla projektu.
+          how: Wypisuje ID, status, datę i branch każdego pipeline.
+          tips:
+            - 'glab pipeline list --status=failed — tylko nieudane'
+            - 'glab pipeline list --page 2 — następna strona'
+      - cmd: glab pipeline status 12345
+        desc: Status konkretnego pipeline
+        detail:
+          what: Pokazuje szczegółowy status pipeline 12345 z listą jobów i ich statusami.
+          how: Pipeline ID znajdziesz w glab pipeline list lub w URL GitLab.
+          tips:
+            - 'glab pipeline status — ostatni pipeline bez podawania ID'
+            - 'glab ci view — interaktywny widok (lepszy niż glab pipeline status)'
+      - cmd: glab ci run
+        desc: Uruchom pipeline ręcznie
+        detail:
+          what: Wyzwala nowy pipeline dla aktualnego brancha.
+          how: Odpowiednik przycisku "Run pipeline" w GitLab UI.
+          tips:
+            - 'glab ci run --branch feature/my-feature — uruchom dla innego brancha'
+            - 'glab ci run -v MY_VAR=value — z zmienną CI/CD'
+      - cmd: glab ci run --branch main
+        desc: Uruchom pipeline na konkretnym branchu
+        detail:
+          what: Wyzwala pipeline dla brancha main zamiast aktualnego.
+          how: Przydatne gdy chcesz ręcznie wyzwolić deploy z brancha main.
+          tips:
+            - 'glab ci run --branch release/1.0 -- uruchom na branchu release'
+            - 'glab pipeline list — sprawdź czy pipeline wystartował'
+      - cmd: glab ci trace
+        desc: Śledź logi joba na żywo
+        detail:
+          what: Streamuje logi aktualnie działającego joba w czasie rzeczywistym.
+          how: Interaktywny — możesz wybrać job gdy pipeline ma wiele jobów.
+          tips:
+            - 'glab ci trace — interaktywnie wybierz job'
+            - 'Ctrl+C — przerwij śledzenie (job nadal działa)'
+      - cmd: glab pipeline retry 12345
+        desc: Retry nieudanego pipeline
+        detail:
+          what: Ponownie uruchamia nieudane joby w pipeline 12345.
+          how: Retry = tylko joby failed, nie wszystkie. Szybszy niż uruchamianie od zera.
+          tips:
+            - 'glab pipeline retry — ostatni nieudany pipeline'
+            - 'Sprawdź logi błędu zanim retry — żeby wiedzieć co naprawić'
+      - cmd: glab pipeline cancel 12345
+        desc: Anuluj pipeline
+        detail:
+          what: Anuluje działający pipeline 12345 — zatrzymuje wszystkie joby.
+          how: Przydatne gdy odkryłeś błąd w kodzie i nie chcesz czekać na koniec pipeline.
+          tips:
+            - 'glab pipeline cancel — anuluj ostatni pipeline'
+            - 'Anulowanie nie cofa wdrożeń które już się zakończyły'
+      - cmd: glab variable set MY_VAR value
+        desc: Ustaw zmienną CI/CD
+        detail:
+          what: Ustawia zmienną CI/CD dostępną we wszystkich pipeline'ach projektu.
+          how: Zmienne dostępne przez $MY_VAR w .gitlab-ci.yml.
+          tips:
+            - 'glab variable list — sprawdź ustawione zmienne'
+            - 'glab variable set MY_VAR value --scope staging — dla konkretnego środowiska'
+      - cmd: glab variable set MY_SECRET secret_val --masked
+        desc: Ustaw zmienną masked (ukryta w logach)
+        detail:
+          what: Ustawia zmienną która jest automatycznie maskowana w logach jobów.
+          how: "--masked = wartość zastąpiona przez [MASKED] w logach. Nie widać nawet jeśli echo $MY_SECRET."
+          tips:
+            - 'Używaj --masked dla haseł, tokenów, kluczy API'
+            - '--protected + --masked = widoczna tylko dla protected branches/tags'
+      - cmd: glab variable list
+        desc: Lista zmiennych CI/CD
+        detail:
+          what: Pokazuje wszystkie zmienne CI/CD projektu z typem i informacją o masked/protected.
+          how: Wartości zmiennych masked nie są widoczne w liście.
+          tips:
+            - 'glab variable list --scope production — zmienne dla środowiska production'
+            - 'glab variable delete MY_VAR — usuń zmienną'
+      - cmd: glab variable delete MY_VAR
+        desc: Usuń zmienną
+        detail:
+          what: Usuwa zmienną CI/CD z projektu.
+          how: Nieodwracalne. Pipeline które używają tej zmiennej mogą się posypać.
+          tips:
+            - 'Sprawdź .gitlab-ci.yml czy zmienna jest używana przed usunięciem'
+            - 'glab variable set MY_VAR new_value — nadpisz zamiast usuwać jeśli chcesz zmienić wartość'
 
   - name: act — lokalne GitHub Actions
     icon: "🎭"
     commands:
-      - desc: Lista dostępnych workflow i jobów
-        code: act --list
-      - desc: Uruchom event push (domyślny)
-        code: act push
-      - desc: Uruchom konkretny job
-        code: act -j test
-      - desc: Uruchom konkretny workflow
-        code: act -W .github/workflows/ci.yml
-      - desc: Symuluj pull_request event
-        code: act pull_request
-      - desc: Dry-run — pokaż co by się wykonało
-        code: act push -n
-      - desc: Podaj sekrety z pliku
-        code: act push --secret-file .secrets
-      - desc: Uruchom z konkretnym image runnera
-        code: act push -P ubuntu-latest=catthehacker/ubuntu:act-latest
-      - desc: Verbose — pełne logi
-        code: act push -v
+      - cmd: act --list
+        desc: Lista dostępnych workflow i jobów
+        detail:
+          what: Pokazuje wszystkie workflow i joby które można uruchomić lokalnie przez act.
+          how: act = narzędzie do lokalnego uruchamiania GitHub Actions bez pushowania do GitHub.
+          tips:
+            - 'brew install act — zainstaluj act (Mac/Linux)'
+            - 'act wymaga Dockera do uruchamiania jobów'
+      - cmd: act push
+        desc: Uruchom event push (domyślny)
+        detail:
+          what: Uruchamia workflow skonfigurowane dla zdarzenia push.
+          how: act symuluje zdarzenie GitHub i uruchamia odpowiednie joby w kontenerze Docker.
+          tips:
+            - 'act -n push — dry-run (pokaż co by się wykonało bez uruchamiania)'
+            - 'Pierwsze uruchomienie pobiera duże Docker image (~1.2GB) — poczekaj'
+      - cmd: act -j test
+        desc: Uruchom konkretny job
+        detail:
+          what: Uruchamia tylko job o nazwie "test" z workflow.
+          how: Przydatne gdy masz wiele jobów i chcesz przetestować tylko jeden.
+          tips:
+            - 'act --list — sprawdź nazwy dostępnych jobów'
+            - 'act -j build -j test — uruchom kilka jobów naraz'
+      - cmd: act -W .github/workflows/ci.yml
+        desc: Uruchom konkretny workflow
+        detail:
+          what: Uruchamia workflow z konkretnego pliku — gdy masz wiele plików workflow.
+          how: "-W = workflow file path."
+          tips:
+            - 'act -W .github/workflows/ci.yml -j lint — konkretny job z konkretnego workflow'
+            - 'act --list -W .github/workflows/ci.yml — lista jobów w tym workflow'
+      - cmd: act pull_request
+        desc: Symuluj pull_request event
+        detail:
+          what: Uruchamia workflow skonfigurowane dla zdarzenia pull_request.
+          how: Przydatne do testowania CI pipeline dla PR bez tworzenia prawdziwego PR.
+          tips:
+            - 'act pull_request --eventpath event.json — podaj szczegóły zdarzenia z pliku JSON'
+            - 'act -e event.json — skrót dla podawania pliku zdarzenia'
+      - cmd: act push -n
+        desc: Dry-run — pokaż co by się wykonało
+        detail:
+          what: Pokazuje plan wykonania bez uruchamiania żadnych kontenerów ani kroków.
+          how: "-n = dry-run. Przydatne żeby sprawdzić czy workflow jest poprawnie skonfigurowane."
+          tips:
+            - 'Szybki sposób na sprawdzenie które joby i kroki będą wykonane'
+            - 'Nie wymaga Dockera — tylko parsuje pliki workflow'
+      - cmd: act push --secret-file .secrets
+        desc: Podaj sekrety z pliku
+        detail:
+          what: Wczytuje sekrety z pliku .secrets (format KEY=VALUE) i przekazuje do workflow.
+          how: Plik .secrets emuluje GitHub Secrets dostępne przez ${{ secrets.KEY }}.
+          tips:
+            - 'echo "MY_TOKEN=abc123" >> .secrets — dodaj sekret'
+            - 'Dodaj .secrets do .gitignore — nigdy nie commituj'
+      - cmd: act push -P ubuntu-latest=catthehacker/ubuntu:act-latest
+        desc: Uruchom z konkretnym image runnera
+        detail:
+          what: Zastępuje domyślny image ubuntu-latest konkretnym obrazem Docker.
+          how: act używa mniejszych obrazów niż GitHub — nie wszystkie narzędzia są dostępne.
+          tips:
+            - 'catthehacker/ubuntu:act-latest — pełniejszy obraz z więcej narzędziami'
+            - 'nektos/act:latest -- domyślny, mniejszy obraz'
+      - cmd: act push -v
+        desc: Verbose — pełne logi
+        detail:
+          what: Uruchamia act z pełnymi logami — pokazuje każdy krok i jego wyjście.
+          how: Przydatne do debugowania gdy job się nie powodzi i nie wiesz dlaczego.
+          tips:
+            - 'act push -v 2>&1 | tee act.log — zapisz logi do pliku'
+            - '-v = verbose. --artifact-server-path /tmp/artifacts — zapisz artefakty lokalnie'
 
   - name: Docker w pipeline
     icon: "🐳"
     commands:
-      - desc: Build image z tagiem i BuildKit
-        code: DOCKER_BUILDKIT=1 docker build -t moja-apka:latest .
-      - desc: Build multi-platform (amd64 + arm64)
-        code: docker buildx build --platform linux/amd64,linux/arm64 -t org/app:latest --push .
-      - desc: Push image do registry
-        code: docker push ghcr.io/org/moja-apka:latest
-      - desc: Skanuj CVE przez Trivy
-        code: trivy image moja-apka:latest
-      - desc: Skanuj przez Docker Scout
-        code: docker scout cves moja-apka:latest
-      - desc: Sprawdź warstwy i rozmiar
-        code: docker history moja-apka:latest
-      - desc: Eksploruj warstwy interaktywnie (dive)
-        code: dive moja-apka:latest
-      - desc: Zaloguj do ghcr.io przez token
-        code: echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
-      - desc: Lista lokalna images z rozmiarem
-        code: docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
-      - desc: Usuń wszystkie nieużywane images
-        code: docker image prune -af
+      - cmd: DOCKER_BUILDKIT=1 docker build -t moja-apka:latest .
+        desc: Build image z tagiem i BuildKit
+        detail:
+          what: Buduje Docker image z włączonym BuildKit — szybszy build z lepszym cache.
+          how: BuildKit jest domyślny od Docker 23+. Starsze wersje wymagają DOCKER_BUILDKIT=1.
+          tips:
+            - 'BuildKit = równoległy build warstw, lepsza obsługa secrets, szybszy cache'
+            - 'docker buildx build — nowszy interfejs BuildKit z multi-platform support'
+      - cmd: docker buildx build --platform linux/amd64,linux/arm64 -t org/app:latest --push .
+        desc: Build multi-platform (amd64 + arm64)
+        detail:
+          what: Buduje image dla obu architektur (Intel/AMD i Apple Silicon/ARM) i pushuje do registry.
+          how: Wymaga docker buildx create --use żeby skonfigurować buildx builder.
+          tips:
+            - 'docker buildx create --use — stwórz builder przed pierwszym użyciem'
+            - 'Niezbędne jeśli deployu na AWS Graviton (arm64) lub Apple M-series'
+      - cmd: docker push ghcr.io/org/moja-apka:latest
+        desc: Push image do registry
+        detail:
+          what: Wysyła zbudowany image do GitHub Container Registry (ghcr.io).
+          how: 'Wymaga zalogowania: echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin'
+          tips:
+            - 'ghcr.io = GitHub Container Registry — darmowe dla publicznych repo'
+            - 'docker push ghcr.io/org/moja-apka:v1.0 — tag konkretną wersję przed push'
+      - cmd: trivy image moja-apka:latest
+        desc: Skanuj CVE przez Trivy
+        detail:
+          what: Skanuje image Docker pod kątem znanych luk bezpieczeństwa (CVE) w pakietach OS i library.
+          how: Trivy sprawdza warstwy image przeciwko bazie CVE. Wypisuje listę podatności z severity.
+          tips:
+            - 'brew install trivy — zainstaluj'
+            - 'trivy image --exit-code 1 --severity CRITICAL moja-apka:latest — fail jeśli CRITICAL CVE'
+            - 'Dodaj do CI: trivy image --format sarif --output results.sarif image:tag'
+      - cmd: docker scout cves moja-apka:latest
+        desc: Skanuj przez Docker Scout
+        detail:
+          what: Oficjalne narzędzie Docker do skanowania CVE — wbudowane w Docker Desktop i CLI.
+          how: Wymaga konta Docker Hub. Alternatywa dla Trivy dostępna bezpośrednio z docker CLI.
+          tips:
+            - 'docker scout recommendations moja-apka:latest — sugestie aktualizacji bazowego image'
+            - 'docker scout quickview moja-apka:latest — szybkie podsumowanie'
+      - cmd: docker history moja-apka:latest
+        desc: Sprawdź warstwy i rozmiar
+        detail:
+          what: Pokazuje historię warstw image — każda instrukcja Dockerfile jako osobna warstwa z rozmiarem.
+          how: Pomaga identyfikować które warstwy zajmują najwięcej miejsca.
+          tips:
+            - 'docker history --no-trunc moja-apka:latest — pełne komendy bez obcinania'
+            - 'dive moja-apka:latest — interaktywna eksploracja warstw (lepszy UX)'
+      - cmd: dive moja-apka:latest
+        desc: Eksploruj warstwy interaktywnie (dive)
+        detail:
+          what: Otwiera interaktywną eksplorację warstw image — pokazuje co każda warstwa dodaje/usuwa.
+          how: dive = narzędzie TUI do analizy efektywności warstw Docker image.
+          tips:
+            - 'brew install dive — zainstaluj'
+            - 'CI=true dive moja-apka:latest — tryb CI z analizą efektywności (nie-interaktywny)'
+      - cmd: echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+        desc: Zaloguj do ghcr.io przez token
+        detail:
+          what: Autentykuje Docker do GitHub Container Registry używając Personal Access Token.
+          how: --password-stdin = czyta hasło ze stdin zamiast argumentu (bezpieczniejsze — nie w historii).
+          tips:
+            - 'Token musi mieć scope write:packages'
+            - 'W GitHub Actions: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin'
+      - cmd: docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+        desc: Lista lokalna images z rozmiarem
+        detail:
+          what: Wyświetla lokalne images w formacie tabeli z repository, tagiem i rozmiarem.
+          how: --format pozwala dostosować output. {{.Size}} = rozmiar skompresowany.
+          tips:
+            - 'docker images --format "{{.Repository}}:{{.Tag}}" — tylko nazwy (do skryptów)'
+            - 'docker images | sort -k7 -h — sortuj po rozmiarze'
+      - cmd: docker image prune -af
+        desc: Usuń wszystkie nieużywane images
+        detail:
+          what: Usuwa wszystkie images które nie są używane przez żaden kontener.
+          how: "-a = wszystkie (nie tylko dangling). -f = force (bez pytania)."
+          tips:
+            - 'docker system prune -af — usuń też kontenery, sieci i build cache'
+            - 'Uruchamiaj regularnie na CI serwerach — image zajmują dużo miejsca'
 
   - name: pre-commit
     icon: "🪝"
     commands:
-      - desc: Zainstaluj hooki git (jednorazowo)
-        code: pre-commit install
-      - desc: Zainstaluj hooki dla commit-msg
-        code: pre-commit install --hook-type commit-msg
-      - desc: Uruchom wszystkie hooki na wszystkich plikach
-        code: pre-commit run --all-files
-      - desc: Uruchom konkretny hook
-        code: pre-commit run ruff --all-files
-      - desc: Pomiń hooki dla jednego commita (nagły przypadek)
-        code: git commit --no-verify -m "hotfix"
-      - desc: Aktualizuj hooki do najnowszych wersji
-        code: pre-commit autoupdate
-      - desc: Wyczyść środowiska hooków
-        code: pre-commit clean
-      - desc: Sprawdź konfigurację hooków
-        code: pre-commit validate-config
-      - desc: Generuj plik .secrets.baseline dla detect-secrets
-        code: detect-secrets scan > .secrets.baseline
+      - cmd: pre-commit install
+        desc: Zainstaluj hooki git (jednorazowo)
+        detail:
+          what: Instaluje hooki pre-commit w lokalnym repozytorium — będą uruchamiać się przy każdym commicie.
+          how: Modyfikuje .git/hooks/pre-commit. Wymaga pliku .pre-commit-config.yaml w repo.
+          tips:
+            - 'pip install pre-commit — zainstaluj narzędzie jeśli nie masz'
+            - 'Każdy nowy contributor musi uruchomić pre-commit install po klonowaniu repo'
+      - cmd: pre-commit install --hook-type commit-msg
+        desc: Zainstaluj hooki dla commit-msg
+        detail:
+          what: Instaluje hooki dla walidacji wiadomości commit — np. conventional commits.
+          how: "Domyślnie pre-commit install dodaje tylko pre-commit hook. Tutaj dodajemy commit-msg."
+          tips:
+            - 'commitizen — popularne narzędzie do conventional commits z pre-commit'
+            - 'pre-commit install --hook-type pre-push — instaluj hook pre-push (zamiast commit-msg)'
+      - cmd: pre-commit run --all-files
+        desc: Uruchom wszystkie hooki na wszystkich plikach
+        detail:
+          what: Uruchamia wszystkie skonfigurowane hooki na wszystkich plikach w repo — nie tylko zmodyfikowanych.
+          how: Normalnie pre-commit działa tylko na staged/changed plikach. --all-files = sprawdź całe repo.
+          tips:
+            - 'Uruchom po pierwszej instalacji pre-commit żeby sprawdzić cały codebase'
+            - 'Może być wolne na dużych repo — uruchom raz żeby naprawić istniejące problemy'
+      - cmd: pre-commit run ruff --all-files
+        desc: Uruchom konkretny hook
+        detail:
+          what: Uruchamia tylko hook "ruff" (linter Python) na wszystkich plikach.
+          how: 'Nazwa hooka = id: w .pre-commit-config.yaml.'
+          tips:
+            - 'pre-commit run black --all-files — tylko formatowanie Black'
+            - 'pre-commit run --hook-stage push --all-files — hooki pre-push'
+      - cmd: git commit --no-verify -m "hotfix"
+        desc: Pomiń hooki dla jednego commita (nagły przypadek)
+        detail:
+          what: Commituje z pominięciem wszystkich hooków pre-commit i commit-msg.
+          how: "--no-verify = skip hooki. Używaj TYLKO w nagłych przypadkach (hotfix production)."
+          tips:
+            - 'Nie nadużywaj --no-verify — po hotfixie uruchom hooki ręcznie: pre-commit run --all-files'
+            - 'Alternatywa: SKIP=ruff git commit -m "msg" — pomiń tylko konkretny hook'
+      - cmd: pre-commit autoupdate
+        desc: Aktualizuj hooki do najnowszych wersji
+        detail:
+          what: Aktualizuje rev (wersje) repozytoriów hooków w .pre-commit-config.yaml do najnowszych tagów.
+          how: Modyfikuje .pre-commit-config.yaml — sprawdź diff i commituj zmiany.
+          tips:
+            - 'Uruchamiaj regularnie (np. miesięcznie) żeby mieć aktualne wersje hooków'
+            - 'pre-commit autoupdate --freeze — użyj dokładnych hash commitów zamiast tagów'
+      - cmd: pre-commit clean
+        desc: Wyczyść środowiska hooków
+        detail:
+          what: Usuwa cache środowisk wirtualnych hooków — zmuszając pre-commit do ponownej instalacji.
+          how: Przydatne gdy hooki przestały działać po aktualizacji Pythona lub systemu.
+          tips:
+            - 'Po pre-commit clean — pierwsze uruchomienie będzie wolniejsze (reinstalacja)'
+            - 'pre-commit gc — usuń cache dla usuniętych hooków (lżejsza wersja clean)'
+      - cmd: pre-commit validate-config
+        desc: Sprawdź konfigurację hooków
+        detail:
+          what: Waliduje składnię pliku .pre-commit-config.yaml bez uruchamiania hooków.
+          how: Szybka weryfikacja czy konfiguracja jest poprawna po edycji.
+          tips:
+            - 'Uruchamiaj po każdej modyfikacji .pre-commit-config.yaml'
+            - 'pre-commit validate-manifest — waliduj .pre-commit-hooks.yaml (dla twórców hooków)'
+      - cmd: detect-secrets scan > .secrets.baseline
+        desc: Generuj plik .secrets.baseline dla detect-secrets
+        detail:
+          what: Skanuje repo i tworzy baseline sekretów — znane "false positives" są ignorowane w przyszłości.
+          how: ".secrets.baseline = lista zaakceptowanych/znanych wyników skanowania."
+          tips:
+            - 'pip install detect-secrets — zainstaluj narzędzie'
+            - 'detect-secrets audit .secrets.baseline — ręcznie przejrzyj i oznacz false positives'
 
   - name: Diagnostyka pipeline
     icon: "🔧"
     commands:
-      - desc: Pobierz logi GitHub Actions runa
-        code: gh run view --log
-      - desc: Pobierz logi zakończonego runa do pliku
-        code: gh run view 1234567890 --log > pipeline.log
-      - desc: Sprawdź status wszystkich checks na PR
-        code: gh pr checks 42
-      - desc: Śledź logi GitLab CI job na żywo
-        code: glab ci trace
-      - desc: Sprawdź GitLab CI lint (waliduj .gitlab-ci.yml)
-        code: glab ci lint
-      - desc: Podgląd zmiennych w GitHub Actions (debug mode)
-        code: gh variable set ACTIONS_STEP_DEBUG --body true
-      - desc: Wyświetl wszystkie zmienne env w kroku Actions
-        code: env | sort
-      - desc: Sprawdź które pliki się zmieniły (dla path filtering)
-        code: git diff --name-only origin/main...HEAD
-      - desc: Sprawdź logi ostatniego docker compose
-        code: docker compose logs --tail 50 --timestamps
+      - cmd: gh run view --log
+        desc: Pobierz logi GitHub Actions runa
+        detail:
+          what: Wyświetla pełne logi ostatniego lub wybranego interaktywnie runa GitHub Actions.
+          how: Bez ID runa — interaktywnie wybierz z listy.
+          tips:
+            - 'gh run view --log | grep -i "error\|failed" — filtruj błędy'
+            - 'gh run view --log-failed — tylko logi nieudanych kroków'
+      - cmd: gh run view 1234567890 --log > pipeline.log
+        desc: Pobierz logi zakończonego runa do pliku
+        detail:
+          what: Zapisuje pełne logi runa do pliku pipeline.log — do dokładnej analizy.
+          how: Run ID z gh run list. Przekierowanie > zapisuje output do pliku.
+          tips:
+            - 'grep -n "error\|warning" pipeline.log — znajdź błędy z numerami linii'
+            - 'less -R pipeline.log — przeglądaj z kolorami'
+      - cmd: gh pr checks 42
+        desc: Sprawdź status wszystkich checks na PR
+        detail:
+          what: Pokazuje status wszystkich CI/CD checks dla Pull Request #42.
+          how: Wypisuje wszystkie statusy checks (Actions, external checks) z linkami do logów.
+          tips:
+            - 'gh pr checks — dla aktualnego PR (z brancha)'
+            - 'gh pr checks 42 --watch — śledź status checks na żywo'
+      - cmd: glab ci trace
+        desc: Śledź logi GitLab CI job na żywo
+        detail:
+          what: Streamuje logi aktualnie działającego joba GitLab CI w czasie rzeczywistym.
+          how: Interaktywny wybór joba jeśli jest kilka.
+          tips:
+            - 'glab ci trace --job=build — konkretny job bez interaktywnego wyboru'
+            - 'Ctrl+C — przerwij śledzenie (job nadal działa)'
+      - cmd: glab ci lint
+        desc: Sprawdź GitLab CI lint (waliduj .gitlab-ci.yml)
+        detail:
+          what: Wysyła .gitlab-ci.yml do GitLab API i waliduje składnię — bez uruchamiania pipeline.
+          how: Sprawdza składnię YAML i poprawność konfiguracji GitLab CI.
+          tips:
+            - 'Uruchamiaj po każdej zmianie .gitlab-ci.yml zanim pushniesz'
+            - 'GitLab UI: CI/CD > Editor — również waliduje na bieżąco'
+      - cmd: gh variable set ACTIONS_STEP_DEBUG --body true
+        desc: Podgląd zmiennych w GitHub Actions (debug mode)
+        detail:
+          what: Włącza debug mode dla GitHub Actions — wypisuje każdy krok ze szczegółami.
+          how: ACTIONS_STEP_DEBUG=true = dodatkowe logi diagnostyczne w każdym kroku Actions.
+          tips:
+            - 'gh variable set ACTIONS_RUNNER_DEBUG --body true — debug mode runnera'
+            - 'Wyłącz po debugowaniu: gh variable set ACTIONS_STEP_DEBUG --body false'
+      - cmd: env | sort
+        desc: Wyświetl wszystkie zmienne env w kroku Actions
+        detail:
+          what: Wypisuje wszystkie zmienne środowiskowe dostępne w danym kroku Actions — do debugowania.
+          how: 'Dodaj krok "run: env | sort" do workflow żeby zobaczyć dostępne zmienne.'
+          tips:
+            - 'NIGDY nie uruchamiaj w publicznym repo — może ujawnić sekrety w logach'
+            - 'Sekrety są maskowane przez GitHub, ale inne wrażliwe dane mogą nie być'
+      - cmd: git diff --name-only origin/main...HEAD
+        desc: Sprawdź które pliki się zmieniły (dla path filtering)
+        detail:
+          what: Wypisuje nazwy plików które różnią się między aktualnym branchem a origin/main.
+          how: Przydatne do konfiguracji path filtering w CI — uruchamiaj pipeline tylko gdy zmienił się określony folder.
+          tips:
+            - 'Użyj w GitHub Actions: paths: ["src/**", "tests/**"] w on.push'
+            - 'dorny/paths-filter action — bardziej zaawansowane filtrowanie ścieżek w Actions'
+      - cmd: docker compose logs --tail 50 --timestamps
+        desc: Sprawdź logi ostatniego docker compose
+        detail:
+          what: Pokazuje ostatnie 50 linii logów ze wszystkich serwisów z timestampami.
+          how: Przydatne do debugowania gdy docker compose up -d i coś nie działa.
+          tips:
+            - 'docker compose logs --tail 50 api — tylko serwis api'
+            - 'docker compose logs -f --tail 10 — follow (live) od ostatnich 10 linii'

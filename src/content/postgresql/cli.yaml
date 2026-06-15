@@ -4,157 +4,535 @@ groups:
   - name: Instalacja i uruchamianie
     icon: "📦"
     commands:
-      - desc: Zainstaluj PostgreSQL (Ubuntu/Debian)
-        code: sudo apt install postgresql postgresql-contrib
-      - desc: Uruchom / zatrzymaj / sprawdź status (systemd)
-        code: sudo systemctl start postgresql && sudo systemctl status postgresql
-      - desc: Zainstaluj PostgreSQL przez Docker
-        code: docker run -d --name postgres -e POSTGRES_PASSWORD=secret -e POSTGRES_DB=mydb -p 5432:5432 postgres:16
-      - desc: Uruchom PostgreSQL z Docker Compose
-        code: "docker compose up -d postgres"
-      - desc: Zainstaluj klienta psql (bez serwera)
-        code: sudo apt install postgresql-client
-      - desc: Sprawdź wersję PostgreSQL
-        code: psql --version
+      - cmd: sudo apt install postgresql postgresql-contrib
+        desc: Zainstaluj PostgreSQL (Ubuntu/Debian)
+        detail:
+          what: Instaluje serwer PostgreSQL i dodatkowe narzędzia (contrib) — na Ubuntu/Debian/WSL.
+          how: postgresql-contrib zawiera przydatne rozszerzenia m.in. uuid-ossp, pg_stat_statements.
+          tips:
+            - 'Domyślnie tworzy użytkownika postgres bez hasła — połącz: sudo -u postgres psql'
+            - 'sudo systemctl start postgresql — uruchom serwer po instalacji'
+      - cmd: sudo systemctl start postgresql && sudo systemctl status postgresql
+        desc: Uruchom / zatrzymaj / sprawdź status (systemd)
+        detail:
+          what: Uruchamia serwer PostgreSQL i sprawdza czy działa poprawnie.
+          how: systemctl zarządza usługami systemowymi. status pokazuje czy Active (running).
+          tips:
+            - 'sudo systemctl enable postgresql — uruchamiaj automatycznie po restarcie'
+            - 'sudo systemctl restart postgresql — restart po zmianie konfiguracji'
+      - cmd: docker run -d --name postgres -e POSTGRES_PASSWORD=secret -e POSTGRES_DB=mydb -p 5432:5432 postgres:16
+        desc: Zainstaluj PostgreSQL przez Docker
+        detail:
+          what: Uruchamia PostgreSQL 16 w kontenerze z hasłem, bazą i portowaniem na localhost:5432.
+          how: POSTGRES_PASSWORD — hasło dla superusera postgres. POSTGRES_DB — baza tworzona automatycznie.
+          tips:
+            - 'Dodaj -v postgres_data:/var/lib/postgresql/data — dane przetrwają restart kontenera'
+            - 'docker exec -it postgres psql -U postgres — wejdź do psql w kontenerze'
+      - cmd: docker compose up -d postgres
+        desc: Uruchom PostgreSQL z Docker Compose
+        detail:
+          what: Uruchamia serwis postgres z docker-compose.yml w tle.
+          how: Wymaga zdefiniowanego serwisu postgres w docker-compose.yml.
+          tips:
+            - 'docker compose logs postgres — sprawdź logi jeśli nie startuje'
+            - 'docker compose exec postgres psql -U postgres — wejdź do psql'
+      - cmd: sudo apt install postgresql-client
+        desc: Zainstaluj klienta psql (bez serwera)
+        detail:
+          what: Instaluje tylko klienta psql — przydatne gdy łączysz się do zewnętrznego serwera.
+          how: Nie instaluje serwera PostgreSQL — tylko narzędzia CLI (psql, pg_dump, pg_restore).
+          tips:
+            - 'Przydatne w produkcji: klient na maszynie deployu, serwer gdzie indziej'
+            - 'psql --version — sprawdź wersję klienta'
+      - cmd: psql --version
+        desc: Sprawdź wersję PostgreSQL
+        detail:
+          what: Wypisuje wersję zainstalowanego klienta psql.
+          how: Wersja klienta powinna być zgodna z wersją serwera (dopuszczalna mała różnica).
+          tips:
+            - 'SELECT version(); — wersja serwera (po połączeniu przez psql)'
+            - 'Klient starszy niż serwer = ostrzeżenie, ale zazwyczaj działa'
 
   - name: Połączenie z bazą (psql)
     icon: "🔌"
     commands:
-      - desc: Połącz się z lokalną bazą
-        code: psql -U postgres -d mydb
-      - desc: Połącz przez URL
-        code: "psql postgresql://postgres:secret@localhost:5432/mydb"
-      - desc: Połącz z hosta zdalnego
-        code: psql -h db.example.com -U postgres -d production
-      - desc: Połącz przez Docker
-        code: docker exec -it postgres psql -U postgres -d mydb
-      - desc: Wykonaj jedno polecenie i wyjdź
-        code: psql -U postgres -d mydb -c "SELECT COUNT(*) FROM users"
-      - desc: Wykonaj plik SQL
-        code: psql -U postgres -d mydb -f schema.sql
-      - desc: Zapisz hasło w pliku .pgpass (żeby nie pytało)
-        code: "echo 'localhost:5432:mydb:postgres:secret' >> ~/.pgpass && chmod 600 ~/.pgpass"
+      - cmd: psql -U postgres -d mydb
+        desc: Połącz się z lokalną bazą
+        detail:
+          what: Łączy się z bazą mydb jako użytkownik postgres na localhost:5432.
+          how: Pyta o hasło jeśli wymagane. Po połączeniu wchodzisz w interaktywny shell psql.
+          tips:
+            - 'sudo -u postgres psql — na Ubuntu często nie wymaga hasła (peer auth)'
+            - '\q lub Ctrl+D — wyjdź z psql'
+      - cmd: "psql postgresql://postgres:secret@localhost:5432/mydb"
+        desc: Połącz przez URL
+        detail:
+          what: Łączy się podając pełny URL połączenia zamiast osobnych flag — wygodniejsze.
+          how: "Format: postgresql://użytkownik:hasło@host:port/baza"
+          tips:
+            - 'Ustaw jako DATABASE_URL w .env — standardowy format dla większości frameworków'
+            - 'SQLAlchemy: create_engine(DATABASE_URL) — używa tego samego formatu'
+      - cmd: psql -h db.example.com -U postgres -d production
+        desc: Połącz z hosta zdalnego
+        detail:
+          what: Łączy się z PostgreSQL na zdalnym serwerze.
+          how: "-h = host. Wymaga że serwer ma pg_hba.conf z regułą dla Twojego IP."
+          tips:
+            - 'psql -h db.example.com -U postgres -d production -W — wymuś pytanie o hasło'
+            - 'Użyj ~/.pgpass żeby nie podawać hasła za każdym razem'
+      - cmd: docker exec -it postgres psql -U postgres -d mydb
+        desc: Połącz przez Docker
+        detail:
+          what: Otwiera sesję psql wewnątrz kontenera Docker z PostgreSQL.
+          how: docker exec -it = interactive terminal. Przydatne gdy PostgreSQL jest w Docker.
+          tips:
+            - 'docker exec -it postgres psql -U postgres — bez -d = domyślna baza postgres'
+            - 'Nazwa kontenera (postgres) musi się zgadzać z --name przy docker run'
+      - cmd: psql -U postgres -d mydb -c "SELECT COUNT(*) FROM users"
+        desc: Wykonaj jedno polecenie i wyjdź
+        detail:
+          what: Wykonuje jedno zapytanie SQL i wraca do shellu — bez wchodzenia w tryb interaktywny.
+          how: "-c = command. Przydatne w skryptach bash i CI/CD."
+          tips:
+            - 'psql -U postgres -d mydb -c "..." -t — tylko wynik bez nagłówków (do skryptów)'
+            - 'PGPASSWORD=secret psql -U postgres -c "..." — hasło przez zmienną środowiskową'
+      - cmd: psql -U postgres -d mydb -f schema.sql
+        desc: Wykonaj plik SQL
+        detail:
+          what: Uruchamia wszystkie zapytania SQL z pliku schema.sql w bazie mydb.
+          how: Każde zapytanie jest wykonywane kolejno. Błąd nie zatrzymuje wykonania (chyba że użyjesz -1).
+          tips:
+            - 'psql -U postgres -d mydb -f schema.sql -1 — cały plik jako jedna transakcja (rollback przy błędzie)'
+            - 'Używaj do migracji, seedowania danych, tworzenia schematu'
+      - cmd: "echo 'localhost:5432:mydb:postgres:secret' >> ~/.pgpass && chmod 600 ~/.pgpass"
+        desc: Zapisz hasło w pliku .pgpass (żeby nie pytało)
+        detail:
+          what: Dodaje wpis do pliku .pgpass — psql automatycznie używa go zamiast pytać o hasło.
+          how: "Format .pgpass: host:port:baza:użytkownik:hasło. chmod 600 = wymagane przez psql."
+          tips:
+            - 'Bez chmod 600 psql ignoruje .pgpass (za szerokie prawa = niebezpieczne)'
+            - '"*" działa jako wildcard: localhost:5432:*:postgres:secret — dla wszystkich baz'
 
   - name: psql — meta-komendy
     icon: "💻"
     commands:
-      - desc: Wylistuj wszystkie bazy
-        code: \l
-      - desc: Połącz z inną bazą
-        code: \c mydb
-      - desc: Wylistuj wszystkie tabele
-        code: \dt
-      - desc: Opisz tabelę (kolumny, typy, constrainty, indeksy)
-        code: \d users
-      - desc: Wylistuj widoki
-        code: \dv
-      - desc: Wylistuj indeksy
-        code: \di
-      - desc: Wylistuj użytkowników / role
-        code: \du
-      - desc: Wylistuj funkcje
-        code: \df
-      - desc: Wylistuj rozszerzenia
-        code: \dx
-      - desc: Historia zapytań
-        code: \s
-      - desc: Timing zapytań (pokaż czas wykonania)
-        code: \timing
-      - desc: Formatowanie wyników — rozszerzony widok
-        code: \x
-      - desc: Wyłącz pager (mniej | more)
-        code: \pset pager off
-      - desc: Wyjdź z psql
-        code: \q
+      - cmd: \l
+        desc: Wylistuj wszystkie bazy
+        detail:
+          what: Pokazuje wszystkie bazy danych na serwerze z właścicielem, kodowaniem i collation.
+          how: Meta-komendy zaczynające się od \ działają tylko wewnątrz psql (nie to samo co SQL).
+          tips:
+            - '\l+ — rozszerzony widok z rozmiarami baz'
+            - 'SELECT datname FROM pg_database — to samo przez SQL'
+      - cmd: \c mydb
+        desc: Połącz z inną bazą
+        detail:
+          what: Przełącza połączenie na inną bazę danych bez wychodzenia z psql.
+          how: '\c = connect. Możesz też podać użytkownika: \c mydb appuser'
+          tips:
+            - '\c - — powróć do poprzedniej bazy'
+            - '\conninfo — pokaż informacje o aktualnym połączeniu'
+      - cmd: \dt
+        desc: Wylistuj wszystkie tabele
+        detail:
+          what: Pokazuje wszystkie tabele w aktualnej bazie (schemat public).
+          how: '\dt *.* — tabele ze wszystkich schematów. \dt schema.* — tabele z konkretnego schematu.'
+          tips:
+            - '\dt+ — rozszerzony widok z rozmiarami i opisami'
+            - '\dt users* — tabele których nazwa zaczyna się od users'
+      - cmd: \d users
+        desc: Opisz tabelę (kolumny, typy, constrainty, indeksy)
+        detail:
+          what: Pokazuje strukturę tabeli users — kolumny, typy, nullable, domyślne wartości, indeksy.
+          how: '\d bez argumentu = lista tabel. \d tabela = szczegóły tabeli.'
+          tips:
+            - '\d+ users — rozszerzone info z rozmiarami kolumn i storage'
+            - 'Najczęstsza komenda podczas developmentu — sprawdź schemat tabeli'
+      - cmd: \dv
+        desc: Wylistuj widoki
+        detail:
+          what: Pokazuje wszystkie widoki (VIEW) w aktualnej bazie.
+          how: Widoki = zapisane zapytania SELECT które możesz używać jak tabele.
+          tips:
+            - '\dv+ — pokaż definicje widoków'
+            - '\d nazwa_widoku — struktura widoku'
+      - cmd: \di
+        desc: Wylistuj indeksy
+        detail:
+          what: Pokazuje wszystkie indeksy w aktualnej bazie z tabelami i typami.
+          how: Przydatne do sprawdzenia czy baza ma odpowiednie indeksy dla wydajności.
+          tips:
+            - '\di+ — rozmiary indeksów'
+            - 'SELECT schemaname, tablename, indexname FROM pg_indexes — to samo przez SQL'
+      - cmd: \du
+        desc: Wylistuj użytkowników / role
+        detail:
+          what: Pokazuje wszystkich użytkowników i role PostgreSQL z ich uprawnieniami.
+          how: "Kolumny: role name, attributes (Superuser, Create DB, etc.), member of."
+          tips:
+            - '\du+ — rozszerzone info z opisami'
+            - 'SELECT usename, usesuper FROM pg_user — to samo przez SQL'
+      - cmd: \df
+        desc: Wylistuj funkcje
+        detail:
+          what: Pokazuje wszystkie funkcje (stored procedures) w aktualnej bazie.
+          how: '\df+ — pełne definicje funkcji. \df nazwa* — funkcje po nazwie.'
+          tips:
+            - '\df *count* — znajdź funkcje z "count" w nazwie'
+            - 'Przydatne gdy używasz rozszerzeń które dodają funkcje (np. pg_trgm)'
+      - cmd: \dx
+        desc: Wylistuj rozszerzenia
+        detail:
+          what: Pokazuje zainstalowane rozszerzenia PostgreSQL z wersjami.
+          how: Rozszerzenia = dodatkowe funkcje (uuid-ossp, postgis, pg_trgm, pg_stat_statements).
+          tips:
+            - '\dx+ — szczegółowe info z opisami'
+            - 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp" — zainstaluj rozszerzenie'
+      - cmd: \s
+        desc: Historia zapytań
+        detail:
+          what: Wyświetla historię wpisanych komend/zapytań w tej sesji psql.
+          how: '\s plik.txt — zapisz historię do pliku.'
+          tips:
+            - 'Strzałka góra/dół — przewijaj historię (jak w bash)'
+            - 'Ctrl+R — wyszukaj w historii (jak w bash)'
+      - cmd: \timing
+        desc: Timing zapytań (pokaż czas wykonania)
+        detail:
+          what: Przełącza wyświetlanie czasu wykonania każdego zapytania — przydatne do optymalizacji.
+          how: 'Po włączeniu każde zapytanie wypisuje "Time: X.XXX ms" pod wynikami.'
+          tips:
+            - 'EXPLAIN ANALYZE SELECT ... — szczegółowy plan wykonania z czasami'
+            - 'Jeśli zapytanie trwa > 100ms — zastanów się nad indeksem'
+      - cmd: \x
+        desc: Formatowanie wyników — rozszerzony widok
+        detail:
+          what: Przełącza między normalnym a rozszerzonym widokiem wyników — każde pole w osobnej linii.
+          how: Bardzo przydatne dla tabel z wieloma kolumnami lub długimi wartościami.
+          tips:
+            - '\x auto — automatycznie wybierz widok w zależności od szerokości terminala'
+            - 'Domyślny widok trudny do czytania dla wide tabel — \x to fix'
+      - cmd: \pset pager off
+        desc: Wyłącz pager (mniej | more)
+        detail:
+          what: Wyłącza pager który przewija przez długie wyniki — od tej pory wszystko wypisuje się od razu.
+          how: Domyślnie psql używa less do długich wyników. Wyłącz gdy kopiujesz output.
+          tips:
+            - '\pset pager on — włącz pager z powrotem'
+            - 'Przydatne przy automatyzacji: psql wypisuje wynik od razu (nie czeka na Enter)'
+      - cmd: \q
+        desc: Wyjdź z psql
+        detail:
+          what: Kończy sesję psql i wraca do shellu.
+          how: 'Alternatywa: Ctrl+D (EOF).'
+          tips:
+            - 'Ctrl+C — przerwij aktualne zapytanie bez wychodzenia'
+            - 'Wpisz \q lub naciśnij Ctrl+D'
 
   - name: Zarządzanie bazami
     icon: "🗄️"
     commands:
-      - desc: Utwórz nową bazę
-        code: createdb -U postgres mydb
-      - desc: Utwórz bazę (w psql)
-        code: CREATE DATABASE mydb OWNER postgres ENCODING 'UTF8';
-      - desc: Usuń bazę
-        code: dropdb -U postgres mydb
-      - desc: Sklonuj bazę (template)
-        code: "CREATE DATABASE mydb_test TEMPLATE mydb;"
-      - desc: Lista baz i rozmiary
-        code: SELECT datname, pg_size_pretty(pg_database_size(datname)) FROM pg_database;
-      - desc: Rozmiar tabeli
-        code: SELECT pg_size_pretty(pg_total_relation_size('users'));
+      - cmd: createdb -U postgres mydb
+        desc: Utwórz nową bazę
+        detail:
+          what: Tworzy nową bazę danych mydb jako narzędzie shell (nie wewnątrz psql).
+          how: Shortcut dla CREATE DATABASE. Przydatne w skryptach bash.
+          tips:
+            - 'createdb -U postgres -O appuser mydb — baza z konkretnym właścicielem'
+            - 'dropdb -U postgres mydb — usuń bazę (narzędzie shell)'
+      - cmd: CREATE DATABASE mydb OWNER postgres ENCODING 'UTF8';
+        desc: Utwórz bazę (w psql)
+        detail:
+          what: Tworzy nową bazę danych wewnątrz psql z podanym właścicielem i kodowaniem.
+          how: Wykonaj będąc połączonym jako superuser. UTF8 = standardowe kodowanie dla nowych projektów.
+          tips:
+            - "LC_COLLATE='pl_PL.utf8' — polskie sortowanie (jeśli obsługiwane przez system)"
+            - 'TEMPLATE = template0 —czysta baza bez połączeń (dla importu)'
+      - cmd: dropdb -U postgres mydb
+        desc: Usuń bazę
+        detail:
+          what: Usuwa całą bazę danych z wszystkimi tabelami i danymi — nieodwracalne.
+          how: "Wymagane: brak aktywnych połączeń do bazy. Wymaga uprawnień superusera lub właściciela."
+          tips:
+            - 'dropdb -U postgres --if-exists mydb — nie zgłaszaj błędu jeśli baza nie istnieje'
+            - 'Zamknij wszystkie połączenia przed dropdb — inaczej błąd "database is being accessed by other users"'
+      - cmd: "CREATE DATABASE mydb_test TEMPLATE mydb;"
+        desc: Sklonuj bazę (template)
+        detail:
+          what: Tworzy nową bazę mydb_test jako kopię mydb — ta sama struktura i dane.
+          how: Wymaga braku połączeń do mydb podczas klonowania. Szybsze niż pg_dump + restore.
+          tips:
+            - 'Przydatne do tworzenia środowiska testowego z kopią produkcji'
+            - 'Wszystkie połączenia do mydb muszą być zamknięte'
+      - cmd: SELECT datname, pg_size_pretty(pg_database_size(datname)) FROM pg_database;
+        desc: Lista baz i rozmiary
+        detail:
+          what: Wyświetla wszystkie bazy z ich rozmiarami w czytelnym formacie (MB, GB).
+          how: pg_database_size() zwraca bajty. pg_size_pretty() formatuje na MB/GB.
+          tips:
+            - 'Uruchom w psql będąc połączonym jako superuser'
+            - '\l+ — prostszy sposób przez meta-komendę psql'
+      - cmd: SELECT pg_size_pretty(pg_total_relation_size('users'));
+        desc: Rozmiar tabeli
+        detail:
+          what: Pokazuje całkowity rozmiar tabeli users łącznie z indeksami i toast.
+          how: pg_total_relation_size() = tabela + indeksy + toast (duże pola). pg_relation_size() = tylko tabela.
+          tips:
+            - 'Sprawdź regularnie przy dużych tabelach — monitoruj wzrost'
+            - "SELECT pg_size_pretty(pg_indexes_size('users')) — rozmiar tylko indeksów"
 
   - name: Zarządzanie użytkownikami
     icon: "👤"
     commands:
-      - desc: Utwórz użytkownika z hasłem
-        code: "CREATE USER appuser WITH PASSWORD 'secret';"
-      - desc: Daj wszystkie uprawnienia do bazy
-        code: GRANT ALL PRIVILEGES ON DATABASE mydb TO appuser;
-      - desc: Daj uprawnienia do tabel
-        code: GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO appuser;
-      - desc: Daj uprawnienia do sekwencji (SERIAL)
-        code: GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO appuser;
-      - desc: Zmień hasło użytkownika
-        code: "ALTER USER postgres WITH PASSWORD 'newpassword';"
-      - desc: Utwórz superusera
-        code: CREATE USER admin WITH SUPERUSER PASSWORD 'secret';
-      - desc: Usuń użytkownika
-        code: DROP USER appuser;
+      - cmd: "CREATE USER appuser WITH PASSWORD 'secret';"
+        desc: Utwórz użytkownika z hasłem
+        detail:
+          what: Tworzy nowe konto użytkownika PostgreSQL z hasłem.
+          how: "CREATE USER = alias dla CREATE ROLE WITH LOGIN. Użytkownik bez LOGIN nie może się połączyć."
+          tips:
+            - "Użyj silnego hasła w produkcji — generuj: openssl rand -hex 32"
+            - 'Po stworzeniu przydziel uprawnienia: GRANT ... ON DATABASE ... TO appuser'
+      - cmd: GRANT ALL PRIVILEGES ON DATABASE mydb TO appuser;
+        desc: Daj wszystkie uprawnienia do bazy
+        detail:
+          what: Przyznaje appuser pełne uprawnienia do bazy mydb (CONNECT, CREATE, TEMP).
+          how: "UWAGA: To nie daje uprawnień do tabel — potrzebujesz też GRANT na schemat i tabele."
+          tips:
+            - 'W PostgreSQL 15+ domyślny schemat public wymaga osobnego GRANT'
+            - 'GRANT CONNECT ON DATABASE mydb TO appuser — minimalne uprawnienia (tylko połączenie)'
+      - cmd: GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO appuser;
+        desc: Daj uprawnienia do tabel
+        detail:
+          what: Przyznaje appuser uprawnienia CRUD do wszystkich tabel w schemacie public.
+          how: ALL TABLES = wszystkie aktualnie istniejące tabele. Nowe tabele wymagają osobnego GRANT.
+          tips:
+            - 'ALTER DEFAULT PRIVILEGES — automatycznie nadaj uprawnienia do nowych tabel'
+            - 'REVOKE DELETE ON ALL TABLES FROM appuser — cofnij konkretne uprawnienie'
+      - cmd: GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO appuser;
+        desc: Daj uprawnienia do sekwencji (SERIAL)
+        detail:
+          what: Przyznaje uprawnienia do sekwencji — wymagane gdy tabele używają SERIAL/BIGSERIAL jako klucz.
+          how: Bez tego INSERT do tabeli z SERIAL zwróci błąd "permission denied for sequence".
+          tips:
+            - 'Sekwencje obsługują auto-increment (SERIAL, BIGSERIAL, GENERATED ALWAYS AS IDENTITY)'
+            - 'Zawsze dodawaj po GRANT na tabele jeśli używasz auto-increment'
+      - cmd: "ALTER USER postgres WITH PASSWORD 'newpassword';"
+        desc: Zmień hasło użytkownika
+        detail:
+          what: Zmienia hasło użytkownika postgres (lub innego).
+          how: Wykonaj jako superuser. Nowe hasło wymagane przy następnym połączeniu.
+          tips:
+            - "\\ password — interaktywna zmiana hasła w psql (hasło nie jest widoczne w historii)"
+            - 'Hasło w ALTER USER jest widoczne w logach — użyj \\password dla bezpieczeństwa'
+      - cmd: CREATE USER admin WITH SUPERUSER PASSWORD 'secret';
+        desc: Utwórz superusera
+        detail:
+          what: Tworzy użytkownika z uprawnieniami superusera — może robić wszystko w PostgreSQL.
+          how: Superuser omija wszystkie sprawdzenia uprawnień. Używaj tylko gdy naprawdę potrzebne.
+          tips:
+            - 'Nie używaj superusera dla aplikacji — twórz ograniczonych użytkowników'
+            - 'CREATEDB CREATEROLE — mniej uprawnień niż SUPERUSER (bezpieczniejsze)'
+      - cmd: DROP USER appuser;
+        desc: Usuń użytkownika
+        detail:
+          what: Usuwa konto użytkownika PostgreSQL.
+          how: "Błąd jeśli użytkownik posiada obiekty lub ma aktywne połączenia — najpierw REASSIGN OWNED."
+          tips:
+            - 'REASSIGN OWNED BY appuser TO postgres; DROP OWNED BY appuser; DROP USER appuser; — bezpieczna sekwencja'
+            - 'Aktywne połączenia blokują DROP USER — zabij je przez pg_terminate_backend'
 
   - name: Backup i restore
     icon: "💾"
     commands:
-      - desc: Backup bazy do pliku SQL
-        code: pg_dump -U postgres mydb > backup.sql
-      - desc: Backup do formatu custom (kompresja)
-        code: pg_dump -U postgres -F c -f backup.dump mydb
-      - desc: Backup tylko struktury
-        code: pg_dump -U postgres --schema-only mydb > schema.sql
-      - desc: Restore z pliku SQL
-        code: psql -U postgres -d mydb < backup.sql
-      - desc: Restore z formatu custom
-        code: pg_restore -U postgres -d mydb backup.dump
-      - desc: Backup przez Docker
-        code: docker exec postgres pg_dump -U postgres mydb > backup.sql
-      - desc: Backup wszystkich baz
-        code: pg_dumpall -U postgres > all.sql
+      - cmd: pg_dump -U postgres mydb > backup.sql
+        desc: Backup bazy do pliku SQL
+        detail:
+          what: Tworzy backup bazy mydb jako plik SQL z komendami CREATE i INSERT — czytelny format.
+          how: "Wynikowy plik można otworzyć edytorem. Przywróć: psql -U postgres -d mydb < backup.sql"
+          tips:
+            - 'pg_dump -U postgres mydb | gzip > backup.sql.gz — kompresuj od razu (dużo mniejszy plik)'
+            - 'Format SQL = najwolniejszy ale najbardziej portable'
+      - cmd: pg_dump -U postgres -F c -f backup.dump mydb
+        desc: Backup do formatu custom (kompresja)
+        detail:
+          what: Tworzy backup w formacie custom (-F c) — skompresowany, z możliwością selektywnego restore.
+          how: "-F c = custom format. -f = output file. Mniejszy niż SQL, szybszy restore."
+          tips:
+            - 'pg_restore --list backup.dump — sprawdź zawartość przed restore'
+            - 'pg_restore -d mydb -t users backup.dump — przywróć tylko tabelę users'
+      - cmd: pg_dump -U postgres --schema-only mydb > schema.sql
+        desc: Backup tylko struktury
+        detail:
+          what: Eksportuje tylko strukturę (CREATE TABLE, INDEX, etc.) bez danych.
+          how: "--schema-only = bez INSERT/COPY. Odwrotnie: --data-only = tylko dane."
+          tips:
+            - 'Przydatne do dokumentacji i migracji struktury między środowiskami'
+            - 'pg_dump --table=users — backup tylko jednej tabeli'
+      - cmd: psql -U postgres -d mydb < backup.sql
+        desc: Restore z pliku SQL
+        detail:
+          what: Przywraca bazę z pliku SQL — wykonuje wszystkie zawarte w nim komendy.
+          how: "Baza musi istnieć przed restore. Stwórz: createdb -U postgres mydb"
+          tips:
+            - 'Błędy podczas restore nie zatrzymują procesu — sprawdź output na końcu'
+            - 'psql -U postgres -d mydb -1 -f backup.sql — restore jako jedna transakcja (rollback przy błędzie)'
+      - cmd: pg_restore -U postgres -d mydb backup.dump
+        desc: Restore z formatu custom
+        detail:
+          what: Przywraca bazę z pliku w formacie custom (-F c) — szybszy niż SQL.
+          how: "Wymaga -d (database) — nie można przekierować stdin jak z SQL."
+          tips:
+            - 'pg_restore -j 4 -d mydb backup.dump — parallel restore (4 workery, szybciej)'
+            - 'pg_restore --clean -d mydb backup.dump — usuń istniejące obiekty przed restore'
+      - cmd: docker exec postgres pg_dump -U postgres mydb > backup.sql
+        desc: Backup przez Docker
+        detail:
+          what: Wykonuje pg_dump wewnątrz kontenera Docker i zapisuje wynik lokalnie.
+          how: docker exec uruchamia pg_dump w kontenerze. Przekierowanie > zapisuje na hoście.
+          tips:
+            - 'docker exec postgres pg_dump -U postgres -F c mydb > backup.dump — format custom'
+            - 'Uruchom z Cron dla automatycznych backupów'
+      - cmd: pg_dumpall -U postgres > all.sql
+        desc: Backup wszystkich baz
+        detail:
+          what: Tworzy backup wszystkich baz danych i ról użytkowników na serwerze.
+          how: pg_dumpall = jak pg_dump ale dla wszystkich baz plus globalnych obiektów (role, tablespaces).
+          tips:
+            - 'Duże pliki — użyj gzip: pg_dumpall -U postgres | gzip > all.sql.gz'
+            - 'Przywróć: psql -U postgres < all.sql (wymaga pustego serwera)'
 
   - name: Administracja i diagnostyka
     icon: "🔧"
     commands:
-      - desc: Aktywne połączenia
-        code: SELECT pid, usename, application_name, state, query FROM pg_stat_activity;
-      - desc: Zabij wiszące połączenie (podaj pid)
-        code: SELECT pg_terminate_backend(12345);
-      - desc: Zabij wszystkie połączenia do bazy
-        code: SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='mydb' AND pid <> pg_backend_pid();
-      - desc: Najwolniejsze zapytania (wymaga pg_stat_statements)
-        code: SELECT query, mean_exec_time, calls FROM pg_stat_statements ORDER BY mean_exec_time DESC LIMIT 10;
-      - desc: Blokady w bazie
-        code: SELECT pid, relation::regclass, mode, granted FROM pg_locks WHERE NOT granted;
-      - desc: VACUUM — wyczyść nieużywane wiersze
-        code: VACUUM ANALYZE users;
-      - desc: REINDEX — przebuduj indeks
-        code: REINDEX TABLE users;
-      - desc: Plik konfiguracyjny postgresql.conf
-        code: SHOW config_file;
-      - desc: Załaduj nową konfigurację bez restartu
-        code: SELECT pg_reload_conf();
-      - desc: Ścieżka do pliku log
-        code: SHOW log_directory;
+      - cmd: SELECT pid, usename, application_name, state, query FROM pg_stat_activity;
+        desc: Aktywne połączenia
+        detail:
+          what: Pokazuje wszystkie aktywne połączenia z procesami, użytkownikami, stanem i aktualnym zapytaniem.
+          how: "state: active=wykonuje, idle=czeka, idle in transaction=otwarta transakcja."
+          tips:
+            - 'WHERE state = ''active'' — tylko aktualnie wykonujące się zapytania'
+            - 'ORDER BY query_start — posortuj po czasie trwania zapytania'
+      - cmd: SELECT pg_terminate_backend(12345);
+        desc: Zabij wiszące połączenie (podaj pid)
+        detail:
+          what: Natychmiast kończy połączenie o podanym PID — transakcja zostaje wycofana.
+          how: Znajdź PID przez pg_stat_activity. pg_terminate_backend = SIGTERM dla procesu.
+          tips:
+            - 'SELECT pg_cancel_backend(12345) — anuluj tylko zapytanie (łagodniejsze, zachowuje połączenie)'
+            - 'Wymagane uprawnienia superusera lub bycie właścicielem procesu'
+      - cmd: "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='mydb' AND pid <> pg_backend_pid();"
+        desc: Zabij wszystkie połączenia do bazy
+        detail:
+          what: Kończy wszystkie aktywne połączenia do bazy mydb — potrzebne przed DROP DATABASE.
+          how: pg_backend_pid() = twój własny PID — wyklucz go żeby nie zabić własnego połączenia.
+          tips:
+            - 'Wymagane przed dropdb lub RESTORE — inne połączenia blokują te operacje'
+            - 'Możesz to też ustawić na poziomie bazy: ALTER DATABASE mydb WITH CONNECTION LIMIT 0'
+      - cmd: SELECT query, mean_exec_time, calls FROM pg_stat_statements ORDER BY mean_exec_time DESC LIMIT 10;
+        desc: Najwolniejsze zapytania (wymaga pg_stat_statements)
+        detail:
+          what: Pokazuje 10 najwolniejszych zapytań z średnim czasem wykonania i liczbą wywołań.
+          how: Wymaga rozszerzenia pg_stat_statements i ustawienia shared_preload_libraries.
+          tips:
+            - 'CREATE EXTENSION IF NOT EXISTS pg_stat_statements — zainstaluj rozszerzenie'
+            - 'Dodaj do postgresql.conf: shared_preload_libraries = ''pg_stat_statements'''
+      - cmd: SELECT pid, relation::regclass, mode, granted FROM pg_locks WHERE NOT granted;
+        desc: Blokady w bazie
+        detail:
+          what: Pokazuje niezakończone blokady — zapytania czekające na dostęp do zasobu.
+          how: NOT granted = blokada oczekująca. Przydatne gdy aplikacja się "zawiesza" na bazie.
+          tips:
+            - 'Long running transaction często powoduje blokady — sprawdź pg_stat_activity'
+            - 'Deadlock = wzajemne blokowanie — PostgreSQL automatycznie zabija jedną z transakcji'
+      - cmd: VACUUM ANALYZE users;
+        desc: VACUUM — wyczyść nieużywane wiersze
+        detail:
+          what: VACUUM usuwa martwe krotki (dead tuples) po UPDATE/DELETE. ANALYZE aktualizuje statystyki.
+          how: PostgreSQL robi AUTOVACUUM automatycznie — ręczny VACUUM gdy autovacuum nie nadąża.
+          tips:
+            - 'VACUUM FULL ANALYZE — odzyska dysk (blokuje tabelę!) tylko gdy naprawdę potrzebne'
+            - 'SELECT n_dead_tup, n_live_tup FROM pg_stat_user_tables WHERE relname=''users'' — sprawdź dead tuples'
+      - cmd: REINDEX TABLE users;
+        desc: REINDEX — przebuduj indeks
+        detail:
+          what: Przebudowuje wszystkie indeksy tabeli users — naprawia uszkodzone indeksy i odzyskuje przestrzeń.
+          how: 'Blokuje tabelę podczas przebudowy. Alternatywa: REINDEX TABLE CONCURRENTLY (nie blokuje).'
+          tips:
+            - 'REINDEX INDEX CONCURRENTLY idx_users_email — przebuduj jeden indeks bez blokady (PostgreSQL 12+)'
+            - 'Używaj gdy indeksy są bloated lub po dużej operacji DELETE'
+      - cmd: SHOW config_file;
+        desc: Plik konfiguracyjny postgresql.conf
+        detail:
+          what: Pokazuje ścieżkę do pliku konfiguracyjnego postgresql.conf.
+          how: Edytuj ten plik żeby zmienić konfigurację serwera (pamięć, połączenia, logi).
+          tips:
+            - 'SHOW all — pokaż wszystkie ustawienia konfiguracyjne'
+            - 'SELECT pg_reload_conf() — załaduj zmiany bez restartu serwera'
+      - cmd: SELECT pg_reload_conf();
+        desc: Załaduj nową konfigurację bez restartu
+        detail:
+          what: Przeładowuje postgresql.conf bez restartu serwera — większość ustawień działa natychmiast.
+          how: Nie wszystkie ustawienia działają przez reload — niektóre wymagają restartu serwera.
+          tips:
+            - 'Ustawienia wymagające restartu: max_connections, shared_buffers, shared_preload_libraries'
+            - 'sudo systemctl reload postgresql — alternatywa przez systemd (poza psql)'
+      - cmd: SHOW log_directory;
+        desc: Ścieżka do pliku log
+        detail:
+          what: Pokazuje katalog gdzie PostgreSQL zapisuje logi.
+          how: Domyślnie /var/log/postgresql/ na Ubuntu. Użyteczne do debugowania błędów serwera.
+          tips:
+            - 'SHOW log_filename — nazwa pliku logów'
+            - 'tail -f /var/log/postgresql/postgresql-16-main.log — śledź logi na żywo'
 
   - name: Rozszerzenia
     icon: "🧩"
     commands:
-      - desc: Lista dostępnych rozszerzeń
-        code: SELECT name, default_version FROM pg_available_extensions ORDER BY name;
-      - desc: Zainstaluj rozszerzenie uuid-ossp
-        code: CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-      - desc: Zainstaluj pg_trgm (fuzzy search)
-        code: CREATE EXTENSION IF NOT EXISTS pg_trgm;
-      - desc: Zainstaluj pg_stat_statements (monitoring zapytań)
-        code: CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
-      - desc: Zainstaluj PostGIS
-        code: CREATE EXTENSION IF NOT EXISTS postgis;
-      - desc: Usuń rozszerzenie
-        code: DROP EXTENSION pg_trgm;
+      - cmd: SELECT name, default_version FROM pg_available_extensions ORDER BY name;
+        desc: Lista dostępnych rozszerzeń
+        detail:
+          what: Pokazuje wszystkie rozszerzenia dostępne do instalacji na tym serwerze.
+          how: Dostępność zależy od zainstalowanych pakietów systemu (postgresql-contrib itp.).
+          tips:
+            - 'SELECT * FROM pg_extension — tylko zainstalowane rozszerzenia'
+            - 'sudo apt install postgresql-16-postgis — zainstaluj rozszerzenie systemowo'
+      - cmd: CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+        desc: Zainstaluj rozszerzenie uuid-ossp
+        detail:
+          what: Instaluje funkcje do generowania UUID — głównie uuid_generate_v4() dla losowych UUID.
+          how: IF NOT EXISTS = bezpieczne do uruchamiania wielokrotnie (np. w migracjach).
+          tips:
+            - "SELECT uuid_generate_v4() — generuj UUID (np. jako domyślna wartość kolumny)"
+            - 'Alternatywa bez rozszerzenia: gen_random_uuid() (dostępne od PostgreSQL 13)'
+      - cmd: CREATE EXTENSION IF NOT EXISTS pg_trgm;
+        desc: Zainstaluj pg_trgm (fuzzy search)
+        detail:
+          what: Instaluje trigram matching — umożliwia wyszukiwanie podobnych tekstów (fuzzy search).
+          how: Po instalacji możesz tworzyć GIN/GIST indeksy dla szybkiego LIKE i % wyszukiwania.
+          tips:
+            - "CREATE INDEX ON articles USING GIN (title gin_trgm_ops) — indeks dla LIKE '%zapytanie%'"
+            - "SELECT * FROM users WHERE name % 'Jan' — fuzzy match (similarity > threshold)"
+      - cmd: CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+        desc: Zainstaluj pg_stat_statements (monitoring zapytań)
+        detail:
+          what: Instaluje rozszerzenie do śledzenia statystyk wszystkich wykonanych zapytań.
+          how: Wymaga dodania do shared_preload_libraries w postgresql.conf i restartu serwera.
+          tips:
+            - 'Dodaj do postgresql.conf: shared_preload_libraries = ''pg_stat_statements'''
+            - 'SELECT pg_stat_statements_reset() — wyczyść zebrane statystyki'
+      - cmd: CREATE EXTENSION IF NOT EXISTS postgis;
+        desc: Zainstaluj PostGIS
+        detail:
+          what: Instaluje PostGIS — rozszerzenie do danych geograficznych (GIS) w PostgreSQL.
+          how: Dodaje typy geometry/geography i setki funkcji do pracy z danymi przestrzennymi.
+          tips:
+            - 'sudo apt install postgresql-16-postgis-3 — zainstaluj systemowo przed CREATE EXTENSION'
+            - 'SELECT ST_Distance(point1, point2) — odległość między punktami geograficznymi'
+      - cmd: DROP EXTENSION pg_trgm;
+        desc: Usuń rozszerzenie
+        detail:
+          what: Usuwa zainstalowane rozszerzenie i wszystkie jego obiekty (funkcje, typy, indeksy).
+          how: Może się nie powieść jeśli inne obiekty (np. indeksy) używają tego rozszerzenia.
+          tips:
+            - 'DROP EXTENSION pg_trgm CASCADE — usuń wraz z zależnościami (ostrożnie!)'
+            - 'Usuń najpierw indeksy używające rozszerzenia: DROP INDEX idx_name'

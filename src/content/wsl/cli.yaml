@@ -1,0 +1,424 @@
+title: Komendy WSL
+
+groups:
+  - name: Zarządzanie distro
+    icon: "🐧"
+    commands:
+      - cmd: wsl --install
+        desc: Zainstaluj WSL z domyślną dystrybucją (Ubuntu)
+        detail:
+          what: Instaluje WSL 2 z Ubuntu jako domyślną dystrybucją — wszystko czego potrzebujesz na start.
+          how: Wymaga Windows 10 2004+ lub Windows 11. Po instalacji wymagany restart systemu.
+          tips:
+            - 'wsl --install -d Ubuntu-22.04 — zainstaluj konkretną wersję Ubuntu'
+            - 'Pierwsze uruchomienie pyta o nazwę użytkownika i hasło Linux'
+      - cmd: wsl --list --online
+        desc: Lista dostępnych dystrybucji do zainstalowania
+        detail:
+          what: Wyświetla listę wszystkich dystrybucji Linux dostępnych do instalacji przez Microsoft Store.
+          how: Połączenie z internetem wymagane. Pokazuje nazwy do użycia z wsl --install -d.
+          tips:
+            - 'Dostępne: Ubuntu-22.04, Ubuntu-24.04, Debian, kali-linux, openSUSE-Leap'
+            - 'wsl --install -d <Nazwa> — zainstaluj wybraną distro'
+      - cmd: wsl --install -d Ubuntu-22.04
+        desc: Zainstaluj konkretną dystrybucję
+        detail:
+          what: Instaluje wybraną dystrybucję Linux obok istniejących — możesz mieć kilka naraz.
+          how: Każda dystrybucja ma własny filesystem, pakiety i konfigurację. Jedna może być domyślna.
+          tips:
+            - 'wsl --list --verbose — sprawdź co masz zainstalowane po instalacji'
+            - 'Ubuntu-22.04 = LTS z długim wsparciem — dobry wybór dla stabilności'
+      - cmd: wsl --list --verbose
+        desc: Lista zainstalowanych distro z wersjami WSL
+        detail:
+          what: Pokazuje wszystkie zainstalowane dystrybucje z wersją WSL (1 lub 2) i statusem (Running/Stopped).
+          how: "Kolumny: NAME, STATE, VERSION. Gwiazdka (*) = domyślna dystrybucja."
+          tips:
+            - 'WSL 2 = lepszy (pełne jądro Linux). WSL 1 = starszy, szybszy dla I/O na Windows FS'
+            - 'wsl --set-version Ubuntu 2 — upgrade dystrybucji z WSL 1 do WSL 2'
+      - cmd: wsl --set-default Ubuntu-22.04
+        desc: Ustaw domyślną dystrybucję
+        detail:
+          what: Ustawia wskazaną dystrybucję jako domyślną — uruchamia się gdy wpisujesz samo wsl.
+          how: Ważne gdy masz kilka dystrybucji. Domyślna jest oznaczona gwiazdką w wsl --list.
+          tips:
+            - 'wsl -d Ubuntu — uruchom konkretną dystrybucję bez zmiany domyślnej'
+            - 'wsl --list --verbose — sprawdź która jest domyślna (gwiazdka)'
+      - cmd: wsl --set-version Ubuntu 2
+        desc: Ustaw wersję WSL dla dystrybucji
+        detail:
+          what: Konwertuje istniejącą dystrybucję między WSL 1 a WSL 2.
+          how: Konwersja może chwilę trwać — kopiuje filesystem. WSL 2 ma pełne jądro Linux.
+          tips:
+            - 'WSL 2 = lepsza kompatybilność z Linuxem (Docker, systemd, inotify)'
+            - 'wsl --set-default-version 2 — ustaw WSL 2 jako domyślne dla nowych instalacji'
+      - cmd: wsl -d Debian
+        desc: Uruchom konkretną dystrybucję
+        detail:
+          what: Uruchamia Debian zamiast domyślnej dystrybucji.
+          how: Przydatne gdy masz kilka dystrybucji — możesz przełączać się między nimi.
+          tips:
+            - 'wsl -d Ubuntu-22.04 — uruchom Ubuntu 22.04'
+            - 'wsl --list --verbose — sprawdź nazwy zainstalowanych dystrybucji'
+      - cmd: wsl -d Ubuntu -u root
+        desc: Uruchom jako konkretny użytkownik
+        detail:
+          what: Uruchamia dystrybucję jako root — przydatne gdy zapomniałeś hasła lub do naprawy systemu.
+          how: "-u root = zaloguj jako root bez podawania hasła."
+          tips:
+            - 'passwd twój_użytkownik — zmień hasło będąc rootem'
+            - 'Ostrożnie — root może usunąć ważne pliki systemowe'
+      - cmd: wsl --unregister Ubuntu
+        desc: Usuń dystrybucję (UWAGA — kasuje dane!)
+        detail:
+          what: Całkowicie usuwa dystrybucję wraz ze wszystkimi danymi — nieodwracalne.
+          how: Usuwa virtualny dysk (ext4.vhdx) z danymi. Nie można cofnąć bez backupu.
+          flags:
+            - flag: --unregister
+              desc: Usuwa dystrybucję i kasuje wszystkie dane
+          tips:
+            - 'wsl --export Ubuntu backup.tar — zrób backup PRZED usunięciem'
+            - 'Po unregister możesz zainstalować świeżą kopię: wsl --install -d Ubuntu'
+
+  - name: Uruchamianie i zatrzymywanie
+    icon: "▶️"
+    commands:
+      - cmd: wsl
+        desc: Uruchom domyślną dystrybucję
+        detail:
+          what: Uruchamia domyślną dystrybucję WSL w bieżącym katalogu Windows.
+          how: Otwiera terminal bash w ~/. Bieżący katalog Windows jest montowany pod /mnt/c/.
+          tips:
+            - 'Pliki Windows są pod /mnt/c/Users/Łukasz/ — możesz je edytować z Linux'
+            - 'cd ~ — wejdź do katalogu domowego Linux (szybszy niż /mnt/c/)'
+      - cmd: wsl --terminate Ubuntu
+        desc: Zatrzymaj konkretną dystrybucję
+        detail:
+          what: Natychmiast zatrzymuje wskazaną dystrybucję — zamyka wszystkie procesy.
+          how: Przydatne gdy dystrybucja się zawiesiła lub zajmuje za dużo pamięci.
+          tips:
+            - 'wsl --shutdown — zatrzymaj wszystkie dystrybucje naraz'
+            - 'Po zatrzymaniu dystrybucja startuje od nowa przy następnym wsl'
+      - cmd: wsl --shutdown
+        desc: Zamknij całe WSL i wszystkie distro
+        detail:
+          what: Zatrzymuje wszystkie działające dystrybucje WSL i wirtualne maszyny.
+          how: Zwalnia pamięć RAM zajmowaną przez WSL. Wymagane czasem po zmianach konfiguracji.
+          tips:
+            - 'Jeśli WSL zużywa za dużo RAM — shutdown i uruchom ponownie'
+            - 'Wszystkie niezapisane dane w pamięci zostaną utracone'
+      - cmd: wsl --status
+        desc: Sprawdź status WSL i dystrybucji
+        detail:
+          what: Pokazuje ogólny status WSL — wersję domyślną, stan dystrybucji i konfigurację.
+          how: Mniej szczegółowe niż wsl --list --verbose. Dobre do szybkiego sprawdzenia.
+          tips:
+            - 'wsl --list --verbose — bardziej szczegółowe info o każdej dystrybucji'
+            - 'Jeśli WSL nie działa po aktualizacji Windows — wsl --update'
+      - cmd: wsl --version
+        desc: Wyświetl wersję WSL, kernela i WSLg
+        detail:
+          what: Pokazuje wersje WSL, jądra Linux, WSLg (grafika) i Windows Subsystem for Android.
+          how: Przydatne do debugowania — sprawdź czy masz aktualną wersję WSL.
+          tips:
+            - 'wsl --update — zaktualizuj WSL do najnowszej wersji'
+            - 'WSLg umożliwia uruchamianie aplikacji GUI Linux bezpośrednio w Windows'
+      - cmd: wsl --update
+        desc: Zaktualizuj jądro WSL i WSLg
+        detail:
+          what: Pobiera i instaluje najnowsze aktualizacje WSL z Microsoft Store.
+          how: Nie wymaga restartu Windows — aktualizacja jądra bez pełnego upgrade.
+          tips:
+            - 'Uruchamiaj co jakiś czas — nowe wersje WSL mają poprawki wydajności i bezpieczeństwa'
+            - 'wsl --version — sprawdź wersję przed i po aktualizacji'
+      - cmd: wsl ls -la /home/lukasz
+        desc: Uruchom komendę Linux bez wchodzenia w tryb interaktywny
+        detail:
+          what: Wykonuje komendę Linux z PowerShell/CMD i wraca — nie otwiera sesji interaktywnej.
+          how: Użyteczne w skryptach Windows (.bat/.ps1) które potrzebują wykonać coś w Linux.
+          tips:
+            - 'wsl python3 skrypt.py — uruchom Python script z Windows'
+            - 'wsl -- bash -c "cd /app && npm run build" — złożone komendy przez bash -c'
+
+  - name: Import i eksport
+    icon: "📦"
+    commands:
+      - cmd: wsl --export Ubuntu C:\backup\ubuntu.tar
+        desc: Wyeksportuj dystrybucję do pliku tar (backup)
+        detail:
+          what: Tworzy pełny backup dystrybucji jako plik tar — cały filesystem, konfiguracja, zainstalowane pakiety.
+          how: Może zajmować dużo miejsca (kilka GB). Świetne przed dużymi zmianami systemu.
+          tips:
+            - 'Eksportuj regularnie jeśli masz dużo skonfigurowanego środowiska'
+            - 'wsl --import Ubuntu D:\WSL\Ubuntu C:\backup\ubuntu.tar — przywróć'
+      - cmd: wsl --import Ubuntu D:\WSL\Ubuntu C:\backup\ubuntu.tar
+        desc: Importuj dystrybucję z pliku tar
+        detail:
+          what: Przywraca dystrybucję z pliku tar do wskazanego katalogu.
+          how: "Drugi argument = katalog gdzie zostanie zapisany virtualny dysk (.vhdx)."
+          tips:
+            - 'wsl --list --verbose — sprawdź czy import się powiódł'
+            - 'Możesz importować pod inną nazwą: wsl --import UbuntuBackup D:\... backup.tar'
+      - cmd: wsl --import UbuntuFast D:\WSL\Ubuntu C:\backup\ubuntu.tar --version 2
+        desc: Importuj na konkretny lokalizację jako WSL 2
+        detail:
+          what: Importuje dystrybucję i wymusza użycie WSL 2 — z pełnym jądrem Linux.
+          how: "--version 2 = zawsze WSL 2 niezależnie od domyślnej wersji."
+          tips:
+            - 'Umieszczaj dyski WSL na szybkim SSD — wydajność zależy od prędkości dysku'
+            - 'D:\\WSL\\ zamiast C:\\ — zostaw C: dla Windows, dane WSL na osobnym dysku'
+
+  - name: Sieć i konfiguracja
+    icon: "🌐"
+    commands:
+      - cmd: wsl hostname -I
+        desc: Wyświetl adres IP WSL (w PowerShell)
+        detail:
+          what: Wypisuje adres IP interfejsu sieciowego WSL — potrzebny do przekierowania portów z Windows.
+          how: WSL ma własny adres IP (zazwyczaj 172.x.x.x). Zmienia się po każdym restarcie WSL.
+          tips:
+            - 'Zmienny IP to problem dla przekierowań portów — skrypt automatyzujący jest lepszy'
+            - 'ip addr show eth0 — z wewnątrz WSL (szczegółowszy output)'
+      - cmd: "netsh interface portproxy add v4tov4 listenaddress=0.0.0.0 listenport=8000 connectaddress=$(wsl hostname -I) connectport=8000"
+        desc: Przekieruj port Windows na WSL (PowerShell Admin)
+        detail:
+          what: Tworzy regułę przekierowania portów — ruch na port 8000 Windows trafi do portu 8000 WSL.
+          how: Wymaga PowerShell z uprawnieniami Administratora. Przydatne żeby testować API z zewnątrz.
+          tips:
+            - 'Uruchom jako Administrator — bez tego netsh nie zadziała'
+            - 'Przydatne gdy chcesz dostęp do FastAPI/Node uruchomionego w WSL z sieci LAN'
+      - cmd: "netsh interface portproxy delete v4tov4 listenaddress=0.0.0.0 listenport=8000"
+        desc: Usuń przekierowanie portu
+        detail:
+          what: Usuwa regułę przekierowania portów dla portu 8000.
+          how: Uruchom jako Administrator. Sprawdź aktywne reguły przed usunięciem.
+          tips:
+            - 'netsh interface portproxy show all — sprawdź aktywne reguły'
+            - 'Po restarcie WSL IP się zmienia — usuń stare reguły i stwórz nowe'
+      - cmd: netsh interface portproxy show all
+        desc: Lista wszystkich przekierowań portów
+        detail:
+          what: Wyświetla wszystkie aktywne reguły przekierowania portów w Windows.
+          how: Pokazuje Listen Address/Port i Connect Address/Port dla każdej reguły.
+          tips:
+            - 'Uruchom w PowerShell (nie wymaga Administratora do odczytu)'
+            - 'Stare reguły z nieaktualnym IP WSL należy usunąć i odtworzyć'
+
+  - name: Bash — nawigacja i pliki
+    icon: "📁"
+    commands:
+      - cmd: cd ~
+        desc: Wejdź do katalogu domowego
+        detail:
+          what: Przechodzi do katalogu domowego aktualnego użytkownika (/home/lukasz).
+          how: "~ = alias dla $HOME. Szybszy sposób niż cd /home/lukasz."
+          tips:
+            - 'Katalog domowy Linux (/home/lukasz) jest osobny od Windows (C:\Users\Łukasz)'
+            - 'Pliki w /home są znacznie szybsze niż w /mnt/c/ — trzymaj projekty tam'
+      - cmd: cd -
+        desc: Wróć do poprzedniego katalogu
+        detail:
+          what: Przechodzi z powrotem do katalogu gdzie byłeś poprzednio — jak back button.
+          how: "cd - wypisuje ścieżkę do której wraca. Możesz używać wielokrotnie do przełączania między dwoma katalogami."
+          tips:
+            - 'Szybki sposób na przełączanie między dwoma katalogami podczas pracy'
+            - 'pushd/popd — bardziej zaawansowany stos katalogów'
+      - cmd: ls -alh
+        desc: Wylistuj pliki z detalami (ukryte, rozmiar, prawa)
+        detail:
+          what: Pokazuje wszystkie pliki (w tym ukryte z .) z prawami, właścicielem, rozmiarem i datą.
+          how: "-a = hidden files. -l = long format. -h = human readable (KB, MB zamiast bajtów)."
+          tips:
+            - 'ls -alh --sort=time — sortuj po dacie modyfikacji'
+            - 'Pliki zaczynające się od . (dot files) = konfiguracja: .bashrc, .gitconfig'
+      - cmd: cp -p plik.txt kopia.txt
+        desc: Skopiuj plik zachowując metadane
+        detail:
+          what: Kopiuje plik zachowując oryginalne prawa dostępu, właściciela i datę modyfikacji.
+          how: "-p = preserve (zachowaj metadata). Bez -p kopiuje tylko zawartość."
+          tips:
+            - 'cp -rp katalog/ kopia/ — rekursywnie z zachowaniem metadata'
+            - 'rsync -av src/ dst/ — lepsza alternatywa dla dużych kopii (pokazuje postęp)'
+      - cmd: cp -r katalog/ kopia_katalogu/
+        desc: Skopiuj katalog rekursywnie
+        detail:
+          what: Kopiuje cały katalog wraz z zawartością do nowej lokalizacji.
+          how: "-r = recursive. Bez -r cp zgłosi błąd przy próbie kopiowania katalogu."
+          tips:
+            - 'cp -rp — dodaj -p żeby zachować prawa i daty'
+            - 'rsync -av --progress katalog/ kopia/ — lepszy dla dużych katalogów (widać postęp)'
+      - cmd: mv stara_nazwa.py nowa_nazwa.py
+        desc: Przenieś lub zmień nazwę
+        detail:
+          what: Przenosi plik lub katalog do nowej lokalizacji / zmienia nazwę.
+          how: "Na tym samym filesystem = bardzo szybka operacja (zmiana wpisu w inode). Między dyskami = wolniejsze."
+          tips:
+            - 'mv plik.txt /mnt/c/Users/Lukasz/Desktop/ — przenieś do pulpitu Windows'
+            - 'mv src/ projekt/ — zmień nazwę katalogu'
+      - cmd: mkdir -p projekty/api/tests
+        desc: Utwórz zagnieżdżone katalogi
+        detail:
+          what: Tworzy pełną ścieżkę katalogów — tworzy wszystkie pośrednie katalogi jeśli nie istnieją.
+          how: "-p = parents (twórz rodziców). Bez -p mkdir zgłosi błąd jeśli katalog nadrzędny nie istnieje."
+          tips:
+            - 'mkdir -p src/{models,routers,tests} — utwórz wiele katalogów naraz (brace expansion)'
+            - 'mkdir -p .github/workflows — typowe przy setupie CI/CD'
+      - cmd: rm -rf stary_katalog/
+        desc: Usuń katalog z zawartością (ostrożnie!)
+        detail:
+          what: Rekursywnie usuwa katalog i całą jego zawartość — nieodwracalne.
+          how: "-r = recursive. -f = force (nie pyta o potwierdzenie)."
+          flags:
+            - flag: -r
+              desc: Rekursywnie (usuwa katalogi)
+            - flag: -f
+              desc: Force — nie pyta o potwierdzenie
+          tips:
+            - 'UWAGA: rm -rf nie ma kosza — nie można cofnąć'
+            - 'rm -ri katalog/ — interaktywne (pyta o każdy plik)'
+      - cmd: find . -name "*.py" -type f
+        desc: Znajdź plik po nazwie
+        detail:
+          what: Szuka plików .py rekursywnie od bieżącego katalogu.
+          how: "-name = wzorzec nazwy (glob). -type f = tylko pliki (nie katalogi)."
+          tips:
+            - 'find . -name "*.py" -newer requirements.txt — pliki nowsze niż requirements.txt'
+            - 'rg --files --glob "*.py" — szybszy jeśli masz ripgrep'
+      - cmd: rg "def main" .
+        desc: Znajdź plik po zawartości (ripgrep)
+        detail:
+          what: Szuka tekstu "def main" we wszystkich plikach rekursywnie — ultraszybka alternatywa dla grep.
+          how: ripgrep automatycznie ignoruje .gitignore, .git/ i pliki binarne.
+          tips:
+            - 'sudo apt install ripgrep — zainstaluj jeśli nie masz'
+            - 'rg "def main" --type py — tylko w plikach Python'
+            - 'rg -l "import fastapi" — pokaż tylko nazwy plików (nie linie)'
+
+  - name: Bash — procesy i sieć
+    icon: "⚙️"
+    commands:
+      - cmd: ps aux | grep python
+        desc: Wyświetl uruchomione procesy
+        detail:
+          what: Pokazuje wszystkie procesy zawierające "python" w nazwie z PID, użyciem CPU i RAM.
+          how: "ps aux — lista wszystkich procesów. | grep python — filtruj tylko pythonowe."
+          tips:
+            - 'ps aux | grep -v grep — ukryj sam proces grep z wyników'
+            - 'pgrep python — tylko PIDy procesów Python (czystsze)'
+      - cmd: kill -9 12345
+        desc: Zabij proces po PID
+        detail:
+          what: Natychmiast zabija proces o podanym PID sygnałem SIGKILL (nie można zignorować).
+          how: "Zastąp 12345 prawdziwym PID z ps aux. -9 = SIGKILL (natychmiastowe). -15 = SIGTERM (graceful)."
+          tips:
+            - 'kill -15 12345 — graceful shutdown (pozwól procesowi posprzątać)'
+            - 'pkill python — zabij wszystkie procesy Python po nazwie'
+      - cmd: ss -tlnp | grep 8000
+        desc: Sprawdź co nasłuchuje na porcie
+        detail:
+          what: Pokazuje który proces nasłuchuje na porcie 8000.
+          how: "ss (socket statistics) zastąpił netstat. -t=tcp, -l=listen, -n=numeric, -p=process."
+          tips:
+            - 'ss -tlnp — pokaż wszystkie nasłuchujące porty TCP'
+            - 'Przydatne gdy "port already in use" — znajdź i zabij proces blokujący port'
+      - cmd: ss -tulpn
+        desc: Sprawdź połączenia sieciowe
+        detail:
+          what: Pokazuje wszystkie nasłuchujące porty TCP i UDP z procesami.
+          how: "-t=TCP, -u=UDP, -l=listen, -p=process, -n=numeric (zamiast nazw usług)."
+          tips:
+            - 'Odpowiednik netstat -tulpn (netstat jest deprecated)'
+            - 'ss -tulpn | grep LISTEN — tylko nasłuchujące'
+      - cmd: ip addr show
+        desc: Wyświetl adres IP interfejsów
+        detail:
+          what: Pokazuje wszystkie interfejsy sieciowe z adresami IP, MAC i stanem.
+          how: Zastąpił ifconfig (deprecated). eth0 = główny interfejs WSL.
+          tips:
+            - 'ip addr show eth0 — tylko główny interfejs (mniej outputu)'
+            - 'hostname -I — tylko IP bez dodatkowych informacji (szybsze)'
+      - cmd: ping -c 4 google.com
+        desc: Ping z limitem pakietów
+        detail:
+          what: Wysyła 4 pakiety ICMP do google.com — sprawdź latencję i połączenie z internetem.
+          how: "-c 4 = wyślij tylko 4 pakiety i zakończ. Bez -c ping działa w nieskończoność."
+          tips:
+            - 'ping -c 4 8.8.8.8 — ping do DNS Google (bardziej niezawodny niż nazwa)'
+            - 'Jeśli ping nie działa z WSL — sprawdź /etc/resolv.conf'
+      - cmd: wget -O output.zip https://example.com/file.zip
+        desc: Pobierz plik z internetu
+        detail:
+          what: Pobiera plik pod podanym URL i zapisuje jako output.zip.
+          how: "-O = output (nazwa pliku). Bez -O wget używa oryginalnej nazwy z URL."
+          tips:
+            - 'curl -L -o output.zip https://example.com/file.zip — alternatywa przez curl'
+            - 'wget -c URL — kontynuuj przerwanego pobierania (resume)'
+      - cmd: "curl -X POST http://localhost:8000/api -H 'Content-Type: application/json' -d '{\"key\": \"value\"}'"
+        desc: Test API (curl z JSON)
+        detail:
+          what: Wysyła POST request z JSON body do lokalnego API — podstawowy test endpoint.
+          how: "-X POST = metoda. -H = nagłówek. -d = data (body)."
+          tips:
+            - 'curl -s URL | python3 -m json.tool — sformatuj JSON response'
+            - 'httpie: pip install httpie; http POST localhost:8000/api key=value — prostsze CLI'
+
+  - name: Bash — uprawnienia i użytkownicy
+    icon: "🔐"
+    commands:
+      - cmd: sudo chown lukasz:lukasz plik.txt
+        desc: Zmień właściciela pliku
+        detail:
+          what: Zmienia właściciela i grupę pliku na lukasz:lukasz.
+          how: "Format: sudo chown użytkownik:grupa plik. Wymaga sudo jeśli nie jesteś właścicielem."
+          tips:
+            - 'sudo chown -R lukasz:lukasz katalog/ — rekursywnie dla całego katalogu'
+            - 'Pliki stworzone przez root w /home/lukasz/ mogą być problemem — chown je'
+      - cmd: chmod 755 skrypt.sh
+        desc: Zmień prawa dostępu
+        detail:
+          what: Ustawia prawa rwxr-xr-x — właściciel może wszystko, pozostali mogą czytać i uruchamiać.
+          how: "Cyfry: 7=rwx, 5=r-x, 4=r--. Kolejność: właściciel, grupa, pozostali."
+          tips:
+            - '755 — typowe dla skryptów i katalogów'
+            - '644 — typowe dla plików konfiguracyjnych (rw-r--r--)'
+            - '600 — tylko właściciel może czytać (klucze SSH, .env)'
+      - cmd: chmod +x deploy.sh
+        desc: Nadaj prawa wykonania skryptowi
+        detail:
+          what: Dodaje prawo wykonania (execute) do pliku — bez tego bash skrypt nie uruchomi się bezpośrednio.
+          how: "+x = dodaj execute dla właściciela, grupy i innych. Prostsze niż podawanie cyfr."
+          tips:
+            - 'Nowy skrypt bash zawsze wymaga chmod +x zanim go uruchomisz'
+            - 'ls -la deploy.sh — sprawdź prawa (x w prawach = plik wykonywalny)'
+      - cmd: sudo su -
+        desc: Uruchom jako root
+        detail:
+          what: Przełącza na użytkownika root z pełnym środowiskiem shell (- = login shell).
+          how: "sudo = wykonaj z uprawnieniami roota. su - = przełącz użytkownika z nowym środowiskiem."
+          tips:
+            - 'Wyjdź z root shell: exit lub Ctrl+D'
+            - 'sudo <komenda> — lepszy sposób niż su - (audytowalny, nie zostajesz rootem)'
+      - cmd: whoami && id
+        desc: Sprawdź kto jesteś
+        detail:
+          what: whoami = nazwa aktualnego użytkownika. id = szczegółowe info z UID, GID i grupami.
+          how: Przydatne po su - żeby potwierdzić że zmieniłeś użytkownika.
+          tips:
+            - 'id — pokazuje też grupy (przydatne przy problemach z uprawnieniami Docker, audio)'
+            - 'Jeśli jesteś rootem: whoami wypisze "root", id wypisze "uid=0(root)"'
+      - cmd: sudo usermod -aG docker $USER
+        desc: Dodaj użytkownika do grupy
+        detail:
+          what: Dodaje aktualnego użytkownika do grupy docker — umożliwia uruchamianie Docker bez sudo.
+          how: "-aG = append to Group (nie zastąp). $USER = bieżący użytkownik. Wymaga wylogowania/restartu WSL."
+          tips:
+            - 'Po usermod wymagane: wsl --shutdown i uruchom WSL ponownie'
+            - 'groups $USER — sprawdź do jakich grup należysz'
+      - cmd: cat /etc/passwd | grep -v nologin
+        desc: Wyświetl zawartość /etc/passwd (użytkownicy)
+        detail:
+          what: Wypisuje konta użytkowników systemu — filtruje te z /nologin (systemowe konta bez shell).
+          how: "/etc/passwd = lista użytkowników. Każda linia: użytkownik:x:UID:GID:opis:home:shell."
+          tips:
+            - 'getent passwd — nowszy sposób (obsługuje też LDAP i inne źródła)'
+            - 'Hasła nie są w /etc/passwd — są w /etc/shadow (dostępny tylko dla roota)'

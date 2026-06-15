@@ -1,0 +1,209 @@
+title: Budowanie grafu
+
+items:
+  - name: StateGraph — budowanie od podstaw
+    icon: "🕸️"
+    desc: >
+      StateGraph to klasa bazowa LangGraph. Definiujesz State (TypedDict), dodajesz węzły
+      i krawędzie, kompilujesz do runnable. Kompilacja waliduje graf — brak END, cykl bez warunku,
+      niezdefiniowany węzeł w edge — wszystko wyłapane przed uruchomieniem.
+    code: |
+      from langgraph.graph import StateGraph, START, END
+      from typing import TypedDict
+
+      # Stan grafu — TypedDict z polami
+      class State(TypedDict):
+          input: str
+          result: str
+          step: int
+
+      # Węzły — funkcje przyjmujące stan, zwracające aktualizacje
+      def step_one(state: State) -> dict:
+          print(f"Krok 1: {state['input']}")
+          return {"step": 1, "result": f"przetworzone: {state['input']}"}
+
+      def step_two(state: State) -> dict:
+          print(f"Krok 2: {state['result']}")
+          return {"step": 2, "result": state["result"].upper()}
+
+      def step_three(state: State) -> dict:
+          return {"step": 3, "result": f"[FINAL] {state['result']}"}
+
+      # Routing na podstawie stanu
+      def route(state: State) -> str:
+          if state["step"] == 1 and len(state["result"]) > 10:
+              return "step_two"
+          return "step_three"
+
+      # Buduj graf
+      builder = StateGraph(State)
+
+      # Dodaj węzły
+      builder.add_node("step_one", step_one)
+      builder.add_node("step_two", step_two)
+      builder.add_node("step_three", step_three)
+
+      # Krawędzie
+      builder.add_edge(START, "step_one")
+      builder.add_conditional_edges("step_one", route, {
+          "step_two": "step_two",
+          "step_three": "step_three",
+      })
+      builder.add_edge("step_two", "step_three")
+      builder.add_edge("step_three", END)
+
+      # Kompilacja
+      graph = builder.compile()
+
+      # Uruchomienie
+      result = graph.invoke({"input": "hello world", "result": "", "step": 0})
+      print(result["result"])  # [FINAL] PRZETWORZONE: HELLO WORLD
+
+  - name: State z Annotated — reducery
+    icon: "📦"
+    desc: >
+      Annotated[typ, reducer] definiuje jak pole stanu jest aktualizowane.
+      add_messages to gotowy reducer dla historii wiadomości — dołącza, nie nadpisuje.
+      Możesz pisać własne reducery dla dowolnej logiki — np. max(), sum(), merge dict.
+    code: |
+      from typing import TypedDict, Annotated
+      from langgraph.graph.message import add_messages
+      from langchain_core.messages import BaseMessage
+      import operator
+
+      # add_messages — dołącz nowe wiadomości do listy
+      class ChatState(TypedDict):
+          messages: Annotated[list[BaseMessage], add_messages]
+          context: str  # zwykłe pole — nadpisywane
+
+      # Własny reducer — suma
+      def sum_reducer(current: int, update: int) -> int:
+          return current + update
+
+      class CounterState(TypedDict):
+          count: Annotated[int, sum_reducer]
+          items: Annotated[list, operator.add]  # dołączaj listy
+
+      # Jak działa reducer przy invoke:
+      # Stan po node A: {"messages": [HumanMessage("cześć")]}
+      # Node B zwraca: {"messages": [AIMessage("hej!")]}
+      # Stan po node B: {"messages": [HumanMessage("cześć"), AIMessage("hej!")]}
+      # (add_messages dołącza, nie nadpisuje!)
+
+      # Reducer z deduplikacją wiadomości (update istniejących po id)
+      from langgraph.graph.message import add_messages
+      # add_messages automatycznie deduplikuje po id wiadomości —
+      # jeśli zwrócisz wiadomość z istniejącym id, nadpisze zamiast dołączyć
+
+  - name: Conditional edges — routing
+    icon: "🔀"
+    desc: >
+      Conditional edges to krawędzie z funkcją routowania — na podstawie stanu
+      decydują który węzeł zostanie odwiedzony następny. Funkcja routowania
+      zwraca string (nazwę węzła) lub END. Mapping opcjonalny dla czytelności.
+    code: |
+      from langgraph.graph import StateGraph, START, END
+      from typing import TypedDict, Literal
+
+      class State(TypedDict):
+          query: str
+          category: str
+          response: str
+
+      def classify(state: State) -> dict:
+          q = state["query"].lower()
+          if "błąd" in q or "error" in q:
+              return {"category": "technical"}
+          elif "cena" in q or "koszt" in q:
+              return {"category": "billing"}
+          else:
+              return {"category": "general"}
+
+      def handle_technical(state: State) -> dict:
+          return {"response": f"Wsparcie techniczne: {state['query']}"}
+
+      def handle_billing(state: State) -> dict:
+          return {"response": f"Dział rozliczeń: {state['query']}"}
+
+      def handle_general(state: State) -> dict:
+          return {"response": f"Odpowiedź ogólna: {state['query']}"}
+
+      # Funkcja routowania — zwraca nazwę następnego węzła
+      def route_by_category(state: State) -> Literal["technical", "billing", "general"]:
+          return state["category"]
+
+      builder = StateGraph(State)
+      builder.add_node("classify", classify)
+      builder.add_node("technical", handle_technical)
+      builder.add_node("billing", handle_billing)
+      builder.add_node("general", handle_general)
+
+      builder.add_edge(START, "classify")
+      builder.add_conditional_edges(
+          "classify",
+          route_by_category,
+          # Mapping (opcjonalne — gdy nazwy różne od return value):
+          {
+              "technical": "technical",
+              "billing": "billing",
+              "general": "general",
+          }
+      )
+      builder.add_edge("technical", END)
+      builder.add_edge("billing", END)
+      builder.add_edge("general", END)
+
+      graph = builder.compile()
+      result = graph.invoke({"query": "mam błąd 500", "category": "", "response": ""})
+      print(result["response"])  # Wsparcie techniczne: mam błąd 500
+
+  - name: Streaming — zdarzenia w czasie rzeczywistym
+    icon: "📡"
+    desc: >
+      LangGraph obsługuje streaming na kilku poziomach — wartości stanu (stream),
+      zdarzenia LLM token-by-token (astream_events), lub oba naraz.
+      Kluczowe dla UI — użytkownik widzi odpowiedź jak jest generowana.
+    code: |
+      from langgraph.graph import StateGraph, START, END
+      from typing import TypedDict, Annotated
+      from langgraph.graph.message import add_messages
+      from langchain_anthropic import ChatAnthropic
+
+      class State(TypedDict):
+          messages: Annotated[list, add_messages]
+
+      llm = ChatAnthropic(model="claude-sonnet-4-6")
+
+      def agent(state: State):
+          return {"messages": [llm.invoke(state["messages"])]}
+
+      graph = StateGraph(State).add_node("agent", agent)
+      graph.add_edge(START, "agent")
+      graph.add_edge("agent", END)
+      app = graph.compile()
+
+      # Stream wartości stanu (po każdym węźle)
+      for chunk in app.stream({"messages": [("human", "Cześć!")]}):
+          print(chunk)
+          # {"agent": {"messages": [AIMessage(content="Hej!")]}}
+
+      # astream_events — tokeny LLM w czasie rzeczywistym
+      import asyncio
+
+      async def stream_tokens():
+          async for event in app.astream_events(
+              {"messages": [("human", "Napisz wiersz")]},
+              version="v2"
+          ):
+              if event["event"] == "on_chat_model_stream":
+                  chunk = event["data"]["chunk"]
+                  print(chunk.content, end="", flush=True)
+
+      asyncio.run(stream_tokens())
+
+      # stream_mode — różne tryby
+      for chunk in app.stream(
+          {"messages": [("human", "Cześć")]},
+          stream_mode="updates"  # tylko aktualizacje, nie pełny stan
+      ):
+          print(chunk)

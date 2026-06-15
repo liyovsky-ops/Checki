@@ -1,0 +1,88 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać WSL?
+  firstComponent: Pierwsze kroki
+  firstComponentLang: bash
+
+intro:
+  title: Czym jest WSL?
+  desc: >
+    Windows Subsystem for Linux (WSL) to warstwa kompatybilności od Microsoftu,
+    która pozwala uruchamiać środowisko Linux bezpośrednio na Windows — bez maszyny wirtualnej
+    i bez dual-boot. WSL 2 używa prawdziwego jądra Linux (Hyper-V Utility VM) — masz pełne
+    syscalls, Docker, szybkie I/O. Dla dewelopera na Windows to najprostszy sposób na bash,
+    apt, Python, Node i cały toolchain open-source bez opuszczania środowiska Windows.
+    VS Code Remote WSL, Docker Desktop, Git — wszystko działa natywnie.
+
+concepts:
+  - title: WSL 2
+    desc: >
+      Druga generacja WSL — prawdziwe jądro Linux (Hyper-V Utility VM), nie warstwa translacji.
+      Pełna kompatybilność syscalls, szybki ext4 (pliki Linux), wsparcie dla Docker Desktop,
+      GUI apps przez WSLg, GPU acceleration (CUDA, DirectML). WSL 2 to standard — WSL 1 tylko
+      gdy potrzebujesz bezpośredniego dostępu do plików Windows przez UNC path z wydajnością.
+    icon: "🐧"
+  - title: Distro
+    desc: >
+      Dystrybucja Linux zainstalowana w WSL. Ubuntu jest domyślna i najpopularniejsza.
+      Każda distro ma własne środowisko — swój menedżer pakietów (apt/dnf/pacman),
+      własny /etc, własny katalog domowy. Możesz mieć kilka distro jednocześnie
+      (Ubuntu + Debian + Arch) i przełączać się między nimi jedną komendą.
+    icon: "📦"
+  - title: .wslconfig
+    desc: >
+      Globalny plik konfiguracyjny WSL 2 — w %USERPROFILE%\.wslconfig (C:\Users\TY\.wslconfig).
+      Kontroluje zasoby maszyny wirtualnej — RAM, CPU, swap, sieć. Bez konfiguracji WSL
+      domyślnie weźmie 50% RAM i wszystkie rdzenie. Zmiana wymaga wsl --shutdown.
+    icon: "⚙️"
+  - title: wsl.conf
+    desc: >
+      Lokalny config per-distro — /etc/wsl.conf wewnątrz dystrybucji.
+      Ustawia automount (montowanie /mnt/c), hostname, domyślny user,
+      systemd (WSL 2 wspiera systemd od 2022), interop z Windows.
+      Zmiana wymaga wsl --terminate DISTRO.
+    icon: "📝"
+
+whenToUse:
+  - Deweloperka na Windows z Linuxowym toolchainem — bash, make, gcc, Python, Node
+  - Docker Desktop z backendem WSL 2 — szybszy i lżejszy niż backend Hyper-V
+  - Git + SSH + GPG skonfigurowane na Linux z dostępem do plików Windows przez /mnt/c
+  - Skrypty bash, cron, automatyzacje niemożliwe lub uciążliwe na PowerShell
+  - Narzędzia bez natywnych wersji Windows — kubectl, terraform, awscli, ansible
+  - VS Code Remote WSL — edytor na Windows, kompilacja i linter na Linux
+  - Python i Node development — brak problemów z ścieżkami i line endings (CRLF)
+
+firstComponent: |
+  # Instalacja WSL 2 (Windows 10 2004+ lub Windows 11)
+  # Uruchom PowerShell jako Administrator:
+
+  wsl --install
+  # Instaluje Ubuntu domyślnie, włącza WSL 2, wymaga restartu
+
+  # Po restarcie systemu Ubuntu uruchomi się automatycznie —
+  # zostaniesz poproszony o nazwę użytkownika i hasło Linux
+
+  # Weryfikacja po instalacji
+  wsl --version          # wersja WSL, jądra i WSLg
+  wsl --list --verbose   # lista zainstalowanych distro z wersjami (1 lub 2)
+  wsl --status           # domyślna distro i konfiguracja
+
+  # Pierwsze kroki w Ubuntu
+  sudo apt update && sudo apt upgrade -y
+
+  # Podstawowe narzędzia developerskie
+  sudo apt install -y \
+    build-essential curl git wget unzip \
+    python3 python3-pip python3-venv \
+    nodejs npm
+
+  # Sprawdź środowisko
+  uname -r      # wersja jądra Linux (np. 5.15.153.1-microsoft-standard-WSL2)
+  whoami        # twój użytkownik Linux
+  cat /etc/os-release | grep PRETTY_NAME   # wersja distro
+
+  # Dostęp do plików Windows z Linux
+  ls /mnt/c/Users/TwojeImie/Documents
+
+  # Dostęp do plików Linux z Windows (w Eksploratorze Windows)
+  # wpisz w pasku adresu: \\wsl$\Ubuntu\home\twojeimie

@@ -1,0 +1,92 @@
+title: LangGraph vs alternatywy
+
+items:
+  - name: CrewAI
+    icon: "🚢"
+    color: "#FF4B4B"
+    tagline: "Role-based multi-agent framework — Crew, Agent, Task"
+    pros:
+      - Intuicyjne API — definiujesz Crew, Agent i Task deklaratywnie
+      - Role-based agents — każdy agent ma role, goal, backstory
+      - Wbudowane narzędzia — search, code interpreter, file ops
+      - Sequential i hierarchical process bez konfiguracji grafu
+      - Niższy próg wejścia — mniej kodu dla prostych multi-agent scenariuszy
+    cons:
+      - Mniej kontroli nad przepływem niż LangGraph — czarna skrzynka
+      - Brak natywnego checkpointingu i human-in-the-loop
+      - Trudniejszy debugging złożonych scenariuszy
+      - Mniej elastyczny gdy potrzebujesz niestandardowego routingu
+      - Mniejsza integracja z LangSmith i observability toolami
+    vs: LangGraph gdy potrzebujesz pełnej kontroli nad przepływem, debugowania i checkpointów. CrewAI gdy chcesz szybko zbudować prosty system rolowych agentów bez konfigurowania grafu.
+
+  - name: AutoGen (Microsoft)
+    icon: "🔷"
+    color: "#0078D4"
+    tagline: "Konwersacyjni agenci od Microsoftu — GroupChat, AssistantAgent"
+    pros:
+      - GroupChat — wielu agentów w jednej rozmowie, naturalny dialog
+      - Code execution — agent pisze i uruchamia kod automatycznie
+      - Human proxy agent — wbudowany human-in-the-loop
+      - AutoGen Studio — UI do budowania agentów bez kodu
+      - Silna integracja z Azure OpenAI i modeli Microsoftu
+    cons:
+      - Przepływ przez konwersację — mniej deterministyczny niż graf
+      - Trudniej testować i weryfikować zachowanie agentów
+      - Overhead komunikacji między agentami przez wiadomości
+      - Mniej wydajny dla ustrukturyzowanych workflow
+      - Mniejsza społeczność niż LangChain/LangGraph
+    vs: LangGraph dla ustrukturyzowanych workflow z kontrolowanym przepływem. AutoGen gdy chcesz dynamicznego multi-agent dialogu gdzie agenci rozmawiają naturalnie lub potrzebujesz GroupChat.
+
+  - name: LangChain (bez LangGraph)
+    icon: "🦜"
+    color: "#1C3C3C"
+    tagline: "Chains i Agents — klasyczny LangChain bez grafu stanów"
+    pros:
+      - Ogromny ekosystem — setki integracji z LLM, vector stores, tools
+      - LCEL (LangChain Expression Language) — deklaratywne chain composing
+      - AgentExecutor — prosty ReAct agent bez definiowania grafu
+      - Długa historia — dojrzała dokumentacja i tutoriale
+      - Łatwiejszy start dla prostych chain use-cases
+    cons:
+      - Brak pętli sterowania — chain jest liniowy lub drzewiasty, nie cykliczny
+      - AgentExecutor mniej konfigurowalny niż LangGraph StateGraph
+      - Brak wbudowanego checkpointingu
+      - Trudniejszy streaming i human-in-the-loop
+      - LangGraph jest oficjalnym następcą AgentExecutor od 2024
+    vs: LangGraph dla agentów z pętlą, checkpointingiem i multi-agent. LangChain LCEL dla prostych sekwencyjnych chain (RAG, summarization) bez potrzeby pętli — doskonale się uzupełniają.
+
+  - name: Haystack (deepset)
+    icon: "🌾"
+    color: "#2B2D42"
+    tagline: "Pipeline do RAG i NLP — Document stores, Retrievers, Generators"
+    pros:
+      - Dedykowany RAG framework — Document stores, Retrievers, Rerankers gotowe
+      - Pipeline as code — deklaratywna definicja pipeliny
+      - Własny ekosystem document stores — Elasticsearch, Weaviate, Pinecone
+      - Haystacks Studio — UI do budowania pipeliny
+      - Dobra dokumentacja dla enterprise RAG
+    cons:
+      - Skupiony na RAG i NLP — słabszy dla autonomicznych agentów
+      - Mniejsza elastyczność agentów niż LangGraph
+      - Mniejsza społeczność niż LangChain/LangGraph
+      - Brak natywnego human-in-the-loop i checkpointingu agentów
+      - Mniej integracji z narzędziami zewnętrznymi
+    vs: LangGraph dla agentów i złożonych wieloetapowych workflow. Haystack dla RAG pipeline z zaawansowanym przetwarzaniem dokumentów — mogą działać razem (LangGraph jako orchestrator, Haystack jako retrieval tool).
+
+  - name: Raw LLM API (bez frameworka)
+    icon: "⚡"
+    color: "#7B2FBE"
+    tagline: "Anthropic API / OpenAI API bezpośrednio — pełna kontrola, zero magii"
+    pros:
+      - Zero overhead frameworka — minimalne zależności
+      - Pełna kontrola nad każdym wywołaniem API
+      - Prostszy debugging — widzisz dokładnie co jest wysyłane
+      - Lepsza wydajność — brak abstrakcji między kodem a API
+      - Nie musisz uczyć się API frameworka
+    cons:
+      - Piszesz od zera — pętla agenta, obsługa błędów, retry, streaming
+      - Brak checkpointingu — musisz implementować sam
+      - Brak gotowych integracji narzędzi
+      - Więcej kodu boilerplate dla prostych scenariuszy
+      - Trudniej skalować do multi-agent bez pomocy biblioteki
+    vs: LangGraph gdy budujesz agentów produkcyjnych — dostaniesz checkpointing, streaming, observability i multi-agent za darmo. Raw API gdy piszesz prosty one-shot prompt lub chcesz zrozumieć jak agent działa pod spodem.

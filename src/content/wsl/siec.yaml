@@ -1,0 +1,161 @@
+title: Sieć i system plików
+
+items:
+  - name: Localhost i porty
+    icon: "🌐"
+    desc: >
+      W WSL 2 maszyna wirtualna ma własny interfejs sieciowy. Port otwarty w WSL
+      jest dostępny z Windows przez localhost — automatyczne forwardowanie portów.
+      Tryb mirrored (WSL 2.0+) upraszcza to jeszcze bardziej.
+    code: |
+      # Port otwarty w WSL jest dostępny z Windows
+      # Uruchom serwer w WSL:
+      python3 -m http.server 8080
+      # Dostępny z Windows: http://localhost:8080
+
+      # FastAPI / uvicorn
+      uvicorn main:app --reload --host 0.0.0.0 --port 8000
+      # W przeglądarce Windows: http://localhost:8000
+
+      # Sprawdź adres IP WSL (w trybie bez mirrored)
+      ip addr show eth0 | grep "inet " | awk '{print $2}'
+      # np. 172.28.144.123/20
+
+      # Adres hosta Windows z WSL (default route)
+      cat /etc/resolv.conf | grep nameserver | awk '{print $2}'
+      # np. 172.28.144.1
+
+      # Networking Mirrored (WSL 2.0+, .wslconfig)
+      # [wsl2]
+      # networkingMode=mirrored
+      # Po tej zmianie: localhost w WSL = localhost w Windows = 127.0.0.1
+
+      # Sprawdź tryb sieci
+      wsl --version
+      # "WSL version: 2.0+" oznacza dostępność mirrored
+
+      # Otwórz port Windows przez WSL (mirrored — automatycznie)
+      # Lub ręcznie (klasyczny WSL 2) w PowerShell:
+      netsh interface portproxy add v4tov4 `
+        listenaddress=0.0.0.0 listenport=8000 `
+        connectaddress=$(wsl hostname -I) connectport=8000
+
+  - name: System plików — dwa światy
+    icon: "📁"
+    desc: >
+      WSL 2 ma dwa niezależne systemy plików — Linux (ext4, szybki) i Windows (NTFS, wolniejszy z WSL).
+      Kluczowa zasada — pliki projektu trzymaj na Linux (/home), nie na Windows (/mnt/c).
+      I/O na /mnt/c jest wielokrotnie wolniejsze niż na native ext4.
+    code: |
+      # System plików Linux (szybki ext4)
+      # ~/        -- katalog domowy Linux (/home/lukasz)
+      # /tmp/     -- pamięć tymczasowa
+      # /var/     -- dane aplikacji
+      # /opt/     -- oprogramowanie opcjonalne
+
+      # System plików Windows (wolniejszy przez 9P protocol)
+      # /mnt/c/   -- dysk C Windows
+      # /mnt/d/   -- dysk D Windows
+      # /mnt/e/   -- dysk E Windows
+
+      # ZASADA: projekty na /home, nie na /mnt/c !
+      # Złe (wolne):
+      cd /mnt/c/Users/lukasz/projekty/moj-projekt
+      npm install   # 10x wolniejsze
+
+      # Dobre (szybkie):
+      cd ~/projekty/moj-projekt
+      npm install   # native speed
+
+      # Kopiowanie plików z Windows do Linux
+      cp /mnt/c/Users/lukasz/Downloads/data.csv ~/projekty/analiza/
+
+      # Kopiowanie z Linux do Windows
+      cp ~/projekty/raport.pdf /mnt/c/Users/lukasz/Desktop/
+
+      # Symlink z Windows do Linux projektu (łatwy dostęp z Eksploratora)
+      cmd.exe /C mklink /J "C:\Users\lukasz\WSL-Projekty" "\\wsl$\Ubuntu\home\lukasz\projekty"
+
+      # Dostęp do WSL z Eksploratora Windows
+      # Wpisz w pasku adresu: \\wsl$\Ubuntu\
+      # Lub: \\wsl.localhost\Ubuntu\
+
+  - name: DNS i hosts
+    icon: "🔍"
+    desc: >
+      WSL 2 generuje /etc/resolv.conf i /etc/hosts automatycznie. Możesz
+      nadpisać DNS (np. 1.1.1.1 zamiast firmowego DNS) lub dodać custom hosts.
+      Tryb mirrored dziedziczy DNS z Windows.
+    code: |
+      # Sprawdź aktualny DNS
+      cat /etc/resolv.conf
+      # nameserver 172.28.144.1  (adres hosta Windows)
+
+      # Nadpisz DNS (Cloudflare/Google zamiast Windows DNS)
+      # W /etc/wsl.conf ustaw:
+      # [network]
+      # generateResolvConf = false
+
+      # Następnie ręcznie:
+      sudo unlink /etc/resolv.conf
+      sudo bash -c 'echo "nameserver 1.1.1.1" > /etc/resolv.conf'
+      sudo bash -c 'echo "nameserver 8.8.8.8" >> /etc/resolv.conf'
+      # Zablokuj nadpisywanie:
+      sudo chattr +i /etc/resolv.conf
+
+      # Custom hosts — dodaj aliasy lokalnych serwisów
+      sudo nano /etc/hosts
+      # 127.0.0.1  api.local
+      # 127.0.0.1  db.local
+      # 127.0.0.1  redis.local
+
+      # Test DNS
+      nslookup google.com
+      dig github.com
+
+      # Sprawdź połączenie z internetem
+      ping -c 3 google.com
+      curl -I https://api.github.com
+
+  - name: SSH i zdalny dostęp
+    icon: "🔐"
+    desc: >
+      WSL może działać jako serwer SSH — przydatne do zdalnego dostępu do
+      środowiska WSL z innego komputera lub z Visual Studio Code Remote SSH.
+      Wymaga forwardowania portu na Windows.
+    code: |
+      # Zainstaluj serwer SSH w WSL
+      sudo apt install -y openssh-server
+
+      # Skonfiguruj SSH
+      sudo nano /etc/ssh/sshd_config
+      # Ustaw:
+      # Port 2222               (nie 22 — Windows może używać 22)
+      # PasswordAuthentication yes
+      # PubkeyAuthentication yes
+
+      # Uruchom SSH (jeśli systemd włączony)
+      sudo systemctl enable ssh
+      sudo systemctl start ssh
+
+      # Lub bez systemd
+      sudo service ssh start
+
+      # Sprawdź status
+      sudo service ssh status
+
+      # Forwarding portu w PowerShell (jako Admin)
+      # Pobierz IP WSL
+      $wslIp = wsl hostname -I
+      # Dodaj proxy
+      netsh interface portproxy add v4tov4 `
+        listenaddress=0.0.0.0 listenport=2222 `
+        connectaddress=$wslIp connectport=2222
+
+      # Połączenie ze zdalnej maszyny
+      ssh -p 2222 lukasz@TWOJE_IP_WINDOWS
+
+      # Auto-start SSH przy logowaniu Windows (Task Scheduler lub .wslconfig boot)
+      # W /etc/wsl.conf:
+      # [boot]
+      # command = service ssh start
