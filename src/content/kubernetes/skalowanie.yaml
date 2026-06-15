@@ -1,0 +1,176 @@
+title: Skalowanie i produkcja
+
+items:
+  - name: HPA — Horizontal Pod Autoscaler
+    desc: >
+      HPA automatycznie skaluje liczbę replik Deployment na podstawie metryk.
+      Sprawdza metryki co 15 sekund (domyślnie). Skaluje w górę szybko,
+      w dół wolniej (cooldown 5 min) żeby uniknąć fluktuacji.
+      Wymaga metrics-server zainstalowanego w klastrze.
+    code: |
+      # Instalacja metrics-server:
+      kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+      # HPA manifest:
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: api-hpa
+        namespace: production
+      spec:
+        scaleTargetRef:
+          apiVersion: apps/v1
+          kind: Deployment
+          name: api
+        minReplicas: 2
+        maxReplicas: 20
+        metrics:
+          - type: Resource
+            resource:
+              name: cpu
+              target:
+                type: Utilization
+                averageUtilization: 70
+        behavior:
+          scaleDown:
+            stabilizationWindowSeconds: 300  # czekaj 5 min przed scale-down
+
+      # Sprawdź status HPA:
+      kubectl get hpa -n production
+
+  - name: Resource Requests i Limits
+    desc: >
+      Requests = minimalne zasoby które K8s rezerwuje dla Poda (używa do schedulingu).
+      Limits = maksimum które Pod może zużyć (przekroczenie CPU throttle, przekroczenie RAM OOMKill).
+      Zawsze ustawiaj requests i limits — bez nich Pod może zająć cały Node.
+    code: |
+      resources:
+        requests:
+          memory: "256Mi"   # K8s rezerwuje 256MB na Node
+          cpu: "250m"       # 0.25 CPU core (250 millicores)
+        limits:
+          memory: "512Mi"   # max RAM zanim OOMKill
+          cpu: "1000m"      # max 1 CPU core (throttle jeśli przekroczy)
+
+      # Sprawdź zużycie zasobów:
+      kubectl top pods -n production
+      kubectl top nodes
+
+      # Rekomendacja: limits.memory = 2x requests.memory
+      # CPU limit = 2-4x CPU requests dla burstable obciążeń
+
+  - name: Liveness i Readiness Probes
+    desc: >
+      Liveness Probe — K8s restartuje Pod jeśli probe nie przechodzi (kontener zamarł).
+      Readiness Probe — K8s usuwa Pod z rotacji Service jeśli nie jest gotowy (np. startuje).
+      Startup Probe — daje czas na start (blokuje liveness na czas startu aplikacji).
+    code: |
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 30   # poczekaj 30s po starcie kontenera
+        periodSeconds: 10         # sprawdzaj co 10s
+        failureThreshold: 3       # restartuj po 3 nieudanych próbach
+        timeoutSeconds: 5
+
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 8000
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        failureThreshold: 3
+
+      startupProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        failureThreshold: 30      # daj 30x10=300 sekund na start
+        periodSeconds: 10
+
+  - name: Rolling Updates i Rollback
+    desc: >
+      Rolling Update zastępuje stare Pody nowymi stopniowo — zero downtime.
+      maxUnavailable = ile Podów może być niedostępnych jednocześnie.
+      maxSurge = ile dodatkowych Podów K8s może stworzyć ponad replicas.
+      Rollback do poprzedniej wersji jedną komendą.
+    code: |
+      strategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxUnavailable: 1   # max 1 Pod niedostępny naraz
+          maxSurge: 1         # max 1 Pod extra ponad replicas
+
+      # Update deployment do nowej wersji:
+      kubectl set image deployment/api api=moja-apka:1.3.0 -n production
+
+      # Obserwuj postęp:
+      kubectl rollout status deployment/api -n production
+
+      # Historia deploymentów:
+      kubectl rollout history deployment/api -n production
+
+      # Rollback do poprzedniej wersji:
+      kubectl rollout undo deployment/api -n production
+
+      # Rollback do konkretnej wersji:
+      kubectl rollout undo deployment/api --to-revision=2 -n production
+
+  - name: PodDisruptionBudget — ochrona podczas maintenance
+    desc: >
+      PDB gwarantuje że podczas maintenance klastra (aktualizacja Nodes, drain)
+      zawsze działa minimum X replik aplikacji.
+      Chroni przed sytuacją gdy K8s wyłączy za dużo Podów jednocześnie.
+    code: |
+      apiVersion: policy/v1
+      kind: PodDisruptionBudget
+      metadata:
+        name: api-pdb
+        namespace: production
+      spec:
+        minAvailable: 2        # zawsze min 2 Pody działają
+        # LUB:
+        # maxUnavailable: 1    # max 1 Pod może być niedostępny
+        selector:
+          matchLabels:
+            app: api
+
+      # PDB jest respektowany przez:
+      # - kubectl drain node
+      # - Cluster Autoscaler
+      # - Managed K8s node upgrades (EKS, GKE, AKS)
+
+  - name: Node Affinity i Tolerations
+    desc: >
+      Node Affinity pozwala przypiąć Pody do określonych Nodes (np. tylko GPU nodes dla ML).
+      Tolerations pozwalają Podom działać na Nodach z Taint (np. dedicated=gpu:NoSchedule).
+      PodAntiAffinity rozkłada repliki po różnych Nodach dla HA.
+    code: |
+      spec:
+        affinity:
+          # Wymagaj Node z labelem zone=eu-west-1a
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: topology.kubernetes.io/zone
+                      operator: In
+                      values:
+                        - eu-west-1a
+                        - eu-west-1b
+          # Rozłóż repliki na różne Nodes (HA)
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchLabels:
+                      app: api
+                  topologyKey: kubernetes.io/hostname
+        # Pozwól działać na Nodach z taint "dedicated=gpu"
+        tolerations:
+          - key: dedicated
+            operator: Equal
+            value: gpu
+            effect: NoSchedule

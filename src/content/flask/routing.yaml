@@ -1,0 +1,185 @@
+title: Routing i Blueprints
+
+items:
+  - name: Podstawowe routes i metody HTTP
+    desc: >
+      @app.route() mapuje URL do funkcji. Domyślnie obsługuje tylko GET.
+      Dodaj methods=['GET', 'POST'] dla innych metod. Zwróć string, Response, jsonify()
+      lub krotkę (data, status_code). Flask automatycznie ustawi Content-Type.
+    code: |
+      from flask import Flask, jsonify, request, abort
+
+      app = Flask(__name__)
+
+      # GET — zwróć dane
+      @app.route('/products')
+      def get_products():
+          return jsonify({'products': [], 'total': 0})
+
+      # POST — przyjmij dane
+      @app.route('/products', methods=['POST'])
+      def create_product():
+          data = request.get_json()
+          if not data or 'name' not in data:
+              abort(400, description='name jest wymagany')
+          return jsonify({'id': 1, **data}), 201
+
+      # PUT i DELETE
+      @app.route('/products/<int:product_id>', methods=['GET', 'PUT', 'DELETE'])
+      def product(product_id):
+          if request.method == 'DELETE':
+              return '', 204
+          if request.method == 'PUT':
+              data = request.get_json()
+              return jsonify({'id': product_id, **data})
+          return jsonify({'id': product_id, 'name': 'Produkt'})
+
+  - name: Parametry URL i konwertery typów
+    desc: >
+      <nazwa> w URL to parametr dynamiczny. <int:id> to konwerter — Flask automatycznie
+      rzutuje i zwraca 404 jeśli konwersja się nie uda. Konwertery: string, int, float, path, uuid.
+    code: |
+      # Podstawowy parametr string
+      @app.route('/users/<username>')
+      def user_profile(username):
+          return f'Profil użytkownika: {username}'
+
+      # Konwerter int — 404 jeśli nie liczba
+      @app.route('/articles/<int:article_id>')
+      def article(article_id):
+          return jsonify({'id': article_id})
+
+      # Konwerter float
+      @app.route('/products/price/<float:max_price>')
+      def products_by_price(max_price):
+          return jsonify({'max_price': max_price})
+
+      # path — akceptuje slashe (dla ścieżek plików)
+      @app.route('/files/<path:filepath>')
+      def serve_file(filepath):
+          return f'Plik: {filepath}'
+
+      # uuid
+      from flask import Flask
+      @app.route('/orders/<uuid:order_id>')
+      def order(order_id):
+          return jsonify({'order_id': str(order_id)})
+
+  - name: Blueprints — organizacja większej aplikacji
+    desc: >
+      Blueprint to zestaw routes, handlery i szablony zgrupowane logicznie.
+      Zarejestruj Blueprint w app.register_blueprint() z opcjonalnym prefixem.
+      Każdy Blueprint może mieć własny katalog templates/ i static/.
+    code: |
+      # users/routes.py
+      from flask import Blueprint, jsonify, request
+
+      users_bp = Blueprint('users', __name__, url_prefix='/users')
+
+      @users_bp.route('/')
+      def list_users():
+          return jsonify({'users': []})
+
+      @users_bp.route('/<int:user_id>')
+      def get_user(user_id):
+          return jsonify({'id': user_id})
+
+      @users_bp.route('/', methods=['POST'])
+      def create_user():
+          data = request.get_json()
+          return jsonify(data), 201
+
+      # -------------------------------------------
+      # auth/routes.py
+      auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
+
+      @auth_bp.route('/login', methods=['POST'])
+      def login():
+          data = request.get_json()
+          return jsonify({'token': 'jwt-token-here'})
+
+      # -------------------------------------------
+      # app.py — rejestracja Blueprintów
+      from flask import Flask
+      from users.routes import users_bp
+      from auth.routes import auth_bp
+
+      app = Flask(__name__)
+      app.register_blueprint(users_bp)   # /users/
+      app.register_blueprint(auth_bp)    # /auth/login
+
+  - name: Struktura projektu Flask
+    desc: >
+      Flask nie narzuca struktury — ale istnieje kilka sprawdzonych wzorców.
+      Application Factory Pattern (create_app()) to standard dla testowanych aplikacji.
+      Oddziela tworzenie app od jej konfiguracji i rejestracji extensions.
+    code: |
+      # Zalecana struktura projektu:
+      myapp/
+        __init__.py        ← create_app() factory
+        config.py          ← klasy Config (Dev, Prod, Test)
+        models/
+          user.py
+          product.py
+        api/
+          users.py         ← Blueprint users_bp
+          products.py      ← Blueprint products_bp
+          auth.py          ← Blueprint auth_bp
+        templates/
+          base.html
+        static/
+      tests/
+        test_users.py
+      requirements.txt
+      run.py
+
+      # myapp/__init__.py — Application Factory
+      from flask import Flask
+      from flask_sqlalchemy import SQLAlchemy
+
+      db = SQLAlchemy()
+
+      def create_app(config_name='default'):
+          app = Flask(__name__)
+          app.config.from_object(config[config_name])
+
+          db.init_app(app)
+
+          from .api.users import users_bp
+          from .api.auth import auth_bp
+          app.register_blueprint(users_bp)
+          app.register_blueprint(auth_bp)
+
+          return app
+
+  - name: Error Handlers i abort()
+    desc: >
+      @app.errorhandler(kod) obsługuje błędy HTTP globalnie. abort(kod) przerywa request
+      z danym kodem błędu. Możesz też stworzyć własne klasy błędów.
+    code: |
+      from flask import Flask, jsonify, abort
+
+      app = Flask(__name__)
+
+      # Globalny handler dla 404
+      @app.errorhandler(404)
+      def not_found(e):
+          return jsonify({'error': 'Nie znaleziono', 'message': str(e)}), 404
+
+      # Handler dla 422 (Unprocessable Entity)
+      @app.errorhandler(422)
+      def unprocessable(e):
+          return jsonify({'error': 'Błędne dane', 'message': str(e)}), 422
+
+      # Handler dla wyjątków Pythona
+      @app.errorhandler(ValueError)
+      def handle_value_error(e):
+          return jsonify({'error': str(e)}), 400
+
+      # Użycie w route:
+      @app.route('/users/<int:user_id>')
+      def get_user(user_id):
+          user = db.get(user_id)
+          if not user:
+              abort(404, description=f'Użytkownik {user_id} nie istnieje')
+          return jsonify(user)

@@ -1,0 +1,222 @@
+title: Manifesty YAML — gotowe szablony
+
+items:
+  - name: Deployment + Service — podstawowy stack
+    desc: >
+      Dwa obiekty które zawsze idą razem — Deployment zarządza replikami Podów,
+      Service daje im stały adres. Oddziel manifestami przez trzy myślniki (---).
+      Aplikuj jedną komendą: kubectl apply -f deploy.yaml
+    code: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: api
+        namespace: production
+        labels:
+          app: api
+      spec:
+        replicas: 3
+        selector:
+          matchLabels:
+            app: api
+        template:
+          metadata:
+            labels:
+              app: api
+          spec:
+            containers:
+              - name: api
+                image: registry.firma.pl/api:1.2.0
+                ports:
+                  - containerPort: 8000
+                envFrom:
+                  - configMapRef:
+                      name: app-config
+                  - secretRef:
+                      name: app-secrets
+                resources:
+                  requests:
+                    memory: "256Mi"
+                    cpu: "250m"
+                  limits:
+                    memory: "512Mi"
+                    cpu: "500m"
+                livenessProbe:
+                  httpGet:
+                    path: /health
+                    port: 8000
+                  initialDelaySeconds: 15
+                  periodSeconds: 10
+                readinessProbe:
+                  httpGet:
+                    path: /ready
+                    port: 8000
+                  initialDelaySeconds: 5
+                  periodSeconds: 5
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: api
+        namespace: production
+      spec:
+        selector:
+          app: api
+        ports:
+          - port: 80
+            targetPort: 8000
+        type: ClusterIP
+
+  - name: Ingress — routing HTTP do wielu serwisów
+    desc: >
+      Ingress to reverse proxy dla całego klastra — jeden LoadBalancer na wejściu,
+      routing po ścieżkach lub domenach do różnych Services wewnątrz.
+      Wymaga Ingress Controller (nginx-ingress, Traefik, AWS ALB Ingress Controller).
+    code: |
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: main-ingress
+        namespace: production
+        annotations:
+          nginx.ingress.kubernetes.io/rewrite-target: /
+          cert-manager.io/cluster-issuer: letsencrypt-prod
+      spec:
+        ingressClassName: nginx
+        tls:
+          - hosts:
+              - api.firma.pl
+              - app.firma.pl
+            secretName: firma-tls
+        rules:
+          - host: api.firma.pl
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: api
+                      port:
+                        number: 80
+          - host: app.firma.pl
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: frontend
+                      port:
+                        number: 80
+
+  - name: HPA — automatyczne skalowanie
+    desc: >
+      HorizontalPodAutoscaler automatycznie skaluje liczbę replik Deployment
+      na podstawie metryk (CPU, RAM, custom metrics). Wymaga metrics-server w klastrze.
+      Skaluje w górę gdy obciążenie rośnie, w dół gdy spada — oszczędność kosztów.
+    code: |
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: api-hpa
+        namespace: production
+      spec:
+        scaleTargetRef:
+          apiVersion: apps/v1
+          kind: Deployment
+          name: api
+        minReplicas: 2
+        maxReplicas: 10
+        metrics:
+          - type: Resource
+            resource:
+              name: cpu
+              target:
+                type: Utilization
+                averageUtilization: 70
+          - type: Resource
+            resource:
+              name: memory
+              target:
+                type: Utilization
+                averageUtilization: 80
+
+  - name: PersistentVolumeClaim — trwały storage
+    desc: >
+      PVC rezerwuje storage dla Poda niezależnie od jego cyklu życia. Dane przeżywają
+      restart i usunięcie Poda. W chmurze PVC automatycznie tworzy EBS (AWS), PD (GCP)
+      lub Azure Disk. Używaj dla baz danych i aplikacji przechowujących pliki.
+    code: |
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: postgres-data
+        namespace: production
+      spec:
+        accessModes:
+          - ReadWriteOnce      # jeden Node naraz (typowe dla baz danych)
+        storageClassName: gp3  # klasa storage (AWS EBS gp3)
+        resources:
+          requests:
+            storage: 20Gi
+      ---
+      # Montowanie PVC w Pod:
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-data
+      containers:
+        - name: postgres
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+
+  - name: NetworkPolicy — firewall między Podami
+    desc: >
+      NetworkPolicy definiuje reguły ruchu sieciowego między Podami.
+      Domyślnie wszystkie Pody mogą rozmawiać ze sobą. NetworkPolicy pozwala
+      to zablokować — np. tylko api może odpytywać bazę danych.
+      Wymaga CNI obsługującego NetworkPolicy (Calico, Cilium, Weave).
+    code: |
+      # Zezwól na ruch do bazy danych TYLKO z Podów z labelem app=api
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: db-allow-api-only
+        namespace: production
+      spec:
+        podSelector:
+          matchLabels:
+            app: postgres
+        policyTypes:
+          - Ingress
+        ingress:
+          - from:
+              - podSelector:
+                  matchLabels:
+                    app: api
+            ports:
+              - protocol: TCP
+                port: 5432
+
+  - name: ResourceQuota — limity dla Namespace
+    desc: >
+      ResourceQuota ogranicza łączne zasoby w Namespace — chroni klaster przed
+      jednym zespołem który zajmie wszystkie CPU i RAM. Ustawiasz maksymalne
+      liczby Podów, CPU, RAM, PVC na poziomie Namespace.
+    code: |
+      apiVersion: v1
+      kind: ResourceQuota
+      metadata:
+        name: production-quota
+        namespace: production
+      spec:
+        hard:
+          pods: "50"
+          requests.cpu: "20"
+          requests.memory: 40Gi
+          limits.cpu: "40"
+          limits.memory: 80Gi
+          persistentvolumeclaims: "10"
+          requests.storage: 200Gi

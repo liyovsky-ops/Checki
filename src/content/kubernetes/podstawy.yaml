@@ -1,0 +1,88 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Kubernetes?
+  firstComponent: Pierwsze kroki z kubectl
+  firstComponentLang: bash
+
+intro:
+  title: Czym jest Kubernetes?
+  desc: >
+    Kubernetes (K8s) to platforma do orkiestracji kontenerów — automatyzuje deploymenty, skalowanie
+    i zarządzanie aplikacjami. Docker pakuje aplikację, K8s nią zarządza na wielu serwerach.
+    Gdy kontener padnie — K8s go restartuje. Gdy ruch wzrośnie — K8s doda repliki automatycznie.
+    Standard produkcyjny w enterprise i wszystkich dużych chmurach: EKS (AWS), GKE (Google), AKS (Azure).
+
+concepts:
+  - title: Klaster i Node
+    desc: >
+      Klaster to zbiór maszyn (Nodes) zarządzanych przez K8s. Control Plane (master) zarządza
+      stanem klastra. Worker Nodes uruchamiają Pody z aplikacjami. Chmury (EKS/GKE/AKS)
+      zarządzają Control Plane za Ciebie — płacisz tylko za Worker Nodes.
+    icon: "🏗️"
+  - title: Pod
+    desc: >
+      Najmniejsza jednostka w K8s. Pod = jeden lub więcej kontenerów współdzielących
+      stos sieciowy i storage. Zazwyczaj jeden kontener = jeden Pod. Pody są efemeryczne —
+      mogą być tworzone i niszczone. Zarządzasz nimi przez Deployment, nie bezpośrednio.
+    icon: "📦"
+  - title: Deployment
+    desc: >
+      Deployment deklaruje pożądany stan aplikacji — ile replik, jaki image, strategia aktualizacji.
+      K8s dba o to żeby stan faktyczny = pożądany. Automatyczny rolling update i rollback.
+      Główny obiekt dla bezstanowych aplikacji (API, backend, frontend).
+    icon: "🚀"
+  - title: Service
+    desc: >
+      Pody mają zmienne IP. Service tworzy stały DNS i Virtual IP dla zbioru Podów.
+      Load balancuje ruch między replikami. Typy: ClusterIP (wewnętrzny),
+      NodePort (port na Nodzie), LoadBalancer (chmurowy load balancer).
+    icon: "🔌"
+  - title: Namespace
+    desc: >
+      Logiczna izolacja zasobów w klastrze. Różne środowiska (dev/staging/prod) lub
+      zespoły w jednym klastrze bez konfliktów. RBAC kontroluje dostęp per Namespace.
+      Wbudowane: default, kube-system, kube-public.
+    icon: "📁"
+  - title: Label i Selector
+    desc: >
+      Label to para klucz-wartość przypisana do zasobu (app=api, env=prod).
+      Selector filtruje zasoby po labelach — Service kieruje ruch do Podów z pasującym labelem.
+      Mechanizm łączący obiekty K8s bez sztywnych referencji.
+    icon: "🏷️"
+
+whenToUse:
+  - Wiele mikroserwisów wymagających niezależnego skalowania i resource limits
+  - High availability — zero downtime deployments, automatic restarts, health checks
+  - Auto-scaling — HPA zwiększa repliki gdy CPU wzrośnie, zmniejsza gdy spada
+  - Multi-environment w jednym klastrze — dev/staging/prod przez Namespaces i RBAC
+  - GitOps workflow — Argo CD lub Flux synchronizuje klaster ze stanem w repozytorium
+  - Zarządzany K8s w chmurze — EKS/GKE/AKS bez samodzielnej konfiguracji Control Plane
+
+firstComponent: |
+  # Instalacja kubectl (Windows)
+  winget install Kubernetes.kubectl
+
+  # Sprawdź kontekst — do którego klastra jesteś podłączony
+  kubectl config current-context
+  kubectl cluster-info
+  kubectl get nodes
+
+  # Uruchom testową aplikację (bez YAML — szybki start)
+  kubectl create deployment nginx --image=nginx:alpine --replicas=2
+  kubectl expose deployment nginx --port=80 --type=NodePort
+
+  # Sprawdź co zostało stworzone
+  kubectl get pods
+  kubectl get deployments
+  kubectl get services
+
+  # Sprawdź szczegóły konkretnego Poda
+  kubectl describe pod <nazwa-poda>
+  kubectl logs <nazwa-poda>
+
+  # Wejdź do Poda interaktywnie
+  kubectl exec -it <nazwa-poda> -- sh
+
+  # Usuń zasoby
+  kubectl delete deployment nginx
+  kubectl delete service nginx

@@ -1,0 +1,208 @@
+title: Obiekty Kubernetes
+
+items:
+  - name: Pod — podstawowa jednostka
+    desc: >
+      Pod to jeden lub więcej kontenerów współdzielących sieć i storage. Pody są efemeryczne —
+      K8s może je niszczyć i tworzyć od nowa. Nie zarządzaj Podami bezpośrednio —
+      używaj Deployment (bezstanowe) lub StatefulSet (stanowe).
+    code: |
+      # Fragment spec Poda (w Deployment):
+      spec:
+        containers:
+          - name: api
+            image: moja-apka:1.0.0
+            ports:
+              - containerPort: 8000
+            env:
+              - name: DATABASE_URL
+                valueFrom:
+                  secretKeyRef:
+                    name: db-secret
+                    key: url
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "250m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+            livenessProbe:
+              httpGet:
+                path: /health
+                port: 8000
+              initialDelaySeconds: 10
+
+  - name: Deployment — zarządzanie replikami
+    desc: >
+      Deployment deklaruje pożądany stan bezstanowej aplikacji. K8s dba żeby stan faktyczny
+      = pożądany. Rolling update — nowe Pody startują zanim stare zostaną usunięte.
+      Automatyczny rollback jeśli nowa wersja nie przejdzie health checks.
+    code: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: api
+        namespace: production
+      spec:
+        replicas: 3
+        selector:
+          matchLabels:
+            app: api
+        strategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxUnavailable: 1
+            maxSurge: 1
+        template:
+          metadata:
+            labels:
+              app: api
+          spec:
+            containers:
+              - name: api
+                image: moja-apka:1.2.0
+                ports:
+                  - containerPort: 8000
+
+  - name: Service — stały endpoint dla Podów
+    desc: >
+      Pody mają zmienne IP — Service daje stały DNS i Virtual IP niezależnie od tego
+      ile Podów działa i jakie mają IP. Load balancuje ruch między pasującymi Podami.
+      Wewnątrz klastra dostępny po nazwie (np. api-service.production.svc.cluster.local).
+    code: |
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: api-service
+      spec:
+        selector:
+          app: api
+        ports:
+          - port: 80
+            targetPort: 8000
+        type: ClusterIP
+      ---
+      # Wywołanie z innego Poda w tym samym namespace:
+      # curl http://api-service
+      # Z innego namespace:
+      # curl http://api-service.production.svc.cluster.local
+
+  - name: ConfigMap — konfiguracja oddzielona od kodu
+    desc: >
+      ConfigMap przechowuje dane konfiguracyjne jako klucz-wartość lub pliki tekstowe.
+      Oddziela konfigurację od image — zmieniasz ConfigMap i restartujesz Pody
+      bez rebuild image. Dla wrażliwych danych używaj Secret zamiast ConfigMap.
+    code: |
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: app-config
+      data:
+        APP_ENV: production
+        LOG_LEVEL: info
+        MAX_WORKERS: "4"
+      ---
+      # Użycie w Pod spec (wszystkie klucze jako env):
+      envFrom:
+        - configMapRef:
+            name: app-config
+
+  - name: Secret — poufne dane
+    desc: >
+      Secret jak ConfigMap ale dla danych wrażliwych — hasła, tokeny, klucze API, certyfikaty TLS.
+      Dane zakodowane w base64 (nie szyfrowane). Dla prawdziwego szyfrowania w spoczynku
+      użyj Sealed Secrets, External Secrets Operator lub Vault Agent Injector.
+    code: |
+      # Utwórz Secret z CLI:
+      kubectl create secret generic db-secret \
+        --from-literal=url="postgresql://user:pass@db:5432/app" \
+        --from-literal=password="supersecret"
+
+      # Użycie w Pod spec:
+      env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: url
+
+  - name: StatefulSet — aplikacje stanowe
+    desc: >
+      StatefulSet gwarantuje stabilne nazwy Podów (pod-0, pod-1), kolejność startu i stopu,
+      oraz PersistentVolumeClaim przypisany do konkretnego Poda po restarcie.
+      Używaj dla PostgreSQL, Redis, Kafka, Elasticsearch w K8s zamiast Deployment.
+    code: |
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata:
+        name: postgres
+      spec:
+        serviceName: postgres
+        replicas: 1
+        selector:
+          matchLabels:
+            app: postgres
+        template:
+          metadata:
+            labels:
+              app: postgres
+          spec:
+            containers:
+              - name: postgres
+                image: postgres:16-alpine
+                env:
+                  - name: POSTGRES_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: db-secret
+                        key: password
+                volumeMounts:
+                  - name: data
+                    mountPath: /var/lib/postgresql/data
+        volumeClaimTemplates:
+          - metadata:
+              name: data
+            spec:
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 10Gi
+
+  - name: Job i CronJob — zadania jednorazowe i cykliczne
+    desc: >
+      Job uruchamia Pod do zakończenia zadania (migracje DB, backup, import danych).
+      CronJob uruchamia Job według harmonogramu cron. Oba automatycznie sprzątają
+      po zakończeniu (TTL). Używaj zamiast ręcznego uruchamiania skryptów.
+    code: |
+      # Job (jednorazowe zadanie)
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: db-migrate
+      spec:
+        template:
+          spec:
+            containers:
+              - name: migrate
+                image: moja-apka:1.2.0
+                command: ["python", "manage.py", "migrate"]
+            restartPolicy: OnFailure
+        ttlSecondsAfterFinished: 3600
+
+      # CronJob (cykliczne)
+      apiVersion: batch/v1
+      kind: CronJob
+      metadata:
+        name: daily-backup
+      spec:
+        schedule: "0 2 * * *"  # co noc o 02:00
+        jobTemplate:
+          spec:
+            template:
+              spec:
+                containers:
+                  - name: backup
+                    image: moja-apka:1.2.0
+                    command: ["python", "backup.py"]
+                restartPolicy: OnFailure

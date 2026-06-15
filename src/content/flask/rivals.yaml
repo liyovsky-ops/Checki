@@ -1,0 +1,82 @@
+title: Flask vs alternatywy webowe dla Pythona
+
+items:
+  - name: FastAPI
+    icon: "🚀"
+    color: "#009688"
+    tagline: Nowoczesny, szybki, async — z type hints i auto-dokumentacją
+    pros:
+      - Async/await natywnie — wydajność na poziomie Node.js
+      - Automatyczna dokumentacja Swagger/OpenAPI z type hints
+      - Wbudowana walidacja danych przez Pydantic
+      - Dependency Injection wbudowany w framework
+    cons:
+      - Mniejszy ekosystem niż Flask (mniej starych tutoriali i bibliotek)
+      - Async wymaga async-friendly bibliotek (SQLAlchemy async, httpx zamiast requests)
+      - Steeper learning curve dla osób bez znajomości type hints i Pydantic
+      - Jinja2 szablony nie są celem FastAPI — gorszy dla server-side rendering
+    vs: FastAPI dla nowych REST API i mikroserwisów — szczególnie gdy potrzebujesz auto-dokumentacji i walidacji. Flask gdy masz istniejący kod, serwujesz HTML lub potrzebujesz prostoty.
+
+  - name: Django
+    icon: "🎸"
+    color: "#44B78B"
+    tagline: Bateryjny — ORM, admin panel, auth, wszystko wbudowane
+    pros:
+      - Wbudowany ORM, admin panel, system autentykacji, formularze
+      - Django REST Framework (DRF) — dojrzałe REST API
+      - Duża społeczność, mnóstwo tutoriali i pakietów
+      - Najlepszy do CMS, portali i aplikacji z rozbudowanym admin
+    cons:
+      - Bardzo opinionated — trudno wyjść poza konwencje Django
+      - Ciężki jak na mikrousługę — wiele kodu którego nie używasz
+      - ORM Django mniej zaawansowany niż SQLAlchemy
+      - Zmiany w architekturze projektu są bolesne
+    vs: Django dla tradycyjnych web aplikacji z dużą ilością CRUD i panelem admina. Flask dla mikroserwisów, API gdzie chcesz pełną kontrolę i lekkość.
+
+  - name: Starlette
+    icon: "⭐"
+    color: "#009688"
+    tagline: ASGI micro-framework — fundament FastAPI, lekki i szybki
+    pros:
+      - ASGI — async od początku, WebSockets, Server-Sent Events
+      - Bardzo lekki i szybki — to na nim zbudowany FastAPI
+      - Wbudowane middleware, routing, pliki statyczne
+      - Świetny do budowy własnych frameworków
+    cons:
+      - Minimalny — mniej batteries-included niż Flask
+      - Mała społeczność bezpośrednio wokół Starlette (ludzie używają FastAPI)
+      - Dokumentacja skromniejsza niż FastAPI czy Flask
+      - Rzadziej widziany w ofertach pracy
+    vs: Starlette gdy chcesz async jak FastAPI ale bez Pydantic i extra warstw. Flask gdy async nie jest priorytetem i cenisz dojrzały ekosystem.
+
+  - name: Tornado
+    icon: "🌪️"
+    color: "#336699"
+    tagline: Async Python web — WebSockets i long polling od 2009 roku
+    pros:
+      - Dojrzały async framework z WebSocket support
+      - Non-blocking I/O — dobry dla długich połączeń
+      - Własny event loop (przed asyncio)
+      - Wbudowany HTTP server — bez Gunicorna do prostych deployów
+    cons:
+      - Przestarzały API (asyncio zastąpił własny event loop Tornado)
+      - Mniejsza społeczność — FastAPI i Starlette są nowocześniejsze
+      - Callback hell w starym kodzie Tornado
+      - Nowe projekty rzadko wybierają Tornado
+    vs: Tornado ma historyczne znaczenie ale FastAPI/Starlette są lepszym wyborem dla nowych projektów async. Flask lepszy od Tornado dla klasycznych REST API.
+
+  - name: Litestar (dawniej Starlite)
+    icon: "💫"
+    color: "#edb641"
+    tagline: Wydajny ASGI — alternatywa FastAPI z lepszym DI i DTO
+    pros:
+      - Szybszy niż FastAPI w benchmarkach
+      - Wbudowany DTO (Data Transfer Objects) — clean architecture
+      - Lepszy Dependency Injection niż FastAPI
+      - OpenAPI dokumentacja, walidacja, middleware — wszystko wbudowane
+    cons:
+      - Mała społeczność i ekosystem vs FastAPI/Flask
+      - Mniej tutoriali i zasobów online
+      - API zmieniało się dużo (rebranding ze Starlite na Litestar)
+      - Trudniej znaleźć deweloperów z doświadczeniem w Litestar
+    vs: Litestar ciekawy technicznie ale mały ekosystem. Flask dla sprawdzonego rozwiązania, FastAPI dla popularności i ekosystemu w przestrzeni async Python.

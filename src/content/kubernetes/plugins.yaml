@@ -1,0 +1,157 @@
+title: Ekosystem Kubernetes
+
+items:
+  - name: Helm
+    icon: "⛵"
+    desc: |
+      Package manager dla Kubernetes — gotowe paczki (Charts) dla popularnych aplikacji.
+      Instalacja: winget install Helm.Helm / brew install helm
+
+      Zamiast pisać manifesty YAML dla Postgres, Redis, nginx-ingress — używasz gotowego Helm Chart.
+      Zarządza wersjami, aktualizacjami i rollbackiem. Standard w każdym produkcyjnym klastrze.
+    code: |
+      # Dodaj repozytorium
+      helm repo add bitnami https://charts.bitnami.com/bitnami
+      helm repo update
+
+      # Zainstaluj PostgreSQL
+      helm install postgres bitnami/postgresql \
+        --namespace production \
+        --set auth.postgresPassword=secret \
+        --set primary.persistence.size=20Gi
+
+      # Lista zainstalowanych chart
+      helm list -n production
+
+      # Aktualizacja z nowymi wartościami
+      helm upgrade postgres bitnami/postgresql -n production \
+        --set primary.resources.limits.memory=2Gi
+
+      # Rollback do poprzedniej wersji
+      helm rollback postgres 1 -n production
+
+  - name: k9s — TUI do zarządzania klastrem
+    icon: "🐕"
+    desc: |
+      Terminal UI do eksploracji i zarządzania klastrem K8s w czasie rzeczywistym.
+      Instalacja: winget install k9scli.k9s / brew install k9s
+
+      Alternatywa dla ciągłego wpisywania kubectl. Widok live Podów, logów, eventów.
+      Skróty klawiszowe do describe, exec, delete. Niezbędne narzędzie DevOps.
+    code: |
+      k9s                        # uruchom
+      k9s -n production          # tylko namespace production
+      k9s --context staging      # inny klaster
+
+      # Skróty w k9s:
+      # :pod        - lista Podów
+      # :deploy     - lista Deploymentów
+      # :svc        - lista Services
+      # l           - logi wybranego Poda
+      # e           - edytuj zasób
+      # d           - describe zasób
+      # ctrl+d      - usuń zasób
+      # /           - filtruj po nazwie
+
+  - name: Argo CD — GitOps Continuous Delivery
+    icon: "🐙"
+    desc: |
+      GitOps CD tool — synchronizuje klaster K8s ze stanem zdefiniowanym w repozytorium Git.
+      Instalacja: kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+      Push do repo = automatyczny deploy do klastra. Drift detection — alarmuje jeśli klaster
+      odbiega od stanu w Git. UI do śledzenia deploymentów. Standard produkcji enterprise.
+    code: |
+      # Instalacja Argo CD przez Helm:
+      helm repo add argo https://argoproj.github.io/argo-helm
+      helm install argocd argo/argo-cd -n argocd --create-namespace
+
+      # CLI logowanie:
+      argocd login argocd.firma.pl
+
+      # Zarejestruj aplikację (sync z repo):
+      argocd app create api \
+        --repo https://github.com/firma/k8s-manifests \
+        --path manifests/api \
+        --dest-server https://kubernetes.default.svc \
+        --dest-namespace production \
+        --sync-policy automated
+
+      # Ręczny sync:
+      argocd app sync api
+
+  - name: Prometheus + Grafana — monitoring
+    icon: "📊"
+    desc: |
+      Prometheus zbiera metryki z klastra i aplikacji. Grafana wizualizuje je w dashboardach.
+      Instalacja: helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack
+
+      kube-prometheus-stack = Prometheus + Grafana + AlertManager + node-exporter + wiele gotowych dashboardów.
+      Standard monitoringu K8s. Metryki CPU, RAM, sieć, HPA, liczba Podów per deployment.
+    code: |
+      # Instalacja kube-prometheus-stack:
+      helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      helm install monitoring prometheus-community/kube-prometheus-stack \
+        --namespace monitoring \
+        --create-namespace \
+        --set grafana.adminPassword=secret
+
+      # Port-forward do Grafana (lokalne):
+      kubectl port-forward svc/monitoring-grafana 3000:80 -n monitoring
+      # Otwórz: http://localhost:3000 (admin/secret)
+
+      # Gotowe dashboardy dla K8s, Pods, Nodes, HPA są zainstalowane automatycznie
+
+  - name: cert-manager — automatyczne certyfikaty TLS
+    icon: "🔐"
+    desc: |
+      Automatycznie wystawia i odnawia certyfikaty TLS z Let's Encrypt lub własnego CA.
+      Instalacja: helm install cert-manager jetstack/cert-manager --set installCRDs=true
+
+      Zero ręcznej obsługi certyfikatów — cert-manager monitoruje wygaśnięcie i odnawia.
+      Integruje z Ingress — dodajesz annotation i masz HTTPS automatycznie.
+    code: |
+      # ClusterIssuer dla Let's Encrypt:
+      apiVersion: cert-manager.io/v1
+      kind: ClusterIssuer
+      metadata:
+        name: letsencrypt-prod
+      spec:
+        acme:
+          server: https://acme-v02.api.letsencrypt.org/directory
+          email: admin@firma.pl
+          privateKeySecretRef:
+            name: letsencrypt-prod
+          solvers:
+            - http01:
+                ingress:
+                  class: nginx
+
+      # W Ingress — annotation wystarczy:
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+      tls:
+        - hosts:
+            - api.firma.pl
+          secretName: api-tls
+
+  - name: Lens — Desktop GUI dla K8s
+    icon: "🔭"
+    desc: |
+      Desktop aplikacja do zarządzania klastrami K8s z GUI.
+      Instalacja: pobierz z lens.app (Windows/Mac/Linux)
+
+      Wizualny widok wszystkich zasobów, logów, metryk. Wbudowany terminal.
+      Dobre dla osób które wolą GUI od TUI. Obsługuje wiele klastrów jednocześnie.
+    code: |
+      # Po instalacji Lens:
+      # 1. Importuj klaster z .kube/config automatycznie
+      # 2. Nawiguj po zasobach w drzewku
+      # 3. Klikaj Pod aby zobaczyć logi, exec, describe
+      # 4. Wbudowane metryki (jeśli zainstalowany Prometheus)
+      # 5. Helm Charts przeglądaj i instaluj z GUI
+
+      # Alternatywy GUI:
+      # Headlamp  - open-source, lżejszy
+      # Octant    - VMware, open-source
+      # k9s       - TUI (terminal)

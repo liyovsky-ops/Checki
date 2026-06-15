@@ -1,0 +1,91 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Flask?
+  firstComponent: Pierwsza aplikacja Flask
+  firstComponentLang: python
+
+intro:
+  title: Czym jest Flask?
+  desc: >
+    Flask to mikro-framework webowy dla Pythona — minimalny core, zero narzuconych decyzji.
+    Dostajesz routing, obsługę requestów i szablony Jinja2. Resztę (baza danych, autoryzacja, API)
+    wybierasz sam. Przeciwieństwo Django — tam wszystko jest wbudowane, tu wszystko jest Twoje.
+    Idealny dla REST API, prototypów, mikroserwisów i gdy chcesz pełną kontrolę nad stackiem.
+
+concepts:
+  - title: Aplikacja Flask
+    desc: >
+      Flask app = instancja klasy Flask(__name__). Jeden obiekt spinający routing, config,
+      extensions i kontekst aplikacji. Tworzy się raz, rejestruje routes i extensions,
+      uruchamia przez app.run() lub serwer WSGI (Gunicorn, uWSGI).
+    icon: "🌶️"
+  - title: Routing i dekoratory
+    desc: >
+      @app.route('/') dekoruje funkcję jako handler dla danej ścieżki.
+      Funkcja zwraca odpowiedź (string, Response, JSON). Flask automatycznie
+      mapuje URL → funkcja i obsługuje metody HTTP (GET, POST, PUT, DELETE).
+    icon: "🛣️"
+  - title: Request Context
+    desc: >
+      Podczas obsługi żądania Flask tworzy kontekst z obiektem request.
+      request.method, request.json, request.form, request.args — dane z żądania.
+      Dostępny wewnątrz route handlerów. Izolowany per request, thread-safe.
+    icon: "📨"
+  - title: Blueprints
+    desc: >
+      Blueprint to moduł z routes, który rejestrujesz w aplikacji głównej.
+      Organizuje dużą aplikację w logiczne moduły — users, products, auth.
+      Każdy Blueprint ma własny prefix URL, statyczne pliki i szablony.
+    icon: "📋"
+  - title: Jinja2 Templates
+    desc: >
+      Wbudowany silnik szablonów. Plik HTML z placeholderami {{ zmienna }},
+      blokami {% if %} {% for %} i dziedziczeniem szablonów ({% extends %}).
+      Flask automatycznie szuka szablonów w katalogu templates/.
+    icon: "📄"
+  - title: Flask Extensions
+    desc: >
+      Flask sam w sobie nie ma ORM, logowania, JWT itp. — ale jest bogaty
+      ekosystem rozszerzeń: Flask-SQLAlchemy, Flask-Login, Flask-JWT-Extended,
+      Flask-Migrate, Flask-CORS. Instalujesz co potrzebujesz, nic więcej.
+    icon: "🔌"
+
+whenToUse:
+  - REST API bez narzuconego ORM — Flask + SQLAlchemy lub dowolna baza
+  - Mikrousługi — lekki, szybki start, minimalne zależności
+  - Prototypy i MVPs gdzie Django byłby overkill
+  - Gdy chcesz pełną kontrolę nad architekturą projektu
+  - Integracja z istniejącym frontendem (React/Vue) przez API
+  - Nauka web developmentu — prostszy punkt startowy niż Django
+
+firstComponent: |
+  # Instalacja
+  pip install flask
+
+  # app.py — minimalna aplikacja
+  from flask import Flask, jsonify, request
+
+  app = Flask(__name__)
+
+  @app.route('/')
+  def hello():
+      return 'Hello, World!'
+
+  @app.route('/users', methods=['GET', 'POST'])
+  def users():
+      if request.method == 'POST':
+          data = request.get_json()
+          return jsonify({'created': data}), 201
+      return jsonify({'users': []})
+
+  @app.route('/users/<int:user_id>')
+  def get_user(user_id):
+      return jsonify({'id': user_id, 'name': 'Jan Kowalski'})
+
+  if __name__ == '__main__':
+      app.run(debug=True)
+
+  # Uruchomienie
+  python app.py
+  # lub przez CLI:
+  flask --app app run --debug

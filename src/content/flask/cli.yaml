@@ -1,0 +1,163 @@
+title: Komendy Flask
+
+groups:
+  - name: Uruchomienie i serwer
+    icon: "🚀"
+    commands:
+      - cmd: flask --app app run --debug
+        desc: Uruchom serwer deweloperski z auto-reload
+        detail:
+          what: Startuje wbudowany serwer Werkzeug z debuggerem i auto-reload przy zmianach pliku.
+          how: '--app app = plik app.py. --debug włącza debugger i reloader. NIE używaj na produkcji.'
+          flags:
+            - flag: '--app <moduł>'
+              desc: Wskaż plik/moduł z aplikacją Flask
+            - flag: --debug
+              desc: Debugger + auto-reload
+            - flag: '--port 5001'
+              desc: Zmień port (domyślnie 5000)
+            - flag: '--host 0.0.0.0'
+              desc: Dostęp z sieci lokalnej
+          tips:
+            - 'Ustaw FLASK_APP=app w .env zamiast podawać --app przy każdej komendzie'
+            - 'flask run --reload --no-debugger — auto-reload bez debuggera'
+      - cmd: flask --app app run --host 0.0.0.0 --port 8000
+        desc: Uruchom na wszystkich interfejsach z custom portem
+        detail:
+          what: Serwer dostępny z innych urządzeń w sieci lokalnej na porcie 8000.
+          how: '0.0.0.0 = nasłuchuj na wszystkich interfejsach sieciowych (nie tylko localhost).'
+          tips:
+            - 'Sprawdź IP maszyny: ip addr lub ipconfig'
+            - 'Dla produkcji użyj Gunicorn zamiast wbudowanego serwera Flask'
+      - cmd: gunicorn -w 4 -b 0.0.0.0:8000 'app:create_app()'
+        desc: Produkcyjny serwer WSGI z 4 workerami
+        detail:
+          what: Gunicorn to produkcyjny WSGI serwer — stabilny, wieloprocesowy, bez debuggera.
+          how: '-w 4 = 4 worker procesy (zazwyczaj 2*CPU+1). create_app() dla Application Factory.'
+          flags:
+            - flag: '-w 4'
+              desc: Liczba worker procesów
+            - flag: '-b 0.0.0.0:8000'
+              desc: Adres i port nasłuchiwania
+            - flag: '--timeout 120'
+              desc: Timeout dla długich requestów
+          tips:
+            - 'pip install gunicorn'
+            - 'gunicorn -w 4 -b :8000 --log-level info app:create_app() — z logowaniem'
+
+  - name: Baza danych i migracje
+    icon: "🗄️"
+    commands:
+      - cmd: flask db init
+        desc: Inicjalizuj Flask-Migrate w projekcie
+        detail:
+          what: Tworzy katalog migrations/ z konfiguracją Alembic. Wykonaj raz na początku projektu.
+          how: Wymaga flask-migrate zainstalowanego i Migrate(app, db) w kodzie.
+          tips:
+            - 'Dodaj migrations/ do git — to historia schematu bazy'
+            - 'Nie modyfikuj ręcznie plików w migrations/versions/'
+      - cmd: flask db migrate -m "opis zmiany"
+        desc: Wygeneruj migrację na podstawie zmian w modelach
+        detail:
+          what: Porównuje aktualne modele SQLAlchemy z bazą i generuje plik migracji z ALTER TABLE.
+          how: Zawsze sprawdź wygenerowany plik w migrations/versions/ przed upgrade.
+          tips:
+            - 'flask db migrate -m "add phone to users" — opisowy komunikat'
+            - 'Alembic nie wykrywa wszystkich zmian (rename kolumny, niektóre constrainty) — sprawdź!'
+      - cmd: flask db upgrade
+        desc: Zastosuj migracje na bazę danych
+        detail:
+          what: Aplikuje wszystkie niezastosowane migracje na bieżącą bazę danych.
+          how: Bezpieczny — każda migracja ma up() i down(). Użyj na lokalnej i produkcyjnej bazie.
+          tips:
+            - 'flask db upgrade head — upgraduj do najnowszej migracji'
+            - 'flask db upgrade <revision_id> — upgraduj do konkretnej wersji'
+      - cmd: flask db downgrade
+        desc: Cofnij ostatnią migrację
+        detail:
+          what: Cofa ostatnią zastosowaną migrację — wykonuje funkcję downgrade() w pliku migracji.
+          how: Używaj ostrożnie na produkcji — może wymagać utraty danych jeśli usunięto kolumnę.
+          tips:
+            - 'flask db downgrade -1 — cofnij jedną migrację'
+            - 'flask db history — lista wszystkich migracji z ID'
+      - cmd: flask db current
+        desc: Pokaż aktualną wersję migracji bazy
+        detail:
+          what: Wyświetla ID aktualnie zastosowanej migracji w bazie danych.
+          how: Porównaj z flask db history żeby wiedzieć które migracje są jeszcze do zastosowania.
+          tips:
+            - 'flask db history — pełna historia wszystkich migracji'
+            - 'flask db show <revision> — szczegóły konkretnej migracji'
+
+  - name: Shell i kontekst aplikacji
+    icon: "🐍"
+    commands:
+      - cmd: flask shell
+        desc: Interaktywny Python shell z kontekstem Flask
+        detail:
+          what: Uruchamia Python REPL z załadowaną aplikacją Flask i kontekstem — możesz używać db, modeli, app.
+          how: Automatycznie importuje app. Przydatny do debugowania, testowania zapytań i jednorazowych operacji.
+          tips:
+            - 'from models import User; User.query.all() — sprawdź dane w bazie'
+            - 'db.create_all() — stwórz wszystkie tabele bez migracji (tylko dev!)'
+      - cmd: flask routes
+        desc: Lista wszystkich zarejestrowanych URL routes
+        detail:
+          what: Wyświetla wszystkie routes aplikacji z metodami HTTP i funkcjami handlerów.
+          how: Przydatne do sprawdzenia czy Blueprint routes są poprawnie zarejestrowane.
+          tips:
+            - 'flask routes | grep api — filtruj po ścieżce'
+            - 'Sprawdź URL prefixes dla Blueprintów'
+
+  - name: Instalacja i środowisko
+    icon: "📦"
+    commands:
+      - cmd: pip install flask
+        desc: Instalacja Flask
+        detail:
+          what: Instaluje Flask i jego zależności (Werkzeug, Jinja2, Click, itsdangerous).
+          how: Instaluj zawsze w virtualenv — nie globalnie.
+          tips:
+            - 'python -m venv venv && source venv/bin/activate (Linux) lub venv\\Scripts\\activate (Windows)'
+            - 'pip install flask flask-sqlalchemy flask-migrate flask-cors — typowy starter pack'
+      - cmd: pip install flask flask-sqlalchemy flask-migrate flask-jwt-extended flask-cors
+        desc: Instalacja typowego stacku Flask API
+        detail:
+          what: Instaluje Flask z najpopularniejszymi rozszerzeniami dla REST API.
+          how: flask-sqlalchemy=ORM, flask-migrate=migracje, flask-jwt-extended=JWT, flask-cors=CORS.
+          tips:
+            - 'pip freeze > requirements.txt — zapisz wersje zależności'
+            - 'pip install -r requirements.txt — zainstaluj z pliku wymagań'
+      - cmd: pip freeze > requirements.txt
+        desc: Zapisz zależności projektu do pliku
+        detail:
+          what: Eksportuje listę zainstalowanych pakietów z wersjami do pliku requirements.txt.
+          how: Commituj requirements.txt do repo. Inni instalują przez pip install -r requirements.txt.
+          tips:
+            - 'pip-compile (pip-tools) — lepsze zarządzanie zależnościami niż freeze'
+            - 'pip install pip-tools && pip-compile pyproject.toml — nowoczesna alternatywa'
+
+  - name: Testy
+    icon: "🧪"
+    commands:
+      - cmd: pytest tests/ -v
+        desc: Uruchom testy Flask z pytest
+        detail:
+          what: Uruchamia testy jednostkowe i integracyjne z verbose output.
+          how: Flask ma wbudowaną obsługę testów przez app.test_client() i app.test_request_context().
+          tips:
+            - 'pytest tests/ -v --tb=short — krótkie tracebacki'
+            - 'pytest tests/test_users.py::test_create_user — jeden konkretny test'
+      - cmd: pytest --cov=app tests/
+        desc: Uruchom testy z raportem pokrycia kodu
+        detail:
+          what: Uruchamia testy i generuje raport coverage — które linie kodu są testowane.
+          how: Wymaga pip install pytest-cov.
+          flags:
+            - flag: '--cov=app'
+              desc: Śledź coverage dla katalogu app
+            - flag: --cov-report=html
+              desc: Generuj raport HTML w htmlcov/
+          tips:
+            - 'pip install pytest pytest-cov'
+            - 'pytest --cov=app --cov-report=html tests/ — raport w htmlcov/index.html'

@@ -1,0 +1,211 @@
+title: Bazy danych z Flask
+
+items:
+  - name: Flask-SQLAlchemy — ORM dla Flask
+    desc: >
+      Flask-SQLAlchemy to integracja SQLAlchemy z Flask — zarządzanie connectionami,
+      kontekstem aplikacji i sesjami. Definiujesz modele jako klasy Python.
+      Obsługuje PostgreSQL, MySQL, SQLite i inne bazy przez URL w config.
+    code: |
+      # pip install flask-sqlalchemy psycopg2-binary
+
+      from flask import Flask
+      from flask_sqlalchemy import SQLAlchemy
+      from datetime import datetime
+
+      app = Flask(__name__)
+      app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://user:pass@localhost:5432/mydb'
+      app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+      db = SQLAlchemy(app)
+
+      # Modele
+      class User(db.Model):
+          __tablename__ = 'users'
+          id         = db.Column(db.Integer, primary_key=True)
+          email      = db.Column(db.String(120), unique=True, nullable=False)
+          name       = db.Column(db.String(80), nullable=False)
+          created_at = db.Column(db.DateTime, default=datetime.utcnow)
+          orders     = db.relationship('Order', backref='user', lazy=True)
+
+          def to_dict(self):
+              return {'id': self.id, 'email': self.email, 'name': self.name}
+
+      class Order(db.Model):
+          __tablename__ = 'orders'
+          id      = db.Column(db.Integer, primary_key=True)
+          user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+          total   = db.Column(db.Numeric(10, 2), nullable=False)
+          status  = db.Column(db.String(20), default='pending')
+
+      # Utwórz tabele
+      with app.app_context():
+          db.create_all()
+
+  - name: Operacje CRUD na modelach
+    desc: >
+      SQLAlchemy dostarcza db.session do zarządzania transakcjami.
+      Zawsze używaj commit() po zapisie i rollback() przy błędach.
+      Queries przez Model.query lub db.session.execute().
+    code: |
+      from flask import jsonify, request
+      from sqlalchemy.exc import IntegrityError
+
+      @app.route('/users', methods=['GET'])
+      def list_users():
+          # Filtrowanie, sortowanie, paginacja
+          page  = request.args.get('page', 1, type=int)
+          limit = request.args.get('limit', 10, type=int)
+          users = User.query \
+              .filter_by(active=True) \
+              .order_by(User.created_at.desc()) \
+              .paginate(page=page, per_page=limit, error_out=False)
+          return jsonify({
+              'users': [u.to_dict() for u in users.items],
+              'total': users.total,
+              'page':  users.page
+          })
+
+      @app.route('/users', methods=['POST'])
+      def create_user():
+          data = request.get_json()
+          user = User(email=data['email'], name=data['name'])
+          try:
+              db.session.add(user)
+              db.session.commit()
+              return jsonify(user.to_dict()), 201
+          except IntegrityError:
+              db.session.rollback()
+              return jsonify({'error': 'Email już istnieje'}), 409
+
+      @app.route('/users/<int:user_id>', methods=['GET'])
+      def get_user(user_id):
+          user = User.query.get_or_404(user_id)
+          return jsonify(user.to_dict())
+
+      @app.route('/users/<int:user_id>', methods=['PUT'])
+      def update_user(user_id):
+          user = User.query.get_or_404(user_id)
+          data = request.get_json()
+          user.name = data.get('name', user.name)
+          db.session.commit()
+          return jsonify(user.to_dict())
+
+      @app.route('/users/<int:user_id>', methods=['DELETE'])
+      def delete_user(user_id):
+          user = User.query.get_or_404(user_id)
+          db.session.delete(user)
+          db.session.commit()
+          return '', 204
+
+  - name: Flask-Migrate — migracje bazy danych
+    desc: >
+      Flask-Migrate to integracja Alembic z Flask — zarządza migracjami schematu bazy.
+      Zamiast ręcznego ALTER TABLE, tworzysz pliki migracji z historią zmian.
+      Bezpieczna aktualizacja produkcyjnej bazy bez utraty danych.
+    code: |
+      # pip install flask-migrate
+
+      from flask import Flask
+      from flask_sqlalchemy import SQLAlchemy
+      from flask_migrate import Migrate
+
+      app = Flask(__name__)
+      app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://...'
+
+      db = SQLAlchemy(app)
+      migrate = Migrate(app, db)
+
+      # Inicjalizacja (raz):
+      # flask db init        ← tworzy katalog migrations/
+
+      # Typowy workflow:
+      # 1. Zmodyfikuj model w Python
+      # 2. flask db migrate -m "add phone column to users"
+      # 3. Sprawdź wygenerowany plik w migrations/versions/
+      # 4. flask db upgrade   ← aplikuj na bazę
+
+      # Inne komendy:
+      # flask db downgrade      ← cofnij ostatnią migrację
+      # flask db history        ← historia migracji
+      # flask db current        ← aktualna wersja bazy
+
+  - name: Application Factory z bazą danych
+    desc: >
+      Prawidłowy wzorzec dla aplikacji z bazą danych — Application Factory zapewnia
+      że db.init_app(app) jest wywoływane prawidłowo. db jest obiektem globalnym
+      importowanym przez modele, ale inicjalizowanym dopiero w create_app().
+    code: |
+      # myapp/__init__.py
+      from flask import Flask
+      from flask_sqlalchemy import SQLAlchemy
+      from flask_migrate import Migrate
+
+      db = SQLAlchemy()
+      migrate = Migrate()
+
+      def create_app(config=None):
+          app = Flask(__name__)
+
+          # Konfiguracja
+          app.config['SQLALCHEMY_DATABASE_URI'] = \
+              'postgresql://user:pass@localhost:5432/mydb'
+          app.config['SECRET_KEY'] = 'dev-secret'
+
+          if config:
+              app.config.update(config)
+
+          # Inicjalizacja extensions
+          db.init_app(app)
+          migrate.init_app(app, db)
+
+          # Rejestracja Blueprintów
+          from .api.users import users_bp
+          app.register_blueprint(users_bp)
+
+          return app
+
+      # Użycie w testach:
+      # app = create_app({'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
+      #                   'TESTING': True})
+
+  - name: Zapytania zaawansowane
+    desc: >
+      SQLAlchemy 2.0 preferuje nowe API przez db.session.execute() i select().
+      Obsługuje JOIN, GROUP BY, subquery, window functions i raw SQL
+      gdy ORM nie wystarczy. Wszystko bezpiecznie przez parametry (bez SQL injection).
+    code: |
+      from sqlalchemy import select, func, and_, or_, text
+
+      # Nowy styl SQLAlchemy 2.0:
+      stmt = select(User).where(
+          and_(
+              User.active == True,
+              or_(User.name.like('%Jan%'), User.email.like('%@firma.pl'))
+          )
+      ).order_by(User.created_at.desc()).limit(10)
+
+      users = db.session.execute(stmt).scalars().all()
+
+      # Agregacje:
+      count_stmt = select(
+          User.status,
+          func.count(User.id).label('total')
+      ).group_by(User.status)
+
+      results = db.session.execute(count_stmt).all()
+
+      # JOIN:
+      stmt = select(User, Order) \
+          .join(Order, Order.user_id == User.id) \
+          .where(Order.status == 'pending')
+
+      rows = db.session.execute(stmt).all()
+      for user, order in rows:
+          print(user.name, order.total)
+
+      # Raw SQL (gdy konieczny):
+      result = db.session.execute(
+          text('SELECT * FROM users WHERE email = :email'),
+          {'email': 'jan@firma.pl'}
+      ).fetchone()

@@ -1,0 +1,82 @@
+title: Kubernetes vs alternatywy orkiestracji
+
+items:
+  - name: Docker Swarm
+    icon: "🐳"
+    color: "#2496ED"
+    tagline: Wbudowana orkiestracja Docker — prosta, mała skala
+    pros:
+      - Wbudowany w Docker — zero dodatkowej instalacji
+      - Bardzo prosta konfiguracja i mała krzywa uczenia
+      - Wystarczający dla małych projektów (2-5 serwisów)
+      - Ten sam format docker-compose.yml
+    cons:
+      - Brak auto-scalingu (HPA nie istnieje)
+      - Bardzo ograniczony ekosystem w porównaniu do K8s
+      - Praktycznie martwy projekt — Docker Inc. skupia się na K8s
+      - Brak rolling updates z health checks na poziomie K8s
+    vs: Swarm dla małych projektów bez potrzeby skalowania. K8s gdy potrzebujesz auto-scaling, zaawansowanego monitoringu i produkcji enterprise. Nie zaczynaj od Swarm jeśli planujesz skalować.
+
+  - name: HashiCorp Nomad
+    icon: "🔷"
+    color: "#00CA8E"
+    tagline: Elastyczny scheduler — kontenery i nie tylko
+    pros:
+      - Prostszy niż K8s — mniej obiektów do nauki
+      - Uruchamia nie tylko kontenery (VMs, Java apps, binaries)
+      - Świetna integracja z Vault i Consul (HashiCorp stack)
+      - Jeden binark — łatwiejszy self-hosting niż K8s
+    cons:
+      - Mniejszy ekosystem niż K8s (mniej operatorów, helm chartów)
+      - Mniej wsparcia ze strony chmur (brak zarządzanego Nomad jak EKS/GKE)
+      - Mniejsza społeczność i mniej tutoriali
+      - Brak niektórych K8s features (CRD, NetworkPolicy)
+    vs: Nomad gdy masz mieszane środowisko (kontenery + legacowe aplikacje) lub lubisz prostotę HashiCorp stacku. K8s gdy chcesz największy ekosystem i wsparcie chmury.
+
+  - name: AWS ECS / Fargate
+    icon: "🟠"
+    color: "#FF9900"
+    tagline: Zarządzana orkiestracja AWS bez Control Plane
+    pros:
+      - Bez zarządzania Control Plane — zero operacyjne overhead
+      - Natywna integracja z ALB, IAM, CloudWatch, ECR
+      - Fargate — serverless kontenery bez zarządzania Nodes
+      - Prostszy model bezpieczeństwa (IAM per task)
+    cons:
+      - Vendor lock-in w AWS — migracja do innej chmury trudna
+      - Mniejszy ekosystem niż K8s (mniej operatorów i narzędzi)
+      - Ograniczone opcje networking vs K8s CNI
+      - Brak portability między środowiskami (lokalny dev inaczej)
+    vs: ECS/Fargate gdy jesteś all-in AWS i cenisz prostotę operacyjną. K8s gdy chcesz cloud-agnostic solution lub multi-cloud. ECS tańszy w małej skali, K8s lepszy w dużej.
+
+  - name: OpenShift (Red Hat)
+    icon: "🔴"
+    color: "#EE0000"
+    tagline: Enterprise K8s z dodatkami Red Hat
+    pros:
+      - K8s pod spodem — kompatybilny z manifesatmi K8s
+      - Wbudowane CI/CD (Tekton), registry, monitoring
+      - Hardened security out of the box (SCC, restricted)
+      - Wsparcie enterprise od Red Hat
+    cons:
+      - Bardzo drogi — licencja Red Hat
+      - Opinionated — narzuca wzorce które mogą kolidować
+      - Cięższy niż vanilla K8s — więcej komponentów
+      - SCC (Security Context Constraints) trudniejsze niż K8s RBAC
+    vs: OpenShift dla enterprise z wymaganiami compliance i budżetem. Vanilla K8s (EKS/GKE/AKS) dla elastyczności i niższych kosztów. OpenShift = K8s z bateriami, ale drogie baterie.
+
+  - name: k3s (Lightweight K8s)
+    icon: "🪶"
+    color: "#FFC61E"
+    tagline: Lekki K8s dla edge, IoT i small clusters
+    pros:
+      - Jeden binarny plik (< 100MB) — instalacja w minutę
+      - Kompatybilny z K8s API — te same manifesty i kubectl
+      - Świetny do edge computing, Raspberry Pi, małych VPS
+      - Darmowy i open-source (SUSE/Rancher)
+    cons:
+      - Nie dla dużych klastrów produkcyjnych
+      - Niektóre K8s features uproszczone lub usunięte
+      - Mniejsza społeczność niż vanilla K8s
+      - HA setup trudniejszy niż EKS/GKE
+    vs: k3s dla edge, IoT, lokalnego developmentu lub małych produkcyjnych VPS. Vanilla K8s (EKS/GKE) dla produkcji enterprise. k3s świetnie zastępuje minikube do lokalnego dev.
