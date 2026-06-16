@@ -1,0 +1,294 @@
+title: Komendy OpenAI SDK
+
+groups:
+  - name: Instalacja i setup
+    icon: "📦"
+    commands:
+      - cmd: pip install openai
+        desc: Zainstaluj OpenAI SDK
+        detail:
+          what: Instaluje oficjalną bibliotekę Pythona do komunikacji z API OpenAI.
+          how: Po instalacji importujesz from openai import OpenAI i tworzysz klienta.
+          tips:
+            - 'pip install openai --upgrade — zaktualizuj do najnowszej wersji (API się zmienia)'
+            - 'pip show openai — sprawdź zainstalowaną wersję'
+      - cmd: 'export OPENAI_API_KEY="sk-..."'
+        desc: Ustaw klucz API (zmienna środowiskowa)
+        detail:
+          what: Ustawia klucz API OpenAI dla bieżącej sesji terminala — klient czyta go automatycznie.
+          how: 'OpenAI() bez argumentów szuka klucza w zmiennej środowiskowej OPENAI_API_KEY.'
+          tips:
+            - 'Klucz znajdziesz na platform.openai.com/api-keys'
+            - 'Nigdy nie commituj klucza do git — dodaj .env do .gitignore'
+      - cmd: pip install python-dotenv
+        desc: Zainstaluj dotenv do wczytywania .env
+        detail:
+          what: Instaluje python-dotenv — pozwala wczytać zmienne środowiskowe z pliku .env do kodu.
+          how: "from dotenv import load_dotenv; load_dotenv() na początku skryptu wczytuje plik .env."
+          tips:
+            - "echo 'OPENAI_API_KEY=sk-...' >> .env — dodaj klucz do pliku"
+            - 'Zawsze .env w .gitignore — nie commituj kluczy API'
+      - cmd: pip install openai tiktoken
+        desc: SDK + tiktoken (liczenie tokenów)
+        detail:
+          what: Instaluje OpenAI SDK razem z tiktoken — biblioteką do liczenia tokenów bez wywołania API.
+          how: tiktoken pozwala sprawdzić koszt/limit kontekstu przed wysłaniem requestu.
+          tips:
+            - 'encoding_for_model("gpt-4o-mini") — pobierz odpowiednie kodowanie dla modelu'
+            - 'Liczenie tokenów lokalnie jest darmowe — nie zużywa limitu API'
+
+  - name: Klient — podstawy
+    icon: "🔑"
+    commands:
+      - cmd: client = OpenAI()
+        desc: Stwórz klienta (czyta OPENAI_API_KEY z env)
+        detail:
+          what: Tworzy klienta autoryzowanego automatycznie kluczem z zmiennej środowiskowej.
+          how: Jeden klient na całą aplikację — reużywaj, nie twórz nowego przy każdym wywołaniu.
+          tips:
+            - 'OpenAI(api_key="sk-...") — przekaż klucz explicite jeśli nie używasz env'
+            - 'client.api_key — sprawdź jaki klucz jest aktywny (debug)'
+      - cmd: client = OpenAI(timeout=20.0, max_retries=3)
+        desc: Klient z timeout i retry
+        detail:
+          what: Konfiguruje klienta z maksymalnym czasem czekania na odpowiedź i liczbą automatycznych prób.
+          how: max_retries automatycznie powtarza request przy błędach sieciowych i rate limitach (429).
+          tips:
+            - 'timeout=httpx.Timeout(10.0, read=30.0) — różne timeouty dla różnych faz'
+            - 'max_retries=0 — wyłącz automatyczny retry jeśli sam go obsługujesz'
+      - cmd: client = AsyncOpenAI()
+        desc: Klient asynchroniczny
+        detail:
+          what: Tworzy klienta z metodami async — używaj w FastAPI i innych frameworkach async.
+          how: Identyczne API jak OpenAI, ale wszystkie metody wymagają await.
+          tips:
+            - 'await client.chat.completions.create(...) — zawsze z await'
+            - 'Jeden AsyncOpenAI() na całą aplikację, nie per-request'
+      - cmd: client.models.list()
+        desc: Wylistuj dostępne modele
+        detail:
+          what: Zwraca listę wszystkich modeli dostępnych dla Twojego konta API.
+          how: Przydatne żeby sprawdzić czy masz dostęp do konkretnego modelu (np. nowy o3).
+          tips:
+            - "[m.id for m in client.models.list()] — lista samych nazw modeli"
+            - 'Dostęp do najnowszych modeli czasem wymaga wcześniejszego użycia API (tier system)'
+
+  - name: Chat Completions
+    icon: "💬"
+    commands:
+      - cmd: client.chat.completions.create(model="gpt-4o-mini", messages=[...])
+        desc: Podstawowe wywołanie chat
+        detail:
+          what: Wysyła listę wiadomości do modelu i zwraca jedną lub więcej propozycji odpowiedzi.
+          how: "messages = lista dictów z role (system/user/assistant) i content."
+          tips:
+            - 'response.choices[0].message.content — tekst odpowiedzi'
+            - 'response.usage.total_tokens — ile tokenów zużyło wywołanie'
+      - cmd: 'response.choices[0].message.content'
+        desc: Odczytaj treść odpowiedzi
+        detail:
+          what: Wyciąga właściwy tekst odpowiedzi z obiektu response.
+          how: choices to lista (n>1 daje kilka alternatywnych odpowiedzi) — domyślnie n=1.
+          tips:
+            - 'response.choices[0].finish_reason — "stop"/"length"/"tool_calls"'
+            - 'len(response.choices) — sprawdź ile alternatyw dostałeś (przy n>1)'
+      - cmd: client.beta.chat.completions.parse(model=..., response_format=Model)
+        desc: Structured output z Pydantic
+        detail:
+          what: Wywołuje model z gwarancją że odpowiedź dokładnie pasuje do podanej klasy Pydantic.
+          how: response_format=TwojaKlasa — model zwraca JSON walidowany i sparsowany automatycznie.
+          tips:
+            - 'response.choices[0].message.parsed — gotowy obiekt Pydantic, nie dict'
+            - 'Dostępne dla gpt-4o i nowszych — sprawdź dokumentację dla starszych modeli'
+
+  - name: Embeddings i obrazy
+    icon: "🧮"
+    commands:
+      - cmd: client.embeddings.create(model="text-embedding-3-small", input=text)
+        desc: Stwórz embedding tekstu
+        detail:
+          what: Zamienia tekst na wektor liczb używany do wyszukiwania semantycznego i RAG.
+          how: input może być stringiem lub listą stringów (batch) — jedno wywołanie, wiele wektorów.
+          tips:
+            - 'response.data[0].embedding — lista floatów (1536 wymiarów dla small)'
+            - 'text-embedding-3-large — dokładniejszy, ale droższy i wolniejszy'
+      - cmd: client.images.generate(model="dall-e-3", prompt=text)
+        desc: Wygeneruj obraz z opisu
+        detail:
+          what: Tworzy obraz na podstawie tekstowego opisu (text-to-image) przy użyciu DALL-E 3.
+          how: 'size="1024x1024", quality="standard"|"hd" — kontrolują rozmiar i cenę.'
+          tips:
+            - 'response.data[0].url — link do obrazu, ważny ograniczony czas, pobierz go'
+            - 'Prompt jest automatycznie rozszerzany przez model — sprawdź response.data[0].revised_prompt'
+      - cmd: client.audio.transcriptions.create(model="whisper-1", file=audio_file)
+        desc: Transkrypcja audio (Whisper)
+        detail:
+          what: Zamienia plik audio na tekst — rozpoznawanie mowy w wielu językach.
+          how: 'file=open("nagranie.mp3", "rb") — otwórz plik w trybie binarnym przed przekazaniem.'
+          tips:
+            - 'response_format="srt" — zwróć z timestampami w formacie napisów'
+            - 'language="pl" — wskaż język żeby poprawić dokładność transkrypcji'
+
+  - name: Debugowanie i koszty
+    icon: "🐛"
+    commands:
+      - cmd: print(response.usage)
+        desc: Sprawdź zużycie tokenów wywołania
+        detail:
+          what: Wyświetla prompt_tokens, completion_tokens i total_tokens dla danego wywołania.
+          how: Pomnóż total_tokens przez cenę modelu (platform.openai.com/pricing) żeby policzyć koszt.
+          tips:
+            - 'Loguj usage przy każdym wywołaniu w produkcji — łatwiej śledzić koszty'
+            - 'completion_tokens zwykle droższe niż prompt_tokens — sprawdź cennik per model'
+      - cmd: pip show openai
+        desc: Sprawdź wersję zainstalowanego SDK
+        detail:
+          what: Wyświetla zainstalowaną wersję biblioteki openai — ważne bo API bywa aktualizowane.
+          how: Porównaj z CHANGELOG na GitHub (openai/openai-python) przed dużym upgrade.
+          tips:
+            - 'pip install --upgrade openai — zaktualizuj do najnowszej wersji'
+            - 'Breaking changes zdarzają się rzadko, ale sprawdzaj przy major version bump'
+      - cmd: 'except openai.RateLimitError: ...'
+        desc: Złap błąd przekroczenia limitu (429)
+        detail:
+          what: Łapie wyjątek zwracany gdy przekroczysz rate limit konta (requesty/minutę lub tokeny/minutę).
+          how: SDK automatycznie retry'uje (max_retries), ale warto też obsłużyć ten wyjątek samemu.
+          tips:
+            - 'Sprawdź limity konta na platform.openai.com/account/limits'
+            - 'time.sleep() + retry własny gdy potrzebujesz dłuższego backoffu niż domyślny'
+      - cmd: 'except openai.APIStatusError as e: print(e.status_code, e.response)'
+        desc: Złap ogólny błąd HTTP od API
+        detail:
+          what: Łapie wszystkie błędy ze statusem HTTP innym niż 2xx — przydatne jako catch-all po konkretnych wyjątkach.
+          how: e.status_code i e.response dają pełny szczegół błędu zwróconego przez serwer OpenAI.
+          tips:
+            - 'Łap konkretne wyjątki (RateLimitError, AuthenticationError) przed ogólnym APIStatusError'
+            - 'openai.AuthenticationError — zwykle złe lub wygasłe OPENAI_API_KEY'
+
+  - name: Function Calling — komendy
+    icon: "🛠️"
+    commands:
+      - cmd: 'tools=[{"type": "function", "function": {...}}]'
+        desc: Zdefiniuj listę narzędzi przekazywaną do modelu
+        detail:
+          what: Parametr tools w chat.completions.create() — lista schematów JSON opisujących funkcje dostępne dla modelu.
+          how: Każdy tool ma name, description i parameters (JSON Schema) — model wybiera który wywołać.
+          tips:
+            - 'Krótkie, precyzyjne description — model wybiera narzędzie na podstawie tego opisu'
+            - "required w parameters wymusza, żeby model zawsze podał dany argument"
+      - cmd: response.choices[0].message.tool_calls
+        desc: Odczytaj wywołania narzędzi z odpowiedzi modelu
+        detail:
+          what: Lista obiektów tool_calls — każdy ma id, function.name i function.arguments (string JSON).
+          how: 'None jeśli model nie zdecydował się użyć żadnego narzędzia — zawsze sprawdź czy nie jest None.'
+          tips:
+            - 'json.loads(call.function.arguments) — sparsuj argumenty do dict'
+            - 'call.id potrzebny do powiązania wyniku z message role="tool"'
+      - cmd: 'tool_choice={"type": "function", "function": {"name": "get_weather"}}'
+        desc: Wymuś konkretne narzędzie
+        detail:
+          what: Zamiast pozwolić modelowi wybrać, wymuszasz wywołanie konkretnej, nazwanej funkcji.
+          how: Przydatne gdy wiesz że dany krok zawsze wymaga konkretnego narzędzia (np. ekstrakcja danych).
+          tips:
+            - 'tool_choice="required" — wymusza JAKIEKOLWIEK narzędzie, ale nie konkretne'
+            - 'tool_choice="none" — zablokuj wywołanie narzędzi, model musi odpowiedzieć tekstem'
+      - cmd: parallel_tool_calls=False
+        desc: Wyłącz równoległe wywołania narzędzi
+        detail:
+          what: Domyślnie model może wywołać kilka narzędzi naraz (parallel_tool_calls=True) — ta flaga wymusza jedno na raz.
+          how: Przydatne gdy narzędzia mają efekty uboczne, które muszą wykonać się sekwencyjnie.
+          tips:
+            - 'Sekwencyjne wywołania są bezpieczniejsze przy operacjach zapisu (baza danych, płatności)'
+            - 'Domyślnie True — równoległe wywołania są szybsze dla operacji tylko-odczyt'
+
+  - name: Streaming — komendy
+    icon: "📡"
+    commands:
+      - cmd: stream=True
+        desc: Włącz streaming odpowiedzi
+        detail:
+          what: Parametr w chat.completions.create() — zamiast czekać na całą odpowiedź, dostajesz generator chunków.
+          how: Iterujesz po stream i odczytujesz chunk.choices[0].delta.content dla każdego fragmentu.
+          tips:
+            - 'delta.content może być None (np. pierwszy chunk z rolą) — zawsze sprawdzaj przed użyciem'
+            - 'stream_options={"include_usage": True} — dostań usage w ostatnim chunku przy streamingu'
+      - cmd: 'for chunk in stream: print(chunk.choices[0].delta.content or "", end="")'
+        desc: Wypisz streaming token po tokenie
+        detail:
+          what: Klasyczna pętla wypisująca każdy fragment odpowiedzi natychmiast po otrzymaniu, bez nowej linii.
+          how: 'end="" zapobiega nowej linii po każdym tokenie — tekst składa się w jedną linię jak w ChatGPT.'
+          tips:
+            - 'flush=True w print() jeśli output nie pojawia się na żywo w terminalu'
+            - 'Zbieraj fragmenty do listy i zrób "".join() jeśli potrzebujesz pełnego tekstu na końcu'
+      - cmd: async for chunk in await client.chat.completions.create(stream=True, ...)
+        desc: Async streaming (AsyncOpenAI)
+        detail:
+          what: Połączenie async + stream — nie blokuje event loop podczas odbierania kolejnych fragmentów.
+          how: Wymaga await przy samym wywołaniu create(), a potem async for przy iteracji po chunkach.
+          tips:
+            - 'Idealne do FastAPI StreamingResponse — przekazujesz generator dalej do klienta'
+            - 'Pamiętaj o await na create() — to różni się od zwykłego stream=True bez async'
+
+  - name: Audio i Text-to-Speech
+    icon: "🔊"
+    commands:
+      - cmd: client.audio.speech.create(model="tts-1", voice="alloy", input=text)
+        desc: Wygeneruj mowę z tekstu (TTS)
+        detail:
+          what: Zamienia tekst na audio (mp3) — text-to-speech, odwrotność transkrypcji Whisper.
+          how: 'voice = "alloy"|"echo"|"fable"|"onyx"|"nova"|"shimmer" — różne głosy do wyboru.'
+          tips:
+            - 'response.stream_to_file("output.mp3") — zapisz wygenerowane audio do pliku'
+            - 'model="tts-1-hd" — wyższa jakość audio, wolniejsze generowanie, wyższy koszt'
+      - cmd: response.stream_to_file('speech.mp3')
+        desc: Zapisz wygenerowane audio do pliku
+        detail:
+          what: Metoda na response z audio.speech.create() — zapisuje binarne dane audio prosto do pliku mp3.
+          how: Alternatywnie response.content daje surowe bajty jeśli potrzebujesz innego formatu zapisu.
+          tips:
+            - 'response_format="opus"|"aac"|"flac" — inne formaty audio przy generowaniu'
+            - 'speed=1.5 — przyspiesz/zwolnij wygenerowaną mowę (0.25 do 4.0)'
+      - cmd: client.audio.translations.create(model="whisper-1", file=audio_file)
+        desc: Przetłumacz audio na angielski tekst
+        detail:
+          what: Whisper potrafi nie tylko transkrybować, ale też tłumaczyć mowę z innego języka na angielski tekst.
+          how: W przeciwieństwie do transcriptions, translations zawsze zwraca tekst w języku angielskim.
+          tips:
+            - 'Do transkrypcji w oryginalnym języku użyj audio.transcriptions, nie translations'
+            - 'Przydatne do szybkiego zrozumienia treści nagrania w nieznanym języku'
+
+  - name: Batch, pliki, moderacja
+    icon: "📋"
+    commands:
+      - cmd: client.files.create(file=open("data.jsonl", "rb"), purpose="batch")
+        desc: Wgraj plik do API (do batch lub fine-tuning)
+        detail:
+          what: Przesyła plik na serwery OpenAI — wymagane przed użyciem Batch API lub fine-tuningiem.
+          how: 'purpose="batch"|"fine-tune"|"assistants" — różne przeznaczenia plików w API.'
+          tips:
+            - 'Format JSONL — jedna linia to jeden JSON request'
+            - 'client.files.list() — sprawdź wszystkie wgrane pliki i ich ID'
+      - cmd: client.batches.create(input_file_id=file.id, endpoint="/v1/chat/completions", completion_window="24h")
+        desc: Uruchom Batch API (50% taniej, wynik do 24h)
+        detail:
+          what: Batch API przetwarza wiele requestów asynchronicznie w tle — znacznie taniej niż zwykłe wywołania, ale wolniej.
+          how: Idealne do zadań niewymagających odpowiedzi natychmiast (masowa klasyfikacja, analiza danych).
+          tips:
+            - 'client.batches.retrieve(batch.id) — sprawdź status (validating/in_progress/completed)'
+            - 'completion_window="24h" — jedyna obecnie wspierana wartość okna czasowego'
+      - cmd: client.moderations.create(input=text)
+        desc: Sprawdź czy tekst narusza politykę treści
+        detail:
+          what: Bezpłatny endpoint sprawdzający tekst pod kątem treści szkodliwych (przemoc, nienawiść, self-harm itd.).
+          how: response.results[0].flagged = bool, plus szczegółowe kategorie z wynikami per kategoria.
+          tips:
+            - 'Uruchamiaj na input użytkownika PRZED wysłaniem do chat.completions w aplikacjach publicznych'
+            - 'model="omni-moderation-latest" — najnowszy model moderacji, wspiera też obrazy'
+      - cmd: client.fine_tuning.jobs.create(training_file=file.id, model="gpt-4o-mini-2024-07-18")
+        desc: Uruchom fine-tuning modelu na własnych danych
+        detail:
+          what: Trenuje wersję modelu dostrojoną do Twoich danych — lepsza jakość dla wąskich, powtarzalnych zadań.
+          how: Wymaga pliku treningowego JSONL z przykładami messages w formacie chat.completions.
+          tips:
+            - 'client.fine_tuning.jobs.list() — sprawdź status i historię zadań fine-tuningu'
+            - 'Fine-tuning kosztuje za trening ORAZ generuje droższy model do późniejszego użycia'

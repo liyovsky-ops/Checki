@@ -1,0 +1,122 @@
+title: Chat Completions API
+
+items:
+  - name: Podstawowe wywołanie chat
+    desc: >
+      chat.completions.create() to główny endpoint do konwersacji. Przekazujesz listę
+      messages z rolami. Model zwraca jedną lub więcej propozycji odpowiedzi (choices).
+      Domyślnie n=1 — jedna odpowiedź.
+    code: |
+      from openai import OpenAI
+
+      client = OpenAI()
+
+      response = client.chat.completions.create(
+          model="gpt-4o-mini",
+          messages=[
+              {"role": "system", "content": "Odpowiadaj krótko, po polsku."},
+              {"role": "user", "content": "Co to jest Docker?"}
+          ]
+      )
+
+      print(response.choices[0].message.content)
+      print(response.choices[0].finish_reason)  # "stop", "length", "tool_calls"
+      print(response.usage)  # prompt_tokens, completion_tokens, total_tokens
+
+  - name: Multi-turn — pamięć konwersacji
+    desc: >
+      API nie pamięta historii — Ty musisz dołączać poprzednie wiadomości do każdego
+      wywołania. Buduj listę messages dodając odpowiedzi modelu i nowe pytania użytkownika.
+    code: |
+      messages = [
+          {"role": "system", "content": "Jesteś asystentem programisty."}
+      ]
+
+      def chat(user_input):
+          messages.append({"role": "user", "content": user_input})
+          response = client.chat.completions.create(
+              model="gpt-4o-mini",
+              messages=messages
+          )
+          reply = response.choices[0].message.content
+          messages.append({"role": "assistant", "content": reply})
+          return reply
+
+      print(chat("Jak nazywa się plik konfiguracyjny Dockera?"))
+      print(chat("Pokaż mi przykład"))  # model pamięta poprzedni kontekst
+
+  - name: Kluczowe parametry
+    desc: >
+      temperature, top_p kontrolują losowość. presence_penalty/frequency_penalty
+      zmniejszają powtarzanie się modelu. stop definiuje sekwencje przerywające generowanie.
+      seed (beta) dla powtarzalnych wyników w testach.
+    code: |
+      response = client.chat.completions.create(
+          model="gpt-4o",
+          messages=messages,
+          temperature=0.2,        # niska = bardziej deterministyczny (dobre dla kodu)
+          max_tokens=500,         # limit długości odpowiedzi
+          top_p=1.0,              # nucleus sampling, zwykle zostaw 1.0 z temperature
+          presence_penalty=0.0,   # >0 = zachęca do nowych tematów
+          frequency_penalty=0.0,  # >0 = zmniejsza powtarzanie słów
+          stop=["\n\n", "###"],   # przerwij generowanie na tej sekwencji
+          n=1,                    # liczba alternatywnych odpowiedzi
+          seed=42                 # powtarzalność (beta, nie 100% gwarantowane)
+      )
+
+  - name: Structured Outputs — gwarantowany JSON
+    desc: >
+      response_format z json_schema gwarantuje że model zwróci JSON o dokładnej strukturze —
+      bez parsowania wolnego tekstu i bez ryzyka błędnego formatu. Najlepszy sposób
+      na ekstrakcję danych z GPT-4o i nowszymi modelami.
+    code: |
+      from pydantic import BaseModel
+
+      class Faktura(BaseModel):
+          numer: str
+          kwota: float
+          data: str
+          dostawca: str
+
+      response = client.beta.chat.completions.parse(
+          model="gpt-4o-mini",
+          messages=[
+              {"role": "system", "content": "Wyciągnij dane z faktury."},
+              {"role": "user", "content": tresc_faktury}
+          ],
+          response_format=Faktura
+      )
+
+      faktura = response.choices[0].message.parsed
+      print(faktura.numer, faktura.kwota)  # typowany obiekt Pydantic, nie dict
+
+  - name: Multi-modal — obrazy w wiadomościach
+    desc: >
+      GPT-4o przyjmuje obrazy jako część message content — analiza screenshotów,
+      diagramów, zdjęć. Content staje się listą obiektów (text + image_url)
+      zamiast prostego stringa.
+    code: |
+      import base64
+
+      def encode_image(path):
+          with open(path, "rb") as f:
+              return base64.b64encode(f.read()).decode("utf-8")
+
+      image_b64 = encode_image("screenshot.png")
+
+      response = client.chat.completions.create(
+          model="gpt-4o",
+          messages=[
+              {
+                  "role": "user",
+                  "content": [
+                      {"type": "text", "text": "Co jest nie tak na tym screenshocie?"},
+                      {
+                          "type": "image_url",
+                          "image_url": {"url": f"data:image/png;base64,{image_b64}"}
+                      }
+                  ]
+              }
+          ]
+      )
+      print(response.choices[0].message.content)

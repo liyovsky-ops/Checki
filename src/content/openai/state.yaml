@@ -1,0 +1,115 @@
+title: Embeddings i Vision
+
+items:
+  - name: Tworzenie embeddingów
+    desc: >
+      embeddings.create() zamienia tekst na wektor liczb (np. 1536 wymiarów dla
+      text-embedding-3-small) — podobne znaczenia mają podobne wektory. Podstawa
+      wyszukiwania semantycznego i RAG.
+    code: |
+      response = client.embeddings.create(
+          model="text-embedding-3-small",
+          input="Kubernetes to system orkiestracji kontenerów"
+      )
+
+      vector = response.data[0].embedding  # lista 1536 floatów
+      print(len(vector), vector[:5])
+
+      # Wiele tekstów naraz (batch)
+      response = client.embeddings.create(
+          model="text-embedding-3-small",
+          input=["Tekst pierwszy", "Tekst drugi", "Tekst trzeci"]
+      )
+      vectors = [item.embedding for item in response.data]
+
+  - name: Podobieństwo kosinusowe
+    desc: >
+      Porównujesz embeddingi licząc cosine similarity — wartość bliska 1.0 znaczy
+      że teksty są semantycznie podobne, bliska 0 że niezwiązane. Podstawa
+      wyszukiwania "znajdź podobne dokumenty".
+    code: |
+      import numpy as np
+
+      def cosine_similarity(a, b):
+          a, b = np.array(a), np.array(b)
+          return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+      emb1 = client.embeddings.create(model="text-embedding-3-small", input="kot").data[0].embedding
+      emb2 = client.embeddings.create(model="text-embedding-3-small", input="pies").data[0].embedding
+      emb3 = client.embeddings.create(model="text-embedding-3-small", input="samochód").data[0].embedding
+
+      print(cosine_similarity(emb1, emb2))  # wyżej — zwierzęta są podobne
+      print(cosine_similarity(emb1, emb3))  # niżej — kot vs samochód
+
+  - name: RAG — wyszukiwanie semantyczne (szkic)
+    desc: >
+      Retrieval Augmented Generation: 1) embedduj dokumenty i zapisz w bazie wektorowej,
+      2) embedduj pytanie użytkownika, 3) znajdź najbardziej podobne dokumenty,
+      4) wstaw je do promptu jako kontekst dla modelu.
+    code: |
+      # 1. Indeksowanie dokumentów (raz, offline)
+      docs = ["Dokument o Pythonie...", "Dokument o Dockerze...", "Dokument o K8s..."]
+      doc_embeddings = [
+          client.embeddings.create(model="text-embedding-3-small", input=d).data[0].embedding
+          for d in docs
+      ]
+
+      # 2. Pytanie użytkownika
+      query = "Jak działa konteneryzacja?"
+      query_emb = client.embeddings.create(model="text-embedding-3-small", input=query).data[0].embedding
+
+      # 3. Znajdź najbardziej podobny dokument
+      similarities = [cosine_similarity(query_emb, d) for d in doc_embeddings]
+      best_doc = docs[similarities.index(max(similarities))]
+
+      # 4. Wstaw jako kontekst do promptu
+      response = client.chat.completions.create(
+          model="gpt-4o-mini",
+          messages=[
+              {"role": "system", "content": f"Odpowiedz na podstawie kontekstu: {best_doc}"},
+              {"role": "user", "content": query}
+          ]
+      )
+      # W produkcji: użyj bazy wektorowej (Pinecone, Chroma, pgvector) zamiast listy w pamięci
+
+  - name: Vision — analiza obrazów z URL
+    desc: >
+      Oprócz base64 możesz przekazać publiczny URL obrazu — model pobiera go
+      sam. Przydatne gdy obrazy są już hostowane (CDN, S3) i nie chcesz
+      kodować ich lokalnie.
+    code: |
+      response = client.chat.completions.create(
+          model="gpt-4o",
+          messages=[
+              {
+                  "role": "user",
+                  "content": [
+                      {"type": "text", "text": "Opisz co widzisz na tym zdjęciu"},
+                      {
+                          "type": "image_url",
+                          "image_url": {
+                              "url": "https://example.com/zdjecie.jpg",
+                              "detail": "high"  # "low" | "high" | "auto" — wpływa na koszt i precyzję
+                          }
+                      }
+                  ]
+              }
+          ]
+      )
+      print(response.choices[0].message.content)
+
+  - name: Generowanie obrazów (DALL-E)
+    desc: >
+      images.generate() tworzy obraz z opisu tekstowego (text-to-image).
+      DALL-E 3 generuje jeden obraz na wywołanie, w wysokiej jakości,
+      z automatycznym rozszerzaniem promptu.
+    code: |
+      response = client.images.generate(
+          model="dall-e-3",
+          prompt="Minimalistyczne logo dla startupu AI, niebiesko-fioletowe, płaskie",
+          size="1024x1024",
+          quality="standard",  # "standard" | "hd"
+          n=1
+      )
+      image_url = response.data[0].url
+      print(image_url)  # URL ważny przez ograniczony czas — pobierz i zapisz lokalnie

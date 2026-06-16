@@ -1,0 +1,81 @@
+title: OpenAI SDK vs alternatywy
+
+items:
+  - name: Anthropic SDK (Claude)
+    icon: "🟣"
+    color: "#D4A574"
+    tagline: "API do modeli Claude — silny w kodzie, długim kontekście i rozumowaniu"
+    pros:
+      - Bardzo dobre wyniki w kodowaniu i złożonym rozumowaniu (Claude Sonnet/Opus)
+      - Prompt caching — drastycznie tańsze powtórne wywołania z tym samym kontekstem
+      - Computer use — model może obsługiwać interfejs graficzny
+      - Wysoki limit kontekstu (200k+ tokenów) w wielu modelach
+      - Mniej "halucynuje" przy strict instructions niż część modeli GPT
+    cons:
+      - Mniejszy ekosystem narzędzi i tutoriali niż OpenAI
+      - Brak natywnego DALL-E/Whisper — tylko tekst i obrazy wejściowe
+      - Inne API (messages, content blocks) — migracja z OpenAI wymaga zmian w kodzie
+      - Mniej modeli "małych/tanich" niż gpt-4o-mini do prostych zadań
+    vs: OpenAI gdy potrzebujesz pełnego ekosystemu (obrazy, audio, function calling, structured outputs) jednym SDK. Anthropic gdy priorytetem jest jakość kodu/rozumowania i prompt caching dla długich kontekstów.
+
+  - name: Google Gemini SDK
+    icon: "✨"
+    color: "#4285F4"
+    tagline: "API Google — multimodalność, ogromny kontekst, integracja z Google Cloud"
+    pros:
+      - Bardzo duży kontekst (do 1-2M tokenów w Gemini 1.5/2.0 Pro)
+      - Natywna multimodalność — wideo, audio, obrazy, tekst w jednym wywołaniu
+      - Darmowy tier przez Google AI Studio do testów i małych projektów
+      - Dobra integracja z resztą Google Cloud (Vertex AI, BigQuery)
+    cons:
+      - API mniej ustandaryzowane historycznie — kilka wersji SDK (google-generativeai → google-genai)
+      - Mniejsza społeczność i mniej przykładów produkcyjnych niż OpenAI
+      - Function calling i structured outputs mniej dopracowane niż w OpenAI
+      - Jakość modeli mniejszych (Flash) bywa niższa niż gpt-4o-mini w niektórych zadaniach
+    vs: OpenAI dla stabilnego, dobrze udokumentowanego API z najszerszym wsparciem community. Gemini gdy potrzebujesz gigantycznego kontekstu lub przetwarzania długich wideo/audio.
+
+  - name: Mistral AI SDK
+    icon: "🌬️"
+    color: "#FA520F"
+    tagline: "Europejski provider — open-weight modele, dobra cena/wydajność"
+    pros:
+      - Część modeli open-weight — można hostować samemu (pełna kontrola danych)
+      - Konkurencyjna cena za token wśród modeli klasy enterprise
+      - Serwery w UE — łatwiejsza zgodność z RODO/GDPR dla europejskich firm
+      - API kompatybilne z OpenAI (chat.completions) — łatwa migracja
+    cons:
+      - Mniejszy ekosystem niż OpenAI/Anthropic — mniej gotowych integracji
+      - Najmocniejsze modele wciąż trochę słabsze niż GPT-4o/Claude w trudnych zadaniach
+      - Mniejsza społeczność i mniej tutoriali po polsku/angielsku
+    vs: OpenAI dla maksymalnej jakości i ekosystemu. Mistral gdy ważna jest lokalizacja danych w UE, koszt, lub chcesz hostować model samodzielnie (open-weight).
+
+  - name: Ollama (modele lokalne)
+    icon: "🦙"
+    color: "#000000"
+    tagline: "Lokalne uruchamianie modeli open-source — zero kosztów API, pełna prywatność"
+    pros:
+      - Zero kosztów za token — model działa na Twoim sprzęcie
+      - Pełna prywatność — dane nigdy nie wychodzą z Twojej maszyny
+      - Działa offline — brak zależności od dostępności API providera
+      - API kompatybilne z OpenAI SDK (base_url="http://localhost:11434/v1")
+    cons:
+      - Wymaga mocnego sprzętu (GPU z dużą pamięcią) dla dużych modeli
+      - Modele open-source generalnie słabsze niż GPT-4o/Claude w trudnych zadaniach
+      - Brak function calling/structured outputs tak dopracowanych jak w OpenAI
+      - Ty zarządzasz infrastrukturą — aktualizacje, skalowanie, monitoring
+    vs: OpenAI gdy potrzebujesz najwyższej jakości i nie chcesz zarządzać infrastrukturą. Ollama gdy priorytetem jest prywatność danych, zerowy koszt API lub praca offline.
+
+  - name: LiteLLM (proxy/abstrakcja)
+    icon: "🔀"
+    color: "#0ea5e9"
+    tagline: "Jeden interfejs OpenAI-style do 100+ providerów (Anthropic, Gemini, lokalne)"
+    pros:
+      - Jeden format wywołania dla wszystkich providerów — łatwe przełączanie modeli
+      - Fallback i load balancing między modelami/providerami wbudowane
+      - Proxy server z budżetowaniem kosztów i rate limitingiem per użytkownik
+      - Ułatwia testowanie wielu modeli bez przepisywania kodu
+    cons:
+      - Dodatkowa warstwa abstrakcji — może maskować specyficzne funkcje providera
+      - Czasem opóźnienie w wsparciu najnowszych features (np. nowy parametr OpenAI)
+      - Debugging trudniejszy — błąd może być w LiteLLM albo w providerze
+    vs: OpenAI SDK gdy używasz tylko jednego providera i chcesz pełnej kontroli/najnowszych funkcji. LiteLLM gdy budujesz produkt który musi wspierać wielu providerów lub robić fallback między nimi.

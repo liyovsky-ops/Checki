@@ -1,0 +1,108 @@
+title: Streaming i Async
+
+items:
+  - name: Streaming odpowiedzi (sync)
+    desc: >
+      stream=True zwraca generator chunków zamiast czekać na całą odpowiedź — pokazujesz
+      tekst użytkownikowi token po tokenie, jak w ChatGPT. Każdy chunk ma delta.content
+      (może być None dla pierwszego/ostatniego chunka).
+    code: |
+      stream = client.chat.completions.create(
+          model="gpt-4o-mini",
+          messages=[{"role": "user", "content": "Napisz krótki wiersz o Pythonie"}],
+          stream=True
+      )
+
+      for chunk in stream:
+          delta = chunk.choices[0].delta.content
+          if delta:
+              print(delta, end="", flush=True)
+      print()  # nowa linia na końcu
+
+  - name: AsyncOpenAI — klient asynchroniczny
+    desc: >
+      AsyncOpenAI ma identyczne API jak OpenAI, ale metody są async — używaj w FastAPI
+      i innych frameworkach async żeby nie blokować event loop podczas czekania na model.
+    code: |
+      from openai import AsyncOpenAI
+      import asyncio
+
+      client = AsyncOpenAI()
+
+      async def ask(question: str) -> str:
+          response = await client.chat.completions.create(
+              model="gpt-4o-mini",
+              messages=[{"role": "user", "content": question}]
+          )
+          return response.choices[0].message.content
+
+      async def main():
+          result = await ask("Co to jest event loop?")
+          print(result)
+
+      asyncio.run(main())
+
+  - name: Async streaming
+    desc: >
+      Połączenie async + stream — idealne dla FastAPI endpointów streamujących odpowiedź
+      do klienta przez Server-Sent Events lub WebSocket bez blokowania serwera.
+    code: |
+      async def stream_answer(question: str):
+          stream = await client.chat.completions.create(
+              model="gpt-4o-mini",
+              messages=[{"role": "user", "content": question}],
+              stream=True
+          )
+          async for chunk in stream:
+              delta = chunk.choices[0].delta.content
+              if delta:
+                  yield delta
+
+      # W FastAPI — Server-Sent Events
+      from fastapi.responses import StreamingResponse
+
+      @app.post("/chat")
+      async def chat_endpoint(question: str):
+          return StreamingResponse(stream_answer(question), media_type="text/plain")
+
+  - name: Równoległe wywołania z asyncio.gather
+    desc: >
+      Wiele niezależnych wywołań API możesz wysłać równolegle z asyncio.gather —
+      znacznie szybsze niż sekwencyjne await, bo czekanie na odpowiedź modelu
+      to głównie I/O (sieć), nie CPU.
+    code: |
+      async def summarize(text: str) -> str:
+          response = await client.chat.completions.create(
+              model="gpt-4o-mini",
+              messages=[{"role": "user", "content": f"Streszcz w 1 zdaniu: {text}"}]
+          )
+          return response.choices[0].message.content
+
+      async def main():
+          texts = ["Tekst 1...", "Tekst 2...", "Tekst 3..."]
+          # Wszystkie 3 wywołania API lecą równolegle, nie po kolei
+          results = await asyncio.gather(*[summarize(t) for t in texts])
+          for r in results:
+              print(r)
+
+  - name: Retry i obsługa błędów
+    desc: >
+      SDK ma wbudowany automatyczny retry (max_retries=2 domyślnie) dla błędów
+      sieciowych i rate limitów (429). Dla pełnej kontroli łap konkretne wyjątki
+      z openai (RateLimitError, APIConnectionError, APIStatusError).
+    code: |
+      from openai import OpenAI, RateLimitError, APIConnectionError
+
+      client = OpenAI(max_retries=3, timeout=20.0)
+
+      try:
+          response = client.chat.completions.create(
+              model="gpt-4o-mini",
+              messages=[{"role": "user", "content": "Cześć"}]
+          )
+      except RateLimitError:
+          print("Przekroczony limit requestów — poczekaj i spróbuj ponownie")
+      except APIConnectionError:
+          print("Problem z połączeniem sieciowym")
+      except Exception as e:
+          print(f"Nieoczekiwany błąd: {e}")

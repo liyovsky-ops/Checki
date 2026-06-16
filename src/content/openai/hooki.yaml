@@ -1,0 +1,118 @@
+title: Function Calling — narzędzia dla modelu
+
+items:
+  - name: Definicja narzędzia (tool)
+    desc: >
+      Tool to opis funkcji którą model może "wybrać" do wywołania — nazwa, opis,
+      schema JSON parametrów. Model NIE wykonuje kodu — zwraca tylko nazwę funkcji
+      i argumenty. Wykonanie i zwrócenie wyniku jest Twoją odpowiedzialnością.
+    code: |
+      tools = [
+          {
+              "type": "function",
+              "function": {
+                  "name": "get_weather",
+                  "description": "Pobierz aktualną pogodę dla danego miasta",
+                  "parameters": {
+                      "type": "object",
+                      "properties": {
+                          "city": {"type": "string", "description": "Nazwa miasta"},
+                          "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}
+                      },
+                      "required": ["city"]
+                  }
+              }
+          }
+      ]
+
+      response = client.chat.completions.create(
+          model="gpt-4o-mini",
+          messages=[{"role": "user", "content": "Jaka jest pogoda w Warszawie?"}],
+          tools=tools,
+          tool_choice="auto"  # model decyduje czy użyć narzędzia
+      )
+
+  - name: Pełny cykl — wywołanie i odpowiedź
+    desc: >
+      Pełny przepływ: 1) model zwraca tool_calls, 2) Ty wykonujesz odpowiednią funkcję
+      Pythona, 3) dołączasz wynik jako message z role="tool", 4) wysyłasz ponownie
+      do modelu żeby sformułował odpowiedź dla użytkownika na podstawie wyniku.
+    code: |
+      import json
+
+      def get_weather(city, unit="celsius"):
+          return {"city": city, "temp": 18, "unit": unit, "condition": "słonecznie"}
+
+      messages = [{"role": "user", "content": "Jaka jest pogoda w Krakowie?"}]
+      response = client.chat.completions.create(
+          model="gpt-4o-mini", messages=messages, tools=tools
+      )
+
+      msg = response.choices[0].message
+      if msg.tool_calls:
+          messages.append(msg)  # dołącz wiadomość modelu z tool_calls
+          for call in msg.tool_calls:
+              args = json.loads(call.function.arguments)
+              result = get_weather(**args)  # wykonaj prawdziwą funkcję
+              messages.append({
+                  "role": "tool",
+                  "tool_call_id": call.id,
+                  "content": json.dumps(result)
+              })
+
+          # Drugie wywołanie — model formułuje odpowiedź na podstawie wyniku
+          final = client.chat.completions.create(model="gpt-4o-mini", messages=messages)
+          print(final.choices[0].message.content)
+
+  - name: Wiele narzędzi i wybór modelu
+    desc: >
+      Model może mieć dostęp do wielu narzędzi naraz i sam decyduje które (jeśli
+      jakieś) wywołać — może też wywołać kilka jednocześnie (parallel tool calls).
+      tool_choice="required" wymusza użycie narzędzia, "none" blokuje.
+    code: |
+      tools = [
+          {"type": "function", "function": {"name": "get_weather", "description": "...", "parameters": {...}}},
+          {"type": "function", "function": {"name": "search_database", "description": "...", "parameters": {...}}},
+          {"type": "function", "function": {"name": "send_email", "description": "...", "parameters": {...}}}
+      ]
+
+      response = client.chat.completions.create(
+          model="gpt-4o",
+          messages=messages,
+          tools=tools,
+          tool_choice="auto",       # "auto" | "required" | "none" | {"type":"function","function":{"name":"..."}}
+          parallel_tool_calls=True  # pozwól modelowi wywołać kilka tools jednocześnie
+      )
+
+      # response.choices[0].message.tool_calls może zawierać kilka wywołań naraz
+      for call in response.choices[0].message.tool_calls or []:
+          print(call.function.name, call.function.arguments)
+
+  - name: Strict mode — gwarancja poprawnego JSON
+    desc: >
+      strict: true gwarantuje że argumenty zwrócone przez model dokładnie odpowiadają
+      schemie parametrów — model nie "zgaduje" formatu. Zalecane dla produkcyjnych
+      narzędzi gdzie błędny JSON oznacza crash.
+    code: |
+      tools = [
+          {
+              "type": "function",
+              "function": {
+                  "name": "create_invoice",
+                  "description": "Utwórz fakturę w systemie",
+                  "strict": True,
+                  "parameters": {
+                      "type": "object",
+                      "properties": {
+                          "client_name": {"type": "string"},
+                          "amount": {"type": "number"},
+                          "currency": {"type": "string", "enum": ["PLN", "EUR", "USD"]}
+                      },
+                      "required": ["client_name", "amount", "currency"],
+                      "additionalProperties": False
+                  }
+              }
+          }
+      ]
+      # Ze strict=True odpowiedź modelu ZAWSZE pasuje do tego schema —
+      # json.loads(call.function.arguments) nigdy nie zawiedzie z błędem struktury

@@ -1,0 +1,84 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać OpenAI SDK?
+  firstComponent: Pierwsze wywołanie API
+  firstComponentLang: python
+
+intro:
+  title: Czym jest OpenAI SDK?
+  desc: >
+    Oficjalna biblioteka Pythona do komunikacji z API OpenAI — GPT-4o, GPT-4.1, o1/o3,
+    DALL-E, Whisper, embeddings. Jeden klient (OpenAI()) daje dostęp do wszystkich endpointów:
+    chat, function calling, streaming, generowanie obrazów, transkrypcja audio.
+    Standard branżowy — większość frameworków AI (LangChain, LangGraph) używa go pod spodem
+    lub ma kompatybilne API (Ollama, OpenRouter, Azure OpenAI).
+
+concepts:
+  - title: Client i API Key
+    desc: >
+      OpenAI() tworzy klienta autoryzowanego kluczem API (zmienna OPENAI_API_KEY
+      lub przekazana explicite). Klient ma metody .chat.completions.create(),
+      .embeddings.create(), .images.generate() itd. Jeden obiekt na całą aplikację.
+    icon: "🔑"
+  - title: Messages i Roles
+    desc: >
+      Konwersacja to lista wiadomości z rolą: system (instrukcje), user (pytanie),
+      assistant (odpowiedź modelu), tool (wynik wywołania funkcji).
+      Model widzi całą historię przy każdym wywołaniu — SDK nie pamięta kontekstu sam.
+    icon: "💬"
+  - title: Model i parametry
+    desc: >
+      Wybierasz model przy każdym wywołaniu (gpt-4o, gpt-4o-mini, o1).
+      temperature kontroluje losowość (0=deterministyczny, 2=bardzo losowy).
+      max_tokens limituje długość odpowiedzi. Różne modele = różne ceny i możliwości.
+    icon: "🎛️"
+  - title: Tokeny
+    desc: >
+      Model przetwarza tekst jako tokeny (≈4 znaki = 1 token w angielskim, więcej w polskim).
+      Cena i limit kontekstu liczone w tokenach. tiktoken pozwala policzyć tokeny
+      przed wysłaniem — unikasz przekroczenia limitu kontekstu.
+    icon: "🔢"
+  - title: Function Calling (Tools)
+    desc: >
+      Model może "zażądać" wywołania funkcji którą zdefiniujesz (np. get_weather()).
+      SDK nie wykonuje funkcji za Ciebie — zwraca jej nazwę i argumenty, Ty wykonujesz
+      kod i odsyłasz wynik z powrotem do modelu. Podstawa budowy agentów.
+    icon: "🛠️"
+  - title: Structured Outputs
+    desc: >
+      response_format z schemą JSON (lub Pydantic model) gwarantuje że odpowiedź modelu
+      ma dokładnie taki kształt jakiego oczekujesz — bez parsowania wolnego tekstu.
+      Dostępne dla GPT-4o i nowszych modeli.
+    icon: "📐"
+
+whenToUse:
+  - Chatboty i asystenci konwersacyjni z pamięcią kontekstu
+  - Function calling — agent wywołujący zewnętrzne API/bazy danych na żądanie modelu
+  - Strukturyzowana ekstrakcja danych z tekstu (response_format + Pydantic)
+  - Streaming odpowiedzi w czasie rzeczywistym do UI (jak ChatGPT)
+  - Embeddings do wyszukiwania semantycznego i RAG (Retrieval Augmented Generation)
+  - Generowanie obrazów (DALL-E), transkrypcja audio (Whisper), text-to-speech
+
+firstComponent: |
+  # Instalacja
+  pip install openai
+
+  # Ustaw klucz API (zmienna środowiskowa)
+  # export OPENAI_API_KEY="sk-..."
+
+  from openai import OpenAI
+
+  client = OpenAI()  # czyta OPENAI_API_KEY automatycznie
+
+  response = client.chat.completions.create(
+      model="gpt-4o-mini",
+      messages=[
+          {"role": "system", "content": "Jesteś pomocnym asystentem."},
+          {"role": "user", "content": "Wyjaśnij czym jest Kubernetes w 2 zdaniach."}
+      ],
+      temperature=0.7,
+      max_tokens=200
+  )
+
+  print(response.choices[0].message.content)
+  print(f"Tokeny: {response.usage.total_tokens}")

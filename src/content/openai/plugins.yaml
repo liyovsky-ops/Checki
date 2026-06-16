@@ -1,0 +1,117 @@
+title: Ekosystem OpenAI SDK
+
+items:
+  - name: tiktoken — liczenie tokenów
+    icon: "🔢"
+    desc: >
+      tiktoken to oficjalna biblioteka OpenAI do liczenia tokenów bez wywoływania API —
+      sprawdzasz koszt i limit kontekstu przed wysłaniem requestu.
+    code: |
+      # pip install tiktoken
+      import tiktoken
+
+      encoding = tiktoken.encoding_for_model("gpt-4o-mini")
+
+      text = "Ile tokenów ma to zdanie?"
+      tokens = encoding.encode(text)
+      print(len(tokens))  # liczba tokenów
+      print(encoding.decode(tokens))  # odwrotnie — tokeny na tekst
+
+      def count_tokens(messages, model="gpt-4o-mini"):
+          enc = tiktoken.encoding_for_model(model)
+          return sum(len(enc.encode(m["content"])) for m in messages)
+
+  - name: instructor — structured outputs przez Pydantic
+    icon: "🧩"
+    desc: >
+      instructor opakowuje klienta OpenAI i automatycznie waliduje/retry'uje odpowiedzi
+      modelu względem schemy Pydantic — przydatne dla starszych modeli bez natywnego
+      response_format lub gdy chcesz automatyczny retry przy błędnej walidacji.
+    code: |
+      # pip install instructor
+      import instructor
+      from openai import OpenAI
+      from pydantic import BaseModel
+
+      client = instructor.from_openai(OpenAI())
+
+      class Osoba(BaseModel):
+          imie: str
+          wiek: int
+
+      osoba = client.chat.completions.create(
+          model="gpt-4o-mini",
+          response_model=Osoba,
+          messages=[{"role": "user", "content": "Jan ma 30 lat"}],
+      )
+      print(osoba.imie, osoba.wiek)  # typowany obiekt, automatyczna walidacja + retry
+
+  - name: LangChain — integracja jako jeden z providerów
+    icon: "🦜"
+    desc: >
+      langchain-openai to oficjalny binding LangChain do OpenAI — używasz gdy budujesz
+      większy pipeline (RAG, agent, chain) i chcesz łatwo przełączać providera bez
+      przepisywania logiki aplikacji.
+    code: |
+      # pip install langchain-openai
+      from langchain_openai import ChatOpenAI
+      from langchain_core.messages import HumanMessage
+
+      llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
+      response = llm.invoke([HumanMessage("Co to jest LangChain?")])
+      print(response.content)
+
+      # Streaming przez LangChain
+      for chunk in llm.stream([HumanMessage("Wymień 3 kolory")]):
+          print(chunk.content, end="", flush=True)
+
+  - name: Helicone / LangSmith — observability
+    icon: "🔍"
+    desc: >
+      Helicone (proxy, jedna linia konfiguracji) i LangSmith (pełna platforma) logują
+      każde wywołanie OpenAI — koszt, latency, prompty, odpowiedzi. Niezbędne przy
+      produkcyjnych aplikacjach gdzie trzeba śledzić wydatki na API.
+    code: |
+      # Helicone — wystarczy zmienić base_url
+      from openai import OpenAI
+
+      client = OpenAI(
+          base_url="https://oai.helicone.ai/v1",
+          default_headers={"Helicone-Auth": f"Bearer {HELICONE_API_KEY}"}
+      )
+      # Każde wywołanie jest teraz logowane na helicone.ai z kosztem i latency
+
+      # Alternatywnie: LangSmith (gdy używasz langchain-openai)
+      import os
+      os.environ["LANGCHAIN_TRACING_V2"] = "true"
+      os.environ["LANGCHAIN_API_KEY"] = "ls__..."
+
+  - name: pgvector / Chroma / Pinecone — bazy wektorowe
+    icon: "🗂️"
+    desc: >
+      Embeddingi z OpenAI trzeba gdzieś przechowywać i przeszukiwać efektywnie —
+      pgvector (rozszerzenie PostgreSQL), Chroma (lokalna, prosta) i Pinecone
+      (managed, skalowalna) to najpopularniejsze opcje do RAG w produkcji.
+    code: |
+      # Chroma — najprostsza do startu, działa lokalnie
+      # pip install chromadb
+      import chromadb
+
+      chroma_client = chromadb.Client()
+      collection = chroma_client.create_collection("dokumenty")
+
+      embedding = client.embeddings.create(
+          model="text-embedding-3-small", input="Tekst dokumentu"
+      ).data[0].embedding
+
+      collection.add(
+          embeddings=[embedding],
+          documents=["Tekst dokumentu"],
+          ids=["doc1"]
+      )
+
+      query_emb = client.embeddings.create(
+          model="text-embedding-3-small", input="pytanie użytkownika"
+      ).data[0].embedding
+
+      results = collection.query(query_embeddings=[query_emb], n_results=3)
