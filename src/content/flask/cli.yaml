@@ -29,6 +29,14 @@ groups:
           tips:
             - 'Sprawdź IP maszyny: ip addr lub ipconfig'
             - 'Dla produkcji użyj Gunicorn zamiast wbudowanego serwera Flask'
+      - cmd: 'flask run --cert=adhoc'
+        desc: Uruchom serwer deweloperski z HTTPS (self-signed)
+        detail:
+          what: Generuje tymczasowy self-signed certyfikat i serwuje aplikację po HTTPS.
+          how: Przydatne do testowania funkcji wymagających HTTPS lokalnie (np. cookies Secure, OAuth callbacks).
+          tips:
+            - 'Przeglądarka pokaże ostrzeżenie o niezaufanym certyfikacie — to normalne dla adhoc'
+            - 'flask run --cert=cert.pem --key=key.pem — własny certyfikat'
       - cmd: gunicorn -w 4 -b 0.0.0.0:8000 'app:create_app()'
         desc: Produkcyjny serwer WSGI z 4 workerami
         detail:
@@ -44,6 +52,22 @@ groups:
           tips:
             - 'pip install gunicorn'
             - 'gunicorn -w 4 -b :8000 --log-level info app:create_app() — z logowaniem'
+      - cmd: waitress-serve --host=0.0.0.0 --port=8000 app:app
+        desc: Produkcyjny serwer WSGI na Windows (Gunicorn nie działa)
+        detail:
+          what: Waitress to czysto-Pythonowy WSGI serwer produkcyjny — działa na Windows, gdzie Gunicorn nie jest wspierany.
+          how: 'pip install waitress. app:app = moduł app, zmienna app (instancja Flask).'
+          tips:
+            - 'Alternatywa dla Gunicorna na Windows i w środowiskach bez fork()'
+            - 'Wolniejszy niż Gunicorn pod dużym obciążeniem, ale stabilny i prosty'
+      - cmd: gunicorn --worker-class gevent -w 4 -b :8000 app:app
+        desc: Gunicorn z workerami async (gevent)
+        detail:
+          what: gevent worker pozwala obsłużyć więcej równoczesnych połączeń niż domyślny sync worker — dobry dla I/O-bound endpointów.
+          how: 'Wymaga pip install gevent. Domyślny sync worker blokuje się na każdym requeście.'
+          tips:
+            - 'Użyj gevent gdy masz wiele długich requestów (np. wywołania zewnętrznych API)'
+            - 'Dla CPU-bound zadań sync worker jest prostszy i wystarczający'
 
   - name: Baza danych i migracje
     icon: "🗄️"
@@ -56,7 +80,7 @@ groups:
           tips:
             - 'Dodaj migrations/ do git — to historia schematu bazy'
             - 'Nie modyfikuj ręcznie plików w migrations/versions/'
-      - cmd: flask db migrate -m "opis zmiany"
+      - cmd: 'flask db migrate -m "opis zmiany"'
         desc: Wygeneruj migrację na podstawie zmian w modelach
         detail:
           what: Porównuje aktualne modele SQLAlchemy z bazą i generuje plik migracji z ALTER TABLE.
@@ -88,6 +112,22 @@ groups:
           tips:
             - 'flask db history — pełna historia wszystkich migracji'
             - 'flask db show <revision> — szczegóły konkretnej migracji'
+      - cmd: 'flask db stamp head'
+        desc: Oznacz bazę jako aktualną bez wykonywania migracji
+        detail:
+          what: Ustawia wewnętrzny wskaźnik wersji Alembic na head bez faktycznego wykonania SQL.
+          how: Przydatne gdy baza już ma odpowiedni schemat (np. po ręcznym imporcie) i tylko synchronizujesz metadane Alembic.
+          tips:
+            - 'Używaj ostrożnie — nie sprawdza czy schemat faktycznie odpowiada migracjom'
+            - 'Typowy use case: migracja istniejącej bazy do systemu migracji Flask-Migrate'
+      - cmd: flask db merge -m "merge heads" rev1 rev2
+        desc: Scal rozjeżdżające się gałęzie migracji
+        detail:
+          what: Tworzy migrację scalającą gdy dwóch developerów wygenerowało migracje równolegle z tego samego punktu (multiple heads).
+          how: 'flask db heads pokazuje rozjechane wersje — merge tworzy wspólny punkt zbieżności.'
+          tips:
+            - 'flask db heads — sprawdź czy masz konflikt wielu head-ów'
+            - 'Częsty problem w zespołach — merguj migracje tak jak merge konfliktów w git'
 
   - name: Shell i kontekst aplikacji
     icon: "🐍"
@@ -108,6 +148,94 @@ groups:
           tips:
             - 'flask routes | grep api — filtruj po ścieżce'
             - 'Sprawdź URL prefixes dla Blueprintów'
+      - cmd: 'app.shell_context_processor(lambda: {"db": db, "User": User})'
+        desc: Zdefiniuj zmienne automatycznie dostępne w flask shell
+        detail:
+          what: Rejestruje funkcję, która zwraca dict zmiennych wstrzykiwanych automatycznie do flask shell.
+          how: Bez tego musisz ręcznie importować modele w każdej sesji shell — to przyspiesza pracę.
+          tips:
+            - '@app.shell_context_processor jako dekorator — czystszy zapis niż lambda'
+            - 'Dodaj wszystkie często używane modele i db do kontekstu'
+      - cmd: 'with app.app_context():'
+        desc: Ręcznie wejdź w kontekst aplikacji (poza requestem)
+        detail:
+          what: Application context daje dostęp do current_app, g i operacji na bazie poza obsługą requestu HTTP.
+          how: Potrzebne w skryptach, zadaniach cron, Celery tasks — wszędzie gdzie nie ma aktywnego requestu.
+          tips:
+            - 'Bez app_context() current_app.config wyrzuci RuntimeError'
+            - 'app.test_request_context() — symuluj cały request (nie tylko app context) w testach'
+
+  - name: Custom CLI commands
+    icon: "⚙️"
+    commands:
+      - cmd: '@app.cli.command("seed-db")'
+        desc: Zdefiniuj własną komendę CLI Flask
+        detail:
+          what: Dekorator rejestrujący funkcję jako nową subkomendę flask — wywołujesz ją jako flask seed-db.
+          how: Funkcja pod dekoratorem może przyjmować argumenty przez click.argument/click.option.
+          tips:
+            - 'flask seed-db — wywołanie zdefiniowanej komendy'
+            - 'Świetne do skryptów onboardingowych: flask create-admin, flask seed-db'
+      - cmd: 'flask create-admin --email admin@firma.pl'
+        desc: Przykład custom komendy z argumentem
+        detail:
+          what: Wywołanie własnej komendy CLI z parametrem przekazanym przez --email.
+          how: 'W kodzie: @click.option("--email") jako argument funkcji komendy.'
+          tips:
+            - 'click.option z prompt=True — komenda zapyta interaktywnie jeśli nie podasz flagi'
+            - 'click.password_option() — bezpieczne wpisywanie hasła bez echo w terminalu'
+      - cmd: flask --help
+        desc: Pokaż wszystkie dostępne komendy (wbudowane + custom)
+        detail:
+          what: Wyświetla listę komend Flask CLI łącznie z tymi zdefiniowanymi przez @app.cli.command().
+          how: Custom komendy pojawiają się w sekcji Commands razem z run, shell, routes, db.
+          tips:
+            - 'flask <komenda> --help — pomoc dla konkretnej komendy'
+            - 'flask db --help — lista subkomend grupy db'
+
+  - name: Konfiguracja i zmienne środowiskowe
+    icon: "🔧"
+    commands:
+      - cmd: 'export FLASK_APP=app.py'
+        desc: Ustaw moduł aplikacji bez --app w każdej komendzie
+        detail:
+          what: Zmienna środowiskowa FLASK_APP mówi CLI gdzie szukać instancji Flask, bez podawania --app przy każdym wywołaniu.
+          how: Czytana przez flask run, flask shell, flask db — wszystkie subkomendy.
+          tips:
+            - "echo 'FLASK_APP=app.py' >> .env — z pip install python-dotenv wczytywane automatycznie"
+            - 'Dla Application Factory: FLASK_APP="app:create_app()"'
+      - cmd: 'export FLASK_DEBUG=1'
+        desc: Włącz debug mode bez flagi --debug
+        detail:
+          what: Alternatywa do --debug — włącza debugger Werkzeug i auto-reload przez zmienną środowiskową.
+          how: Działa identycznie jak flag --debug, ale ustawione raz w .env nie trzeba pamiętać o fladze.
+          tips:
+            - 'Nigdy nie ustawiaj FLASK_DEBUG=1 na produkcji — debugger pozwala wykonać kod przez przeglądarkę!'
+            - 'Sprawdź app.debug w kodzie żeby zweryfikować aktywny tryb'
+      - cmd: app.config.from_object('config.ProductionConfig')
+        desc: Wczytaj konfigurację z klasy Python
+        detail:
+          what: Ładuje wszystkie wielkie-literowe atrybuty klasy jako config aplikacji — czysty sposób na różne środowiska (dev/test/prod).
+          how: 'Typowy wzorzec: klasy Config, DevConfig(Config), ProductionConfig(Config) w pliku config.py.'
+          tips:
+            - "app.config.from_object('config.DevConfig') vs ProductionConfig — przełączaj przez zmienną env"
+            - 'app.config.from_envvar("APP_SETTINGS") — wskaż ścieżkę modułu configu przez zmienną środowiskową'
+      - cmd: app.config.from_prefixed_env()
+        desc: Wczytaj config ze zmiennych środowiskowych z prefiksem FLASK_
+        detail:
+          what: Automatycznie mapuje zmienne środowiskowe zaczynające się od FLASK_ na klucze w app.config.
+          how: 'np. FLASK_SECRET_KEY=xyz staje się app.config["SECRET_KEY"] = "xyz" — bez kodu mapującego.'
+          tips:
+            - 'Świetne dla konteneryzowanych deployów (Docker, Kubernetes) — config przez env vars'
+            - 'Wartości są parsowane jako JSON jeśli możliwe — liczby i booleans działają poprawnie'
+      - cmd: "python -c \"import secrets; print(secrets.token_hex(32))\""
+        desc: Wygeneruj bezpieczny SECRET_KEY
+        detail:
+          what: Generuje kryptograficznie bezpieczny losowy ciąg do użycia jako SECRET_KEY (sesje, CSRF tokens).
+          how: SECRET_KEY musi być unikalny i tajny na produkcji — nigdy nie commituj go do repo.
+          tips:
+            - 'Zapisz w zmiennej środowiskowej, nie w kodzie: app.config["SECRET_KEY"] = os.environ["SECRET_KEY"]'
+            - 'Zmiana SECRET_KEY na produkcji wyloguje wszystkich użytkowników (unieważnia sesje)'
 
   - name: Instalacja i środowisko
     icon: "📦"
@@ -136,6 +264,14 @@ groups:
           tips:
             - 'pip-compile (pip-tools) — lepsze zarządzanie zależnościami niż freeze'
             - 'pip install pip-tools && pip-compile pyproject.toml — nowoczesna alternatywa'
+      - cmd: uv venv && uv pip install flask
+        desc: Stwórz środowisko i instaluj przez uv (szybszy pip)
+        detail:
+          what: uv to ultraszybki menedżer pakietów Python — tworzy venv i instaluje zależności wielokrotnie szybciej niż pip.
+          how: 'uv venv tworzy .venv. uv pip install ma identyczne API jak pip, ale jest dużo szybszy.'
+          tips:
+            - 'pip install uv — zainstaluj uv jednorazowo'
+            - 'uv pip install -r requirements.txt — szybka instalacja z pliku wymagań'
 
   - name: Testy
     icon: "🧪"
@@ -161,3 +297,91 @@ groups:
           tips:
             - 'pip install pytest pytest-cov'
             - 'pytest --cov=app --cov-report=html tests/ — raport w htmlcov/index.html'
+      - cmd: 'client = app.test_client()'
+        desc: Stwórz testowy klient HTTP (bez prawdziwego serwera)
+        detail:
+          what: test_client() symuluje requesty HTTP do aplikacji bez startowania prawdziwego serwera sieciowego.
+          how: 'client.get("/api/users"), client.post("/api/users", json={...}) — pełne API requestów.'
+          tips:
+            - 'response = client.get("/"); assert response.status_code == 200'
+            - 'with app.test_client() as c: — context manager zachowuje sesję między requestami'
+      - cmd: tox
+        desc: Uruchom testy na wielu wersjach Pythona naraz
+        detail:
+          what: tox automatyzuje uruchamianie testów w izolowanych środowiskach dla różnych wersji Pythona (3.10, 3.11, 3.12...).
+          how: Konfiguracja w tox.ini definiuje envlist i komendy testowe dla każdego środowiska.
+          tips:
+            - 'pip install tox — wymagana instalacja'
+            - 'Przydatne przy publikowaniu paczek wspierających kilka wersji Pythona'
+
+  - name: Logging i debugowanie
+    icon: "🐛"
+    commands:
+      - cmd: app.logger.info('Użytkownik zalogowany')
+        desc: Zaloguj wiadomość przez wbudowany logger Flask
+        detail:
+          what: app.logger to standardowy logger Pythona skonfigurowany przez Flask — zapisuje do stderr domyślnie.
+          how: 'Poziomy: app.logger.debug/info/warning/error/critical — filtrowane przez app.logger.setLevel().'
+          tips:
+            - 'app.logger.setLevel(logging.DEBUG) — pokaż też logi debug (domyślnie WARNING+)'
+            - 'W produkcji wysyłaj logi do pliku lub systemu agregującego (Sentry, ELK), nie tylko stdout'
+      - cmd: 'import logging; logging.basicConfig(level=logging.DEBUG)'
+        desc: Skonfiguruj globalne poziomy logowania Pythona
+        detail:
+          what: Ustawia minimalny poziom logów dla wszystkich loggerów w aplikacji, włącznie z bibliotekami trzecimi.
+          how: Przydatne do debugowania — zobacz logi SQLAlchemy, Werkzeug i własnej aplikacji naraz.
+          tips:
+            - "logging.getLogger('werkzeug').setLevel(logging.WARNING) — wyciszanie logów requestów HTTP"
+            - 'Skonfiguruj raz przy starcie aplikacji, nie w handlerach'
+      - cmd: app.register_error_handler(404, not_found)
+        desc: Zarejestruj własny handler błędu HTTP
+        detail:
+          what: Pozwala zwrócić customowy JSON/HTML dla konkretnego kodu błędu HTTP (404, 500, itd.) zamiast domyślnej strony Flask.
+          how: '@app.errorhandler(404) jako dekorator jest częściej używany niż register_error_handler bezpośrednio.'
+          tips:
+            - "@app.errorhandler(404)\\ndef not_found(e): return jsonify({'error': 'Not found'}), 404"
+            - 'Dla API zawsze zwracaj JSON z błędami, nie domyślny HTML Flask'
+      - cmd: flask --app app run --debug 2>&1 | tee debug.log
+        desc: Uruchom serwer i zapisz output do pliku jednocześnie
+        detail:
+          what: tee przekazuje output jednocześnie do terminala i pliku debug.log — przydatne przy analizie błędów po fakcie.
+          how: 2>&1 łączy stderr ze stdout, żeby tracebacki też trafiły do pliku.
+          tips:
+            - 'tail -f debug.log w drugim terminalu żeby śledzić logi na żywo'
+            - 'Pamiętaj wyczyścić/rotować duże pliki logów w długo działających sesjach dev'
+
+  - name: Deployment
+    icon: "🚢"
+    commands:
+      - cmd: gunicorn -w 4 -b 127.0.0.1:8000 app:app --daemon --pid app.pid
+        desc: Uruchom Gunicorn jako daemon w tle (za reverse proxy)
+        detail:
+          what: Startuje Gunicorn w tle, zapisując PID do pliku — typowy setup za Nginx jako reverse proxy.
+          how: 'Nginx nasłuchuje na 80/443 i przekazuje requesty do Gunicorna na 127.0.0.1:8000.'
+          tips:
+            - 'kill -HUP $(cat app.pid) — przeładuj workerów bez przerwy w działaniu (graceful reload)'
+            - 'Lepiej użyj systemd niż --daemon na produkcji — automatyczny restart po crashu'
+      - cmd: systemctl start myflaskapp.service
+        desc: Uruchom aplikację Flask jako usługę systemd
+        detail:
+          what: systemd zarządza procesem Gunicorna jako usługą systemową — auto-restart po crashu, start przy boocie.
+          how: Wymaga pliku /etc/systemd/system/myflaskapp.service z ExecStart wskazującym na gunicorn.
+          tips:
+            - 'systemctl enable myflaskapp — automatyczny start po restarcie serwera'
+            - 'journalctl -u myflaskapp -f — śledź logi usługi na żywo'
+      - cmd: docker build -t my-flask-app .
+        desc: Zbuduj obraz Docker dla aplikacji Flask
+        detail:
+          what: Buduje obraz Dockera z aplikacją Flask na podstawie Dockerfile w katalogu projektu.
+          how: 'Typowy Dockerfile: FROM python:3.12-slim, COPY requirements.txt, RUN pip install, CMD gunicorn.'
+          tips:
+            - 'Użyj python:3.12-slim, nie pełnego obrazu — mniejszy rozmiar finalnego image'
+            - 'Multi-stage build dla mniejszego finalnego obrazu produkcyjnego'
+      - cmd: 'echo "web: gunicorn app:app" > Procfile'
+        desc: Skonfiguruj deployment na Heroku/Railway (Procfile)
+        detail:
+          what: Procfile mówi platformie PaaS (Heroku, Railway) jaką komendą wystartować proces web.
+          how: Platforma automatycznie wykrywa Procfile i uruchamia wskazaną komendę po deployu.
+          tips:
+            - 'Dodaj też runtime.txt z wersją Pythona dla pełnej kontroli środowiska'
+            - 'web: gunicorn app:app --workers 4 — skonfiguruj liczbę workerów wprost w Procfile'
