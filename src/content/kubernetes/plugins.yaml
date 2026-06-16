@@ -135,6 +135,89 @@ items:
             - api.firma.pl
           secretName: api-tls
 
+  - name: Kustomize — patche i overlays bez templatowania
+    icon: "🩹"
+    desc: |
+      Wbudowane w kubectl (kubectl apply -k) narzędzie do parametryzacji manifestów przez
+      patche, nie szablony. Instalacja CLI (opcjonalna, do build/edit): brew install kustomize
+
+      Wzorzec base + overlays: jeden wspólny manifest bazowy (base/), a każde środowisko
+      (dev/staging/production) ma overlay z patchami zmieniającymi tylko to co się różni —
+      replicas, limity zasobów, zmienne env, tag obrazu. Zero duplikacji YAML, zero szablonów
+      Jinja/Go templates jak w Helm. Senior-level must-know: różnica między trzema typami
+      patcha (Strategic Merge, JSON 6902, JSON Merge) decyduje czy patch zrobi to czego
+      oczekujesz, szczególnie na listach (containers, env, volumes).
+    code: |
+      # Struktura katalogów — wzorzec base + overlays
+      # k8s/
+      #   base/
+      #     deployment.yaml
+      #     service.yaml
+      #     kustomization.yaml
+      #   overlays/
+      #     dev/
+      #       kustomization.yaml
+      #       patch-replicas.yaml
+      #     production/
+      #       kustomization.yaml
+      #       patch-replicas.yaml
+      #       patch-resources.yaml
+
+      # base/kustomization.yaml — wskazuje zasoby bazowe
+      apiVersion: kustomize.config.k8s.io/v1beta1
+      kind: Kustomization
+      resources:
+        - deployment.yaml
+        - service.yaml
+      commonLabels:
+        app.kubernetes.io/managed-by: kustomize
+
+      # overlays/production/kustomization.yaml — dziedziczy base + patche
+      apiVersion: kustomize.config.k8s.io/v1beta1
+      kind: Kustomization
+      namespace: production
+      resources:
+        - ../../base
+      patches:
+        - path: patch-replicas.yaml
+          target:
+            kind: Deployment
+            name: api
+        - path: patch-resources.yaml
+          target:
+            kind: Deployment
+            name: api
+      images:
+        - name: api
+          newTag: v2.3.1
+
+      # overlays/production/patch-replicas.yaml — Strategic Merge Patch (domyślny)
+      # Scala się "po imieniu" — bezpieczny dla pól prostych
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: api
+      spec:
+        replicas: 5
+
+      # Alternatywa: JSON 6902 Patch — precyzyjne operacje po ścieżce
+      # Użyj gdy strategic merge nie wystarcza (np. usunięcie elementu z listy)
+      # patches:
+      #   - target:
+      #       kind: Deployment
+      #       name: api
+      #     patch: |-
+      #       - op: replace
+      #         path: /spec/replicas
+      #         value: 5
+      #       - op: remove
+      #         path: /spec/template/spec/containers/0/env/2
+
+      # Podgląd i apply
+      # kustomize build overlays/production          -- wyrenderuj YAML (bez apply)
+      # kubectl apply -k overlays/production          -- zbuduj i zaaplikuj
+      # kubectl diff -k overlays/production            -- co się zmieni przed apply
+
   - name: Lens — Desktop GUI dla K8s
     icon: "🔭"
     desc: |

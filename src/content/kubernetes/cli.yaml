@@ -257,3 +257,71 @@ groups:
           tips:
             - 'kubectl diff -k ./kustomize/overlays/production — podgląd zmian przed apply'
             - 'kustomize build ./kustomize/ | kubectl apply -f - — pipe przez kustomize binary'
+
+  - name: Patche — kubectl patch i Kustomize
+    icon: "🩹"
+    commands:
+      - cmd: 'kubectl patch deployment api -p ''{"spec":{"replicas":5}}'''
+        desc: Strategic Merge Patch (domyślny typ patcha)
+        detail:
+          what: Domyślny typ patcha kubectl — scala podany JSON/YAML ze istniejącym zasobem, rozumiejąc semantykę pól K8s (np. listy z merge key).
+          how: 'Bez --type kubectl używa strategic merge — bezpieczny dla większości pól, ale wymaga znajomości semantyki danego zasobu.'
+          tips:
+            - 'Najlepszy wybór dla pól prostych (replicas, image) i większości codziennych zmian'
+            - 'Dla list (np. containers[]) strategic merge scala po merge key (name), nie zastępuje całej listy'
+      - cmd: 'kubectl patch deployment api --type=json -p ''[{"op":"replace","path":"/spec/replicas","value":5}]'''
+        desc: JSON Patch — RFC 6902 (precyzyjne operacje)
+        detail:
+          what: JSON Patch operuje na dokładnej ścieżce JSON (path) z operacjami add/remove/replace/move/copy/test — zero "magii" scalania.
+          how: '--type=json wymaga listy operacji, nie obiektu. path="/spec/replicas" wskazuje dokładne pole do zmiany.'
+          tips:
+            - 'Jedyny typ patcha który pozwala usunąć element z listy po indeksie: {"op":"remove","path":"/spec/template/spec/containers/0/env/2"}'
+            - 'Senior tip: JSON Patch jest deterministyczny — używaj go w automatyzacji/CI gdzie potrzebujesz przewidywalności, nie heurystyk merge'
+      - cmd: 'kubectl patch deployment api --type=merge -p ''{"spec":{"replicas":5}}'''
+        desc: JSON Merge Patch — RFC 7386 (prostszy, ale zastępuje listy)
+        detail:
+          what: Merge Patch (RFC 7386) jest prostszy niż strategic merge, ale NIE rozumie semantyki K8s — listy są całkowicie zastępowane, nie scalane.
+          how: Różnica od strategic merge jest krytyczna dla pól typu containers[] — merge patch wyczyści i zastąpi całą listę, nie tylko zmieni jeden element.
+          tips:
+            - 'Uważaj: kubectl patch --type=merge na liście containers usunie wszystkie kontenery których nie podałeś w patchu!'
+            - 'Strategic merge istnieje właśnie po to żeby uniknąć tego problemu — używaj merge tylko gdy rozumiesz konsekwencje'
+      - cmd: kubectl patch deployment api --patch-file patch.yaml
+        desc: Patch z pliku (czytelniejszy niż inline JSON)
+        detail:
+          what: Wczytuje treść patcha z pliku YAML/JSON zamiast wklejać go inline w terminalu — czytelniejsze dla złożonych zmian.
+          how: 'Domyślnie strategic merge — dodaj --type=json lub --type=merge jeśli potrzebujesz innego typu.'
+          tips:
+            - 'Trzymaj patch.yaml w repo jako część dokumentacji zmiany (audyt, code review)'
+            - 'Dobre do jednorazowych hotfixów na produkcji bez edycji całego manifestu'
+      - cmd: 'kubectl patch node worker-1 -p ''{"spec":{"unschedulable":true}}'''
+        desc: Patch zasobu klastrowego (cordon przez patch)
+        detail:
+          what: Patche działają na każdym typie zasobu, nie tylko Deployment — tu oznaczamy Node jako unschedulable.
+          how: 'To dokładnie to co robi kubectl cordon worker-1 pod spodem — patch jest niższym poziomem abstrakcji.'
+          tips:
+            - 'kubectl cordon/drain to wygodne skrypty nad kubectl patch — warto znać oba poziomy'
+            - 'Przydatne gdy potrzebujesz patcha którego nie ma jako gotowej komendy kubectl'
+      - cmd: kustomize edit add patch --path patch-replicas.yaml --kind Deployment
+        desc: Dodaj patch do kustomization.yaml (CLI, nie ręczna edycja)
+        detail:
+          what: kustomize edit modyfikuje kustomization.yaml programowo — dodaje wpis do sekcji patches bez ręcznej edycji YAML.
+          how: 'Generuje wpis: patches: [{path: patch-replicas.yaml, target: {kind: Deployment}}].'
+          tips:
+            - 'Przydatne w skryptach CI generujących overlay automatycznie'
+            - 'Ręczna edycja kustomization.yaml jest równie częsta — kustomize edit to tylko wygoda dla automatyzacji'
+      - cmd: kustomize edit set image api=registry.firma.pl/api:v2.3.1
+        desc: Zmień tag obrazu przez Kustomize (typowy krok w CD)
+        detail:
+          what: Aktualizuje sekcję images w kustomization.yaml — nadpisuje tag obrazu bez modyfikowania bazowego manifestu Deployment.
+          how: 'To jeden z najczęstszych kroków w pipeline CD: checkout overlay, kustomize edit set image, git commit, ArgoCD/Flux synchronizuje.'
+          tips:
+            - 'Wzorzec GitOps: CI ustawia obraz przez kustomize edit, commituje do repo manifestów, CD synchronizuje klaster'
+            - 'kustomize edit set image api=api:v2.3.1 — bez registry jeśli używasz domyślnego'
+      - cmd: kustomize build overlays/production --output rendered.yaml
+        desc: Wyrenderuj finalne manifesty z bazy + patchy (bez apply)
+        detail:
+          what: Łączy base/ z patchami z overlays/production/ i zapisuje finalny, w pełni rozwinięty YAML do pliku — bez wysyłania do klastra.
+          how: Senior workflow — zawsze renderuj i przeglądnij output przed apply na produkcji, szczególnie po zmianach w patchach.
+          tips:
+            - 'diff <(kustomize build overlays/staging) <(kustomize build overlays/production) — porównaj środowiska'
+            - 'Commituj rendered.yaml do osobnego repo "manifesty po renderowaniu" dla pełnego audytu w niektórych setupach GitOps'
