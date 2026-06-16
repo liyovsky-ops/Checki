@@ -39,7 +39,7 @@ export const ALL_FRAMEWORKS = [
   { name:'PyAutoGUI',     icon:'🖱️', color:'#FF6B6B', lang:'Python',     cat:'Backend',   desc:'Automatyzacja UI i GUI' },
   // Backend Python frameworki
   { name:'Django',        icon:'🎸',  color:'#44b78b', lang:'Python',     cat:'Backend',   desc:'Bateryjny framework webowy' },
-  { name:'Flask',         icon:'🌶️', color:'#a0a0a0', lang:'Python',     cat:'Backend',   desc:'Mikro-framework webowy' },
+  { name:'Flask',         icon:'🌶️', color:'#E8402C', lang:'Python',     cat:'Backend',   desc:'Mikro-framework webowy' },
   { name:'FastAPI',       icon:'🚀',  color:'#009688', lang:'Python',     cat:'Backend',   desc:'Nowoczesne API z type hints' },
   { name:'Tornado',       icon:'🌪️', color:'#336699', lang:'Python',     cat:'Backend',   desc:'Async serwer webowy' },
   { name:'Starlette',     icon:'⭐',  color:'#009688', lang:'Python',     cat:'Backend',   desc:'ASGI micro-framework' },
@@ -167,7 +167,7 @@ export const FRAMEWORKS = {
     { id: 'asyncio',       name: 'asyncio',       icon: '⚡',  color: '#5865F2', lang: 'Python',     desc: 'Asynchroniczny Python' },
     { id: 'beautifulsoup', name: 'BeautifulSoup', icon: '🍲',  color: '#3CB371', lang: 'Python',     desc: 'Parsowanie HTML i XML' },
     { id: 'pyautogui',     name: 'PyAutoGUI',     icon: '🖱️', color: '#FF6B6B', lang: 'Python',     desc: 'Automatyzacja UI i GUI' },
-    { id: 'flask',         name: 'Flask',         icon: '🌶️', color: '#a0a0a0', lang: 'Python',     desc: 'Mikro-framework webowy' },
+    { id: 'flask',         name: 'Flask',         icon: '🌶️', color: '#E8402C', lang: 'Python',     desc: 'Mikro-framework webowy' },
   ],
   database: [
     { id: 'postgresql', name: 'PostgreSQL', icon: '🐘', color: '#336791', lang: 'SQL',       desc: 'Zaawansowana baza relacyjna' },
