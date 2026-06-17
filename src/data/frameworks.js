@@ -194,11 +194,11 @@ export const FRAMEWORKS = {
     { id: 'selenium',   name: 'Selenium',   icon: '🔬',  color: '#43b02a', lang: 'Python',     desc: 'Klasyczna automatyzacja UI' },
   ],
   ai: [
-    { id: 'langgraph',  name: 'LangGraph',    icon: '🕸️', color: '#1c3c3c', lang: 'Python', desc: 'Agenci jako grafy stanów' },
-    { id: 'mcp',        name: 'MCP',          icon: '🔌',  color: '#a78bfa', lang: 'Python', desc: 'Model Context Protocol' },
-    { id: 'pytorch',    name: 'PyTorch',      icon: '🔥',  color: '#ee4c2c', lang: 'Python', desc: 'ML/research od Meta' },
-    { id: 'tensorflow', name: 'TensorFlow',   icon: '🧠',  color: '#ff6f00', lang: 'Python', desc: 'ML na masową skalę od Google' },
-    { id: 'huggingface',name: 'Hugging Face', icon: '🤗',  color: '#ffd21e', lang: 'Python', desc: 'Centrum modeli i transformerów' },
-    { id: 'openai',     name: 'OpenAI SDK',   icon: '✦',   color: '#10a37f', lang: 'Python', desc: 'Najpopularniejsze API do LLM' },
+    { id: 'langgraph',    name: 'LangGraph',    icon: '🕸️', color: '#1c3c3c', lang: 'Python', desc: 'Agenci jako grafy stanów' },
+    { id: 'mcp',          name: 'MCP',          icon: '🔌',  color: '#a78bfa', lang: 'Python', desc: 'Model Context Protocol' },
+    { id: 'openaisdk',    name: 'OpenAI SDK',   icon: '✦',   color: '#10a37f', lang: 'Python', desc: 'Najpopularniejsze API do LLM' },
+    { id: 'anthropicsdk', name: 'Anthropic SDK',icon: '✺',   color: '#D4A574', lang: 'Python', desc: 'SDK do modeli Claude' },
+    { id: 'pytorch',      name: 'PyTorch',      icon: '🔥',  color: '#ee4c2c', lang: 'Python', desc: 'ML/research od Meta' },
+    { id: 'tensorflow',   name: 'TensorFlow',   icon: '🧠',  color: '#ff6f00', lang: 'Python', desc: 'ML na masową skalę od Google' },
   ],
 };

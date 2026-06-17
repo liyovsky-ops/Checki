@@ -1,0 +1,173 @@
+title: Messages API — pełne możliwości
+
+items:
+  - name: System prompt i multi-turn conversation
+    desc: >
+      system jest osobnym parametrem (nie wiadomością jak w OpenAI). Historię budujesz
+      przez alternujące pary user/assistant — SDK nie pamięta poprzednich wywołań,
+      musisz przekazywać pełną historię przy każdym requeście.
+    code: |
+      messages = []
+
+      def chat(user_input: str) -> str:
+          messages.append({"role": "user", "content": user_input})
+
+          response = client.messages.create(
+              model="claude-sonnet-4-6",
+              max_tokens=2048,
+              system="Jesteś ekspertem Python. Odpowiadaj precyzyjnie, po polsku.",
+              messages=messages
+          )
+
+          reply = response.content[0].text
+          messages.append({"role": "assistant", "content": reply})
+          return reply
+
+      print(chat("Co to jest GIL?"))
+      print(chat("Jak asyncio go omija?"))  # Claude pamięta poprzednie pytanie
+
+  - name: Vision — analiza obrazów
+    desc: >
+      Claude widzi obrazy przekazane jako base64 w content bloku image. Obsługuje
+      PNG, JPEG, GIF, WebP. Można łączyć tekst i obrazy w jednej wiadomości.
+      Uwaga: Claude nie pobiera obrazów z URL — musisz samemu zakodować do base64.
+    code: |
+      import base64
+
+      def analyze_image(image_path: str, question: str) -> str:
+          with open(image_path, "rb") as f:
+              image_data = base64.standard_b64encode(f.read()).decode("utf-8")
+
+          response = client.messages.create(
+              model="claude-sonnet-4-6",
+              max_tokens=1024,
+              messages=[
+                  {
+                      "role": "user",
+                      "content": [
+                          {
+                              "type": "image",
+                              "source": {
+                                  "type": "base64",
+                                  "media_type": "image/png",
+                                  "data": image_data,
+                              },
+                          },
+                          {"type": "text", "text": question}
+                      ],
+                  }
+              ],
+          )
+          return response.content[0].text
+
+      result = analyze_image("diagram.png", "Co jest na tym diagramie architektury?")
+
+  - name: Wiele obrazów i dokumenty PDF
+    desc: >
+      Możesz przekazać wiele bloków image w jednej wiadomości — przydatne do porównywania
+      screenshotów, analizy sekwencji klatek. Obsługiwane są też dokumenty PDF
+      przez type="document" (beta feature dla długich kontekstów).
+    code: |
+      # Wiele obrazów naraz
+      response = client.messages.create(
+          model="claude-sonnet-4-6",
+          max_tokens=1024,
+          messages=[
+              {
+                  "role": "user",
+                  "content": [
+                      {"type": "text", "text": "Porównaj te dwa screenshoty — co się zmieniło?"},
+                      {
+                          "type": "image",
+                          "source": {"type": "base64", "media_type": "image/png", "data": img1_b64},
+                      },
+                      {
+                          "type": "image",
+                          "source": {"type": "base64", "media_type": "image/png", "data": img2_b64},
+                      },
+                  ],
+              }
+          ],
+      )
+
+      # PDF jako dokument (beta)
+      with open("raport.pdf", "rb") as f:
+          pdf_data = base64.standard_b64encode(f.read()).decode("utf-8")
+
+      response = client.beta.messages.create(
+          model="claude-sonnet-4-6",
+          max_tokens=2048,
+          betas=["pdfs-2024-09-25"],
+          messages=[{
+              "role": "user",
+              "content": [
+                  {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_data}},
+                  {"type": "text", "text": "Podsumuj kluczowe punkty tego raportu."}
+              ]
+          }]
+      )
+
+  - name: Parametry wywołania i stop sequences
+    desc: >
+      temperature (0-1), top_p, top_k kontrolują losowość. stop_sequences przerywa
+      generowanie po napotkaniu ciągu znaków. metadata.user_id pozwala OpenAI monitorować
+      klientów per użytkownik — przydatne do trust and safety.
+    code: |
+      response = client.messages.create(
+          model="claude-sonnet-4-6",
+          max_tokens=500,
+          temperature=0.0,          # deterministyczny (dobre dla kodu/faktów)
+          stop_sequences=["---", "KONIEC"],  # zatrzymaj przed tymi ciągami
+          system="Jesteś generatorem JSON. Zwracaj wyłącznie poprawny JSON.",
+          messages=[{"role": "user", "content": "Lista 3 krajów EU jako JSON array"}],
+          metadata={"user_id": "user_123"},  # do monitorowania trust & safety
+      )
+
+      # finish_reason: "end_turn" | "max_tokens" | "stop_sequence"
+      print(response.stop_reason)
+      print(response.content[0].text)
+
+  - name: Odczyt usage i kosztów
+    desc: >
+      response.usage zawiera szczegółowy podział tokenów — w tym cache_read_input_tokens
+      i cache_creation_input_tokens. Tokeny odczytane z cache są 10x tańsze od
+      normalnych input tokenów. Bez cachingu: input = cache_creation, cache_read = 0.
+    code: |
+      response = client.messages.create(
+          model="claude-sonnet-4-6",
+          max_tokens=1024,
+          messages=[{"role": "user", "content": "Cześć!"}]
+      )
+
+      u = response.usage
+      print(f"Input:        {u.input_tokens:>6} tokenów")
+      print(f"Output:       {u.output_tokens:>6} tokenów")
+      print(f"Cache write:  {u.cache_creation_input_tokens or 0:>6} tokenów")  # koszt 125%
+      print(f"Cache read:   {u.cache_read_input_tokens or 0:>6} tokenów")       # koszt 10%
+
+      # Szacowany koszt dla claude-sonnet-4-6:
+      # input:        $3.00 / 1M tokenów
+      # output:       $15.00 / 1M tokenów
+      # cache write:  $3.75 / 1M tokenów
+      # cache read:   $0.30 / 1M tokenów  ← 10x taniej!
+
+  - name: Prefill — wymuś format odpowiedzi
+    desc: >
+      Możesz "prefillować" odpowiedź Claude wstawiając wiadomość assistant z fragmentem
+      tekstu — Claude kontynuuje od tego miejsca. Potężna technika do wymuszania formatu
+      (np. wymuszasz "{" na początku żeby Claude zwrócił JSON) bez stosowania tool use.
+    code: |
+      response = client.messages.create(
+          model="claude-sonnet-4-6",
+          max_tokens=512,
+          messages=[
+              {"role": "user", "content": "Podaj mi dane użytkownika Jan Kowalski, wiek 30, email jan@firm.pl"},
+              {"role": "assistant", "content": "{"}  # prefill — Claude MUSI kontynuować od "{"
+          ],
+      )
+
+      # Claude zwróci resztę JSONa (bo zaczął od "{")
+      # Dodaj "{ " + response.content[0].text żeby mieć pełny JSON
+      full_json = "{" + response.content[0].text
+      import json
+      data = json.loads(full_json)

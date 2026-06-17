@@ -1,0 +1,84 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Anthropic SDK?
+  firstComponent: Pierwsze wywołanie Claude
+  firstComponentLang: python
+
+intro:
+  title: Czym jest Anthropic SDK?
+  desc: >
+    Oficjalna biblioteka Pythona do modeli Claude (claude-opus-4-8, claude-sonnet-4-6,
+    claude-haiku-4-5, claude-fable-5). Jeden klient daje dostęp do Messages API,
+    streamingu, tool use, vision, prompt cachingu i extended thinking.
+    API jest stateless — każde wywołanie to niezależny request, SDK nie przechowuje
+    kontekstu między wywołaniami. Fundamentalna różnica względem OpenAI: max_tokens
+    jest wymagany, system jest osobnym parametrem (nie wiadomością), a modele
+    odpowiadają zawsze jako assistant (rola user i assistant wymiennie w historii).
+
+concepts:
+  - title: Klient i API Key
+    desc: >
+      Anthropic() tworzy synchroniczny klient czytający ANTHROPIC_API_KEY z env.
+      AsyncAnthropic() dla kodu async (FastAPI, asyncio). Jeden klient na całą
+      aplikację — reużywaj zamiast tworzyć nowy per-request.
+    icon: "🔑"
+  - title: Messages API — stateless
+    desc: >
+      client.messages.create() to jedyne API do konwersacji. Przekazujesz pełną
+      historię messages (user/assistant) przy każdym wywołaniu — SDK nic nie pamięta.
+      max_tokens jest WYMAGANY (brak domyślnej wartości, w odróżnieniu od OpenAI).
+    icon: "💬"
+  - title: Modele Claude
+    desc: >
+      Cztery aktualne rodziny: Fable 5 (claude-fable-5, najnowszy), Opus 4.8
+      (claude-opus-4-8, najlepszy do złożonego rozumowania), Sonnet 4.6
+      (claude-sonnet-4-6, balans jakość/szybkość/cena), Haiku 4.5
+      (claude-haiku-4-5-20251001, najszybszy i najtańszy).
+    icon: "🧠"
+  - title: Content Blocks
+    desc: >
+      Każda wiadomość to lista bloków treści (nie plain string). Bloki to TextBlock,
+      ImageBlock, ToolUseBlock, ToolResultBlock, ThinkingBlock. Model zwraca listę
+      content bloków — możesz dostać tekst i wywołanie narzędzia jednocześnie.
+    icon: "🧩"
+  - title: Prompt Caching
+    desc: >
+      Unikalna cecha Anthropic: możesz oznaczyć części promptu flagą cache_control.
+      System cache'uje je po stronie API na 5 minut — kolejne wywołania z tym samym
+      prefixem są 90% tańsze i szybsze. Kluczowe przy długich system promptach i RAG.
+    icon: "⚡"
+  - title: Extended Thinking
+    desc: >
+      thinking: {type: "enabled", budget_tokens: N} pozwala Claude "myśleć" przed
+      odpowiedzią — model dostaje budżet tokenów na wewnętrzne rozumowanie widoczne
+      dla Ciebie jako ThinkingBlock. Dramatycznie poprawia wyniki na zadaniach
+      matematycznych, kodowania i wieloetapowego wnioskowania.
+    icon: "💭"
+
+whenToUse:
+  - Budowanie aplikacji konwersacyjnych z modelami Claude
+  - Tool use i function calling — agenci wywołujący zewnętrzne API
+  - Zadania wymagające extended thinking (trudna matematyka, złożone rozumowanie)
+  - RAG z prompt cachingiem — tania obsługa długich dokumentów jako kontekstu
+  - Vision — analiza obrazów, screenshotów, diagramów przez modele Claude
+  - Computer use — automatyzacja interfejsów graficznych przez Claude
+  - Batch API — masowe przetwarzanie dokumentów z 50% rabatem
+
+firstComponent: |
+  # pip install anthropic
+
+  import anthropic
+
+  client = anthropic.Anthropic()  # czyta ANTHROPIC_API_KEY z env
+
+  message = client.messages.create(
+      model="claude-sonnet-4-6",
+      max_tokens=1024,          # WYMAGANY — brak domyślnej wartości
+      system="Odpowiadaj krótko i po polsku.",
+      messages=[
+          {"role": "user", "content": "Wyjaśnij w 2 zdaniach czym jest prompt caching."}
+      ]
+  )
+
+  print(message.content[0].text)
+  print(f"Tokeny: {message.usage.input_tokens} in / {message.usage.output_tokens} out")

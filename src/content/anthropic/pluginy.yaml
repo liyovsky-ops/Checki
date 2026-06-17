@@ -1,0 +1,173 @@
+title: Ekosystem Anthropic SDK
+
+items:
+  - name: langchain-anthropic — ChatAnthropic
+    icon: "🦜"
+    desc: >
+      Oficjalna integracja Anthropic z LangChain — ChatAnthropic jest wrapperem
+      dającym dostęp do Claude przez standardowe LangChain API (LCEL, invoke, stream,
+      bind_tools). Używaj gdy budujesz pipeline z LangGraph lub LangChain chains.
+    code: |
+      # pip install langchain-anthropic
+      from langchain_anthropic import ChatAnthropic
+      from langchain_core.messages import HumanMessage, SystemMessage
+
+      llm = ChatAnthropic(
+          model="claude-sonnet-4-6",
+          temperature=0.0,
+          max_tokens=4096,
+          # api_key="..." lub z env ANTHROPIC_API_KEY
+      )
+
+      response = llm.invoke([
+          SystemMessage("Odpowiadaj po polsku. Jesteś ekspertem DevOps."),
+          HumanMessage("Co to jest blue-green deployment?")
+      ])
+      print(response.content)
+
+      # Streaming
+      for chunk in llm.stream([HumanMessage("Wymień 5 dobrych praktyk CI/CD")]):
+          print(chunk.content, end="", flush=True)
+
+      # Bind tools — agent z narzędziami
+      from langchain_core.tools import tool
+
+      @tool
+      def sprawdz_status(serwis: str) -> str:
+          """Sprawdź status danego serwisu."""
+          return f"{serwis}: OK (uptime 99.9%)"
+
+      llm_with_tools = llm.bind_tools([sprawdz_status])
+
+  - name: instructor — structured outputs przez tool use
+    icon: "🧩"
+    desc: >
+      instructor opakowuje klienta Anthropic i automatycznie waliduje/retry'uje
+      odpowiedzi względem schematu Pydantic — używa tool use pod spodem.
+      Prostszy niż ręczny extract tool trick, z wbudowanym retry i walidacją.
+    code: |
+      # pip install instructor
+      import instructor
+      import anthropic
+      from pydantic import BaseModel
+
+      client = instructor.from_anthropic(anthropic.Anthropic())
+
+      class Faktura(BaseModel):
+          numer:    str
+          kwota:    float
+          waluta:   str
+          dostawca: str
+          data:     str
+
+      faktura = client.messages.create(
+          model="claude-sonnet-4-6",
+          max_tokens=1024,
+          response_model=Faktura,
+          messages=[{
+              "role": "user",
+              "content": "Faktura FV/2025/001 z 15.03.2025, kwota 2450 PLN, Firma ABC Sp. z o.o."
+          }]
+      )
+
+      print(faktura.numer)   # "FV/2025/001"
+      print(faktura.kwota)   # 2450.0
+      # Typowany obiekt Pydantic — nie dict, z pełną walidacją i automatycznym retry
+
+  - name: Helicone — observability bez zmiany kodu
+    icon: "🔍"
+    desc: >
+      Helicone działa jako proxy przed API Anthropic — pełne logowanie wywołań
+      (prompt, odpowiedź, latency, koszt) przez zmianę tylko base_url i jednego headera.
+      Kluczowe na produkcji do śledzenia kosztów i debugowania odpowiedzi.
+    code: |
+      import anthropic
+
+      client = anthropic.Anthropic(
+          base_url="https://anthropic.helicone.ai",
+          default_headers={
+              "Helicone-Auth": f"Bearer {HELICONE_API_KEY}",
+              # Opcjonalne metadane per-request:
+              "Helicone-User-Id":     "user_123",
+              "Helicone-Session-Id":  "session_abc",
+              "Helicone-Session-Name":"support-chat",
+          }
+      )
+
+      # Każde wywołanie przez ten klient jest logowane na helicone.ai
+      response = client.messages.create(
+          model="claude-sonnet-4-6",
+          max_tokens=1024,
+          messages=[{"role": "user", "content": "Cześć"}]
+      )
+
+      # Helicone pokazuje: prompt/odpowiedź, latency, koszt w $, model, user_id
+      # Bezpłatny tier: 10k requestów/miesiąc — wystarczy do developmentu
+
+  - name: Anthropic Bedrock i Vertex AI
+    icon: "☁️"
+    desc: >
+      Claude dostępny też przez AWS Bedrock i Google Vertex AI — identyczne API,
+      inna ścieżka autoryzacji. Przydatne gdy firma ma enterprise umowy z AWS/GCP
+      lub wymaga przetwarzania danych w konkretnym regionie chmury.
+    code: |
+      # AWS Bedrock — pip install anthropic[bedrock]
+      import anthropic
+
+      bedrock_client = anthropic.AnthropicBedrock(
+          aws_access_key="...",
+          aws_secret_key="...",
+          aws_region="eu-central-1",
+      )
+
+      response = bedrock_client.messages.create(
+          model="anthropic.claude-sonnet-4-6-20250514-v1:0",  # model ID w formacie Bedrock
+          max_tokens=1024,
+          messages=[{"role": "user", "content": "Cześć z Bedrocka!"}]
+      )
+
+      # Google Vertex AI — pip install anthropic[vertex]
+      from anthropic import AnthropicVertex
+
+      vertex_client = AnthropicVertex(
+          project_id="moj-projekt-gcp",
+          region="europe-west1"
+      )
+
+      response = vertex_client.messages.create(
+          model="claude-sonnet-4-6@20250514",  # model ID w formacie Vertex
+          max_tokens=1024,
+          messages=[{"role": "user", "content": "Cześć z Vertex!"}]
+      )
+      # Reszta API identyczna jak standardowy Anthropic()
+
+  - name: LangSmith + LangGraph — tracing i agenci
+    icon: "🕸️"
+    desc: >
+      LangSmith loguje każde wywołanie ChatAnthropic automatycznie gdy ustawisz
+      LANGCHAIN_TRACING_V2=true. LangGraph używa ChatAnthropic jako LLM dla węzłów
+      grafu — pełny stack agentowy z tracingiem produkcyjnym.
+    code: |
+      import os
+      os.environ["LANGCHAIN_TRACING_V2"] = "true"
+      os.environ["LANGCHAIN_API_KEY"]    = "ls__..."
+
+      from langchain_anthropic import ChatAnthropic
+      from langgraph.prebuilt import create_react_agent
+      from langchain_core.tools import tool
+
+      llm = ChatAnthropic(model="claude-sonnet-4-6", max_tokens=4096)
+
+      @tool
+      def search_code(query: str) -> str:
+          """Przeszukaj bazę wiedzy o kodzie."""
+          return f"Wyniki dla: {query}"
+
+      # Agent z Claude jako LLM — każde wywołanie widoczne w LangSmith
+      agent = create_react_agent(llm, [search_code])
+
+      result = agent.invoke({
+          "messages": [("human", "Jak zaimplementować retry pattern w Pythonie?")]
+      })
+      print(result["messages"][-1].content)
+      # Trace pojawi się na smith.langchain.com z pełnym kontekstem wywołań

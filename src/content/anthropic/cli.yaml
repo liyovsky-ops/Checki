@@ -1,0 +1,370 @@
+title: Komendy Anthropic SDK
+
+groups:
+  - name: Instalacja i setup
+    icon: "📦"
+    commands:
+      - cmd: pip install anthropic
+        desc: Zainstaluj oficjalny Anthropic SDK
+        detail:
+          what: Instaluje bibliotekę anthropic — jedyną oficjalną bibliotekę do modeli Claude.
+          how: Po instalacji importujesz import anthropic i tworzysz klienta Anthropic().
+          tips:
+            - 'pip install anthropic --upgrade — zaktualizuj do najnowszej wersji'
+            - 'pip install anthropic[bedrock] — dodaj wsparcie dla AWS Bedrock'
+      - cmd: 'export ANTHROPIC_API_KEY="sk-ant-..."'
+        desc: Ustaw klucz API (sesja terminala)
+        detail:
+          what: Klient Anthropic() szuka klucza w zmiennej ANTHROPIC_API_KEY automatycznie.
+          how: Klucz zaczyna się od sk-ant- (nie mylić z sk- od OpenAI).
+          tips:
+            - 'Klucz znajdziesz na console.anthropic.com → API Keys'
+            - 'Nigdy nie commituj klucza do git — zawsze .env + .gitignore'
+      - cmd: pip install anthropic python-dotenv
+        desc: Zainstaluj SDK z obsługą pliku .env
+        detail:
+          what: python-dotenv wczytuje zmienne środowiskowe z pliku .env przy starcie aplikacji.
+          how: 'from dotenv import load_dotenv; load_dotenv() na początku skryptu — PRZED tworzeniem klienta.'
+          tips:
+            - "echo 'ANTHROPIC_API_KEY=sk-ant-...' >> .env"
+            - 'Dodaj .env do .gitignore — nie commituj kluczy'
+      - cmd: pip install anthropic langchain-anthropic instructor
+        desc: Pełny stack — SDK + LangChain + structured outputs
+        detail:
+          what: Instaluje zestaw najczęściej używany razem z Anthropic SDK w produkcji.
+          how: langchain-anthropic = ChatAnthropic dla LangGraph. instructor = structured outputs przez tool use.
+          tips:
+            - 'pip freeze > requirements.txt — zapisz wersje po konfiguracji'
+            - 'Warto też pip install httpx jeśli budujesz własne wrapper-y'
+
+  - name: Klient — tworzenie i konfiguracja
+    icon: "🔑"
+    commands:
+      - cmd: client = anthropic.Anthropic()
+        desc: Stwórz synchroniczny klient (czyta klucz z env)
+        detail:
+          what: Tworzy klienta Anthropic czytającego ANTHROPIC_API_KEY ze zmiennej środowiskowej.
+          how: Jeden klient na całą aplikację — reużywaj, nie twórz nowego przy każdym wywołaniu.
+          tips:
+            - 'anthropic.Anthropic(api_key="sk-ant-...") — przekaż klucz explicite (dev/testing)'
+            - 'client.api_key — sprawdź aktywny klucz'
+      - cmd: async_client = anthropic.AsyncAnthropic()
+        desc: Klient asynchroniczny (FastAPI, asyncio)
+        detail:
+          what: Identyczne API jak Anthropic(), ale wszystkie metody są async — wymagają await.
+          how: Używaj w FastAPI endpointach, asyncio skryptach, wszędzie gdzie masz event loop.
+          tips:
+            - 'await async_client.messages.create(...) — zawsze z await'
+            - 'Jeden AsyncAnthropic() na całą aplikację'
+      - cmd: client = anthropic.Anthropic(timeout=60.0, max_retries=3)
+        desc: Klient z timeout i retry
+        detail:
+          what: Konfiguruje maksymalny czas oczekiwania na odpowiedź i liczbę automatycznych prób.
+          how: max_retries automatycznie powtarza przy błędach sieciowych i przeciążeniu (529).
+          tips:
+            - 'Dla długich wywołań (extended thinking) ustaw timeout=300 lub więcej'
+            - 'max_retries=0 — wyłącz retry jeśli sam obsługujesz ponowne próby'
+      - cmd: client.models.list()
+        desc: Lista dostępnych modeli Claude
+        detail:
+          what: Zwraca listę wszystkich modeli Claude dostępnych dla Twojego konta API.
+          how: Przydatne do sprawdzenia dokładnych nazw modeli i czy masz dostęp do konkretnej wersji.
+          tips:
+            - '[m.id for m in client.models.list()] — lista samych ID modeli'
+            - 'Tier systemy API mogą ograniczać dostęp do nowszych modeli'
+
+  - name: Messages API — wywołania podstawowe
+    icon: "💬"
+    commands:
+      - cmd: client.messages.create(model=..., max_tokens=..., messages=[...])
+        desc: Podstawowe wywołanie Messages API
+        detail:
+          what: Wysyła wiadomości do Claude i zwraca pełny obiekt Message z content, usage, stop_reason.
+          how: 'max_tokens jest WYMAGANY. messages = lista dictów z role (user/assistant) i content.'
+          tips:
+            - 'response.content[0].text — tekst odpowiedzi'
+            - 'response.stop_reason: "end_turn" / "max_tokens" / "tool_use" / "stop_sequence"'
+      - cmd: 'system="Twoja rola i instrukcje"'
+        desc: Dodaj system prompt (osobny parametr, nie wiadomość)
+        detail:
+          what: W Anthropic SDK system jest osobnym parametrem create(), nie pierwszą wiadomością jak w OpenAI.
+          how: Możesz podać string (prosty) lub listę bloków ContentBlock (dla prompt cachingu).
+          tips:
+            - 'Nie wstawiaj system jako {"role": "system", ...} do messages — to błąd API!'
+            - 'Dla cachingu: system=[{"type": "text", "text": "...", "cache_control": {...}}]'
+      - cmd: response.content[0].text
+        desc: Odczytaj tekst odpowiedzi
+        detail:
+          what: response.content to lista bloków treści — text, tool_use, thinking. Dla prostych odpowiedzi [0] to TextBlock.
+          how: Zawsze sprawdzaj response.content[0].type == "text" gdy masz tool use lub thinking.
+          tips:
+            - 'For block in response.content: if block.type == "text": print(block.text)'
+            - 'response.content[0] może być ToolUseBlock gdy model wywołuje narzędzie!'
+      - cmd: 'temperature=0.0'
+        desc: Ustaw deterministyczność (0 = przewidywalny, 1 = kreatywny)
+        detail:
+          what: temperature kontroluje losowość generowania — 0 to prawie deterministyczny output.
+          how: Dla kodu, ekstrakcji danych, faktów — używaj niskiej temperatury (0.0-0.2).
+          tips:
+            - 'Claude może dawać różne wyniki nawet przy temperature=0 — to normalne przy długich outputach'
+            - 'Nie ustawiaj jednocześnie temperature i top_p — wybierz jedno z nich'
+      - cmd: 'stop_sequences=["</answer>", "---"]'
+        desc: Zatrzymaj generowanie na podanym ciągu znaków
+        detail:
+          what: Claude przestaje generować gdy natrafi na dowolny z podanych ciągów — przydatne do kontrolowania formatu.
+          how: 'response.stop_reason == "stop_sequence" gdy Claude zatrzymał się na jednym z tych ciągów.'
+          tips:
+            - 'Wzorzec XML: prefill "<answer>" + stop_sequences=["</answer>"] — ekstrakcja precyzyjnej odpowiedzi'
+            - 'Możesz kombinować prefill + stop_sequences do wymuszania dowolnego formatu'
+
+  - name: Streaming
+    icon: "📡"
+    commands:
+      - cmd: with client.messages.stream(...) as stream
+        desc: Context manager streamingu odpowiedzi
+        detail:
+          what: client.messages.stream() zwraca context manager — wejdź przez with, iteruj po stream.
+          how: Blokuje do zakończenia streamu wewnątrz bloku with. Po wyjściu możesz wywołać get_final_message().
+          tips:
+            - 'get_final_message() dostępne tylko PO wyjściu z bloku with'
+            - 'Dla async: async with async_client.messages.stream(...) as stream'
+      - cmd: 'for text in stream.text_stream'
+        desc: Iterator tokenów (najprostszy streaming)
+        detail:
+          what: stream.text_stream to iterator yielding string chunki — same teksty, bez metadanych eventów.
+          how: Najprostszy sposób na streaming gdy nie potrzebujesz obsługiwać tool use ani thinking.
+          tips:
+            - 'print(text, end="", flush=True) — wypisuj token po tokenie bez nowej linii'
+            - 'Zbierz w listę i "".join(chunks) jeśli potrzebujesz pełnego tekstu'
+      - cmd: stream.get_final_message()
+        desc: Pobierz pełny Message po zakończeniu streamu
+        detail:
+          what: Zwraca kompletny obiekt Message z usage (tokeny), stop_reason i pełną listą content bloków.
+          how: Wywoływalne tylko po wyjściu z bloku with stream — inaczej stream może być niekompletny.
+          tips:
+            - 'stream.get_final_text() — shorthand, zwraca tylko tekst bez metadanych'
+            - 'final.usage.cache_read_input_tokens — sprawdź cache hits po streamie z cachingiem'
+      - cmd: 'for event in stream: if event.type == "content_block_delta"'
+        desc: Iteruj po pełnych eventach strumienia
+        detail:
+          what: Iteracja po stream (nie text_stream) daje kompletne obiekty zdarzeń — przydatne przy tool use i thinking.
+          how: 'event.type: message_start / content_block_start / content_block_delta / content_block_stop / message_stop.'
+          tips:
+            - 'event.delta.type: "text_delta" (tekst) / "input_json_delta" (tool args) / "thinking_delta"'
+            - 'Potrzebne gdy chcesz obsługiwać tool use lub thinking podczas streamingu'
+
+  - name: Tool Use
+    icon: "🛠️"
+    commands:
+      - cmd: 'tools=[{"name": "...", "description": "...", "input_schema": {...}}]'
+        desc: Definicja narzędzia dla Claude
+        detail:
+          what: Lista narzędzi przekazywana do messages.create(). Każde narzędzie ma name, description i input_schema (JSON Schema).
+          how: description to główna wskazówka dla modelu — pisz dokładnie co robi narzędzie i kiedy użyć.
+          tips:
+            - 'Dobry opis narzędzia ważniejszy niż dobry prompt — model wybiera narzędzie na podstawie description'
+            - '"required": ["pole"] w input_schema wymusza podanie argumentu przez model'
+      - cmd: response.stop_reason == "tool_use"
+        desc: Sprawdź czy model chce wywołać narzędzie
+        detail:
+          what: Gdy model zdecyduje się wywołać narzędzie, stop_reason to "tool_use" — musisz obsłużyć pętlę.
+          how: '"end_turn" = normalna odpowiedź. "tool_use" = musisz wykonać narzędzie i wrócić z wynikiem.'
+          tips:
+            - 'Zawsze sprawdzaj stop_reason przed odczytaniem response.content[0].text!'
+            - 'Model może wywołać kilka narzędzi naraz — iteruj po response.content, nie zakładaj tylko jednego bloku'
+      - cmd: '[b for b in response.content if b.type == "tool_use"]'
+        desc: Wyodrębnij wszystkie wywołania narzędzi
+        detail:
+          what: Filtruje content bloki zostawiając tylko ToolUseBlock — każdy ma id, name i input (dict).
+          how: 'block.input to już sparsowany dict, nie string JSON — SDK parsuje automatycznie.'
+          tips:
+            - 'block.id jest kluczowy — musisz go użyć w tool_result.tool_use_id'
+            - 'block.input["parametr"] — dostęp do argumentów jak do normalnego słownika'
+      - cmd: '{"type": "tool_result", "tool_use_id": block.id, "content": json.dumps(result)}'
+        desc: Format wyniku narzędzia do odesłania Claude
+        detail:
+          what: Wynik narzędzia to dict z type="tool_result", pasującym tool_use_id i content (string lub lista bloków).
+          how: Wstawiasz go do listy content w nowej wiadomości role="user" i wywołujesz create() ponownie.
+          tips:
+            - 'content może być string (prosty) lub lista bloków (też obraz z base64)'
+            - 'Dodaj "is_error": True jeśli narzędzie zwróciło błąd — Claude to uwzględni'
+      - cmd: 'tool_choice={"type": "tool", "name": "extract_data"}'
+        desc: Wymuś wywołanie konkretnego narzędzia
+        detail:
+          what: Claude MUSI wywołać to konkretne narzędzie — niezależnie od treści wiadomości.
+          how: Wzorzec ekstrakcji danych i structured outputs — zawsze dostajesz typowany wynik.
+          tips:
+            - 'tool_choice={"type": "any"} — musi użyć jakiegokolwiek narzędzia'
+            - 'tool_choice={"type": "none"} — blokuje użycie narzędzi (czysta rozmowa)'
+
+  - name: Prompt Caching
+    icon: "⚡"
+    commands:
+      - cmd: '"cache_control": {"type": "ephemeral"}'
+        desc: Oznacz blok do cache (5-minutowe TTL)
+        detail:
+          what: Dodajesz cache_control do bloku w system prompt, user message lub narzędziu. API cache'uje prefiks do tego punktu.
+          how: Pierwsze wywołanie = cache write (droższe o 25%). Kolejne w 5 min = cache read (10x tańsze).
+          tips:
+            - 'Minimalna wielkość do cache: 1024 tokeny dla Claude Sonnet/Opus, 2048 dla Haiku'
+            - 'Identyczny tekst musi być w tym samym miejscu struktury — cache zależy od pozycji w promptcie'
+      - cmd: response.usage.cache_read_input_tokens
+        desc: Sprawdź ile tokenów trafiło z cache (hit)
+        detail:
+          what: cache_read_input_tokens to tokeny odczytane z cache — policz je zamiast normalnych input_tokens dla kosztu.
+          how: 'cache_creation_input_tokens = nowo zapisane do cache. cache_read = odczytane z istniejącego cache.'
+          tips:
+            - 'cache_read = 0 przy pierwszym wywołaniu lub po wygaśnięciu (>5 minut)'
+            - 'Cena cache_read dla Sonnet: $0.30/MTok vs $3.00/MTok dla normalnych input (10x taniej!)'
+      - cmd: 'system=[{"type":"text", "text": LONG_PROMPT, "cache_control": {"type":"ephemeral"}}]'
+        desc: Cache systemu jako lista bloków ContentBlock
+        detail:
+          what: System prompt jako lista bloków pozwala dodać cache_control do całego lub części systemu.
+          how: 'Możesz mieć wiele bloków w system — tylko ostatni z cache_control wyznacza granicę cache.'
+          tips:
+            - 'Zmiana czegokolwiek PRZED cache_control unieważnia cache — prefiks musi być identyczny'
+            - 'Dla bardzo długich systemów (10k+ tokenów): używaj cache na każde wywołanie — zwrot po 2-3 requestach'
+      - cmd: '"cache_control": {"type": "ephemeral"} # w ostatnim narzędziu'
+        desc: Cache zestawu narzędzi (duże listy tools)
+        detail:
+          what: Gdy masz 20-100 narzędzi, ich definicje to tysiące tokenów. Caching tools obniża koszt agentów o 80-90%.
+          how: Wstawiasz cache_control w ostatnim elemencie listy tools — API cache'uje wszystkie narzędzia powyżej.
+          tips:
+            - "Dotyczy też tools w systemie — jeśli narzędzia nie zmieniają się między wywołaniami, zawsze je cache'uj"
+            - 'Połącz caching systemu + narzędzi + dokumentów = minimalne koszty przy dużych kontekstach'
+
+  - name: Extended Thinking
+    icon: "💭"
+    commands:
+      - cmd: 'thinking={"type": "enabled", "budget_tokens": 10000}'
+        desc: Włącz extended thinking (Claude "myśli" przed odpowiedzią)
+        detail:
+          what: Daje Claude budżet N tokenów na wewnętrzne rozumowanie widoczne jako ThinkingBlock w response.content.
+          how: 'max_tokens MUSI być większy niż budget_tokens. Minimum budget: 1000 tokenów. Wyłącza streaming tekstu.'
+          tips:
+            - 'Dla trudnych zadań: budget 8000-16000 tokenów. Dla prostszych: 1000-3000.'
+            - 'Thinking bloki są widoczne w odpowiedzi ale NIE są liczone do max_tokens outputu'
+      - cmd: '[b for b in response.content if b.type == "thinking"]'
+        desc: Odczytaj bloki myślenia Claude
+        detail:
+          what: Filtruje content bloki zostawiając ThinkingBloki — każdy ma .thinking (string z rozumowaniem).
+          how: Możesz wyświetlić użytkownikowi, logować do debugowania lub ignorować — używasz tylko TextBloku.
+          tips:
+            - 'block.thinking może mieć tysiące znaków — loguj do pliku, nie do konsoli na produkcji'
+            - 'Thinking nie znika z responsecontentu — zawsze dostaniesz go gdy thinking jest włączone'
+      - cmd: 'messages.append({"role": "assistant", "content": response.content})'
+        desc: ZACHOWAJ ThinkingBlock w historii multi-turn
+        detail:
+          what: Przy multi-turn z thinking MUSISZ zachować ThinkingBlock w wiadomości assistant — API odrzuci request bez niego.
+          how: Przekaż całe response.content (nie tylko TextBlock) gdy dodajesz wiadomość assistant do historii.
+          tips:
+            - 'Najczęstszy błąd: filtrowanie content bloków i wyrzucanie ThinkingBlock przed dodaniem do historii'
+            - 'W kolejnym wywołaniu API zweryfikuje że ThinkingBlock pasuje do wcześniej wygenerowanego'
+      - cmd: 'thinking={"type": "disabled"}'
+        desc: Jawnie wyłącz thinking (domyślnie wyłączone)
+        detail:
+          what: Thinking jest domyślnie wyłączone — możesz to ustawić explicite dla czytelności kodu.
+          how: Bez thinking i bez extended_thinking header — normalne wywołanie jak zwykle.
+          tips:
+            - 'Nie mieszaj thinking=enabled z tool_choice=auto gdy budujesz agenta — może dawać dziwne wyniki'
+            - 'Streaming z thinking zwraca thinking_delta eventy — obsługuj je jeśli chcesz pokazywać postęp'
+
+  - name: Batch API — masowe przetwarzanie
+    icon: "📋"
+    commands:
+      - cmd: client.beta.messages.batches.create(requests=[...])
+        desc: Utwórz batch (50% taniej, wynik do 24h)
+        detail:
+          what: Batch API przetwarza wiele requestów asynchronicznie — 50% tańsze od synchronicznych wywołań.
+          how: Każdy request to dict z custom_id (twój identyfikator) i params (jak normalne messages.create).
+          tips:
+            - 'Idealnie dla: masowej ekstrakcji danych, klasyfikacji dokumentów, generowania raportów'
+            - 'custom_id pozwala powiązać wynik z oryginalnym requestem po zakończeniu batcha'
+      - cmd: client.beta.messages.batches.retrieve(batch_id)
+        desc: Sprawdź status batcha
+        detail:
+          what: Zwraca obiekt batcha z processing_status i statystykami (request_counts per status).
+          how: 'Statusy: in_progress / ended. Polluj co kilka minut lub użyj webhooka.'
+          tips:
+            - 'batch.request_counts.succeeded / errored / expired — szczegółowy podział wyników'
+            - 'Maksymalny czas przetwarzania: 24h — po tym requestach wygasają'
+      - cmd: 'for result in client.beta.messages.batches.results(batch_id)'
+        desc: Pobierz wyniki ukończonego batcha
+        detail:
+          what: Iteruje po wynikach batcha — każdy result ma custom_id i result (sukces lub błąd).
+          how: 'result.result.type: "succeeded" lub "errored". Dla sukcesu: result.result.message to pełny Message.'
+          tips:
+            - 'Filtruj po result.result.type == "succeeded" przed odczytem .message'
+            - 'Zapisuj wyniki do pliku/bazy na bieżąco — batche mogą mieć tysiące wyników'
+      - cmd: client.beta.messages.batches.list()
+        desc: Lista wszystkich batchy konta
+        detail:
+          what: Zwraca historię batchy z ich statusami i datami — przydatne do monitorowania i debugowania.
+          how: Batcheki są widoczne przez 30 dni po zakończeniu.
+          tips:
+            - 'client.beta.messages.batches.cancel(batch_id) — anuluj batch przed zakończeniem'
+            - 'Monitoruj przez Anthropic Console zamiast API jeśli nie potrzebujesz automatyzacji'
+
+  - name: Token counting i koszty
+    icon: "💰"
+    commands:
+      - cmd: client.beta.messages.count_tokens(model=..., messages=[...])
+        desc: Policz tokeny BEZ wysyłania do modelu
+        detail:
+          what: Liczy ile tokenów zajmuje request (system + messages + tools) bez faktycznego wywołania — darmowe.
+          how: Zwraca obiekt z input_tokens — użyj przed wysłaniem do sprawdzenia czy nie przekraczasz limitu.
+          tips:
+            - 'Sprawdź czy mieszczysz się w kontekście przed kosztownym wywołaniem'
+            - 'Uwzględnia też tokeny narzędzi — ważne gdy masz dużą listę tools'
+      - cmd: response.usage.input_tokens
+        desc: Input tokeny normalnego wywołania
+        detail:
+          what: Rzeczywista liczba tokenów wejściowych zużyta przez wywołanie (bez cache hits).
+          how: 'Pełne koszty = input_tokens * cena_in + output_tokens * cena_out + cache_creation * cena_cw + cache_read * cena_cr.'
+          tips:
+            - 'Dla Sonnet: $3/MTok in, $15/MTok out, $3.75/MTok cache write, $0.30/MTok cache read'
+            - 'Thinking tokeny wliczone w output_tokens — przy budget 10k możesz płacić sporo za thinking'
+      - cmd: 'print(f"Koszt: ${(u.input_tokens * 3 + u.output_tokens * 15) / 1_000_000:.4f}")'
+        desc: Oblicz szacowany koszt wywołania (Sonnet)
+        detail:
+          what: Prosta kalkulacja kosztu na podstawie usage — przydatna do logowania kosztów w aplikacji.
+          how: Ceny w USD za milion tokenów — sprawdź aktualne ceny na anthropic.com/pricing.
+          tips:
+            - 'Dodaj logowanie kosztów do każdego wywołania produkcyjnego — łatwiej śledzić wydatki'
+            - 'Helicone robi to automatycznie i pokazuje w dashboardzie per user/session'
+
+  - name: Error handling i debugowanie
+    icon: "🐛"
+    commands:
+      - cmd: 'except anthropic.APIStatusError as e: print(e.status_code, e.message)'
+        desc: Złap błąd API z kodem HTTP
+        detail:
+          what: Łapie wszystkie błędy z niezerowym kodem HTTP — masz dostęp do status_code i szczegółowego message.
+          how: Łap konkretne podklasy przed ogólnym APIStatusError aby obsłużyć różne błędy inaczej.
+          tips:
+            - 'anthropic.AuthenticationError (401) — złe ANTHROPIC_API_KEY'
+            - 'anthropic.PermissionDeniedError (403) — brak dostępu do modelu lub feature'
+      - cmd: 'except anthropic.RateLimitError: time.sleep(60); retry()'
+        desc: Obsłuż przekroczenie limitu requestów (429)
+        detail:
+          what: Rate limit zwraca 429 — SDK automatycznie retry'uje, ale możesz też obsłużyć sam z niestandardowym backoffem.
+          how: 'Sprawdź nagłówek retry-after w e.response.headers żeby wiedzieć ile czekać.'
+          tips:
+            - 'Exponential backoff z jitter — nie używaj stałego sleep bo wszystkie instancey obudzą się naraz'
+            - 'Ogranicz liczbę concurrent requestów jeśli często hitujesz rate limit'
+      - cmd: 'except anthropic.APIConnectionError: # problem sieciowy'
+        desc: Obsłuż błąd połączenia sieciowego
+        detail:
+          what: APIConnectionError = nie udało się nawiązać połączenia z API (brak sieci, timeout połączenia).
+          how: SDK automatycznie retry'uje przy connection errors (max_retries). Catch dla własnej logiki fallback.
+          tips:
+            - 'Ustaw odpowiedni timeout= przy tworzeniu klienta — zapobiegnie wieszaniu requestów'
+            - 'Loguj APIConnectionError — częste przy niestabilnym łączu lub przeciążonym API'
+      - cmd: pip show anthropic
+        desc: Sprawdź zainstalowaną wersję SDK
+        detail:
+          what: Wyświetla wersję biblioteki anthropic — ważne bo API bywa aktualizowane (nowe modele, features).
+          how: Porównaj z CHANGELOG na GitHub (anthropic-ai/anthropic-sdk-python).
+          tips:
+            - 'pip install --upgrade anthropic — zaktualizuj do najnowszej'
+            - 'Sprawdzaj CHANGELOG przed upgrade — extended thinking i computer use miały breaking changes'

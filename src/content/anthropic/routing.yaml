@@ -1,0 +1,219 @@
+title: Tool Use — function calling
+
+items:
+  - name: Definicja narzędzia i odczyt odpowiedzi
+    desc: >
+      Narzędzie to JSON Schema z name, description i input_schema. Model decyduje
+      kiedy wywołać narzędzie i zwraca ToolUseBlock z id, name i input (sparsowany dict).
+      response.stop_reason == "tool_use" sygnalizuje że model chce wywołać narzędzie.
+    code: |
+      tools = [
+          {
+              "name": "get_weather",
+              "description": "Pobierz aktualną pogodę dla podanego miasta. Zwraca temperaturę i warunki.",
+              "input_schema": {
+                  "type": "object",
+                  "properties": {
+                      "city":  {"type": "string",  "description": "Nazwa miasta"},
+                      "units": {"type": "string",  "enum": ["celsius", "fahrenheit"], "description": "Jednostka temperatury"}
+                  },
+                  "required": ["city"]
+              },
+          }
+      ]
+
+      response = client.messages.create(
+          model="claude-sonnet-4-6",
+          max_tokens=1024,
+          tools=tools,
+          messages=[{"role": "user", "content": "Jaka jest pogoda w Krakowie i Gdańsku?"}],
+      )
+
+      print(response.stop_reason)  # "tool_use"
+
+      for block in response.content:
+          if block.type == "tool_use":
+              print(f"Narzędzie: {block.name}")
+              print(f"ID:        {block.id}")
+              print(f"Argumenty: {block.input}")  # dict, już sparsowany
+
+  - name: Pełny cykl multi-turn — execute i tool_result
+    desc: >
+      Tool use to co najmniej dwa wywołania API: 1) model zwraca ToolUseBlock,
+      2) Ty wykonujesz funkcję i odsyłasz wynik jako tool_result w nowej wiadomości user.
+      Model formułuje końcową odpowiedź na podstawie wyniku narzędzia.
+    code: |
+      import json
+
+      def get_weather(city: str, units: str = "celsius") -> dict:
+          return {"city": city, "temp": 18, "units": units, "conditions": "słonecznie"}
+
+      messages = [{"role": "user", "content": "Jaka jest pogoda w Warszawie?"}]
+
+      # Krok 1: model prosi o narzędzie
+      response = client.messages.create(
+          model="claude-sonnet-4-6",
+          max_tokens=1024,
+          tools=tools,
+          messages=messages
+      )
+
+      # Krok 2: wykonaj narzędzia i zbierz wyniki
+      tool_results = []
+      for block in response.content:
+          if block.type == "tool_use":
+              result = get_weather(**block.input)
+              tool_results.append({
+                  "type": "tool_result",
+                  "tool_use_id": block.id,    # musi pasować do block.id
+                  "content": json.dumps(result, ensure_ascii=False)
+              })
+
+      # Krok 3: wróć do modelu z wynikami narzędzi
+      messages.append({"role": "assistant", "content": response.content})
+      messages.append({"role": "user",      "content": tool_results})
+
+      final = client.messages.create(
+          model="claude-sonnet-4-6",
+          max_tokens=1024,
+          tools=tools,
+          messages=messages
+      )
+      print(final.content[0].text)  # finalna odpowiedź dla użytkownika
+
+  - name: tool_choice — kontrola wyboru narzędzia
+    desc: >
+      tool_choice steruje tym kiedy i które narzędzie model może wywołać.
+      auto (domyślnie) — model sam decyduje. any — musi wywołać jakieś narzędzie.
+      tool — musi wywołać konkretnie to narzędzie. none — nie może wywołać żadnego.
+    code: |
+      # auto — domyślne, model sam decyduje
+      response = client.messages.create(
+          model="claude-sonnet-4-6",
+          max_tokens=1024,
+          tools=tools,
+          tool_choice={"type": "auto"},
+          messages=[{"role": "user", "content": "Cześć, co słychać?"}]
+          # może NIE wywołać narzędzia bo pytanie nie wymaga pogody
+      )
+
+      # any — MUSI wywołać jakiekolwiek narzędzie
+      response = client.messages.create(
+          model="claude-sonnet-4-6",
+          max_tokens=1024,
+          tools=tools,
+          tool_choice={"type": "any"},
+          messages=[{"role": "user", "content": "Skontaktuj się z API"}]
+      )
+
+      # tool — MUSI wywołać konkretne narzędzie (wymuś ekstrakcję danych)
+      response = client.messages.create(
+          model="claude-sonnet-4-6",
+          max_tokens=1024,
+          tools=tools,
+          tool_choice={"type": "tool", "name": "get_weather"},
+          messages=[{"role": "user", "content": "Powiedz mi coś o Gdańsku"}]
+          # model MUSI wywołać get_weather nawet jeśli nie ma sensu
+      )
+
+  - name: Równoległe wywołania narzędzi
+    desc: >
+      Gdy model musi wywołać kilka narzędzi niezależnie (np. pogoda w kilku miastach),
+      zwróci wiele bloków ToolUseBlock w jednej odpowiedzi. Możesz wywołać je równolegle
+      i zwrócić wszystkie wyniki naraz — szybciej niż sekwencyjnie.
+    code: |
+      import asyncio
+
+      response = client.messages.create(
+          model="claude-sonnet-4-6",
+          max_tokens=1024,
+          tools=tools,
+          messages=[{"role": "user", "content": "Pogoda w Warszawie, Krakowie i Gdańsku?"}]
+      )
+
+      # Model może zwrócić 3 ToolUseBlock naraz
+      tool_calls = [b for b in response.content if b.type == "tool_use"]
+      print(f"Wywołań narzędzi: {len(tool_calls)}")
+
+      # Wykonaj równolegle (async wersja):
+      async def execute_tools_parallel(tool_calls):
+          tasks = [asyncio.to_thread(get_weather, **call.input) for call in tool_calls]
+          results = await asyncio.gather(*tasks)
+
+          return [
+              {
+                  "type": "tool_result",
+                  "tool_use_id": call.id,
+                  "content": json.dumps(result, ensure_ascii=False)
+              }
+              for call, result in zip(tool_calls, results)
+          ]
+
+  - name: Narzędzia jako ekstrakcja danych (bez wykonania)
+    desc: >
+      Potężny wzorzec: zdefiniuj narzędzie z input_schema jako strukturą danych
+      którą chcesz wyodrębnić, użyj tool_choice force, a potem NIE wykonuj narzędzia —
+      po prostu odczytaj block.input jako sparsowany, zwalidowany JSON. Tańszy i prostszy
+      odpowiednik structured outputs z OpenAI (bez potrzeby beta.parse).
+    code: |
+      extract_tool = {
+          "name": "extract_invoice_data",
+          "description": "Wyodrębnij dane z faktury",
+          "input_schema": {
+              "type": "object",
+              "properties": {
+                  "numer":    {"type": "string"},
+                  "kwota":    {"type": "number"},
+                  "waluta":   {"type": "string", "enum": ["PLN", "EUR", "USD"]},
+                  "dostawca": {"type": "string"},
+                  "data":     {"type": "string", "description": "Format YYYY-MM-DD"}
+              },
+              "required": ["numer", "kwota", "waluta", "dostawca", "data"]
+          }
+      }
+
+      invoice_text = "Faktura nr FV/2025/001 z dnia 2025-03-15, kwota: 2450.00 PLN, Sprzedawca: Firma ABC sp. z o.o."
+
+      response = client.messages.create(
+          model="claude-sonnet-4-6",
+          max_tokens=512,
+          tools=[extract_tool],
+          tool_choice={"type": "tool", "name": "extract_invoice_data"},
+          messages=[{"role": "user", "content": invoice_text}]
+      )
+
+      # Odczytaj dane — block.input to już dict (SDK parsuje JSON automatycznie)
+      data = response.content[0].input
+      print(data["numer"], data["kwota"], data["waluta"])
+
+  - name: Narzędzia wbudowane — computer use (beta)
+    desc: >
+      Claude może obsługiwać interfejsy graficzne przez specjalne narzędzia beta:
+      computer (kliknięcia/klawiatura/screenshot), text_editor (operacje na plikach),
+      bash (wykonywanie komend). Wymaga specjalnego headera betas.
+    code: |
+      response = client.beta.messages.create(
+          model="claude-sonnet-4-6",
+          max_tokens=4096,
+          betas=["computer-use-2024-10-22"],
+          tools=[
+              {
+                  "type": "computer_20241022",
+                  "name": "computer",
+                  "display_width_px": 1920,
+                  "display_height_px": 1080,
+                  "display_number": 1,
+              },
+              {"type": "text_editor_20241022", "name": "str_replace_editor"},
+              {"type": "bash_20241022",        "name": "bash"},
+          ],
+          messages=[{
+              "role": "user",
+              "content": "Otwórz przeglądarkę, wejdź na github.com i znajdź repo anthropic-sdk-python"
+          }]
+      )
+
+      # Model zwraca action: screenshot, key, type, mouse_move, left_click, etc.
+      for block in response.content:
+          if block.type == "tool_use" and block.name == "computer":
+              print(f"Akcja: {block.input['action']}")

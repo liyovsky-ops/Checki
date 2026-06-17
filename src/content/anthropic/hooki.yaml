@@ -1,0 +1,176 @@
+title: Streaming — token po tokenie
+
+items:
+  - name: messages.stream() — context manager
+    desc: >
+      Podstawowy wzorzec streamingu w SDK — client.messages.stream() zwraca
+      context manager MessageStreamManager. Strumień tokenów odbierasz przez
+      text_stream (iterator yielding stringów) lub pełne eventy przez stream.
+    code: |
+      with client.messages.stream(
+          model="claude-sonnet-4-6",
+          max_tokens=1024,
+          system="Odpowiadaj po polsku.",
+          messages=[{"role": "user", "content": "Opisz architekturę mikroserwisów w 5 punktach"}],
+      ) as stream:
+          for text in stream.text_stream:
+              print(text, end="", flush=True)
+      print()
+
+      # Pełna wiadomość po zakończeniu streamu
+      final = stream.get_final_message()
+      print(f"\nTokeny: {final.usage.input_tokens} in / {final.usage.output_tokens} out")
+
+  - name: Eventy — MessageStreamEvent
+    desc: >
+      stream może emitować szczegółowe eventy: message_start, content_block_start,
+      content_block_delta, content_block_stop, message_delta, message_stop.
+      Przydatne gdy chcesz obsługiwać tool use, thinking lub rozróżniać typy deltów.
+    code: |
+      with client.messages.stream(
+          model="claude-sonnet-4-6",
+          max_tokens=1024,
+          messages=[{"role": "user", "content": "Wyjaśnij asyncio"}],
+      ) as stream:
+          for event in stream:
+              # event.type to string z typem zdarzenia
+              if event.type == "content_block_delta":
+                  if event.delta.type == "text_delta":
+                      print(event.delta.text, end="", flush=True)
+              elif event.type == "message_start":
+                  print(f"[model: {event.message.model}]")
+              elif event.type == "message_stop":
+                  print("\n[stream zakończony]")
+
+  - name: Async streaming — AsyncAnthropic
+    desc: >
+      Dla kodu async (FastAPI, asyncio) używaj AsyncAnthropic() z async with i async for.
+      Identyczne API jak synchroniczny klient, ale każda operacja wymaga await.
+      Idealny wzorzec dla FastAPI endpoint streamujący odpowiedź do klienta.
+    code: |
+      import asyncio
+      from anthropic import AsyncAnthropic
+
+      async_client = AsyncAnthropic()
+
+      async def stream_response(question: str):
+          async with async_client.messages.stream(
+              model="claude-sonnet-4-6",
+              max_tokens=1024,
+              messages=[{"role": "user", "content": question}],
+          ) as stream:
+              async for text in stream.text_stream:
+                  yield text
+
+      # FastAPI — Server-Sent Events
+      from fastapi.responses import StreamingResponse
+
+      @app.post("/chat")
+      async def chat_endpoint(question: str):
+          return StreamingResponse(
+              stream_response(question),
+              media_type="text/event-stream"
+          )
+
+      # Lub samo asyncio:
+      async def main():
+          async with async_client.messages.stream(
+              model="claude-sonnet-4-6",
+              max_tokens=1024,
+              messages=[{"role": "user", "content": "Cześć"}]
+          ) as stream:
+              async for text in stream.text_stream:
+                  print(text, end="", flush=True)
+
+      asyncio.run(main())
+
+  - name: Stream z tool use — InputJSONDelta
+    desc: >
+      Gdy Claude wywołuje narzędzie podczas streamingu, dostaniesz content_block_start
+      z typem tool_use, a potem input_json_delta chunki zawierające fragmenty JSONa
+      argumentów. Musisz złożyć je w całość i sparsować dopiero na końcu.
+    code: |
+      import json
+
+      tools = [{
+          "name": "get_weather",
+          "description": "Pobierz pogodę dla miasta",
+          "input_schema": {
+              "type": "object",
+              "properties": {"city": {"type": "string"}},
+              "required": ["city"]
+          }
+      }]
+
+      tool_input_chunks = []
+
+      with client.messages.stream(
+          model="claude-sonnet-4-6",
+          max_tokens=1024,
+          tools=tools,
+          messages=[{"role": "user", "content": "Jaka pogoda w Warszawie?"}],
+      ) as stream:
+          for event in stream:
+              if event.type == "content_block_delta":
+                  if event.delta.type == "input_json_delta":
+                      tool_input_chunks.append(event.delta.partial_json)
+                  elif event.delta.type == "text_delta":
+                      print(event.delta.text, end="", flush=True)
+              elif event.type == "content_block_start":
+                  if hasattr(event.content_block, "name"):
+                      print(f"\n[tool: {event.content_block.name}]")
+
+      # Złóż JSON argumentów narzędzia
+      tool_args = json.loads("".join(tool_input_chunks))
+      print(f"Wywołaj get_weather(city={tool_args['city']!r})")
+
+  - name: get_final_message() i get_final_text()
+    desc: >
+      Po zakończeniu streamu (wyjście z bloku with) stream.get_final_message()
+      zwraca pełny obiekt Message z usage, stop_reason i kompletną listą content bloków.
+      get_final_text() zwraca tylko tekst wszystkich TextBlocków jako jeden string.
+    code: |
+      with client.messages.stream(
+          model="claude-sonnet-4-6",
+          max_tokens=2048,
+          messages=[{"role": "user", "content": "Napisz krótki tutorial o Dockerze"}],
+      ) as stream:
+          for text in stream.text_stream:
+              print(text, end="", flush=True)
+
+      # Dostępne dopiero po wyjściu z bloku with
+      final_message = stream.get_final_message()
+      final_text    = stream.get_final_text()  # shorthand dla get_final_message().content[0].text
+
+      print(f"\n\nStop reason: {final_message.stop_reason}")
+      print(f"Długość: {len(final_text)} znaków")
+      print(f"Usage: {final_message.usage}")
+
+  - name: Streaming z prompt cachingiem
+    desc: >
+      Prompt caching działa normalnie ze streamingiem — dodajesz cache_control tak samo.
+      W response.usage (dostępnym przez get_final_message()) sprawdzasz cache_read/write.
+      Pierwsze wywołanie zapisuje do cache, kolejne są dużo tańsze.
+    code: |
+      LONG_SYSTEM_PROMPT = """Jesteś ekspertem Python z 20-letnim doświadczeniem.
+      Znasz dogłębnie: asyncio, SQLAlchemy, FastAPI, Docker, Kubernetes, AWS, LangGraph...
+      [... długi dokument: 1000+ tokenów ...]"""
+
+      with client.messages.stream(
+          model="claude-sonnet-4-6",
+          max_tokens=1024,
+          system=[{
+              "type": "text",
+              "text": LONG_SYSTEM_PROMPT,
+              "cache_control": {"type": "ephemeral"}  # cache ten system prompt
+          }],
+          messages=[{"role": "user", "content": "Co to jest event loop?"}],
+      ) as stream:
+          for text in stream.text_stream:
+              print(text, end="", flush=True)
+
+      # Sprawdź cache hits po streamingu:
+      final = stream.get_final_message()
+      u = final.usage
+      print(f"\ncache_write: {u.cache_creation_input_tokens}")
+      print(f"cache_read:  {u.cache_read_input_tokens}")

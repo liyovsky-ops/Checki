@@ -1,0 +1,86 @@
+title: Anthropic SDK vs alternatywy
+
+items:
+  - name: OpenAI SDK (GPT-4o, o3)
+    icon: "✦"
+    color: "#10a37f"
+    tagline: "Największy ekosystem, function calling, structured outputs, DALL-E, Whisper"
+    pros:
+      - Największa społeczność i ekosystem — najwięcej tutoriali, integracji, narzędzi
+      - Batch API z pełną obsługą i prostym API (bez beta headers)
+      - Wbudowana generacja obrazów (DALL-E) i transkrypcja audio (Whisper)
+      - structured outputs (beta.parse + Pydantic) — bardziej eleganckie niż tool trick
+      - Więcej modeli "małych" (gpt-4o-mini) dla tanich zadań
+    cons:
+      - Brak prompt cachingu z tak niskim kosztem (10x) jak Anthropic
+      - Brak extended thinking — modele reasoning (o1/o3) działają inaczej, brak wglądu
+      - GPT-4o gorzej radzi z długim kontekstem i złożonymi instrukcjami systemowymi
+      - Brak computer use — brak możliwości obsługi GUI przez API
+      - Mniej wyraźna persona "bezpiecznego" modelu — Claude bywa dokładniejszy przy strict instructions
+    vs: OpenAI gdy potrzebujesz obrazów/audio, rozbudowanego ekosystemu i najszerszego wsparcia community. Anthropic gdy chcesz prompt cachingu, extended thinking, długiego kontekstu (200k) lub computer use.
+
+  - name: Google Gemini SDK (Gemini 2.0 Pro/Flash)
+    icon: "✨"
+    color: "#4285F4"
+    tagline: "Ogromny kontekst (1-2M tokenów), natywna multimodalność z wideo i audio"
+    pros:
+      - Gigantyczny kontekst (1-2M tokenów w Gemini 2.0 Flash) — nie ma odpowiednika
+      - Natywna multimodalność wideo i audio w jednym wywołaniu
+      - Bezpłatny tier przez Google AI Studio do developmentu
+      - Dobra integracja z Google Cloud (Vertex AI)
+    cons:
+      - API mniej stabilne historycznie — kilka SDK rewizji
+      - Brak prompt cachingu tak dobrego jak Anthropic
+      - Structured outputs mniej dopracowane
+      - Brak odpowiednika computer use
+      - Mniejsza społeczność i mniej przykładów enterprise
+    vs: Gemini gdy potrzebujesz przetworzyć długie wideo lub gigantyczne dokumenty w jednym kontekście. Anthropic gdy budujesz produkcyjne aplikacje z narzędziami, cachingiem i extended thinking.
+
+  - name: Mistral AI (Mistral Large, Mixtral)
+    icon: "🌬️"
+    color: "#FA520F"
+    tagline: "Europejski open-weight, self-hosting, RODO-friendly, dobra cena"
+    pros:
+      - Modele open-weight (Mistral 7B, Mixtral) — możesz hostować sam (zero vendor lock-in)
+      - Serwery w UE — łatwiejsza zgodność z RODO dla polskich/europejskich firm
+      - Konkurencyjna cena za token dla klas enterprise
+      - API kompatybilne z OpenAI format — łatwa migracja kodu
+    cons:
+      - Nie ma odpowiednika extended thinking
+      - Brak prompt cachingu
+      - Bez computer use, bez wbudowanego Whisper/DALL-E
+      - Jakość najlepszych modeli wciąż niżej od Claude Opus/Sonnet w trudnych zadaniach
+      - Mała społeczność i mniej zasobów edukacyjnych
+    vs: Mistral gdy priorytetem jest lokalizacja danych w UE lub self-hosting modeli. Anthropic gdy jakość odpowiedzi i zaawansowane features (caching, thinking) są ważniejsze.
+
+  - name: Cohere (Command R+)
+    icon: "🌀"
+    color: "#D18EE2"
+    tagline: "Enterprise RAG, native tool use, multilingual embeddings, managed deployment"
+    pros:
+      - Native RAG — Rerank API, embeddings wielojęzyczne gotowe do produkcji
+      - Enterprise deployment na prywatnej infrastrukturze
+      - Tool use dobrze zoptymalizowane pod agentic workflows
+      - Silny w klasyfikacji i wydobyciu informacji ze strukturyzowanych danych
+    cons:
+      - Mniejsza jakość dla generycznych zadań konwersacyjnych
+      - Mniejsza społeczność i dokumentacja
+      - Brak streamingg thinking, computer use, zaawansowanego caching
+      - Mniej tutoriali i przykładów online
+    vs: Cohere dla produkcyjnego RAG z wielojęzycznym retrieval i enterprise deployment. Anthropic dla zastosowań wymagających głębokiego rozumowania, długich instrukcji systemowych i extended thinking.
+
+  - name: Ollama / lokalne modele (Llama, Phi, Gemma)
+    icon: "🦙"
+    color: "#595959"
+    tagline: "Pełna prywatność, zero kosztów API, offline — ale na własnym sprzęcie"
+    pros:
+      - Zero kosztów za token — model na Twoim GPU/CPU
+      - Pełna prywatność danych — nic nie wychodzi na zewnątrz
+      - Działa offline — brak zależności od dostępności API
+      - API kompatybilne z OpenAI SDK — przełączanie bez zmiany kodu
+    cons:
+      - Wymaga mocnego sprzętu (GPU z min. 8-24GB VRAM dla sensownych modeli)
+      - Lokalne modele open-source wyraźnie słabsze od Claude Opus/Sonnet w trudnych zadaniach
+      - Brak prompt cachingu, extended thinking, computer use, Batch API
+      - Ty zarządzasz infrastrukturą — aktualizacje, monitoring, skalowanie
+    vs: Ollama gdy dane muszą zostać lokalnie (medycyna, prawo, finanse z wrażliwymi danymi) lub koszt tokenów jest krytyczny. Anthropic gdy jakość odpowiedzi i zaawansowane features są ważniejsze od prywatności/kosztu.
