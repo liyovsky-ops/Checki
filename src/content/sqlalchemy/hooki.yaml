@@ -1,0 +1,181 @@
+title: Zapytania — SELECT, filtrowanie, agregacje
+
+items:
+  - name: select() i podstawowe filtrowanie (styl 2.0)
+    desc: >
+      SQLAlchemy 2.0: używaj select(Model) zamiast session.query(Model).
+      session.execute() + .scalars().all() to standardowy wzorzec pobierania wielu rekordów.
+      scalar_one() dla jednego, scalar_one_or_none() gdy rekord może nie istnieć.
+    code: |
+      from sqlalchemy import select, and_, or_, not_
+
+      with Session(engine) as session:
+          # SELECT * FROM users WHERE name LIKE '%Jan%'
+          stmt = select(User).where(User.name.like("%Jan%"))
+          users = session.scalars(stmt).all()  # lista obiektów User
+
+          # Wiele warunków — and_ i or_
+          stmt = select(User).where(
+              and_(
+                  User.is_active == True,
+                  or_(
+                      User.email.endswith("@firma.pl"),
+                      User.role == "admin"
+                  )
+              )
+          )
+          results = session.scalars(stmt).all()
+
+          # Jeden wynik lub None (bezpieczny)
+          user = session.scalars(
+              select(User).where(User.email == "jan@firma.pl")
+          ).one_or_none()
+
+          # Jeden wynik lub wyjątek (NoResultFound / MultipleResultsFound)
+          user = session.scalars(
+              select(User).where(User.id == 5)
+          ).one()
+
+  - name: Sortowanie, paginacja, LIMIT
+    desc: >
+      order_by() dla sortowania, limit()/offset() dla paginacji.
+      Kursor-based pagination (where id > last_id) jest wydajniejszy niż offset
+      dla dużych tabel — unikaj offset przy milionach rekordów.
+    code: |
+      from sqlalchemy import desc, asc
+
+      with Session(engine) as session:
+          # Sortowanie
+          stmt = select(User).order_by(desc(User.created_at), asc(User.name))
+          users = session.scalars(stmt).all()
+
+          # Paginacja offset-based (PROSTA, ale wolna na dużych tabelach)
+          page = 3
+          page_size = 20
+          stmt = select(User).order_by(User.id).limit(page_size).offset((page-1) * page_size)
+          users = session.scalars(stmt).all()
+
+          # Paginacja kursor-based (WYDAJNA dla dużych tabel)
+          last_id = 1000  # ID ostatniego rekordu poprzedniej strony
+          stmt = select(User).where(User.id > last_id).order_by(User.id).limit(20)
+          next_users = session.scalars(stmt).all()
+
+  - name: Agregacje i GROUP BY
+    desc: >
+      func.count(), func.sum(), func.avg(), func.max(), func.min() + group_by() + having().
+      Możesz select() na konkretnych kolumnach i wyrażeniach zamiast całych modeli.
+    code: |
+      from sqlalchemy import func, select
+
+      with Session(engine) as session:
+          # Policz wszystkich użytkowników
+          count = session.scalar(select(func.count()).select_from(User))
+
+          # GROUP BY — zamówienia per użytkownik
+          stmt = (
+              select(Order.user_id, func.count(Order.id).label("order_count"),
+                     func.sum(Order.total_amount).label("total_spent"))
+              .group_by(Order.user_id)
+              .having(func.count(Order.id) > 5)
+              .order_by(desc("total_spent"))
+          )
+          rows = session.execute(stmt).all()
+          # rows = lista named tuples: row.user_id, row.order_count, row.total_spent
+
+          # Konkretne kolumny zamiast całego modelu
+          stmt = select(User.id, User.email, User.name)
+          for row in session.execute(stmt):
+              print(row.id, row.email, row.name)
+
+  - name: JOIN — łączenie tabel
+    desc: >
+      join() i outerjoin() dla łączenia tabel. SQLAlchemy automatycznie wykrywa
+      warunek joina z kluczy obcych jeśli masz zdefiniowane relacje lub ForeignKey.
+    code: |
+      from sqlalchemy import join
+
+      with Session(engine) as session:
+          # INNER JOIN — automatycznie przez ForeignKey
+          stmt = (
+              select(Order, User)
+              .join(User, Order.user_id == User.id)
+              .where(User.is_active == True)
+          )
+          for order, user in session.execute(stmt):
+              print(f"{user.name}: zamówienie #{order.id}")
+
+          # LEFT OUTER JOIN — wszyscy użytkownicy, nawet bez zamówień
+          stmt = (
+              select(User, func.count(Order.id).label("orders"))
+              .outerjoin(Order, Order.user_id == User.id)
+              .group_by(User.id)
+          )
+          rows = session.execute(stmt).all()
+
+          # JOIN z aliasem (gdy ta sama tabela wiele razy)
+          from sqlalchemy.orm import aliased
+          ParentUser = aliased(User, name="parent")
+          stmt = select(User, ParentUser).join(ParentUser, User.parent_id == ParentUser.id)
+
+  - name: Subquery i CTE (Common Table Expressions)
+    desc: >
+      subquery() zamienia select() w podzapytanie do użycia w outer query.
+      cte() tworzy WITH clause — czytelniejszy i wydajniejszy niż zagnieżdżone subquery.
+      Potężne narzędzia do złożonych raportów analitycznych.
+    code: |
+      from sqlalchemy import select, func
+      from sqlalchemy.orm import Session
+
+      with Session(engine) as session:
+          # Subquery — znajdź users z więcej niż 3 zamówieniami
+          orders_subq = (
+              select(Order.user_id, func.count(Order.id).label("cnt"))
+              .group_by(Order.user_id)
+              .having(func.count(Order.id) > 3)
+              .subquery()
+          )
+          stmt = select(User).join(orders_subq, User.id == orders_subq.c.user_id)
+          power_users = session.scalars(stmt).all()
+
+          # CTE — czytelniejszy format dla złożonych zapytań
+          top_buyers_cte = (
+              select(
+                  Order.user_id,
+                  func.sum(Order.total_amount).label("total")
+              )
+              .group_by(Order.user_id)
+              .order_by(desc("total"))
+              .limit(100)
+              .cte("top_buyers")
+          )
+          stmt = select(User).join(top_buyers_cte, User.id == top_buyers_cte.c.user_id)
+          vip_users = session.scalars(stmt).all()
+
+  - name: UPDATE i DELETE przez SQL (bez ładowania obiektów)
+    desc: >
+      Dla masowych operacji (UPDATE 10k rekordów) użyj session.execute(update(Model))
+      zamiast ładowania każdego obiektu. Dużo szybsze bo omija ORM layer i identity map.
+    code: |
+      from sqlalchemy import update, delete
+
+      with Session(engine) as session:
+          # UPDATE bez ładowania obiektów — jeden SQL
+          stmt = (
+              update(User)
+              .where(User.last_login < datetime(2024, 1, 1))
+              .values(is_active=False)
+          )
+          result = session.execute(stmt)
+          print(f"Dezaktywowano: {result.rowcount} użytkowników")
+          session.commit()
+
+          # DELETE bez ładowania obiektów
+          stmt = delete(Order).where(Order.status == "cancelled", Order.created_at < cutoff_date)
+          result = session.execute(stmt)
+          print(f"Usunięto: {result.rowcount} zamówień")
+          session.commit()
+
+          # UPDATE konkretnych rekordów po liście ID
+          stmt = update(User).where(User.id.in_([1, 5, 42, 100])).values(role="premium")
+          session.execute(stmt)
+          session.commit()

@@ -1,0 +1,92 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać SQLAlchemy?
+  firstComponent: Pierwsze połączenie z bazą
+  firstComponentLang: python
+
+intro:
+  title: Czym jest SQLAlchemy?
+  desc: >
+    Najpotężniejszy Python SQL toolkit i ORM. Dwa poziomy abstrakcji: Core (surowe SQL
+    przez Pythona, maksymalna kontrola) i ORM (mapowanie klas Python na tabele SQL,
+    wygoda i relacje). SQLAlchemy 2.0 (aktualna, od 2023) ujednoliciło API: jedno session.execute()
+    dla wszystkiego, nowy select() zamiast query(). Obsługuje PostgreSQL, MySQL, SQLite,
+    Oracle, MS SQL i inne przez dialekty. Standard w enterprise Python — Flask-SQLAlchemy,
+    FastAPI z SQLModel, Alembic migracje — wszystko oparte na SQLAlchemy Core.
+
+concepts:
+  - title: Engine — połączenie z bazą
+    desc: >
+      Engine to "fabryka połączeń" — tworzy connection pool i zarządza połączeniami.
+      Tworzysz jeden Engine na całą aplikację przez create_engine(url). URL zawiera
+      driver, credentials, host i bazę: postgresql+psycopg2://user:pass@host/db.
+    icon: "🔌"
+  - title: Session — jednostka pracy ORM
+    desc: >
+      Session to "tożsamość obiektów" — przechowuje wszystkie załadowane obiekty w pamięci,
+      śledzi zmiany (dirty objects), batches INSERTy/UPDATEy i wysyła je do bazy przy commit().
+      Używaj Session jako context managera: with Session(engine) as session.
+    icon: "🔄"
+  - title: Core vs ORM
+    desc: >
+      Core = pisz SQL przez Pythona (select(), insert(), join()) — pełna kontrola.
+      ORM = mapuj klasy Pythona na tabele, operuj na obiektach, relacje automatycznie.
+      Możesz mieszać: ORM do prostego CRUD, Core do złożonych zapytań analitycznych.
+    icon: "⚖️"
+  - title: Mapped Columns i Typy (2.0+)
+    desc: >
+      SQLAlchemy 2.0 preferuje Mapped[T] i mapped_column() z type hints.
+      Python typ (str, int, datetime) mapuje na SQL typ automatycznie.
+      Stary styl (Column, Integer, String) nadal działa — dużo legacy kodu to ma.
+    icon: "📝"
+  - title: Identity Map — obiekt unikalny w sesji
+    desc: >
+      Session gwarantuje że dla danego primary key jest tylko JEDEN obiekt Pythona w sesji.
+      Drugie zapytanie o ten sam rekord zwraca ten sam obiekt z pamięci, nie SQL.
+      To automatyczna cache warstwy ORM — zrozumienie tego zapobiega N+1 bugom.
+    icon: "🗺️"
+  - title: Lazy vs Eager Loading
+    desc: >
+      Domyślnie relacje ładują się leniwie (SELECT gdy dostęp do .orders).
+      Eager loading (selectinload, joinedload) ładuje relacje z góry w jednym zapytaniu.
+      Brak eager loading to najczęstsza przyczyna N+1 problem — tysiące SQLi zamiast jednego.
+    icon: "⚡"
+
+whenToUse:
+  - Aplikacje Python z relacyjną bazą danych (FastAPI, Flask, Celery)
+  - Złożone zapytania z joinami, subquery, CTE — Core daje pełną kontrolę
+  - Projekty z modelami ORM i relacjami (jeden-do-wielu, wiele-do-wielu)
+  - Async aplikacje (FastAPI + asyncpg) przez AsyncSession
+  - Migracje schematu przez Alembic
+  - Zastąpienie django ORM w non-Django projektach
+
+firstComponent: |
+  # pip install sqlalchemy psycopg2-binary
+
+  from sqlalchemy import create_engine, String, Integer
+  from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
+
+  # Engine — connection string
+  engine = create_engine("postgresql+psycopg2://user:pass@localhost/mydb", echo=True)
+
+  # Baza dla modeli ORM
+  class Base(DeclarativeBase):
+      pass
+
+  class User(Base):
+      __tablename__ = "users"
+
+      id:    Mapped[int] = mapped_column(primary_key=True)
+      email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+      name:  Mapped[str] = mapped_column(String(80))
+
+  # Stwórz tabele
+  Base.metadata.create_all(engine)
+
+  # CRUD
+  with Session(engine) as session:
+      user = User(email="jan@firma.pl", name="Jan Kowalski")
+      session.add(user)
+      session.commit()
+      session.refresh(user)
+      print(user.id)   # wygenerowany przez bazę

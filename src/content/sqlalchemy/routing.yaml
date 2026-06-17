@@ -1,0 +1,180 @@
+title: Relacje — jeden-do-wielu, wiele-do-wielu
+
+items:
+  - name: One-to-Many — jeden użytkownik ma wiele zamówień
+    desc: >
+      relationship() definiuje relację ORM — SQLAlchemy automatycznie generuje JOINy.
+      back_populates synchronizuje obie strony relacji. ForeignKey w tabeli "wielu"
+      (Order.user_id) to fundament.
+    code: |
+      from sqlalchemy.orm import relationship, Mapped, mapped_column
+      from sqlalchemy import ForeignKey
+      from typing import List
+
+      class User(Base):
+          __tablename__ = "users"
+          id:     Mapped[int] = mapped_column(primary_key=True)
+          email:  Mapped[str] = mapped_column(String(120), unique=True)
+
+          # Relacja do zamówień — SQLAlchemy wypełnia automatycznie
+          orders: Mapped[List["Order"]] = relationship("Order", back_populates="user")
+
+      class Order(Base):
+          __tablename__ = "orders"
+          id:      Mapped[int] = mapped_column(primary_key=True)
+          user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+          total:   Mapped[float]
+
+          # Odwrotna strona relacji
+          user: Mapped["User"] = relationship("User", back_populates="orders")
+
+      # Użycie:
+      with Session(engine) as session:
+          user = session.get(User, 1)
+          print(user.orders)    # LIST — LAZY LOAD (SQL przy pierwszym dostępie)
+          print(user.orders[0].total)
+
+          # Dodaj zamówienie przez relację
+          new_order = Order(total=299.99, user=user)
+          session.add(new_order)
+          session.commit()
+
+  - name: Many-to-Many — produkty i kategorie
+    desc: >
+      Wiele-do-wielu wymaga tabeli asocjacyjnej. secondary= wskazuje tę tabelę.
+      SQLAlchemy zarządza wstawianiem/usuwaniem z tabeli asocjacyjnej automatycznie.
+    code: |
+      from sqlalchemy import Table, Column, ForeignKey
+
+      # Tabela asocjacyjna — bez modelu ORM (dla prostego M:N)
+      product_category = Table(
+          "product_category",
+          Base.metadata,
+          Column("product_id",  ForeignKey("products.id"),  primary_key=True),
+          Column("category_id", ForeignKey("categories.id"), primary_key=True),
+      )
+
+      class Product(Base):
+          __tablename__ = "products"
+          id:   Mapped[int] = mapped_column(primary_key=True)
+          name: Mapped[str] = mapped_column(String(200))
+
+          categories: Mapped[List["Category"]] = relationship(
+              "Category", secondary=product_category, back_populates="products"
+          )
+
+      class Category(Base):
+          __tablename__ = "categories"
+          id:   Mapped[int] = mapped_column(primary_key=True)
+          name: Mapped[str] = mapped_column(String(100))
+
+          products: Mapped[List["Product"]] = relationship(
+              "Product", secondary=product_category, back_populates="categories"
+          )
+
+      # Użycie — SQLAlchemy zarządza tabelą asocjacyjną:
+      with Session(engine) as session:
+          laptop = Product(name="Laptop Dell")
+          electronics = Category(name="Elektronika")
+          laptop.categories.append(electronics)
+          session.add(laptop)
+          session.commit()
+
+  - name: Lazy vs Eager Loading — problem N+1
+    desc: >
+      Domyślny lazy loading generuje SELECT przy każdym dostępie do relacji —
+      N użytkowników = N+1 zapytań SQL. Eager loading (selectinload, joinedload)
+      ładuje relacje z góry. To najważniejsza optymalizacja zapytań ORM.
+    code: |
+      from sqlalchemy.orm import selectinload, joinedload, lazyload
+
+      with Session(engine) as session:
+          # PROBLEM — N+1 queries (100 userów = 101 SQL):
+          users = session.scalars(select(User)).all()
+          for user in users:
+              print(user.orders)  # SELECT per user — WOLNE!
+
+          # SELECTINLOAD — dwa zapytania: jedno dla users, jedno dla orders
+          # SELECT users; SELECT orders WHERE user_id IN (1,2,3,...)
+          stmt = select(User).options(selectinload(User.orders))
+          users = session.scalars(stmt).all()
+          for user in users:
+              print(user.orders)  # już załadowane, zero SQL!
+
+          # JOINEDLOAD — jeden JOIN query (lepszy dla jeden-do-jeden lub małej liczby)
+          stmt = select(User).options(joinedload(User.profile))
+          users = session.scalars(stmt).unique().all()  # .unique() wymagane przy joinedload
+
+          # Zagnieżdżony eager load (user -> orders -> products)
+          stmt = select(User).options(
+              selectinload(User.orders).selectinload(Order.products)
+          )
+          users = session.scalars(stmt).all()
+
+  - name: cascade — propagacja operacji na relacjach
+    desc: >
+      cascade="all, delete-orphan" na relacji automatycznie usuwa powiązane obiekty
+      gdy usuwasz rodzica. Bez cascade musisz ręcznie usuwać dzieci lub polegać
+      na ON DELETE CASCADE w bazie danych.
+    code: |
+      class User(Base):
+          __tablename__ = "users"
+          id:    Mapped[int] = mapped_column(primary_key=True)
+          email: Mapped[str] = mapped_column(String(120))
+
+          # all = save-update, merge, expunge, delete, refresh-expire
+          # delete-orphan = usuń Order gdy usunięty z kolekcji (nie tylko gdy user usunięty)
+          orders: Mapped[List["Order"]] = relationship(
+              "Order",
+              back_populates="user",
+              cascade="all, delete-orphan",
+              passive_deletes=True   # polegaj na ON DELETE CASCADE w bazie, nie ładuj obiektów
+          )
+
+      # Użycie:
+      with Session(engine) as session:
+          user = session.get(User, 1)
+          session.delete(user)  # automatycznie usuwa też user.orders!
+          session.commit()
+
+          # Usuń pojedyncze zamówienie przez relację (delete-orphan):
+          user = session.scalars(
+              select(User).options(selectinload(User.orders)).where(User.id == 2)
+          ).one()
+          order_to_remove = user.orders[0]
+          user.orders.remove(order_to_remove)  # delete-orphan = usuwa z bazy!
+          session.commit()
+
+  - name: Asocjacja z dodatkowymi polami (association object)
+    desc: >
+      Gdy tabela wiele-do-wielu ma własne pola (np. data dodania, rola), tworzysz
+      klasę ORM zamiast prostej Table. Association object = pełny model z relacjami
+      do obu stron.
+    code: |
+      class UserProject(Base):
+          """Asocjacja User ↔ Project z dodatkowym polem 'role'"""
+          __tablename__ = "user_projects"
+
+          user_id:    Mapped[int] = mapped_column(ForeignKey("users.id"),    primary_key=True)
+          project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), primary_key=True)
+          role:       Mapped[str] = mapped_column(String(50), default="member")
+          joined_at:  Mapped[datetime] = mapped_column(server_default=func.now())
+
+          user:    Mapped["User"]    = relationship("User",    back_populates="user_projects")
+          project: Mapped["Project"] = relationship("Project", back_populates="user_projects")
+
+      class User(Base):
+          __tablename__ = "users"
+          id:   Mapped[int] = mapped_column(primary_key=True)
+          user_projects: Mapped[List["UserProject"]] = relationship(back_populates="user")
+
+          # Convenience: bezpośredni dostęp do projektów (pominij asocjację)
+          projects: Mapped[List["Project"]] = relationship(
+              secondary="user_projects", viewonly=True
+          )
+
+      # Dodaj usera do projektu z rolą:
+      with Session(engine) as session:
+          assoc = UserProject(user_id=1, project_id=5, role="lead")
+          session.add(assoc)
+          session.commit()

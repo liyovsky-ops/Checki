@@ -21,6 +21,7 @@ import { FW_KUBERNETES_DATA }  from '../data/fw_kubernetes.js';
 import { FW_FLASK_DATA }       from '../data/fw_flask.js';
 import { FW_OPENAI_DATA }      from '../data/fw_openai.js';
 import { FW_ANTHROPIC_DATA }   from '../data/fw_anthropic.js';
+import { FW_SQLALCHEMY_DATA }  from '../data/fw_sqlalchemy.js';
 
 let activeTab = 'podstawy';
 let activeFw  = 'react';
@@ -34,6 +35,7 @@ const FW_DATA_MAP = {
   wsl: FW_WSL_DATA, langgraph: FW_LANGGRAPH_DATA,
   kubernetes: FW_KUBERNETES_DATA, flask: FW_FLASK_DATA,
   openaisdk: FW_OPENAI_DATA, anthropicsdk: FW_ANTHROPIC_DATA,
+  sqlalchemy: FW_SQLALCHEMY_DATA,
 };
 
 export function openFramework(fw) {

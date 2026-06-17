@@ -1,0 +1,154 @@
+title: SQLAlchemy — komendy i snippety
+
+groups:
+  - name: Instalacja i konfiguracja
+    items:
+      - cmd: pip install sqlalchemy psycopg2-binary
+        desc: SQLAlchemy + PostgreSQL sync driver
+      - cmd: pip install sqlalchemy asyncpg
+        desc: SQLAlchemy + PostgreSQL async driver (asyncio)
+      - cmd: pip install sqlalchemy aiosqlite
+        desc: SQLAlchemy + SQLite async driver
+      - cmd: pip install alembic
+        desc: Migracje bazy danych (oficjalne narzędzie SQLAlchemy)
+      - cmd: pip install sqlmodel
+        desc: SQLModel — SQLAlchemy + Pydantic v2 w jednym
+
+  - name: Engine i połączenie
+    items:
+      - cmd: "engine = create_engine('postgresql+psycopg2://user:pass@localhost/mydb', echo=True)"
+        desc: Sync engine PostgreSQL z logowaniem SQL
+      - cmd: "engine = create_engine('sqlite:///./app.db')"
+        desc: SQLite lokalny plik
+      - cmd: "engine = create_async_engine('postgresql+asyncpg://user:pass@localhost/mydb')"
+        desc: Async engine dla asyncio/FastAPI
+      - cmd: engine.dispose()
+        desc: Zamknij wszystkie połączenia w pool
+      - cmd: "with engine.connect() as conn: result = conn.execute(text('SELECT 1'))"
+        desc: Test połączenia z bazą (Core level)
+
+  - name: Modele ORM
+    items:
+      - cmd: 'class User(Base): id: Mapped[int] = mapped_column(primary_key=True)'
+        desc: 'Definicja modelu (styl 2.0: Mapped + mapped_column)'
+      - cmd: Base.metadata.create_all(engine)
+        desc: Utwórz wszystkie tabele (tylko jeśli nie istnieją)
+      - cmd: Base.metadata.drop_all(engine)
+        desc: Usuń wszystkie tabele (DESTRUKCYJNE — tylko dev)
+      - cmd: "print(User.__table__.columns.keys())"
+        desc: Lista kolumn modelu
+      - cmd: "inspect(engine).get_table_names()"
+        desc: Lista tabel w bazie danych (inspect z sqlalchemy)
+
+  - name: Session i CRUD
+    items:
+      - cmd: 'with Session(engine) as session: session.add(user)'
+        desc: Kontekst sesji — automatyczny rollback przy wyjątku
+      - cmd: session.add(user)
+        desc: Dodaj obiekt do sesji (INSERT przy commit)
+      - cmd: session.add_all([u1, u2, u3])
+        desc: Bulk add — lista obiektów
+      - cmd: session.commit()
+        desc: Wyślij wszystkie zmiany do bazy (INSERT/UPDATE/DELETE)
+      - cmd: session.rollback()
+        desc: Cofnij wszystkie niezatwierdzone zmiany
+      - cmd: session.refresh(user)
+        desc: Odśwież obiekt z bazy (po commit, żeby mieć ID)
+      - cmd: session.get(User, user_id)
+        desc: SELECT po primary key — używa identity map cache
+      - cmd: session.delete(user)
+        desc: Usuń obiekt (DELETE przy commit)
+      - cmd: session.expunge(user)
+        desc: Usuń obiekt z sesji bez DELETE
+
+  - name: Zapytania SELECT
+    items:
+      - cmd: session.scalars(select(User)).all()
+        desc: SELECT * FROM users — lista wszystkich obiektów
+      - cmd: 'session.scalars(select(User).where(User.email == "x@y.com")).one_or_none()'
+        desc: SELECT z warunkiem — jeden lub None
+      - cmd: 'select(User).where(User.name.like("%Jan%"))'
+        desc: LIKE w warunku
+      - cmd: 'select(User).where(User.id.in_([1, 2, 3]))'
+        desc: WHERE id IN (...)
+      - cmd: 'select(User).order_by(desc(User.created_at)).limit(10).offset(20)'
+        desc: ORDER BY + paginacja offset
+      - cmd: 'session.scalar(select(func.count()).select_from(User))'
+        desc: COUNT(*) — liczba rekordów
+      - cmd: 'select(Order.user_id, func.sum(Order.total).label("sum")).group_by(Order.user_id)'
+        desc: GROUP BY z agregacją
+
+  - name: Relacje i eager loading
+    items:
+      - cmd: 'select(User).options(selectinload(User.orders))'
+        desc: Eager load relacji (2 zapytania — polecany)
+      - cmd: 'select(User).options(joinedload(User.profile))'
+        desc: Eager load przez JOIN (1 zapytanie — dla jeden-do-jeden)
+      - cmd: 'select(User).options(selectinload(User.orders).selectinload(Order.items))'
+        desc: Zagnieżdżony eager load (3 poziomy)
+      - cmd: user.orders.append(order)
+        desc: Dodaj do relacji (INSERT do tabeli asocjacyjnej automatycznie)
+      - cmd: user.orders.remove(order)
+        desc: Usuń z relacji (delete-orphan cascade jeśli ustawione)
+
+  - name: UPDATE i DELETE przez SQL
+    items:
+      - cmd: 'session.execute(update(User).where(User.id == 5).values(name="Nowe"))'
+        desc: UPDATE bez ładowania obiektu — jeden SQL
+      - cmd: 'session.execute(update(User).where(User.is_active == False).values(deleted_at=func.now()))'
+        desc: Bulk UPDATE na wielu rekordach
+      - cmd: 'session.execute(delete(Order).where(Order.status == "cancelled"))'
+        desc: DELETE bez ładowania obiektów
+      - cmd: result.rowcount
+        desc: Liczba zmodyfikowanych wierszy po UPDATE/DELETE
+
+  - name: Alembic — migracje
+    items:
+      - cmd: alembic init alembic
+        desc: Inicjalizacja — tworzy katalog alembic/ i alembic.ini
+      - cmd: alembic revision --autogenerate -m "add users table"
+        desc: Generuj migrację — porównuje modele z bazą (autogenerate)
+      - cmd: alembic revision -m "custom change"
+        desc: Pusta migracja — wypełnij upgrade/downgrade ręcznie
+      - cmd: alembic upgrade head
+        desc: Zastosuj wszystkie migracje (do najnowszej)
+      - cmd: alembic upgrade +1
+        desc: Zastosuj jedną migrację do przodu
+      - cmd: alembic downgrade -1
+        desc: Cofnij ostatnią migrację
+      - cmd: alembic downgrade base
+        desc: Cofnij wszystkie migracje (czysta baza)
+      - cmd: alembic current
+        desc: Pokaż aktualną wersję migracji w bazie
+      - cmd: alembic history --verbose
+        desc: Historia wszystkich migracji
+      - cmd: alembic show head
+        desc: Pokaż najnowszą migrację
+
+  - name: Async SQLAlchemy
+    items:
+      - cmd: 'AsyncSessionLocal = async_sessionmaker(async_engine, expire_on_commit=False)'
+        desc: Fabryka sesji async — expire_on_commit=False kluczowe dla FastAPI
+      - cmd: 'async with AsyncSessionLocal() as session: ...'
+        desc: Async context manager dla sesji
+      - cmd: 'result = await session.execute(select(User))'
+        desc: Async SELECT — zawsze await
+      - cmd: 'await session.commit()'
+        desc: Async commit
+      - cmd: 'await session.refresh(user)'
+        desc: Async refresh po commit
+      - cmd: 'await conn.run_sync(Base.metadata.create_all)'
+        desc: Uruchom sync create_all wewnątrz async context
+
+  - name: Inspekcja i debugging
+    items:
+      - cmd: 'print(select(User).where(User.id == 1).compile(compile_kwargs={"literal_binds": True}))'
+        desc: Wydrukuj wygenerowany SQL z wartościami
+      - cmd: 'engine = create_engine(url, echo=True)'
+        desc: Loguj każde zapytanie SQL do stdout
+      - cmd: 'from sqlalchemy import event; @event.listens_for(engine, "before_cursor_execute") def before(conn, cursor, statement, ...)'
+        desc: Hook na każde zapytanie SQL (custom logging, timing)
+      - cmd: 'session.identity_map.items()'
+        desc: Pokaż wszystkie obiekty w identity map sesji
+      - cmd: 'from sqlalchemy import inspect; mapper = inspect(User); print([c.key for c in mapper.columns])'
+        desc: Inspekcja modelu — kolumny, relacje, właściwości

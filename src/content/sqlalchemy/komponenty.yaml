@@ -1,0 +1,164 @@
+title: Modele ORM — mapowanie klas na tabele
+
+items:
+  - name: Mapped Columns — nowy styl 2.0
+    desc: >
+      SQLAlchemy 2.0 preferuje Mapped[typ] i mapped_column() z type hints —
+      Python typ automatycznie mapuje na SQL typ. Optional[str] oznacza nullable.
+      String(n), Integer, Boolean, DateTime — precyzyjne typy SQL gdy potrzebne.
+    code: |
+      from datetime import datetime
+      from typing import Optional
+      from sqlalchemy import String, Text, DateTime, func
+      from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+      class Base(DeclarativeBase):
+          pass
+
+      class Article(Base):
+          __tablename__ = "articles"
+
+          id:         Mapped[int]      = mapped_column(primary_key=True)
+          title:      Mapped[str]      = mapped_column(String(200), nullable=False)
+          content:    Mapped[str]      = mapped_column(Text)
+          slug:       Mapped[str]      = mapped_column(String(200), unique=True, index=True)
+          is_published: Mapped[bool]   = mapped_column(default=False)
+          author_id:  Mapped[int]      = mapped_column(index=True)
+          views:      Mapped[int]      = mapped_column(default=0)
+          summary:    Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+          created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+          updated_at: Mapped[datetime] = mapped_column(DateTime, onupdate=func.now())
+
+  - name: Constraints, Indexes i __table_args__
+    desc: >
+      Złożone indeksy (multi-column), unique constraints, foreign keys i inne
+      opcje tabeli definiujesz przez __table_args__. UniqueConstraint na wielu
+      kolumnach, CheckConstraint dla reguł biznesowych na poziomie bazy.
+    code: |
+      from sqlalchemy import UniqueConstraint, CheckConstraint, Index, ForeignKey
+
+      class Booking(Base):
+          __tablename__ = "bookings"
+
+          id:         Mapped[int] = mapped_column(primary_key=True)
+          user_id:    Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+          resource_id:Mapped[int] = mapped_column(ForeignKey("resources.id"))
+          start_date: Mapped[datetime]
+          end_date:   Mapped[datetime]
+          status:     Mapped[str] = mapped_column(String(20), default="pending")
+
+          __table_args__ = (
+              # Unikalność na wielu kolumnach
+              UniqueConstraint("user_id", "resource_id", "start_date", name="uq_booking"),
+              # Sprawdź regułę biznesową na poziomie SQL
+              CheckConstraint("end_date > start_date", name="ck_date_order"),
+              # Złożony indeks dla częstych zapytań filtrujących
+              Index("ix_bookings_status_date", "status", "start_date"),
+          )
+
+  - name: Mixin — wielokrotne użycie pól
+    desc: >
+      Mixin to klasa Python bez __tablename__ z polami do dziedziczenia — eliminuje
+      duplikację pól created_at, updated_at, id we wszystkich modelach. Wzorzec
+      powszechny w dużych projektach enterprise.
+    code: |
+      from sqlalchemy.orm import declared_attr
+
+      class TimestampMixin:
+          created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+          updated_at: Mapped[datetime] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+
+      class SoftDeleteMixin:
+          deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+          @property
+          def is_deleted(self) -> bool:
+              return self.deleted_at is not None
+
+      # Używaj w modelach przez dziedziczenie
+      class User(TimestampMixin, SoftDeleteMixin, Base):
+          __tablename__ = "users"
+          id:    Mapped[int] = mapped_column(primary_key=True)
+          email: Mapped[str] = mapped_column(String(120), unique=True)
+          # created_at, updated_at, deleted_at automatycznie z Mixin
+
+      class Order(TimestampMixin, Base):
+          __tablename__ = "orders"
+          id:      Mapped[int] = mapped_column(primary_key=True)
+          user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+          # created_at, updated_at z Mixin
+
+  - name: CRUD — podstawowe operacje sesji
+    desc: >
+      Cztery podstawowe operacje: session.add() (INSERT), session.get() (SELECT po PK),
+      session.execute(select()) (dowolny SELECT), session.delete() (DELETE).
+      commit() wysyła wszystkie zmiany do bazy. refresh() odświeża obiekt z bazy po commit.
+    code: |
+      from sqlalchemy.orm import Session
+      from sqlalchemy import select
+
+      with Session(engine) as session:
+          # INSERT
+          user = User(email="jan@firma.pl", name="Jan")
+          session.add(user)
+          session.commit()
+          session.refresh(user)  # odśwież ID z bazy
+          print(user.id)
+
+          # SELECT po primary key — szybki, używa identity map
+          found = session.get(User, user.id)
+
+          # SELECT z warunkami
+          stmt = select(User).where(User.email == "jan@firma.pl")
+          result = session.execute(stmt)
+          user2 = result.scalar_one()  # oczekuj dokładnie jednego wiersza
+
+          # UPDATE
+          user2.name = "Jan Kowalski"
+          session.commit()  # SQLAlchemy wykrywa zmianę automatycznie (dirty tracking)
+
+          # DELETE
+          session.delete(user2)
+          session.commit()
+
+          # Bulk INSERT (wydajny)
+          session.add_all([
+              User(email=f"user{i}@firma.pl", name=f"User {i}")
+              for i in range(100)
+          ])
+          session.commit()
+
+  - name: Repr i __str__ — debugowanie modeli
+    desc: >
+      Dodaj __repr__ do modeli żeby Session.__repr__(), logowanie i debugger
+      pokazywały sensowne informacje zamiast <User object at 0x...>.
+      SQLAlchemy 2.0 ma też ReprMixin który generuje repr automatycznie.
+    code: |
+      class User(TimestampMixin, Base):
+          __tablename__ = "users"
+
+          id:    Mapped[int] = mapped_column(primary_key=True)
+          email: Mapped[str] = mapped_column(String(120), unique=True)
+          name:  Mapped[str] = mapped_column(String(80))
+
+          def __repr__(self) -> str:
+              return f"User(id={self.id!r}, email={self.email!r})"
+
+          def to_dict(self) -> dict:
+              return {
+                  "id":    self.id,
+                  "email": self.email,
+                  "name":  self.name,
+              }
+
+      # Serializacja z Pydantic (SQLModel lub ręcznie)
+      from pydantic import BaseModel
+
+      class UserSchema(BaseModel):
+          id:    int
+          email: str
+          name:  str
+
+          model_config = {"from_attributes": True}  # pozwala na UserSchema.model_validate(user_obj)
+
+      user_schema = UserSchema.model_validate(user)

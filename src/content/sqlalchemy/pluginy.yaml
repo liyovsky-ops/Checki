@@ -1,0 +1,195 @@
+title: Ekosystem — Alembic, SQLModel i integracje
+
+items:
+  - name: Alembic — migracje bazy danych
+    desc: >
+      Alembic to oficjalne narzędzie do migracji SQLAlchemy — wersjonuje schemat bazy
+      przez pliki migracji Python. alembic revision --autogenerate porównuje modele
+      z bazą i generuje diff automatycznie.
+    code: |
+      # pip install alembic
+
+      # Inicjalizacja
+      alembic init alembic
+
+      # alembic/env.py — podłącz swoje modele:
+      from myapp.models import Base
+      target_metadata = Base.metadata
+
+      # Generuj migrację auto (porównuje modele z bazą)
+      alembic revision --autogenerate -m "add users table"
+
+      # Zastosuj migracje
+      alembic upgrade head
+
+      # Cofnij ostatnią
+      alembic downgrade -1
+
+      # Historia migracji
+      alembic history --verbose
+
+      # Przykład wygenerowanego pliku migracji:
+      def upgrade() -> None:
+          op.add_column("users", sa.Column("phone", sa.String(20), nullable=True))
+          op.create_index("ix_users_phone", "users", ["phone"])
+
+      def downgrade() -> None:
+          op.drop_index("ix_users_phone", "users")
+          op.drop_column("users", "phone")
+
+  - name: SQLModel — ORM + Pydantic w jednym
+    desc: >
+      SQLModel (od twórcy FastAPI) łączy SQLAlchemy ORM z Pydantic v2 — jeden model
+      klasy służy jako tabela bazy I schema API (request/response). Idealne do FastAPI.
+      Ostrzeżenie: SQLModel to cienka warstwa nad SQLAlchemy, czasem lagging za updates.
+    code: |
+      # pip install sqlmodel
+
+      from sqlmodel import SQLModel, Field, Session, create_engine, select
+      from typing import Optional
+
+      # Jeden model = tabela bazy + Pydantic schema
+      class User(SQLModel, table=True):
+          id:    Optional[int] = Field(default=None, primary_key=True)
+          email: str           = Field(unique=True, index=True)
+          name:  str
+
+      # Pydantic schema (bez table=True) — do request/response
+      class UserCreate(SQLModel):
+          email: str
+          name:  str
+
+      # FastAPI endpoint — SQLModel jako response model
+      from fastapi import FastAPI
+      app = FastAPI()
+      engine = create_engine("sqlite:///./test.db")
+      SQLModel.metadata.create_all(engine)
+
+      @app.post("/users/", response_model=User)
+      def create_user(user: UserCreate):
+          db_user = User.model_validate(user)
+          with Session(engine) as session:
+              session.add(db_user)
+              session.commit()
+              session.refresh(db_user)
+              return db_user
+
+  - name: Flask-SQLAlchemy — integracja z Flask
+    desc: >
+      Flask-SQLAlchemy to extension łączący SQLAlchemy z Flask — automatyczny teardown
+      sesji po request, db.session zamiast Session(engine), Migrate dla Alembic integration.
+    code: |
+      # pip install flask-sqlalchemy flask-migrate
+
+      from flask import Flask
+      from flask_sqlalchemy import SQLAlchemy
+      from flask_migrate import Migrate
+      from sqlalchemy.orm import Mapped, mapped_column
+
+      app = Flask(__name__)
+      app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://user:pass@localhost/mydb"
+      app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+      db = SQLAlchemy(app)
+      migrate = Migrate(app, db)
+
+      class User(db.Model):
+          __tablename__ = "users"
+          id:    Mapped[int] = mapped_column(db.Integer, primary_key=True)
+          email: Mapped[str] = mapped_column(db.String(120), unique=True)
+          name:  Mapped[str] = mapped_column(db.String(80))
+
+      # Flask-Migrate (Alembic przez Flask CLI):
+      # flask db init       — inicjalizacja migrations/
+      # flask db migrate -m "add users"
+      # flask db upgrade
+
+      # Endpoint
+      @app.route("/users/")
+      def get_users():
+          users = db.session.scalars(db.select(User)).all()
+          return [{"id": u.id, "email": u.email} for u in users]
+
+  - name: Pydantic integracja — serializacja modeli
+    desc: >
+      SQLAlchemy modele to nie Pydantic — musisz zmapować ręcznie lub przez SQLModel.
+      Pydantic v2 obsługuje ORM objects przez model_config from_attributes=True.
+      Wzorzec Repository Pattern oddziela logikę DB od API schemas.
+    code: |
+      from pydantic import BaseModel, ConfigDict
+      from sqlalchemy.orm import Session
+
+      # Pydantic schema dla API
+      class UserOut(BaseModel):
+          model_config = ConfigDict(from_attributes=True)
+
+          id:    int
+          email: str
+          name:  str
+
+      class OrderOut(BaseModel):
+          model_config = ConfigDict(from_attributes=True)
+
+          id:     int
+          total:  float
+          status: str
+
+      class UserWithOrders(BaseModel):
+          model_config = ConfigDict(from_attributes=True)
+
+          id:     int
+          email:  str
+          orders: list[OrderOut]
+
+      # FastAPI endpoint z konwersją SQLAlchemy → Pydantic
+      from sqlalchemy.orm import selectinload
+
+      @app.get("/users/{user_id}", response_model=UserWithOrders)
+      async def get_user(user_id: int, db: AsyncSession = Depends(get_db)):
+          result = await db.execute(
+              select(User)
+              .options(selectinload(User.orders))
+              .where(User.id == user_id)
+          )
+          user = result.scalar_one_or_none()
+          if not user:
+              raise HTTPException(404)
+          return UserWithOrders.model_validate(user)  # ORM → Pydantic
+
+  - name: greenlet i asyncio — pułapki miksowania sync/async
+    desc: >
+      Sync SQLAlchemy używa greenlets wewnętrznie. Nigdy nie miksuj sync Session z async
+      kodem (i odwrotnie). run_sync() pozwala uruchomić sync kod wewnątrz async context
+      — przydatne do migracji lub kodu legacy.
+    code: |
+      from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+
+      # BŁĄD — sync Session w async funkcji:
+      # async def bad_function():
+      #     with Session(sync_engine) as session:  # blokuje event loop!
+      #         ...
+
+      # POPRAWNIE — zawsze async engine + AsyncSession w async kodzie:
+      async def good_function(session: AsyncSession):
+          result = await session.execute(select(User))
+          return result.scalars().all()
+
+      # run_sync() — uruchom sync callable wewnątrz async context
+      # Przydatne np. do create_all() schema:
+      async def create_tables():
+          async with async_engine.begin() as conn:
+              await conn.run_sync(Base.metadata.create_all)
+
+      # Migracje Alembic (sync) z async engine — przez connectable:
+      # W alembic/env.py:
+      from asyncio import run
+      from sqlalchemy.ext.asyncio import async_engine_from_config
+
+      def run_async_migrations():
+          connectable = async_engine_from_config(config.get_section(config.config_ini_section))
+          async def do_migrations(connection):
+              await connection.run_sync(do_run_migrations)
+          async def main():
+              async with connectable.connect() as connection:
+                  await do_migrations(connection)
+          run(main())

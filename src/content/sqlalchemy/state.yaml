@@ -1,0 +1,171 @@
+title: Async SQLAlchemy — FastAPI i asyncio
+
+items:
+  - name: AsyncEngine i AsyncSession — setup
+    desc: >
+      Async SQLAlchemy wymaga async-compatible drivera: asyncpg (PostgreSQL),
+      aiosqlite (SQLite). Tworzysz async_engine przez create_async_engine() i
+      fabrykę sesji przez async_sessionmaker. Używaj w FastAPI przez dependency injection.
+    code: |
+      from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+      from sqlalchemy.orm import DeclarativeBase
+
+      # asyncpg zamiast psycopg2 — pip install asyncpg
+      DATABASE_URL = "postgresql+asyncpg://user:pass@localhost/mydb"
+
+      async_engine = create_async_engine(
+          DATABASE_URL,
+          echo=True,          # loguj SQL
+          pool_size=20,       # max połączeń w pool
+          max_overflow=10,    # dodatkowe połączenia ponad pool_size przy szczycie
+      )
+
+      # Fabryka sesji — tworzy sesje asynchroniczne
+      AsyncSessionLocal = async_sessionmaker(
+          async_engine,
+          expire_on_commit=False,  # obiekty nie wygasają po commit — ważne w FastAPI!
+      )
+
+      # Dependency dla FastAPI
+      async def get_db():
+          async with AsyncSessionLocal() as session:
+              yield session
+
+  - name: Async CRUD — podstawowe operacje
+    desc: >
+      AsyncSession ma te same metody co Session, ale wymagają await tam gdzie
+      trafia do bazy. session.add() i session.delete() są synchroniczne (tylko
+      buforowanie), ale execute(), commit(), refresh() to async.
+    code: |
+      from sqlalchemy import select
+      from sqlalchemy.ext.asyncio import AsyncSession
+
+      async def create_user(session: AsyncSession, email: str, name: str) -> User:
+          user = User(email=email, name=name)
+          session.add(user)
+          await session.commit()
+          await session.refresh(user)   # odśwież ID i server defaults z bazy
+          return user
+
+      async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
+          result = await session.execute(
+              select(User).where(User.email == email)
+          )
+          return result.scalar_one_or_none()
+
+      async def get_users_paginated(session: AsyncSession, page: int, size: int) -> list[User]:
+          result = await session.execute(
+              select(User)
+              .order_by(User.created_at.desc())
+              .limit(size)
+              .offset((page - 1) * size)
+          )
+          return list(result.scalars().all())
+
+      async def delete_user(session: AsyncSession, user_id: int) -> bool:
+          user = await session.get(User, user_id)
+          if not user:
+              return False
+          await session.delete(user)
+          await session.commit()
+          return True
+
+  - name: FastAPI — dependency injection z AsyncSession
+    desc: >
+      Standardowy wzorzec FastAPI + SQLAlchemy async: get_db() dependency wstrzykuje
+      sesję do endpointów. expire_on_commit=False krytyczne — bez tego obiekty
+      wygasają po commit i FastAPI nie może ich serializować do JSON.
+    code: |
+      from fastapi import FastAPI, Depends, HTTPException
+      from sqlalchemy.ext.asyncio import AsyncSession
+
+      app = FastAPI()
+
+      # Dependency
+      async def get_db():
+          async with AsyncSessionLocal() as session:
+              try:
+                  yield session
+              except Exception:
+                  await session.rollback()
+                  raise
+
+      # Endpoint
+      @app.post("/users/", status_code=201)
+      async def create_user_endpoint(
+          email: str,
+          name:  str,
+          db:    AsyncSession = Depends(get_db)
+      ):
+          # Sprawdź czy email zajęty
+          existing = await get_user_by_email(db, email)
+          if existing:
+              raise HTTPException(status_code=409, detail="Email already taken")
+
+          user = await create_user(db, email, name)
+          return {"id": user.id, "email": user.email}
+
+      @app.get("/users/{user_id}")
+      async def get_user_endpoint(user_id: int, db: AsyncSession = Depends(get_db)):
+          user = await db.get(User, user_id)
+          if not user:
+              raise HTTPException(status_code=404, detail="User not found")
+          return {"id": user.id, "email": user.email, "name": user.name}
+
+  - name: Async eager loading — selectinload z await
+    desc: >
+      Lazy loading jest ZAKAZANY w async SQLAlchemy — próba leniwego załadowania
+      relacji poza async context powoduje MissingGreenlet / błąd. Zawsze używaj
+      selectinload() lub joinedload() w async kodzie.
+    code: |
+      from sqlalchemy.orm import selectinload
+
+      async def get_user_with_orders(session: AsyncSession, user_id: int) -> User | None:
+          result = await session.execute(
+              select(User)
+              .options(selectinload(User.orders))   # WYMAGANE w async!
+              .where(User.id == user_id)
+          )
+          return result.scalar_one_or_none()
+
+      # BŁĄD — lazy loading poza async context:
+      # user = await session.get(User, 1)
+      # print(user.orders)  # MissingGreenlet error lub nie zadziała!
+
+      # POPRAWNIE — zawsze z opcją ładowania:
+      async def get_users_with_all_data(session: AsyncSession) -> list[User]:
+          result = await session.execute(
+              select(User).options(
+                  selectinload(User.orders).selectinload(Order.products),
+                  selectinload(User.profile),
+              )
+          )
+          return list(result.scalars().unique().all())
+
+  - name: Connection pool i optymalizacja wydajności
+    desc: >
+      Pool zarządza wielokrotnym użyciem połączeń do bazy. pool_size + max_overflow
+      to max połączeń równoczesnych. pool_pre_ping sprawdza czy połączenie nie wygasło.
+      Kluczowe dla aplikacji produkcyjnych pod obciążeniem.
+    code: |
+      from sqlalchemy.ext.asyncio import create_async_engine
+      from sqlalchemy.pool import NullPool
+
+      # Produkcyjny engine z pełną konfiguracją pool
+      async_engine = create_async_engine(
+          DATABASE_URL,
+          pool_size=10,           # stałe połączenia w pool
+          max_overflow=20,        # dodatkowe połączenia przy szczycie
+          pool_timeout=30,        # sekund czekania na wolne połączenie
+          pool_recycle=1800,      # odnawiaj połączenia co 30 minut (zapobiega timeout serwera)
+          pool_pre_ping=True,     # sprawdź połączenie przed użyciem (pg: SELECT 1)
+      )
+
+      # Dla serverless (Lambda, Cloud Functions) — brak pool, każde wywołanie nowe połączenie
+      serverless_engine = create_async_engine(DATABASE_URL, poolclass=NullPool)
+
+      # Monitorowanie pool:
+      pool = async_engine.pool
+      print(f"Aktywne:    {pool.checkedout()}")
+      print(f"W pool:     {pool.checkedin()}")
+      print(f"Overflow:   {pool.overflow()}")

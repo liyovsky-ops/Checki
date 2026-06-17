@@ -20483,4 +20483,775 @@ result = agent.invoke({
 })
 print(result["messages"][-1].content)
 # Trace pojawi się na smith.langchain.com z pełnym kontekstem wywołań
-`}]},komendy:{title:`Komendy Anthropic SDK`,groups:[{name:`Instalacja i setup`,icon:`📦`,commands:[{cmd:`pip install anthropic`,desc:`Zainstaluj oficjalny Anthropic SDK`,detail:{what:`Instaluje bibliotekę anthropic — jedyną oficjalną bibliotekę do modeli Claude.`,how:`Po instalacji importujesz import anthropic i tworzysz klienta Anthropic().`,tips:[`pip install anthropic --upgrade — zaktualizuj do najnowszej wersji`,`pip install anthropic[bedrock] — dodaj wsparcie dla AWS Bedrock`]}},{cmd:`export ANTHROPIC_API_KEY="sk-ant-..."`,desc:`Ustaw klucz API (sesja terminala)`,detail:{what:`Klient Anthropic() szuka klucza w zmiennej ANTHROPIC_API_KEY automatycznie.`,how:`Klucz zaczyna się od sk-ant- (nie mylić z sk- od OpenAI).`,tips:[`Klucz znajdziesz na console.anthropic.com → API Keys`,`Nigdy nie commituj klucza do git — zawsze .env + .gitignore`]}},{cmd:`pip install anthropic python-dotenv`,desc:`Zainstaluj SDK z obsługą pliku .env`,detail:{what:`python-dotenv wczytuje zmienne środowiskowe z pliku .env przy starcie aplikacji.`,how:`from dotenv import load_dotenv; load_dotenv() na początku skryptu — PRZED tworzeniem klienta.`,tips:[`echo 'ANTHROPIC_API_KEY=sk-ant-...' >> .env`,`Dodaj .env do .gitignore — nie commituj kluczy`]}},{cmd:`pip install anthropic langchain-anthropic instructor`,desc:`Pełny stack — SDK + LangChain + structured outputs`,detail:{what:`Instaluje zestaw najczęściej używany razem z Anthropic SDK w produkcji.`,how:`langchain-anthropic = ChatAnthropic dla LangGraph. instructor = structured outputs przez tool use.`,tips:[`pip freeze > requirements.txt — zapisz wersje po konfiguracji`,`Warto też pip install httpx jeśli budujesz własne wrapper-y`]}}]},{name:`Klient — tworzenie i konfiguracja`,icon:`🔑`,commands:[{cmd:`client = anthropic.Anthropic()`,desc:`Stwórz synchroniczny klient (czyta klucz z env)`,detail:{what:`Tworzy klienta Anthropic czytającego ANTHROPIC_API_KEY ze zmiennej środowiskowej.`,how:`Jeden klient na całą aplikację — reużywaj, nie twórz nowego przy każdym wywołaniu.`,tips:[`anthropic.Anthropic(api_key="sk-ant-...") — przekaż klucz explicite (dev/testing)`,`client.api_key — sprawdź aktywny klucz`]}},{cmd:`async_client = anthropic.AsyncAnthropic()`,desc:`Klient asynchroniczny (FastAPI, asyncio)`,detail:{what:`Identyczne API jak Anthropic(), ale wszystkie metody są async — wymagają await.`,how:`Używaj w FastAPI endpointach, asyncio skryptach, wszędzie gdzie masz event loop.`,tips:[`await async_client.messages.create(...) — zawsze z await`,`Jeden AsyncAnthropic() na całą aplikację`]}},{cmd:`client = anthropic.Anthropic(timeout=60.0, max_retries=3)`,desc:`Klient z timeout i retry`,detail:{what:`Konfiguruje maksymalny czas oczekiwania na odpowiedź i liczbę automatycznych prób.`,how:`max_retries automatycznie powtarza przy błędach sieciowych i przeciążeniu (529).`,tips:[`Dla długich wywołań (extended thinking) ustaw timeout=300 lub więcej`,`max_retries=0 — wyłącz retry jeśli sam obsługujesz ponowne próby`]}},{cmd:`client.models.list()`,desc:`Lista dostępnych modeli Claude`,detail:{what:`Zwraca listę wszystkich modeli Claude dostępnych dla Twojego konta API.`,how:`Przydatne do sprawdzenia dokładnych nazw modeli i czy masz dostęp do konkretnej wersji.`,tips:[`[m.id for m in client.models.list()] — lista samych ID modeli`,`Tier systemy API mogą ograniczać dostęp do nowszych modeli`]}}]},{name:`Messages API — wywołania podstawowe`,icon:`💬`,commands:[{cmd:`client.messages.create(model=..., max_tokens=..., messages=[...])`,desc:`Podstawowe wywołanie Messages API`,detail:{what:`Wysyła wiadomości do Claude i zwraca pełny obiekt Message z content, usage, stop_reason.`,how:`max_tokens jest WYMAGANY. messages = lista dictów z role (user/assistant) i content.`,tips:[`response.content[0].text — tekst odpowiedzi`,`response.stop_reason: "end_turn" / "max_tokens" / "tool_use" / "stop_sequence"`]}},{cmd:`system="Twoja rola i instrukcje"`,desc:`Dodaj system prompt (osobny parametr, nie wiadomość)`,detail:{what:`W Anthropic SDK system jest osobnym parametrem create(), nie pierwszą wiadomością jak w OpenAI.`,how:`Możesz podać string (prosty) lub listę bloków ContentBlock (dla prompt cachingu).`,tips:[`Nie wstawiaj system jako {"role": "system", ...} do messages — to błąd API!`,`Dla cachingu: system=[{"type": "text", "text": "...", "cache_control": {...}}]`]}},{cmd:`response.content[0].text`,desc:`Odczytaj tekst odpowiedzi`,detail:{what:`response.content to lista bloków treści — text, tool_use, thinking. Dla prostych odpowiedzi [0] to TextBlock.`,how:`Zawsze sprawdzaj response.content[0].type == "text" gdy masz tool use lub thinking.`,tips:[`For block in response.content: if block.type == "text": print(block.text)`,`response.content[0] może być ToolUseBlock gdy model wywołuje narzędzie!`]}},{cmd:`temperature=0.0`,desc:`Ustaw deterministyczność (0 = przewidywalny, 1 = kreatywny)`,detail:{what:`temperature kontroluje losowość generowania — 0 to prawie deterministyczny output.`,how:`Dla kodu, ekstrakcji danych, faktów — używaj niskiej temperatury (0.0-0.2).`,tips:[`Claude może dawać różne wyniki nawet przy temperature=0 — to normalne przy długich outputach`,`Nie ustawiaj jednocześnie temperature i top_p — wybierz jedno z nich`]}},{cmd:`stop_sequences=["</answer>", "---"]`,desc:`Zatrzymaj generowanie na podanym ciągu znaków`,detail:{what:`Claude przestaje generować gdy natrafi na dowolny z podanych ciągów — przydatne do kontrolowania formatu.`,how:`response.stop_reason == "stop_sequence" gdy Claude zatrzymał się na jednym z tych ciągów.`,tips:[`Wzorzec XML: prefill "<answer>" + stop_sequences=["</answer>"] — ekstrakcja precyzyjnej odpowiedzi`,`Możesz kombinować prefill + stop_sequences do wymuszania dowolnego formatu`]}}]},{name:`Streaming`,icon:`📡`,commands:[{cmd:`with client.messages.stream(...) as stream`,desc:`Context manager streamingu odpowiedzi`,detail:{what:`client.messages.stream() zwraca context manager — wejdź przez with, iteruj po stream.`,how:`Blokuje do zakończenia streamu wewnątrz bloku with. Po wyjściu możesz wywołać get_final_message().`,tips:[`get_final_message() dostępne tylko PO wyjściu z bloku with`,`Dla async: async with async_client.messages.stream(...) as stream`]}},{cmd:`for text in stream.text_stream`,desc:`Iterator tokenów (najprostszy streaming)`,detail:{what:`stream.text_stream to iterator yielding string chunki — same teksty, bez metadanych eventów.`,how:`Najprostszy sposób na streaming gdy nie potrzebujesz obsługiwać tool use ani thinking.`,tips:[`print(text, end="", flush=True) — wypisuj token po tokenie bez nowej linii`,`Zbierz w listę i "".join(chunks) jeśli potrzebujesz pełnego tekstu`]}},{cmd:`stream.get_final_message()`,desc:`Pobierz pełny Message po zakończeniu streamu`,detail:{what:`Zwraca kompletny obiekt Message z usage (tokeny), stop_reason i pełną listą content bloków.`,how:`Wywoływalne tylko po wyjściu z bloku with stream — inaczej stream może być niekompletny.`,tips:[`stream.get_final_text() — shorthand, zwraca tylko tekst bez metadanych`,`final.usage.cache_read_input_tokens — sprawdź cache hits po streamie z cachingiem`]}},{cmd:`for event in stream: if event.type == "content_block_delta"`,desc:`Iteruj po pełnych eventach strumienia`,detail:{what:`Iteracja po stream (nie text_stream) daje kompletne obiekty zdarzeń — przydatne przy tool use i thinking.`,how:`event.type: message_start / content_block_start / content_block_delta / content_block_stop / message_stop.`,tips:[`event.delta.type: "text_delta" (tekst) / "input_json_delta" (tool args) / "thinking_delta"`,`Potrzebne gdy chcesz obsługiwać tool use lub thinking podczas streamingu`]}}]},{name:`Tool Use`,icon:`🛠️`,commands:[{cmd:`tools=[{"name": "...", "description": "...", "input_schema": {...}}]`,desc:`Definicja narzędzia dla Claude`,detail:{what:`Lista narzędzi przekazywana do messages.create(). Każde narzędzie ma name, description i input_schema (JSON Schema).`,how:`description to główna wskazówka dla modelu — pisz dokładnie co robi narzędzie i kiedy użyć.`,tips:[`Dobry opis narzędzia ważniejszy niż dobry prompt — model wybiera narzędzie na podstawie description`,`"required": ["pole"] w input_schema wymusza podanie argumentu przez model`]}},{cmd:`response.stop_reason == "tool_use"`,desc:`Sprawdź czy model chce wywołać narzędzie`,detail:{what:`Gdy model zdecyduje się wywołać narzędzie, stop_reason to "tool_use" — musisz obsłużyć pętlę.`,how:`"end_turn" = normalna odpowiedź. "tool_use" = musisz wykonać narzędzie i wrócić z wynikiem.`,tips:[`Zawsze sprawdzaj stop_reason przed odczytaniem response.content[0].text!`,`Model może wywołać kilka narzędzi naraz — iteruj po response.content, nie zakładaj tylko jednego bloku`]}},{cmd:`[b for b in response.content if b.type == "tool_use"]`,desc:`Wyodrębnij wszystkie wywołania narzędzi`,detail:{what:`Filtruje content bloki zostawiając tylko ToolUseBlock — każdy ma id, name i input (dict).`,how:`block.input to już sparsowany dict, nie string JSON — SDK parsuje automatycznie.`,tips:[`block.id jest kluczowy — musisz go użyć w tool_result.tool_use_id`,`block.input["parametr"] — dostęp do argumentów jak do normalnego słownika`]}},{cmd:`{"type": "tool_result", "tool_use_id": block.id, "content": json.dumps(result)}`,desc:`Format wyniku narzędzia do odesłania Claude`,detail:{what:`Wynik narzędzia to dict z type="tool_result", pasującym tool_use_id i content (string lub lista bloków).`,how:`Wstawiasz go do listy content w nowej wiadomości role="user" i wywołujesz create() ponownie.`,tips:[`content może być string (prosty) lub lista bloków (też obraz z base64)`,`Dodaj "is_error": True jeśli narzędzie zwróciło błąd — Claude to uwzględni`]}},{cmd:`tool_choice={"type": "tool", "name": "extract_data"}`,desc:`Wymuś wywołanie konkretnego narzędzia`,detail:{what:`Claude MUSI wywołać to konkretne narzędzie — niezależnie od treści wiadomości.`,how:`Wzorzec ekstrakcji danych i structured outputs — zawsze dostajesz typowany wynik.`,tips:[`tool_choice={"type": "any"} — musi użyć jakiegokolwiek narzędzia`,`tool_choice={"type": "none"} — blokuje użycie narzędzi (czysta rozmowa)`]}}]},{name:`Prompt Caching`,icon:`⚡`,commands:[{cmd:`"cache_control": {"type": "ephemeral"}`,desc:`Oznacz blok do cache (5-minutowe TTL)`,detail:{what:`Dodajesz cache_control do bloku w system prompt, user message lub narzędziu. API cache'uje prefiks do tego punktu.`,how:`Pierwsze wywołanie = cache write (droższe o 25%). Kolejne w 5 min = cache read (10x tańsze).`,tips:[`Minimalna wielkość do cache: 1024 tokeny dla Claude Sonnet/Opus, 2048 dla Haiku`,`Identyczny tekst musi być w tym samym miejscu struktury — cache zależy od pozycji w promptcie`]}},{cmd:`response.usage.cache_read_input_tokens`,desc:`Sprawdź ile tokenów trafiło z cache (hit)`,detail:{what:`cache_read_input_tokens to tokeny odczytane z cache — policz je zamiast normalnych input_tokens dla kosztu.`,how:`cache_creation_input_tokens = nowo zapisane do cache. cache_read = odczytane z istniejącego cache.`,tips:[`cache_read = 0 przy pierwszym wywołaniu lub po wygaśnięciu (>5 minut)`,`Cena cache_read dla Sonnet: $0.30/MTok vs $3.00/MTok dla normalnych input (10x taniej!)`]}},{cmd:`system=[{"type":"text", "text": LONG_PROMPT, "cache_control": {"type":"ephemeral"}}]`,desc:`Cache systemu jako lista bloków ContentBlock`,detail:{what:`System prompt jako lista bloków pozwala dodać cache_control do całego lub części systemu.`,how:`Możesz mieć wiele bloków w system — tylko ostatni z cache_control wyznacza granicę cache.`,tips:[`Zmiana czegokolwiek PRZED cache_control unieważnia cache — prefiks musi być identyczny`,`Dla bardzo długich systemów (10k+ tokenów): używaj cache na każde wywołanie — zwrot po 2-3 requestach`]}},{cmd:`"cache_control": {"type": "ephemeral"} # w ostatnim narzędziu`,desc:`Cache zestawu narzędzi (duże listy tools)`,detail:{what:`Gdy masz 20-100 narzędzi, ich definicje to tysiące tokenów. Caching tools obniża koszt agentów o 80-90%.`,how:`Wstawiasz cache_control w ostatnim elemencie listy tools — API cache'uje wszystkie narzędzia powyżej.`,tips:[`Dotyczy też tools w systemie — jeśli narzędzia nie zmieniają się między wywołaniami, zawsze je cache'uj`,`Połącz caching systemu + narzędzi + dokumentów = minimalne koszty przy dużych kontekstach`]}}]},{name:`Extended Thinking`,icon:`💭`,commands:[{cmd:`thinking={"type": "enabled", "budget_tokens": 10000}`,desc:`Włącz extended thinking (Claude "myśli" przed odpowiedzią)`,detail:{what:`Daje Claude budżet N tokenów na wewnętrzne rozumowanie widoczne jako ThinkingBlock w response.content.`,how:`max_tokens MUSI być większy niż budget_tokens. Minimum budget: 1000 tokenów. Wyłącza streaming tekstu.`,tips:[`Dla trudnych zadań: budget 8000-16000 tokenów. Dla prostszych: 1000-3000.`,`Thinking bloki są widoczne w odpowiedzi ale NIE są liczone do max_tokens outputu`]}},{cmd:`[b for b in response.content if b.type == "thinking"]`,desc:`Odczytaj bloki myślenia Claude`,detail:{what:`Filtruje content bloki zostawiając ThinkingBloki — każdy ma .thinking (string z rozumowaniem).`,how:`Możesz wyświetlić użytkownikowi, logować do debugowania lub ignorować — używasz tylko TextBloku.`,tips:[`block.thinking może mieć tysiące znaków — loguj do pliku, nie do konsoli na produkcji`,`Thinking nie znika z responsecontentu — zawsze dostaniesz go gdy thinking jest włączone`]}},{cmd:`messages.append({"role": "assistant", "content": response.content})`,desc:`ZACHOWAJ ThinkingBlock w historii multi-turn`,detail:{what:`Przy multi-turn z thinking MUSISZ zachować ThinkingBlock w wiadomości assistant — API odrzuci request bez niego.`,how:`Przekaż całe response.content (nie tylko TextBlock) gdy dodajesz wiadomość assistant do historii.`,tips:[`Najczęstszy błąd: filtrowanie content bloków i wyrzucanie ThinkingBlock przed dodaniem do historii`,`W kolejnym wywołaniu API zweryfikuje że ThinkingBlock pasuje do wcześniej wygenerowanego`]}},{cmd:`thinking={"type": "disabled"}`,desc:`Jawnie wyłącz thinking (domyślnie wyłączone)`,detail:{what:`Thinking jest domyślnie wyłączone — możesz to ustawić explicite dla czytelności kodu.`,how:`Bez thinking i bez extended_thinking header — normalne wywołanie jak zwykle.`,tips:[`Nie mieszaj thinking=enabled z tool_choice=auto gdy budujesz agenta — może dawać dziwne wyniki`,`Streaming z thinking zwraca thinking_delta eventy — obsługuj je jeśli chcesz pokazywać postęp`]}}]},{name:`Batch API — masowe przetwarzanie`,icon:`📋`,commands:[{cmd:`client.beta.messages.batches.create(requests=[...])`,desc:`Utwórz batch (50% taniej, wynik do 24h)`,detail:{what:`Batch API przetwarza wiele requestów asynchronicznie — 50% tańsze od synchronicznych wywołań.`,how:`Każdy request to dict z custom_id (twój identyfikator) i params (jak normalne messages.create).`,tips:[`Idealnie dla: masowej ekstrakcji danych, klasyfikacji dokumentów, generowania raportów`,`custom_id pozwala powiązać wynik z oryginalnym requestem po zakończeniu batcha`]}},{cmd:`client.beta.messages.batches.retrieve(batch_id)`,desc:`Sprawdź status batcha`,detail:{what:`Zwraca obiekt batcha z processing_status i statystykami (request_counts per status).`,how:`Statusy: in_progress / ended. Polluj co kilka minut lub użyj webhooka.`,tips:[`batch.request_counts.succeeded / errored / expired — szczegółowy podział wyników`,`Maksymalny czas przetwarzania: 24h — po tym requestach wygasają`]}},{cmd:`for result in client.beta.messages.batches.results(batch_id)`,desc:`Pobierz wyniki ukończonego batcha`,detail:{what:`Iteruje po wynikach batcha — każdy result ma custom_id i result (sukces lub błąd).`,how:`result.result.type: "succeeded" lub "errored". Dla sukcesu: result.result.message to pełny Message.`,tips:[`Filtruj po result.result.type == "succeeded" przed odczytem .message`,`Zapisuj wyniki do pliku/bazy na bieżąco — batche mogą mieć tysiące wyników`]}},{cmd:`client.beta.messages.batches.list()`,desc:`Lista wszystkich batchy konta`,detail:{what:`Zwraca historię batchy z ich statusami i datami — przydatne do monitorowania i debugowania.`,how:`Batcheki są widoczne przez 30 dni po zakończeniu.`,tips:[`client.beta.messages.batches.cancel(batch_id) — anuluj batch przed zakończeniem`,`Monitoruj przez Anthropic Console zamiast API jeśli nie potrzebujesz automatyzacji`]}}]},{name:`Token counting i koszty`,icon:`💰`,commands:[{cmd:`client.beta.messages.count_tokens(model=..., messages=[...])`,desc:`Policz tokeny BEZ wysyłania do modelu`,detail:{what:`Liczy ile tokenów zajmuje request (system + messages + tools) bez faktycznego wywołania — darmowe.`,how:`Zwraca obiekt z input_tokens — użyj przed wysłaniem do sprawdzenia czy nie przekraczasz limitu.`,tips:[`Sprawdź czy mieszczysz się w kontekście przed kosztownym wywołaniem`,`Uwzględnia też tokeny narzędzi — ważne gdy masz dużą listę tools`]}},{cmd:`response.usage.input_tokens`,desc:`Input tokeny normalnego wywołania`,detail:{what:`Rzeczywista liczba tokenów wejściowych zużyta przez wywołanie (bez cache hits).`,how:`Pełne koszty = input_tokens * cena_in + output_tokens * cena_out + cache_creation * cena_cw + cache_read * cena_cr.`,tips:[`Dla Sonnet: $3/MTok in, $15/MTok out, $3.75/MTok cache write, $0.30/MTok cache read`,`Thinking tokeny wliczone w output_tokens — przy budget 10k możesz płacić sporo za thinking`]}},{cmd:'print(f"Koszt: ${(u.input_tokens * 3 + u.output_tokens * 15) / 1_000_000:.4f}")',desc:`Oblicz szacowany koszt wywołania (Sonnet)`,detail:{what:`Prosta kalkulacja kosztu na podstawie usage — przydatna do logowania kosztów w aplikacji.`,how:`Ceny w USD za milion tokenów — sprawdź aktualne ceny na anthropic.com/pricing.`,tips:[`Dodaj logowanie kosztów do każdego wywołania produkcyjnego — łatwiej śledzić wydatki`,`Helicone robi to automatycznie i pokazuje w dashboardzie per user/session`]}}]},{name:`Error handling i debugowanie`,icon:`🐛`,commands:[{cmd:`except anthropic.APIStatusError as e: print(e.status_code, e.message)`,desc:`Złap błąd API z kodem HTTP`,detail:{what:`Łapie wszystkie błędy z niezerowym kodem HTTP — masz dostęp do status_code i szczegółowego message.`,how:`Łap konkretne podklasy przed ogólnym APIStatusError aby obsłużyć różne błędy inaczej.`,tips:[`anthropic.AuthenticationError (401) — złe ANTHROPIC_API_KEY`,`anthropic.PermissionDeniedError (403) — brak dostępu do modelu lub feature`]}},{cmd:`except anthropic.RateLimitError: time.sleep(60); retry()`,desc:`Obsłuż przekroczenie limitu requestów (429)`,detail:{what:`Rate limit zwraca 429 — SDK automatycznie retry'uje, ale możesz też obsłużyć sam z niestandardowym backoffem.`,how:`Sprawdź nagłówek retry-after w e.response.headers żeby wiedzieć ile czekać.`,tips:[`Exponential backoff z jitter — nie używaj stałego sleep bo wszystkie instancey obudzą się naraz`,`Ogranicz liczbę concurrent requestów jeśli często hitujesz rate limit`]}},{cmd:`except anthropic.APIConnectionError: # problem sieciowy`,desc:`Obsłuż błąd połączenia sieciowego`,detail:{what:`APIConnectionError = nie udało się nawiązać połączenia z API (brak sieci, timeout połączenia).`,how:`SDK automatycznie retry'uje przy connection errors (max_retries). Catch dla własnej logiki fallback.`,tips:[`Ustaw odpowiedni timeout= przy tworzeniu klienta — zapobiegnie wieszaniu requestów`,`Loguj APIConnectionError — częste przy niestabilnym łączu lub przeciążonym API`]}},{cmd:`pip show anthropic`,desc:`Sprawdź zainstalowaną wersję SDK`,detail:{what:`Wyświetla wersję biblioteki anthropic — ważne bo API bywa aktualizowane (nowe modele, features).`,how:`Porównaj z CHANGELOG na GitHub (anthropic-ai/anthropic-sdk-python).`,tips:[`pip install --upgrade anthropic — zaktualizuj do najnowszej`,`Sprawdzaj CHANGELOG przed upgrade — extended thinking i computer use miały breaking changes`]}}]}]}}},Y=`podstawy`,Rn=`react`,zn={react:Xt,fastapi:Qt,pytest:en,requests:nn,beautifulsoup:an,asyncio:sn,git:ln,docker:dn,pyautogui:pn,mcp:hn,aws:_n,postgresql:yn,redis:xn,terraform:Cn,cicd:Tn,wsl:Dn,langgraph:kn,kubernetes:jn,flask:Nn,openaisdk:Fn,anthropicsdk:Ln};function Bn(e){let t=document.getElementById(`fw-detail-overlay`);if(!t)return;let n=e.name.toLowerCase().replace(/[^a-z0-9]/g,``);Rn=n,Y=`podstawy`;let r=zn[n]||null,i=e.color||`#61dafb`,a=r&&r.meta&&r.meta.color2?r.meta.color2:i;t.style.setProperty(`--fw-color`,i),t.style.setProperty(`--fw-color-2`,a),r?Hn(e,r,t):Un(e,t),t.classList.add(`fw-detail--visible`),document.addEventListener(`keydown`,X)}function Vn(){let e=document.getElementById(`fw-detail-overlay`);e&&e.classList.remove(`fw-detail--visible`),document.removeEventListener(`keydown`,X)}function X(e){e.key===`Escape`&&(document.getElementById(`fwd-cmd-modal`)?.classList.contains(`fwd-cmd-modal--visible`)||Vn())}function Hn(e,t,n){Gt(t.content.komendy||null);let r=t.meta&&t.meta.icon?t.meta.icon:e.icon,i=t.tabs.map(e=>`<button class="fwd-tab`+(e.id===Y?` active`:``)+`" onclick="switchDetailTab('`+e.id+`')">`+e.label+`</button>`).join(``);n.innerHTML=`<div class="fwd-header"><button class="fwd-back-btn" onclick="closeDetailPage()">← Powrót</button><div class="fwd-header-icon">`+r+`</div><div class="fwd-header-info"><div class="fwd-header-name" style="background:linear-gradient(90deg,var(--fw-color),var(--fw-color-2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">`+t.meta.name+`</div><div class="fwd-header-tagline">`+t.meta.tagline+`</div></div><div class="fwd-header-badges"><span class="fwd-badge">`+t.meta.lang+`</span><span class="fwd-badge">od `+t.meta.year+`</span><span class="fwd-badge">⭐ `+t.meta.stars+`</span></div></div><div class="fwd-tabs">`+i+`</div><div class="fwd-content" id="fwd-content"></div>`,Kn(Y,t)}function Un(e,t){t.innerHTML=`<div class="fwd-header"><button class="fwd-back-btn" onclick="closeDetailPage()">← Powrót</button><div class="fwd-header-icon">`+e.icon+`</div><div class="fwd-header-info"><div class="fwd-header-name" style="color:`+(e.color||`#888`)+`">`+e.name+`</div><div class="fwd-header-tagline">`+e.desc+`</div></div></div><div class="fwd-content"><div class="fwd-coming-soon"><div class="fwd-coming-icon">`+e.icon+`</div><div>Szczegóły <strong>`+e.name+`</strong> wkrótce...</div></div></div>`}function Wn(e){Y=e,document.querySelectorAll(`.fwd-tab`).forEach(e=>e.classList.remove(`active`));let t=document.querySelector(`.fwd-tab[onclick*="'`+e+`'"]`);t&&t.classList.add(`active`);let n=zn[Rn];n&&Kn(e,n)}function Z(e){return e&&Array.isArray(e.items)}function Gn(e){return e&&Array.isArray(e.items)&&e.items.length>0&&e.items[0].tagline!==void 0}function Kn(e,t){let n=document.getElementById(`fwd-content`);if(!n)return;n.scrollTop=0;let r=t.meta||{};switch(e){case`podstawy`:n.innerHTML=It(t.content.podstawy,r);break;case`komponenty`:n.innerHTML=Z(t.content.komponenty)?K(t.content.komponenty,r):Lt(t.content.komponenty,r);break;case`hooki`:n.innerHTML=Z(t.content.hooki)?K(t.content.hooki,r):Rt(t.content.hooki);break;case`routing`:n.innerHTML=Z(t.content.routing)?K(t.content.routing,r):zt(t.content.routing,r);break;case`state`:n.innerHTML=Z(t.content.state)?K(t.content.state,r):Bt(t.content.state);break;case`rywale`:n.innerHTML=Gn(t.content.rywale)?Ht(t.content.rywale):Z(t.content.rywale)?K(t.content.rywale,r):Vt(t.content.rywale);break;case`pluginy`:n.innerHTML=Z(t.content.pluginy)?K(t.content.pluginy,r):Ut(t.content.pluginy);break;case`komendy`:n.innerHTML=Wt(t.content.komendy);break;default:n.innerHTML=`<div class="fwd-coming-soon"><div>Wkrótce...</div></div>`}}document.addEventListener(`DOMContentLoaded`,function(){if(!document.getElementById(`fw-detail-overlay`)){let e=document.createElement(`div`);e.id=`fw-detail-overlay`,document.body.appendChild(e)}});var qn={from:{opis:`Importuje konkretną funkcję lub klasę z modułu.`,przyklad:`from os import path`,kat:`słowo kluczowe`},import:{opis:`Ładuje moduł (bibliotekę) żebyś mógł użyć jego funkcji.`,przyklad:`import os`,kat:`słowo kluczowe`},def:{opis:`Definiuje nową funkcję — blok kodu który można wielokrotnie wywoływać.`,przyklad:`def powitaj(imie): ...`,kat:`słowo kluczowe`},return:{opis:`Kończy funkcję i zwraca wartość do miejsca wywołania.`,przyklad:`return wynik`,kat:`słowo kluczowe`},if:{opis:`Sprawdza warunek — kod w środku wykona się tylko gdy warunek jest prawdziwy.`,przyklad:`if x > 0: ...`,kat:`słowo kluczowe`},else:{opis:`Wykonuje się gdy żaden wcześniejszy if/elif nie był prawdziwy.`,przyklad:`else: ...`,kat:`słowo kluczowe`},elif:{opis:`Sprawdza kolejny warunek gdy poprzedni if był fałszywy.`,przyklad:`elif x == 0: ...`,kat:`słowo kluczowe`},for:{opis:`Pętla — powtarza blok kodu dla każdego elementu w kolekcji.`,przyklad:`for element in lista: ...`,kat:`słowo kluczowe`},while:{opis:`Pętla — powtarza blok kodu dopóki warunek jest prawdziwy.`,przyklad:`while x > 0: ...`,kat:`słowo kluczowe`},with:{opis:`Otwiera zasób (np. plik) i automatycznie go zamyka po wyjściu z bloku.`,przyklad:`with open('plik.txt') as f: ...`,kat:`słowo kluczowe`},try:{opis:`Blok kodu który może rzucić wyjątek — Python próbuje go wykonać.`,przyklad:`try: ...`,kat:`słowo kluczowe`},except:{opis:`Łapie wyjątek (błąd) i pozwala go obsłużyć zamiast zatrzymywać program.`,przyklad:`except ValueError as e: ...`,kat:`słowo kluczowe`},raise:{opis:`Rzuca wyjątek — sygnalizuje że coś poszło nie tak.`,przyklad:`raise ValueError('Zła wartość')`,kat:`słowo kluczowe`},class:{opis:`Definiuje nową klasę — szablon do tworzenia obiektów.`,przyklad:`class Samochod: ...`,kat:`słowo kluczowe`},lambda:{opis:`Tworzy małą anonimową funkcję w jednej linii.`,przyklad:`podwoj = lambda x: x * 2`,kat:`słowo kluczowe`},yield:{opis:`Zwraca wartość z generatora i pauzuje funkcję — nie kończy jej jak return.`,przyklad:`yield wartosc`,kat:`słowo kluczowe`},async:{opis:`Oznacza funkcję jako asynchroniczną — może być wstrzymana bez blokowania.`,przyklad:`async def pobierz(): ...`,kat:`słowo kluczowe`},await:{opis:`Czeka na wynik asynchronicznej operacji nie blokując reszty programu.`,przyklad:`dane = await pobierz()`,kat:`słowo kluczowe`},in:{opis:`Sprawdza czy element należy do kolekcji.`,przyklad:`if 'a' in 'abc': ...`,kat:`słowo kluczowe`},not:{opis:`Odwraca wartość logiczną — True staje się False i odwrotnie.`,przyklad:`not True  # → False`,kat:`słowo kluczowe`},and:{opis:`Logiczne I — True tylko gdy oba warunki są prawdziwe.`,przyklad:`if x > 0 and x < 10: ...`,kat:`słowo kluczowe`},or:{opis:`Logiczne LUB — True gdy choć jeden warunek jest prawdziwy.`,przyklad:`if x < 0 or x > 100: ...`,kat:`słowo kluczowe`},as:{opis:`Nadaje alias — krótszą nazwę importowanemu modułowi lub wyjątkowi.`,przyklad:`import numpy as np`,kat:`słowo kluczowe`},pass:{opis:`Nic nie robi — placeholder gdy składnia wymaga bloku kodu.`,przyklad:`def todo(): pass`,kat:`słowo kluczowe`},break:{opis:`Natychmiast kończy pętlę for lub while.`,przyklad:`if x == 5: break`,kat:`słowo kluczowe`},continue:{opis:`Pomija resztę bieżącej iteracji i przechodzi do następnej.`,przyklad:`if x < 0: continue`,kat:`słowo kluczowe`},del:{opis:`Usuwa zmienną, element listy lub atrybut obiektu z pamięci.`,przyklad:`del lista[0]`,kat:`słowo kluczowe`},global:{opis:`Mówi że zmienna wewnątrz funkcji to ta sama co na poziomie modułu.`,przyklad:`global licznik`,kat:`słowo kluczowe`},True:{opis:`Wartość logiczna 'prawda'.`,przyklad:`x = True`,kat:`słowo kluczowe`},False:{opis:`Wartość logiczna 'fałsz'.`,przyklad:`x = False`,kat:`słowo kluczowe`},None:{opis:`Reprezentuje brak wartości — jak 'nic'. Funkcje bez return zwracają None.`,przyklad:`x = None`,kat:`słowo kluczowe`},print:{opis:`Wyświetla tekst lub wartości na ekranie.`,przyklad:`print('Witaj świecie')`,kat:`funkcja wbudowana`},len:{opis:`Zwraca liczbę elementów w liście, tekście lub innej kolekcji.`,przyklad:`len([1, 2, 3])  # → 3`,kat:`funkcja wbudowana`},range:{opis:`Generuje ciąg liczb całkowitych. Używany w pętlach for.`,przyklad:`range(0, 10)  # → 0..9`,kat:`funkcja wbudowana`},int:{opis:`Zamienia wartość na liczbę całkowitą.`,przyklad:`int('42')  # → 42`,kat:`funkcja wbudowana`},str:{opis:`Zamienia wartość na tekst.`,przyklad:`str(42)  # → '42'`,kat:`funkcja wbudowana`},float:{opis:`Zamienia wartość na liczbę zmiennoprzecinkową.`,przyklad:`float('3.14')  # → 3.14`,kat:`funkcja wbudowana`},bool:{opis:`Zamienia wartość na True lub False.`,przyklad:`bool(0)  # → False`,kat:`funkcja wbudowana`},list:{opis:`Tworzy listę — modyfikowalną kolekcję elementów.`,przyklad:`list('abc')  # → ['a','b','c']`,kat:`funkcja wbudowana`},dict:{opis:`Tworzy słownik — strukturę par klucz:wartość.`,przyklad:`dict(imie='Jan')`,kat:`funkcja wbudowana`},set:{opis:`Tworzy zbiór unikalnych elementów.`,przyklad:`set([1,2,2,3])  # → {1,2,3}`,kat:`funkcja wbudowana`},tuple:{opis:`Tworzy krotkę — niemodyfikowalną listę.`,przyklad:`tuple([1,2,3])  # → (1,2,3)`,kat:`funkcja wbudowana`},type:{opis:`Zwraca typ (klasę) obiektu.`,przyklad:`type(42)  # → <class 'int'>`,kat:`funkcja wbudowana`},isinstance:{opis:`Sprawdza czy obiekt jest określonego typu.`,przyklad:`isinstance(42, int)  # → True`,kat:`funkcja wbudowana`},enumerate:{opis:`Dodaje licznik do iteracji — zwraca pary (indeks, wartość).`,przyklad:`for i, v in enumerate(lista): ...`,kat:`funkcja wbudowana`},zip:{opis:`Łączy wiele list w pary — jak zamek błyskawiczny.`,przyklad:`zip([1,2],[3,4])  # → [(1,3),(2,4)]`,kat:`funkcja wbudowana`},map:{opis:`Stosuje funkcję do każdego elementu listy.`,przyklad:`list(map(str, [1,2,3]))`,kat:`funkcja wbudowana`},filter:{opis:`Filtruje listę — zostawia tylko elementy dla których funkcja zwraca True.`,przyklad:`list(filter(lambda x: x>0, lista))`,kat:`funkcja wbudowana`},sorted:{opis:`Zwraca nową posortowaną listę nie zmieniając oryginału.`,przyklad:`sorted([3,1,2])  # → [1,2,3]`,kat:`funkcja wbudowana`},reversed:{opis:`Zwraca iterator przechodzący przez sekwencję od końca.`,przyklad:`list(reversed([1,2,3]))`,kat:`funkcja wbudowana`},sum:{opis:`Sumuje wszystkie elementy listy.`,przyklad:`sum([1,2,3,4])  # → 10`,kat:`funkcja wbudowana`},min:{opis:`Zwraca najmniejszą wartość z listy.`,przyklad:`min([3,1,4])  # → 1`,kat:`funkcja wbudowana`},max:{opis:`Zwraca największą wartość z listy.`,przyklad:`max([3,1,4])  # → 4`,kat:`funkcja wbudowana`},abs:{opis:`Zwraca wartość bezwzględną liczby.`,przyklad:`abs(-5)  # → 5`,kat:`funkcja wbudowana`},round:{opis:`Zaokrągla liczbę do podanej liczby miejsc.`,przyklad:`round(3.14159, 2)  # → 3.14`,kat:`funkcja wbudowana`},open:{opis:`Otwiera plik do czytania lub pisania.`,przyklad:`with open('plik.txt', 'r') as f: ...`,kat:`funkcja wbudowana`},input:{opis:`Zatrzymuje program i czeka na wpisanie tekstu przez użytkownika.`,przyklad:`imie = input('Podaj imię: ')`,kat:`funkcja wbudowana`},super:{opis:`Daje dostęp do metod klasy nadrzędnej. Używane przy dziedziczeniu.`,przyklad:`super().__init__()`,kat:`funkcja wbudowana`},hasattr:{opis:`Sprawdza czy obiekt posiada dany atrybut.`,przyklad:`hasattr(obiekt, 'metoda')`,kat:`funkcja wbudowana`},getattr:{opis:`Pobiera wartość atrybutu obiektu po jego nazwie jako tekście.`,przyklad:`getattr(obiekt, 'nazwa', domyslna)`,kat:`funkcja wbudowana`},setattr:{opis:`Ustawia wartość atrybutu obiektu po nazwie.`,przyklad:`setattr(obiekt, 'nazwa', wartosc)`,kat:`funkcja wbudowana`},connect:{opis:`Otwiera połączenie z bazą danych SQLite pod podaną ścieżką.`,przyklad:`sqlite3.connect('baza.db')`,kat:`metoda`},execute:{opis:`Wykonuje zapytanie SQL na bazie danych.`,przyklad:`conn.execute('SELECT * FROM users')`,kat:`metoda`},fetchall:{opis:`Pobiera wszystkie wyniki zapytania SQL jako listę.`,przyklad:`rows = cursor.fetchall()`,kat:`metoda`},fetchone:{opis:`Pobiera jeden wynik zapytania SQL.`,przyklad:`row = cursor.fetchone()`,kat:`metoda`},append:{opis:`Dodaje element na koniec listy.`,przyklad:`lista.append(42)`,kat:`metoda listy`},extend:{opis:`Dodaje wszystkie elementy innej listy na koniec.`,przyklad:`lista.extend([4,5,6])`,kat:`metoda listy`},items:{opis:`Zwraca pary (klucz, wartość) słownika — idealne do iteracji.`,przyklad:`for k, v in slownik.items(): ...`,kat:`metoda słownika`},keys:{opis:`Zwraca wszystkie klucze słownika.`,przyklad:`slownik.keys()`,kat:`metoda słownika`},values:{opis:`Zwraca wszystkie wartości słownika.`,przyklad:`slownik.values()`,kat:`metoda słownika`},get:{opis:`Pobiera wartość klucza. Zwraca None gdy klucz nie istnieje.`,przyklad:`slownik.get('klucz', 'domyslna')`,kat:`metoda słownika`},update:{opis:`Aktualizuje słownik danymi z innego słownika.`,przyklad:`slownik.update({'nowy': 1})`,kat:`metoda słownika`},split:{opis:`Dzieli tekst na listę fragmentów według separatora.`,przyklad:`'a,b,c'.split(',')  # → ['a','b','c']`,kat:`metoda tekstu`},join:{opis:`Łączy elementy listy w jeden tekst ze separatorem.`,przyklad:`', '.join(['a','b','c'])`,kat:`metoda tekstu`},strip:{opis:`Usuwa białe znaki z początku i końca tekstu.`,przyklad:`'  hello  '.strip()  # → 'hello'`,kat:`metoda tekstu`},replace:{opis:`Zamienia wszystkie wystąpienia fragmentu tekstu na inny.`,przyklad:`'hello world'.replace('world','Python')`,kat:`metoda tekstu`},format:{opis:`Wstawia wartości w miejsca {} w tekście.`,przyklad:`'{} ma {} lat'.format('Jan', 30)`,kat:`metoda tekstu`},lower:{opis:`Zamienia wszystkie litery na małe.`,przyklad:`'HELLO'.lower()  # → 'hello'`,kat:`metoda tekstu`},upper:{opis:`Zamienia wszystkie litery na WIELKIE.`,przyklad:`'hello'.upper()  # → 'HELLO'`,kat:`metoda tekstu`},startswith:{opis:`Sprawdza czy tekst zaczyna się od podanego fragmentu.`,przyklad:`'hello'.startswith('he')  # → True`,kat:`metoda tekstu`},endswith:{opis:`Sprawdza czy tekst kończy się podanym fragmentem.`,przyklad:`'hello'.endswith('lo')  # → True`,kat:`metoda tekstu`},os:{opis:`Operacje na systemie plików — ścieżki, foldery, zmienne środowiskowe.`,przyklad:`os.path.join('folder', 'plik.txt')`,kat:`moduł`},sys:{opis:`Informacje o interpreterze — argumenty, wyjście, ścieżki importu.`,przyklad:`sys.argv  # → argumenty z linii poleceń`,kat:`moduł`},json:{opis:`Czytanie i zapisywanie danych w formacie JSON.`,przyklad:`json.dumps({'a': 1})  # → '{"a": 1}'`,kat:`moduł`},re:{opis:`Wyrażenia regularne — zaawansowane wyszukiwanie wzorców w tekście.`,przyklad:`re.findall(r'\\d+', 'abc123')`,kat:`moduł`},random:{opis:`Generowanie liczb losowych i losowe wybieranie elementów.`,przyklad:`random.choice(['a','b','c'])`,kat:`moduł`},datetime:{opis:`Praca z datami i czasem — tworzenie, formatowanie, różnice.`,przyklad:`datetime.now().strftime('%Y-%m-%d')`,kat:`moduł`},time:{opis:`Funkcje czasu — mierzenie, wstrzymywanie programu.`,przyklad:`time.sleep(1)  # czekaj 1 sekundę`,kat:`moduł`},math:{opis:`Funkcje matematyczne — pierwiastki, logarytmy, trygonometria.`,przyklad:`math.sqrt(16)  # → 4.0`,kat:`moduł`},sqlite3:{opis:`Wbudowana baza danych SQLite — prosta baza w jednym pliku.`,przyklad:`sqlite3.connect('baza.db')`,kat:`moduł`},Flask:{opis:`Klasa tworząca aplikację webową Flask. Punkt startowy każdej aplikacji Flask.`,przyklad:`app = Flask(__name__)`,kat:`Flask`},jsonify:{opis:`Zamienia słownik Pythona na odpowiedź HTTP w formacie JSON.`,przyklad:`return jsonify({'status': 'ok'})`,kat:`Flask`},route:{opis:`Dekorator Flask — przypisuje funkcję do konkretnego adresu URL.`,przyklad:`@app.route('/users')`,kat:`Flask`},request:{opis:`Obiekt Flask zawierający dane przychodzącego żądania HTTP.`,przyklad:`request.json  # → dane z body`,kat:`Flask`}},Q=document.getElementById(`dictTooltip`),Jn=document.getElementById(`dictTooltipLabel`),Yn=document.getElementById(`dictTooltipOpis`),Xn=document.getElementById(`dictTooltipPrzyklad`);function Zn(){document.querySelectorAll(`.kw, .fn`).forEach(function(e){let t=e.textContent.trim();qn[t]&&(e.setAttribute(`data-dict`,t),e.addEventListener(`mouseenter`,e=>Qn(e,t)),e.addEventListener(`mouseleave`,tr))})}function Qn(e,t){let n=qn[t];Jn.textContent=n.kat+` · `+t,Yn.textContent=n.opis,Xn.textContent=n.przyklad,Q.style.display=`block`,$n(e)}function $n(e){er(e.clientX,e.clientY),document.addEventListener(`mousemove`,$,{passive:!0})}function er(e,t){let n=e+16,r=t-10,i=Q.offsetWidth,a=Q.offsetHeight;Q.style.left=(n+i>window.innerWidth?n-i-32:n)+`px`,Q.style.top=(r+a>window.innerHeight?r-a:r)+`px`}function $(e){if(Q.style.display===`none`){document.removeEventListener(`mousemove`,$);return}er(e.clientX,e.clientY)}function tr(){Q.style.display=`none`,document.removeEventListener(`mousemove`,$)}document.addEventListener(`DOMContentLoaded`,function(){Zn();let e=document.getElementById(`editor`)||document.body;new MutationObserver(Zn).observe(e,{childList:!0,subtree:!0})}),u({addToHistoria:he,resetDeadCode:qe,resetBadPatterns:ct,prefetchAll:wt}),ue({highlightLine:ee,renderEditor:f,getOriginalCodeText:d,resetDeadCode:qe,resetBadPatterns:ct,applyDeadCodeResults:D,applyBadPatternResults:k}),ye({getOriginalCodeText:d,addToHistoria:he}),Ae({getOriginalCodeText:d,saveHistoria:_}),Be({getOriginalCodeText:d,saveHistoria:_,refreshHistoriaIfVisible:v}),Ze({getOriginalCodeText:d,saveHistoria:_,refreshHistoriaIfVisible:v}),_t({renderujArchiwum:bt,clearDeadCodeHighlights:O,clearBadPatternHighlights:A}),Ct({saveHistoria:_,refreshHistoriaIfVisible:v}),jt({openFramework:Bn}),Object.assign(window,{showApp:Mt,onFwSearch:Pt,clearFwSearch:W,openFramework:Bn,closeDetailPage:Vn,switchDetailTab:Wn,onFwDetailEscape:X,openCmdModal:Kt,closeCmdModal:J,copyCmdText:Jt,openTranslator:be,closeTranslator:xe,toggleWand:Ee,openTranslatorFromHistoria:Oe,openVivisekcja:je,closeVivisekcja:Me,toggleDeadCode:Ve,highlightDeadLines:Ke,toggleBadPatterns:tt,highlightBadPatternLines:st,handleFileUpload:m,switchEditorTab:N,handleAnalizuj:ft,selectMode:lt,setActive:yt,switchTab:vt,sendAI:P,showHistoria:y,showHistoriaDetail:pe,loadKodFromHistoria:ge,pokazModal:xt,zamknijModal:St});
+`}]},komendy:{title:`Komendy Anthropic SDK`,groups:[{name:`Instalacja i setup`,icon:`📦`,commands:[{cmd:`pip install anthropic`,desc:`Zainstaluj oficjalny Anthropic SDK`,detail:{what:`Instaluje bibliotekę anthropic — jedyną oficjalną bibliotekę do modeli Claude.`,how:`Po instalacji importujesz import anthropic i tworzysz klienta Anthropic().`,tips:[`pip install anthropic --upgrade — zaktualizuj do najnowszej wersji`,`pip install anthropic[bedrock] — dodaj wsparcie dla AWS Bedrock`]}},{cmd:`export ANTHROPIC_API_KEY="sk-ant-..."`,desc:`Ustaw klucz API (sesja terminala)`,detail:{what:`Klient Anthropic() szuka klucza w zmiennej ANTHROPIC_API_KEY automatycznie.`,how:`Klucz zaczyna się od sk-ant- (nie mylić z sk- od OpenAI).`,tips:[`Klucz znajdziesz na console.anthropic.com → API Keys`,`Nigdy nie commituj klucza do git — zawsze .env + .gitignore`]}},{cmd:`pip install anthropic python-dotenv`,desc:`Zainstaluj SDK z obsługą pliku .env`,detail:{what:`python-dotenv wczytuje zmienne środowiskowe z pliku .env przy starcie aplikacji.`,how:`from dotenv import load_dotenv; load_dotenv() na początku skryptu — PRZED tworzeniem klienta.`,tips:[`echo 'ANTHROPIC_API_KEY=sk-ant-...' >> .env`,`Dodaj .env do .gitignore — nie commituj kluczy`]}},{cmd:`pip install anthropic langchain-anthropic instructor`,desc:`Pełny stack — SDK + LangChain + structured outputs`,detail:{what:`Instaluje zestaw najczęściej używany razem z Anthropic SDK w produkcji.`,how:`langchain-anthropic = ChatAnthropic dla LangGraph. instructor = structured outputs przez tool use.`,tips:[`pip freeze > requirements.txt — zapisz wersje po konfiguracji`,`Warto też pip install httpx jeśli budujesz własne wrapper-y`]}}]},{name:`Klient — tworzenie i konfiguracja`,icon:`🔑`,commands:[{cmd:`client = anthropic.Anthropic()`,desc:`Stwórz synchroniczny klient (czyta klucz z env)`,detail:{what:`Tworzy klienta Anthropic czytającego ANTHROPIC_API_KEY ze zmiennej środowiskowej.`,how:`Jeden klient na całą aplikację — reużywaj, nie twórz nowego przy każdym wywołaniu.`,tips:[`anthropic.Anthropic(api_key="sk-ant-...") — przekaż klucz explicite (dev/testing)`,`client.api_key — sprawdź aktywny klucz`]}},{cmd:`async_client = anthropic.AsyncAnthropic()`,desc:`Klient asynchroniczny (FastAPI, asyncio)`,detail:{what:`Identyczne API jak Anthropic(), ale wszystkie metody są async — wymagają await.`,how:`Używaj w FastAPI endpointach, asyncio skryptach, wszędzie gdzie masz event loop.`,tips:[`await async_client.messages.create(...) — zawsze z await`,`Jeden AsyncAnthropic() na całą aplikację`]}},{cmd:`client = anthropic.Anthropic(timeout=60.0, max_retries=3)`,desc:`Klient z timeout i retry`,detail:{what:`Konfiguruje maksymalny czas oczekiwania na odpowiedź i liczbę automatycznych prób.`,how:`max_retries automatycznie powtarza przy błędach sieciowych i przeciążeniu (529).`,tips:[`Dla długich wywołań (extended thinking) ustaw timeout=300 lub więcej`,`max_retries=0 — wyłącz retry jeśli sam obsługujesz ponowne próby`]}},{cmd:`client.models.list()`,desc:`Lista dostępnych modeli Claude`,detail:{what:`Zwraca listę wszystkich modeli Claude dostępnych dla Twojego konta API.`,how:`Przydatne do sprawdzenia dokładnych nazw modeli i czy masz dostęp do konkretnej wersji.`,tips:[`[m.id for m in client.models.list()] — lista samych ID modeli`,`Tier systemy API mogą ograniczać dostęp do nowszych modeli`]}}]},{name:`Messages API — wywołania podstawowe`,icon:`💬`,commands:[{cmd:`client.messages.create(model=..., max_tokens=..., messages=[...])`,desc:`Podstawowe wywołanie Messages API`,detail:{what:`Wysyła wiadomości do Claude i zwraca pełny obiekt Message z content, usage, stop_reason.`,how:`max_tokens jest WYMAGANY. messages = lista dictów z role (user/assistant) i content.`,tips:[`response.content[0].text — tekst odpowiedzi`,`response.stop_reason: "end_turn" / "max_tokens" / "tool_use" / "stop_sequence"`]}},{cmd:`system="Twoja rola i instrukcje"`,desc:`Dodaj system prompt (osobny parametr, nie wiadomość)`,detail:{what:`W Anthropic SDK system jest osobnym parametrem create(), nie pierwszą wiadomością jak w OpenAI.`,how:`Możesz podać string (prosty) lub listę bloków ContentBlock (dla prompt cachingu).`,tips:[`Nie wstawiaj system jako {"role": "system", ...} do messages — to błąd API!`,`Dla cachingu: system=[{"type": "text", "text": "...", "cache_control": {...}}]`]}},{cmd:`response.content[0].text`,desc:`Odczytaj tekst odpowiedzi`,detail:{what:`response.content to lista bloków treści — text, tool_use, thinking. Dla prostych odpowiedzi [0] to TextBlock.`,how:`Zawsze sprawdzaj response.content[0].type == "text" gdy masz tool use lub thinking.`,tips:[`For block in response.content: if block.type == "text": print(block.text)`,`response.content[0] może być ToolUseBlock gdy model wywołuje narzędzie!`]}},{cmd:`temperature=0.0`,desc:`Ustaw deterministyczność (0 = przewidywalny, 1 = kreatywny)`,detail:{what:`temperature kontroluje losowość generowania — 0 to prawie deterministyczny output.`,how:`Dla kodu, ekstrakcji danych, faktów — używaj niskiej temperatury (0.0-0.2).`,tips:[`Claude może dawać różne wyniki nawet przy temperature=0 — to normalne przy długich outputach`,`Nie ustawiaj jednocześnie temperature i top_p — wybierz jedno z nich`]}},{cmd:`stop_sequences=["</answer>", "---"]`,desc:`Zatrzymaj generowanie na podanym ciągu znaków`,detail:{what:`Claude przestaje generować gdy natrafi na dowolny z podanych ciągów — przydatne do kontrolowania formatu.`,how:`response.stop_reason == "stop_sequence" gdy Claude zatrzymał się na jednym z tych ciągów.`,tips:[`Wzorzec XML: prefill "<answer>" + stop_sequences=["</answer>"] — ekstrakcja precyzyjnej odpowiedzi`,`Możesz kombinować prefill + stop_sequences do wymuszania dowolnego formatu`]}}]},{name:`Streaming`,icon:`📡`,commands:[{cmd:`with client.messages.stream(...) as stream`,desc:`Context manager streamingu odpowiedzi`,detail:{what:`client.messages.stream() zwraca context manager — wejdź przez with, iteruj po stream.`,how:`Blokuje do zakończenia streamu wewnątrz bloku with. Po wyjściu możesz wywołać get_final_message().`,tips:[`get_final_message() dostępne tylko PO wyjściu z bloku with`,`Dla async: async with async_client.messages.stream(...) as stream`]}},{cmd:`for text in stream.text_stream`,desc:`Iterator tokenów (najprostszy streaming)`,detail:{what:`stream.text_stream to iterator yielding string chunki — same teksty, bez metadanych eventów.`,how:`Najprostszy sposób na streaming gdy nie potrzebujesz obsługiwać tool use ani thinking.`,tips:[`print(text, end="", flush=True) — wypisuj token po tokenie bez nowej linii`,`Zbierz w listę i "".join(chunks) jeśli potrzebujesz pełnego tekstu`]}},{cmd:`stream.get_final_message()`,desc:`Pobierz pełny Message po zakończeniu streamu`,detail:{what:`Zwraca kompletny obiekt Message z usage (tokeny), stop_reason i pełną listą content bloków.`,how:`Wywoływalne tylko po wyjściu z bloku with stream — inaczej stream może być niekompletny.`,tips:[`stream.get_final_text() — shorthand, zwraca tylko tekst bez metadanych`,`final.usage.cache_read_input_tokens — sprawdź cache hits po streamie z cachingiem`]}},{cmd:`for event in stream: if event.type == "content_block_delta"`,desc:`Iteruj po pełnych eventach strumienia`,detail:{what:`Iteracja po stream (nie text_stream) daje kompletne obiekty zdarzeń — przydatne przy tool use i thinking.`,how:`event.type: message_start / content_block_start / content_block_delta / content_block_stop / message_stop.`,tips:[`event.delta.type: "text_delta" (tekst) / "input_json_delta" (tool args) / "thinking_delta"`,`Potrzebne gdy chcesz obsługiwać tool use lub thinking podczas streamingu`]}}]},{name:`Tool Use`,icon:`🛠️`,commands:[{cmd:`tools=[{"name": "...", "description": "...", "input_schema": {...}}]`,desc:`Definicja narzędzia dla Claude`,detail:{what:`Lista narzędzi przekazywana do messages.create(). Każde narzędzie ma name, description i input_schema (JSON Schema).`,how:`description to główna wskazówka dla modelu — pisz dokładnie co robi narzędzie i kiedy użyć.`,tips:[`Dobry opis narzędzia ważniejszy niż dobry prompt — model wybiera narzędzie na podstawie description`,`"required": ["pole"] w input_schema wymusza podanie argumentu przez model`]}},{cmd:`response.stop_reason == "tool_use"`,desc:`Sprawdź czy model chce wywołać narzędzie`,detail:{what:`Gdy model zdecyduje się wywołać narzędzie, stop_reason to "tool_use" — musisz obsłużyć pętlę.`,how:`"end_turn" = normalna odpowiedź. "tool_use" = musisz wykonać narzędzie i wrócić z wynikiem.`,tips:[`Zawsze sprawdzaj stop_reason przed odczytaniem response.content[0].text!`,`Model może wywołać kilka narzędzi naraz — iteruj po response.content, nie zakładaj tylko jednego bloku`]}},{cmd:`[b for b in response.content if b.type == "tool_use"]`,desc:`Wyodrębnij wszystkie wywołania narzędzi`,detail:{what:`Filtruje content bloki zostawiając tylko ToolUseBlock — każdy ma id, name i input (dict).`,how:`block.input to już sparsowany dict, nie string JSON — SDK parsuje automatycznie.`,tips:[`block.id jest kluczowy — musisz go użyć w tool_result.tool_use_id`,`block.input["parametr"] — dostęp do argumentów jak do normalnego słownika`]}},{cmd:`{"type": "tool_result", "tool_use_id": block.id, "content": json.dumps(result)}`,desc:`Format wyniku narzędzia do odesłania Claude`,detail:{what:`Wynik narzędzia to dict z type="tool_result", pasującym tool_use_id i content (string lub lista bloków).`,how:`Wstawiasz go do listy content w nowej wiadomości role="user" i wywołujesz create() ponownie.`,tips:[`content może być string (prosty) lub lista bloków (też obraz z base64)`,`Dodaj "is_error": True jeśli narzędzie zwróciło błąd — Claude to uwzględni`]}},{cmd:`tool_choice={"type": "tool", "name": "extract_data"}`,desc:`Wymuś wywołanie konkretnego narzędzia`,detail:{what:`Claude MUSI wywołać to konkretne narzędzie — niezależnie od treści wiadomości.`,how:`Wzorzec ekstrakcji danych i structured outputs — zawsze dostajesz typowany wynik.`,tips:[`tool_choice={"type": "any"} — musi użyć jakiegokolwiek narzędzia`,`tool_choice={"type": "none"} — blokuje użycie narzędzi (czysta rozmowa)`]}}]},{name:`Prompt Caching`,icon:`⚡`,commands:[{cmd:`"cache_control": {"type": "ephemeral"}`,desc:`Oznacz blok do cache (5-minutowe TTL)`,detail:{what:`Dodajesz cache_control do bloku w system prompt, user message lub narzędziu. API cache'uje prefiks do tego punktu.`,how:`Pierwsze wywołanie = cache write (droższe o 25%). Kolejne w 5 min = cache read (10x tańsze).`,tips:[`Minimalna wielkość do cache: 1024 tokeny dla Claude Sonnet/Opus, 2048 dla Haiku`,`Identyczny tekst musi być w tym samym miejscu struktury — cache zależy od pozycji w promptcie`]}},{cmd:`response.usage.cache_read_input_tokens`,desc:`Sprawdź ile tokenów trafiło z cache (hit)`,detail:{what:`cache_read_input_tokens to tokeny odczytane z cache — policz je zamiast normalnych input_tokens dla kosztu.`,how:`cache_creation_input_tokens = nowo zapisane do cache. cache_read = odczytane z istniejącego cache.`,tips:[`cache_read = 0 przy pierwszym wywołaniu lub po wygaśnięciu (>5 minut)`,`Cena cache_read dla Sonnet: $0.30/MTok vs $3.00/MTok dla normalnych input (10x taniej!)`]}},{cmd:`system=[{"type":"text", "text": LONG_PROMPT, "cache_control": {"type":"ephemeral"}}]`,desc:`Cache systemu jako lista bloków ContentBlock`,detail:{what:`System prompt jako lista bloków pozwala dodać cache_control do całego lub części systemu.`,how:`Możesz mieć wiele bloków w system — tylko ostatni z cache_control wyznacza granicę cache.`,tips:[`Zmiana czegokolwiek PRZED cache_control unieważnia cache — prefiks musi być identyczny`,`Dla bardzo długich systemów (10k+ tokenów): używaj cache na każde wywołanie — zwrot po 2-3 requestach`]}},{cmd:`"cache_control": {"type": "ephemeral"} # w ostatnim narzędziu`,desc:`Cache zestawu narzędzi (duże listy tools)`,detail:{what:`Gdy masz 20-100 narzędzi, ich definicje to tysiące tokenów. Caching tools obniża koszt agentów o 80-90%.`,how:`Wstawiasz cache_control w ostatnim elemencie listy tools — API cache'uje wszystkie narzędzia powyżej.`,tips:[`Dotyczy też tools w systemie — jeśli narzędzia nie zmieniają się między wywołaniami, zawsze je cache'uj`,`Połącz caching systemu + narzędzi + dokumentów = minimalne koszty przy dużych kontekstach`]}}]},{name:`Extended Thinking`,icon:`💭`,commands:[{cmd:`thinking={"type": "enabled", "budget_tokens": 10000}`,desc:`Włącz extended thinking (Claude "myśli" przed odpowiedzią)`,detail:{what:`Daje Claude budżet N tokenów na wewnętrzne rozumowanie widoczne jako ThinkingBlock w response.content.`,how:`max_tokens MUSI być większy niż budget_tokens. Minimum budget: 1000 tokenów. Wyłącza streaming tekstu.`,tips:[`Dla trudnych zadań: budget 8000-16000 tokenów. Dla prostszych: 1000-3000.`,`Thinking bloki są widoczne w odpowiedzi ale NIE są liczone do max_tokens outputu`]}},{cmd:`[b for b in response.content if b.type == "thinking"]`,desc:`Odczytaj bloki myślenia Claude`,detail:{what:`Filtruje content bloki zostawiając ThinkingBloki — każdy ma .thinking (string z rozumowaniem).`,how:`Możesz wyświetlić użytkownikowi, logować do debugowania lub ignorować — używasz tylko TextBloku.`,tips:[`block.thinking może mieć tysiące znaków — loguj do pliku, nie do konsoli na produkcji`,`Thinking nie znika z responsecontentu — zawsze dostaniesz go gdy thinking jest włączone`]}},{cmd:`messages.append({"role": "assistant", "content": response.content})`,desc:`ZACHOWAJ ThinkingBlock w historii multi-turn`,detail:{what:`Przy multi-turn z thinking MUSISZ zachować ThinkingBlock w wiadomości assistant — API odrzuci request bez niego.`,how:`Przekaż całe response.content (nie tylko TextBlock) gdy dodajesz wiadomość assistant do historii.`,tips:[`Najczęstszy błąd: filtrowanie content bloków i wyrzucanie ThinkingBlock przed dodaniem do historii`,`W kolejnym wywołaniu API zweryfikuje że ThinkingBlock pasuje do wcześniej wygenerowanego`]}},{cmd:`thinking={"type": "disabled"}`,desc:`Jawnie wyłącz thinking (domyślnie wyłączone)`,detail:{what:`Thinking jest domyślnie wyłączone — możesz to ustawić explicite dla czytelności kodu.`,how:`Bez thinking i bez extended_thinking header — normalne wywołanie jak zwykle.`,tips:[`Nie mieszaj thinking=enabled z tool_choice=auto gdy budujesz agenta — może dawać dziwne wyniki`,`Streaming z thinking zwraca thinking_delta eventy — obsługuj je jeśli chcesz pokazywać postęp`]}}]},{name:`Batch API — masowe przetwarzanie`,icon:`📋`,commands:[{cmd:`client.beta.messages.batches.create(requests=[...])`,desc:`Utwórz batch (50% taniej, wynik do 24h)`,detail:{what:`Batch API przetwarza wiele requestów asynchronicznie — 50% tańsze od synchronicznych wywołań.`,how:`Każdy request to dict z custom_id (twój identyfikator) i params (jak normalne messages.create).`,tips:[`Idealnie dla: masowej ekstrakcji danych, klasyfikacji dokumentów, generowania raportów`,`custom_id pozwala powiązać wynik z oryginalnym requestem po zakończeniu batcha`]}},{cmd:`client.beta.messages.batches.retrieve(batch_id)`,desc:`Sprawdź status batcha`,detail:{what:`Zwraca obiekt batcha z processing_status i statystykami (request_counts per status).`,how:`Statusy: in_progress / ended. Polluj co kilka minut lub użyj webhooka.`,tips:[`batch.request_counts.succeeded / errored / expired — szczegółowy podział wyników`,`Maksymalny czas przetwarzania: 24h — po tym requestach wygasają`]}},{cmd:`for result in client.beta.messages.batches.results(batch_id)`,desc:`Pobierz wyniki ukończonego batcha`,detail:{what:`Iteruje po wynikach batcha — każdy result ma custom_id i result (sukces lub błąd).`,how:`result.result.type: "succeeded" lub "errored". Dla sukcesu: result.result.message to pełny Message.`,tips:[`Filtruj po result.result.type == "succeeded" przed odczytem .message`,`Zapisuj wyniki do pliku/bazy na bieżąco — batche mogą mieć tysiące wyników`]}},{cmd:`client.beta.messages.batches.list()`,desc:`Lista wszystkich batchy konta`,detail:{what:`Zwraca historię batchy z ich statusami i datami — przydatne do monitorowania i debugowania.`,how:`Batcheki są widoczne przez 30 dni po zakończeniu.`,tips:[`client.beta.messages.batches.cancel(batch_id) — anuluj batch przed zakończeniem`,`Monitoruj przez Anthropic Console zamiast API jeśli nie potrzebujesz automatyzacji`]}}]},{name:`Token counting i koszty`,icon:`💰`,commands:[{cmd:`client.beta.messages.count_tokens(model=..., messages=[...])`,desc:`Policz tokeny BEZ wysyłania do modelu`,detail:{what:`Liczy ile tokenów zajmuje request (system + messages + tools) bez faktycznego wywołania — darmowe.`,how:`Zwraca obiekt z input_tokens — użyj przed wysłaniem do sprawdzenia czy nie przekraczasz limitu.`,tips:[`Sprawdź czy mieszczysz się w kontekście przed kosztownym wywołaniem`,`Uwzględnia też tokeny narzędzi — ważne gdy masz dużą listę tools`]}},{cmd:`response.usage.input_tokens`,desc:`Input tokeny normalnego wywołania`,detail:{what:`Rzeczywista liczba tokenów wejściowych zużyta przez wywołanie (bez cache hits).`,how:`Pełne koszty = input_tokens * cena_in + output_tokens * cena_out + cache_creation * cena_cw + cache_read * cena_cr.`,tips:[`Dla Sonnet: $3/MTok in, $15/MTok out, $3.75/MTok cache write, $0.30/MTok cache read`,`Thinking tokeny wliczone w output_tokens — przy budget 10k możesz płacić sporo za thinking`]}},{cmd:'print(f"Koszt: ${(u.input_tokens * 3 + u.output_tokens * 15) / 1_000_000:.4f}")',desc:`Oblicz szacowany koszt wywołania (Sonnet)`,detail:{what:`Prosta kalkulacja kosztu na podstawie usage — przydatna do logowania kosztów w aplikacji.`,how:`Ceny w USD za milion tokenów — sprawdź aktualne ceny na anthropic.com/pricing.`,tips:[`Dodaj logowanie kosztów do każdego wywołania produkcyjnego — łatwiej śledzić wydatki`,`Helicone robi to automatycznie i pokazuje w dashboardzie per user/session`]}}]},{name:`Error handling i debugowanie`,icon:`🐛`,commands:[{cmd:`except anthropic.APIStatusError as e: print(e.status_code, e.message)`,desc:`Złap błąd API z kodem HTTP`,detail:{what:`Łapie wszystkie błędy z niezerowym kodem HTTP — masz dostęp do status_code i szczegółowego message.`,how:`Łap konkretne podklasy przed ogólnym APIStatusError aby obsłużyć różne błędy inaczej.`,tips:[`anthropic.AuthenticationError (401) — złe ANTHROPIC_API_KEY`,`anthropic.PermissionDeniedError (403) — brak dostępu do modelu lub feature`]}},{cmd:`except anthropic.RateLimitError: time.sleep(60); retry()`,desc:`Obsłuż przekroczenie limitu requestów (429)`,detail:{what:`Rate limit zwraca 429 — SDK automatycznie retry'uje, ale możesz też obsłużyć sam z niestandardowym backoffem.`,how:`Sprawdź nagłówek retry-after w e.response.headers żeby wiedzieć ile czekać.`,tips:[`Exponential backoff z jitter — nie używaj stałego sleep bo wszystkie instancey obudzą się naraz`,`Ogranicz liczbę concurrent requestów jeśli często hitujesz rate limit`]}},{cmd:`except anthropic.APIConnectionError: # problem sieciowy`,desc:`Obsłuż błąd połączenia sieciowego`,detail:{what:`APIConnectionError = nie udało się nawiązać połączenia z API (brak sieci, timeout połączenia).`,how:`SDK automatycznie retry'uje przy connection errors (max_retries). Catch dla własnej logiki fallback.`,tips:[`Ustaw odpowiedni timeout= przy tworzeniu klienta — zapobiegnie wieszaniu requestów`,`Loguj APIConnectionError — częste przy niestabilnym łączu lub przeciążonym API`]}},{cmd:`pip show anthropic`,desc:`Sprawdź zainstalowaną wersję SDK`,detail:{what:`Wyświetla wersję biblioteki anthropic — ważne bo API bywa aktualizowane (nowe modele, features).`,how:`Porównaj z CHANGELOG na GitHub (anthropic-ai/anthropic-sdk-python).`,tips:[`pip install --upgrade anthropic — zaktualizuj do najnowszej`,`Sprawdzaj CHANGELOG przed upgrade — extended thinking i computer use miały breaking changes`]}}]}]}}},Rn={id:`sqlalchemy`,name:`SQLAlchemy`,icon:`🗄️`,color:`#D71F00`,color2:`#F59E0B`,tagline:`Python SQL toolkit i ORM — Core, ORM 2.0, async, relacje, migracje`,year:2006,author:`Mike Bayer / SQLAlchemy Project`,lang:`Python`,github:`sqlalchemy/sqlalchemy`,stars:`10k+`,codeLang:`python`,tabs:[{id:`podstawy`,label:`Podstawy`},{id:`komponenty`,label:`Modele ORM`},{id:`hooki`,label:`Zapytania`},{id:`routing`,label:`Relacje`},{id:`state`,label:`Async SQLAlchemy`},{id:`rywale`,label:`Rywale`},{id:`pluginy`,label:`Ekosystem`},{id:`komendy`,label:`Komendy`}]},zn={meta:Rn,tabs:Rn.tabs,content:{podstawy:{labels:{concepts:`Kluczowe koncepcje`,whenToUse:`Kiedy używać SQLAlchemy?`,firstComponent:`Pierwsze połączenie z bazą`,firstComponentLang:`python`},intro:{title:`Czym jest SQLAlchemy?`,desc:`Najpotężniejszy Python SQL toolkit i ORM. Dwa poziomy abstrakcji: Core (surowe SQL przez Pythona, maksymalna kontrola) i ORM (mapowanie klas Python na tabele SQL, wygoda i relacje). SQLAlchemy 2.0 (aktualna, od 2023) ujednoliciło API: jedno session.execute() dla wszystkiego, nowy select() zamiast query(). Obsługuje PostgreSQL, MySQL, SQLite, Oracle, MS SQL i inne przez dialekty. Standard w enterprise Python — Flask-SQLAlchemy, FastAPI z SQLModel, Alembic migracje — wszystko oparte na SQLAlchemy Core.
+`},concepts:[{title:`Engine — połączenie z bazą`,desc:`Engine to "fabryka połączeń" — tworzy connection pool i zarządza połączeniami. Tworzysz jeden Engine na całą aplikację przez create_engine(url). URL zawiera driver, credentials, host i bazę: postgresql+psycopg2://user:pass@host/db.
+`,icon:`🔌`},{title:`Session — jednostka pracy ORM`,desc:`Session to "tożsamość obiektów" — przechowuje wszystkie załadowane obiekty w pamięci, śledzi zmiany (dirty objects), batches INSERTy/UPDATEy i wysyła je do bazy przy commit(). Używaj Session jako context managera: with Session(engine) as session.
+`,icon:`🔄`},{title:`Core vs ORM`,desc:`Core = pisz SQL przez Pythona (select(), insert(), join()) — pełna kontrola. ORM = mapuj klasy Pythona na tabele, operuj na obiektach, relacje automatycznie. Możesz mieszać: ORM do prostego CRUD, Core do złożonych zapytań analitycznych.
+`,icon:`⚖️`},{title:`Mapped Columns i Typy (2.0+)`,desc:`SQLAlchemy 2.0 preferuje Mapped[T] i mapped_column() z type hints. Python typ (str, int, datetime) mapuje na SQL typ automatycznie. Stary styl (Column, Integer, String) nadal działa — dużo legacy kodu to ma.
+`,icon:`📝`},{title:`Identity Map — obiekt unikalny w sesji`,desc:`Session gwarantuje że dla danego primary key jest tylko JEDEN obiekt Pythona w sesji. Drugie zapytanie o ten sam rekord zwraca ten sam obiekt z pamięci, nie SQL. To automatyczna cache warstwy ORM — zrozumienie tego zapobiega N+1 bugom.
+`,icon:`🗺️`},{title:`Lazy vs Eager Loading`,desc:`Domyślnie relacje ładują się leniwie (SELECT gdy dostęp do .orders). Eager loading (selectinload, joinedload) ładuje relacje z góry w jednym zapytaniu. Brak eager loading to najczęstsza przyczyna N+1 problem — tysiące SQLi zamiast jednego.
+`,icon:`⚡`}],whenToUse:[`Aplikacje Python z relacyjną bazą danych (FastAPI, Flask, Celery)`,`Złożone zapytania z joinami, subquery, CTE — Core daje pełną kontrolę`,`Projekty z modelami ORM i relacjami (jeden-do-wielu, wiele-do-wielu)`,`Async aplikacje (FastAPI + asyncpg) przez AsyncSession`,`Migracje schematu przez Alembic`,`Zastąpienie django ORM w non-Django projektach`],firstComponent:`# pip install sqlalchemy psycopg2-binary
+
+from sqlalchemy import create_engine, String, Integer
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
+
+# Engine — connection string
+engine = create_engine("postgresql+psycopg2://user:pass@localhost/mydb", echo=True)
+
+# Baza dla modeli ORM
+class Base(DeclarativeBase):
+    pass
+
+class User(Base):
+    __tablename__ = "users"
+
+    id:    Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    name:  Mapped[str] = mapped_column(String(80))
+
+# Stwórz tabele
+Base.metadata.create_all(engine)
+
+# CRUD
+with Session(engine) as session:
+    user = User(email="jan@firma.pl", name="Jan Kowalski")
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    print(user.id)   # wygenerowany przez bazę
+`},komponenty:{title:`Modele ORM — mapowanie klas na tabele`,items:[{name:`Mapped Columns — nowy styl 2.0`,desc:`SQLAlchemy 2.0 preferuje Mapped[typ] i mapped_column() z type hints — Python typ automatycznie mapuje na SQL typ. Optional[str] oznacza nullable. String(n), Integer, Boolean, DateTime — precyzyjne typy SQL gdy potrzebne.
+`,code:`from datetime import datetime
+from typing import Optional
+from sqlalchemy import String, Text, DateTime, func
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+class Base(DeclarativeBase):
+    pass
+
+class Article(Base):
+    __tablename__ = "articles"
+
+    id:         Mapped[int]      = mapped_column(primary_key=True)
+    title:      Mapped[str]      = mapped_column(String(200), nullable=False)
+    content:    Mapped[str]      = mapped_column(Text)
+    slug:       Mapped[str]      = mapped_column(String(200), unique=True, index=True)
+    is_published: Mapped[bool]   = mapped_column(default=False)
+    author_id:  Mapped[int]      = mapped_column(index=True)
+    views:      Mapped[int]      = mapped_column(default=0)
+    summary:    Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, onupdate=func.now())
+`},{name:`Constraints, Indexes i __table_args__`,desc:`Złożone indeksy (multi-column), unique constraints, foreign keys i inne opcje tabeli definiujesz przez __table_args__. UniqueConstraint na wielu kolumnach, CheckConstraint dla reguł biznesowych na poziomie bazy.
+`,code:`from sqlalchemy import UniqueConstraint, CheckConstraint, Index, ForeignKey
+
+class Booking(Base):
+    __tablename__ = "bookings"
+
+    id:         Mapped[int] = mapped_column(primary_key=True)
+    user_id:    Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    resource_id:Mapped[int] = mapped_column(ForeignKey("resources.id"))
+    start_date: Mapped[datetime]
+    end_date:   Mapped[datetime]
+    status:     Mapped[str] = mapped_column(String(20), default="pending")
+
+    __table_args__ = (
+        # Unikalność na wielu kolumnach
+        UniqueConstraint("user_id", "resource_id", "start_date", name="uq_booking"),
+        # Sprawdź regułę biznesową na poziomie SQL
+        CheckConstraint("end_date > start_date", name="ck_date_order"),
+        # Złożony indeks dla częstych zapytań filtrujących
+        Index("ix_bookings_status_date", "status", "start_date"),
+    )
+`},{name:`Mixin — wielokrotne użycie pól`,desc:`Mixin to klasa Python bez __tablename__ z polami do dziedziczenia — eliminuje duplikację pól created_at, updated_at, id we wszystkich modelach. Wzorzec powszechny w dużych projektach enterprise.
+`,code:`from sqlalchemy.orm import declared_attr
+
+class TimestampMixin:
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+
+class SoftDeleteMixin:
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
+
+# Używaj w modelach przez dziedziczenie
+class User(TimestampMixin, SoftDeleteMixin, Base):
+    __tablename__ = "users"
+    id:    Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(120), unique=True)
+    # created_at, updated_at, deleted_at automatycznie z Mixin
+
+class Order(TimestampMixin, Base):
+    __tablename__ = "orders"
+    id:      Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    # created_at, updated_at z Mixin
+`},{name:`CRUD — podstawowe operacje sesji`,desc:`Cztery podstawowe operacje: session.add() (INSERT), session.get() (SELECT po PK), session.execute(select()) (dowolny SELECT), session.delete() (DELETE). commit() wysyła wszystkie zmiany do bazy. refresh() odświeża obiekt z bazy po commit.
+`,code:`from sqlalchemy.orm import Session
+from sqlalchemy import select
+
+with Session(engine) as session:
+    # INSERT
+    user = User(email="jan@firma.pl", name="Jan")
+    session.add(user)
+    session.commit()
+    session.refresh(user)  # odśwież ID z bazy
+    print(user.id)
+
+    # SELECT po primary key — szybki, używa identity map
+    found = session.get(User, user.id)
+
+    # SELECT z warunkami
+    stmt = select(User).where(User.email == "jan@firma.pl")
+    result = session.execute(stmt)
+    user2 = result.scalar_one()  # oczekuj dokładnie jednego wiersza
+
+    # UPDATE
+    user2.name = "Jan Kowalski"
+    session.commit()  # SQLAlchemy wykrywa zmianę automatycznie (dirty tracking)
+
+    # DELETE
+    session.delete(user2)
+    session.commit()
+
+    # Bulk INSERT (wydajny)
+    session.add_all([
+        User(email=f"user{i}@firma.pl", name=f"User {i}")
+        for i in range(100)
+    ])
+    session.commit()
+`},{name:`Repr i __str__ — debugowanie modeli`,desc:`Dodaj __repr__ do modeli żeby Session.__repr__(), logowanie i debugger pokazywały sensowne informacje zamiast <User object at 0x...>. SQLAlchemy 2.0 ma też ReprMixin który generuje repr automatycznie.
+`,code:`class User(TimestampMixin, Base):
+    __tablename__ = "users"
+
+    id:    Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(120), unique=True)
+    name:  Mapped[str] = mapped_column(String(80))
+
+    def __repr__(self) -> str:
+        return f"User(id={self.id!r}, email={self.email!r})"
+
+    def to_dict(self) -> dict:
+        return {
+            "id":    self.id,
+            "email": self.email,
+            "name":  self.name,
+        }
+
+# Serializacja z Pydantic (SQLModel lub ręcznie)
+from pydantic import BaseModel
+
+class UserSchema(BaseModel):
+    id:    int
+    email: str
+    name:  str
+
+    model_config = {"from_attributes": True}  # pozwala na UserSchema.model_validate(user_obj)
+
+user_schema = UserSchema.model_validate(user)
+`}]},hooki:{title:`Zapytania — SELECT, filtrowanie, agregacje`,items:[{name:`select() i podstawowe filtrowanie (styl 2.0)`,desc:`SQLAlchemy 2.0: używaj select(Model) zamiast session.query(Model). session.execute() + .scalars().all() to standardowy wzorzec pobierania wielu rekordów. scalar_one() dla jednego, scalar_one_or_none() gdy rekord może nie istnieć.
+`,code:`from sqlalchemy import select, and_, or_, not_
+
+with Session(engine) as session:
+    # SELECT * FROM users WHERE name LIKE '%Jan%'
+    stmt = select(User).where(User.name.like("%Jan%"))
+    users = session.scalars(stmt).all()  # lista obiektów User
+
+    # Wiele warunków — and_ i or_
+    stmt = select(User).where(
+        and_(
+            User.is_active == True,
+            or_(
+                User.email.endswith("@firma.pl"),
+                User.role == "admin"
+            )
+        )
+    )
+    results = session.scalars(stmt).all()
+
+    # Jeden wynik lub None (bezpieczny)
+    user = session.scalars(
+        select(User).where(User.email == "jan@firma.pl")
+    ).one_or_none()
+
+    # Jeden wynik lub wyjątek (NoResultFound / MultipleResultsFound)
+    user = session.scalars(
+        select(User).where(User.id == 5)
+    ).one()
+`},{name:`Sortowanie, paginacja, LIMIT`,desc:`order_by() dla sortowania, limit()/offset() dla paginacji. Kursor-based pagination (where id > last_id) jest wydajniejszy niż offset dla dużych tabel — unikaj offset przy milionach rekordów.
+`,code:`from sqlalchemy import desc, asc
+
+with Session(engine) as session:
+    # Sortowanie
+    stmt = select(User).order_by(desc(User.created_at), asc(User.name))
+    users = session.scalars(stmt).all()
+
+    # Paginacja offset-based (PROSTA, ale wolna na dużych tabelach)
+    page = 3
+    page_size = 20
+    stmt = select(User).order_by(User.id).limit(page_size).offset((page-1) * page_size)
+    users = session.scalars(stmt).all()
+
+    # Paginacja kursor-based (WYDAJNA dla dużych tabel)
+    last_id = 1000  # ID ostatniego rekordu poprzedniej strony
+    stmt = select(User).where(User.id > last_id).order_by(User.id).limit(20)
+    next_users = session.scalars(stmt).all()
+`},{name:`Agregacje i GROUP BY`,desc:`func.count(), func.sum(), func.avg(), func.max(), func.min() + group_by() + having(). Możesz select() na konkretnych kolumnach i wyrażeniach zamiast całych modeli.
+`,code:`from sqlalchemy import func, select
+
+with Session(engine) as session:
+    # Policz wszystkich użytkowników
+    count = session.scalar(select(func.count()).select_from(User))
+
+    # GROUP BY — zamówienia per użytkownik
+    stmt = (
+        select(Order.user_id, func.count(Order.id).label("order_count"),
+               func.sum(Order.total_amount).label("total_spent"))
+        .group_by(Order.user_id)
+        .having(func.count(Order.id) > 5)
+        .order_by(desc("total_spent"))
+    )
+    rows = session.execute(stmt).all()
+    # rows = lista named tuples: row.user_id, row.order_count, row.total_spent
+
+    # Konkretne kolumny zamiast całego modelu
+    stmt = select(User.id, User.email, User.name)
+    for row in session.execute(stmt):
+        print(row.id, row.email, row.name)
+`},{name:`JOIN — łączenie tabel`,desc:`join() i outerjoin() dla łączenia tabel. SQLAlchemy automatycznie wykrywa warunek joina z kluczy obcych jeśli masz zdefiniowane relacje lub ForeignKey.
+`,code:`from sqlalchemy import join
+
+with Session(engine) as session:
+    # INNER JOIN — automatycznie przez ForeignKey
+    stmt = (
+        select(Order, User)
+        .join(User, Order.user_id == User.id)
+        .where(User.is_active == True)
+    )
+    for order, user in session.execute(stmt):
+        print(f"{user.name}: zamówienie #{order.id}")
+
+    # LEFT OUTER JOIN — wszyscy użytkownicy, nawet bez zamówień
+    stmt = (
+        select(User, func.count(Order.id).label("orders"))
+        .outerjoin(Order, Order.user_id == User.id)
+        .group_by(User.id)
+    )
+    rows = session.execute(stmt).all()
+
+    # JOIN z aliasem (gdy ta sama tabela wiele razy)
+    from sqlalchemy.orm import aliased
+    ParentUser = aliased(User, name="parent")
+    stmt = select(User, ParentUser).join(ParentUser, User.parent_id == ParentUser.id)
+`},{name:`Subquery i CTE (Common Table Expressions)`,desc:`subquery() zamienia select() w podzapytanie do użycia w outer query. cte() tworzy WITH clause — czytelniejszy i wydajniejszy niż zagnieżdżone subquery. Potężne narzędzia do złożonych raportów analitycznych.
+`,code:`from sqlalchemy import select, func
+from sqlalchemy.orm import Session
+
+with Session(engine) as session:
+    # Subquery — znajdź users z więcej niż 3 zamówieniami
+    orders_subq = (
+        select(Order.user_id, func.count(Order.id).label("cnt"))
+        .group_by(Order.user_id)
+        .having(func.count(Order.id) > 3)
+        .subquery()
+    )
+    stmt = select(User).join(orders_subq, User.id == orders_subq.c.user_id)
+    power_users = session.scalars(stmt).all()
+
+    # CTE — czytelniejszy format dla złożonych zapytań
+    top_buyers_cte = (
+        select(
+            Order.user_id,
+            func.sum(Order.total_amount).label("total")
+        )
+        .group_by(Order.user_id)
+        .order_by(desc("total"))
+        .limit(100)
+        .cte("top_buyers")
+    )
+    stmt = select(User).join(top_buyers_cte, User.id == top_buyers_cte.c.user_id)
+    vip_users = session.scalars(stmt).all()
+`},{name:`UPDATE i DELETE przez SQL (bez ładowania obiektów)`,desc:`Dla masowych operacji (UPDATE 10k rekordów) użyj session.execute(update(Model)) zamiast ładowania każdego obiektu. Dużo szybsze bo omija ORM layer i identity map.
+`,code:`from sqlalchemy import update, delete
+
+with Session(engine) as session:
+    # UPDATE bez ładowania obiektów — jeden SQL
+    stmt = (
+        update(User)
+        .where(User.last_login < datetime(2024, 1, 1))
+        .values(is_active=False)
+    )
+    result = session.execute(stmt)
+    print(f"Dezaktywowano: {result.rowcount} użytkowników")
+    session.commit()
+
+    # DELETE bez ładowania obiektów
+    stmt = delete(Order).where(Order.status == "cancelled", Order.created_at < cutoff_date)
+    result = session.execute(stmt)
+    print(f"Usunięto: {result.rowcount} zamówień")
+    session.commit()
+
+    # UPDATE konkretnych rekordów po liście ID
+    stmt = update(User).where(User.id.in_([1, 5, 42, 100])).values(role="premium")
+    session.execute(stmt)
+    session.commit()
+`}]},routing:{title:`Relacje — jeden-do-wielu, wiele-do-wielu`,items:[{name:`One-to-Many — jeden użytkownik ma wiele zamówień`,desc:`relationship() definiuje relację ORM — SQLAlchemy automatycznie generuje JOINy. back_populates synchronizuje obie strony relacji. ForeignKey w tabeli "wielu" (Order.user_id) to fundament.
+`,code:`from sqlalchemy.orm import relationship, Mapped, mapped_column
+from sqlalchemy import ForeignKey
+from typing import List
+
+class User(Base):
+    __tablename__ = "users"
+    id:     Mapped[int] = mapped_column(primary_key=True)
+    email:  Mapped[str] = mapped_column(String(120), unique=True)
+
+    # Relacja do zamówień — SQLAlchemy wypełnia automatycznie
+    orders: Mapped[List["Order"]] = relationship("Order", back_populates="user")
+
+class Order(Base):
+    __tablename__ = "orders"
+    id:      Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    total:   Mapped[float]
+
+    # Odwrotna strona relacji
+    user: Mapped["User"] = relationship("User", back_populates="orders")
+
+# Użycie:
+with Session(engine) as session:
+    user = session.get(User, 1)
+    print(user.orders)    # LIST — LAZY LOAD (SQL przy pierwszym dostępie)
+    print(user.orders[0].total)
+
+    # Dodaj zamówienie przez relację
+    new_order = Order(total=299.99, user=user)
+    session.add(new_order)
+    session.commit()
+`},{name:`Many-to-Many — produkty i kategorie`,desc:`Wiele-do-wielu wymaga tabeli asocjacyjnej. secondary= wskazuje tę tabelę. SQLAlchemy zarządza wstawianiem/usuwaniem z tabeli asocjacyjnej automatycznie.
+`,code:`from sqlalchemy import Table, Column, ForeignKey
+
+# Tabela asocjacyjna — bez modelu ORM (dla prostego M:N)
+product_category = Table(
+    "product_category",
+    Base.metadata,
+    Column("product_id",  ForeignKey("products.id"),  primary_key=True),
+    Column("category_id", ForeignKey("categories.id"), primary_key=True),
+)
+
+class Product(Base):
+    __tablename__ = "products"
+    id:   Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+
+    categories: Mapped[List["Category"]] = relationship(
+        "Category", secondary=product_category, back_populates="products"
+    )
+
+class Category(Base):
+    __tablename__ = "categories"
+    id:   Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+
+    products: Mapped[List["Product"]] = relationship(
+        "Product", secondary=product_category, back_populates="categories"
+    )
+
+# Użycie — SQLAlchemy zarządza tabelą asocjacyjną:
+with Session(engine) as session:
+    laptop = Product(name="Laptop Dell")
+    electronics = Category(name="Elektronika")
+    laptop.categories.append(electronics)
+    session.add(laptop)
+    session.commit()
+`},{name:`Lazy vs Eager Loading — problem N+1`,desc:`Domyślny lazy loading generuje SELECT przy każdym dostępie do relacji — N użytkowników = N+1 zapytań SQL. Eager loading (selectinload, joinedload) ładuje relacje z góry. To najważniejsza optymalizacja zapytań ORM.
+`,code:`from sqlalchemy.orm import selectinload, joinedload, lazyload
+
+with Session(engine) as session:
+    # PROBLEM — N+1 queries (100 userów = 101 SQL):
+    users = session.scalars(select(User)).all()
+    for user in users:
+        print(user.orders)  # SELECT per user — WOLNE!
+
+    # SELECTINLOAD — dwa zapytania: jedno dla users, jedno dla orders
+    # SELECT users; SELECT orders WHERE user_id IN (1,2,3,...)
+    stmt = select(User).options(selectinload(User.orders))
+    users = session.scalars(stmt).all()
+    for user in users:
+        print(user.orders)  # już załadowane, zero SQL!
+
+    # JOINEDLOAD — jeden JOIN query (lepszy dla jeden-do-jeden lub małej liczby)
+    stmt = select(User).options(joinedload(User.profile))
+    users = session.scalars(stmt).unique().all()  # .unique() wymagane przy joinedload
+
+    # Zagnieżdżony eager load (user -> orders -> products)
+    stmt = select(User).options(
+        selectinload(User.orders).selectinload(Order.products)
+    )
+    users = session.scalars(stmt).all()
+`},{name:`cascade — propagacja operacji na relacjach`,desc:`cascade="all, delete-orphan" na relacji automatycznie usuwa powiązane obiekty gdy usuwasz rodzica. Bez cascade musisz ręcznie usuwać dzieci lub polegać na ON DELETE CASCADE w bazie danych.
+`,code:`class User(Base):
+    __tablename__ = "users"
+    id:    Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(120))
+
+    # all = save-update, merge, expunge, delete, refresh-expire
+    # delete-orphan = usuń Order gdy usunięty z kolekcji (nie tylko gdy user usunięty)
+    orders: Mapped[List["Order"]] = relationship(
+        "Order",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True   # polegaj na ON DELETE CASCADE w bazie, nie ładuj obiektów
+    )
+
+# Użycie:
+with Session(engine) as session:
+    user = session.get(User, 1)
+    session.delete(user)  # automatycznie usuwa też user.orders!
+    session.commit()
+
+    # Usuń pojedyncze zamówienie przez relację (delete-orphan):
+    user = session.scalars(
+        select(User).options(selectinload(User.orders)).where(User.id == 2)
+    ).one()
+    order_to_remove = user.orders[0]
+    user.orders.remove(order_to_remove)  # delete-orphan = usuwa z bazy!
+    session.commit()
+`},{name:`Asocjacja z dodatkowymi polami (association object)`,desc:`Gdy tabela wiele-do-wielu ma własne pola (np. data dodania, rola), tworzysz klasę ORM zamiast prostej Table. Association object = pełny model z relacjami do obu stron.
+`,code:`class UserProject(Base):
+    """Asocjacja User ↔ Project z dodatkowym polem 'role'"""
+    __tablename__ = "user_projects"
+
+    user_id:    Mapped[int] = mapped_column(ForeignKey("users.id"),    primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), primary_key=True)
+    role:       Mapped[str] = mapped_column(String(50), default="member")
+    joined_at:  Mapped[datetime] = mapped_column(server_default=func.now())
+
+    user:    Mapped["User"]    = relationship("User",    back_populates="user_projects")
+    project: Mapped["Project"] = relationship("Project", back_populates="user_projects")
+
+class User(Base):
+    __tablename__ = "users"
+    id:   Mapped[int] = mapped_column(primary_key=True)
+    user_projects: Mapped[List["UserProject"]] = relationship(back_populates="user")
+
+    # Convenience: bezpośredni dostęp do projektów (pominij asocjację)
+    projects: Mapped[List["Project"]] = relationship(
+        secondary="user_projects", viewonly=True
+    )
+
+# Dodaj usera do projektu z rolą:
+with Session(engine) as session:
+    assoc = UserProject(user_id=1, project_id=5, role="lead")
+    session.add(assoc)
+    session.commit()
+`}]},state:{title:`Async SQLAlchemy — FastAPI i asyncio`,items:[{name:`AsyncEngine i AsyncSession — setup`,desc:`Async SQLAlchemy wymaga async-compatible drivera: asyncpg (PostgreSQL), aiosqlite (SQLite). Tworzysz async_engine przez create_async_engine() i fabrykę sesji przez async_sessionmaker. Używaj w FastAPI przez dependency injection.
+`,code:`from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import DeclarativeBase
+
+# asyncpg zamiast psycopg2 — pip install asyncpg
+DATABASE_URL = "postgresql+asyncpg://user:pass@localhost/mydb"
+
+async_engine = create_async_engine(
+    DATABASE_URL,
+    echo=True,          # loguj SQL
+    pool_size=20,       # max połączeń w pool
+    max_overflow=10,    # dodatkowe połączenia ponad pool_size przy szczycie
+)
+
+# Fabryka sesji — tworzy sesje asynchroniczne
+AsyncSessionLocal = async_sessionmaker(
+    async_engine,
+    expire_on_commit=False,  # obiekty nie wygasają po commit — ważne w FastAPI!
+)
+
+# Dependency dla FastAPI
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        yield session
+`},{name:`Async CRUD — podstawowe operacje`,desc:`AsyncSession ma te same metody co Session, ale wymagają await tam gdzie trafia do bazy. session.add() i session.delete() są synchroniczne (tylko buforowanie), ale execute(), commit(), refresh() to async.
+`,code:`from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+async def create_user(session: AsyncSession, email: str, name: str) -> User:
+    user = User(email=email, name=name)
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)   # odśwież ID i server defaults z bazy
+    return user
+
+async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
+    result = await session.execute(
+        select(User).where(User.email == email)
+    )
+    return result.scalar_one_or_none()
+
+async def get_users_paginated(session: AsyncSession, page: int, size: int) -> list[User]:
+    result = await session.execute(
+        select(User)
+        .order_by(User.created_at.desc())
+        .limit(size)
+        .offset((page - 1) * size)
+    )
+    return list(result.scalars().all())
+
+async def delete_user(session: AsyncSession, user_id: int) -> bool:
+    user = await session.get(User, user_id)
+    if not user:
+        return False
+    await session.delete(user)
+    await session.commit()
+    return True
+`},{name:`FastAPI — dependency injection z AsyncSession`,desc:`Standardowy wzorzec FastAPI + SQLAlchemy async: get_db() dependency wstrzykuje sesję do endpointów. expire_on_commit=False krytyczne — bez tego obiekty wygasają po commit i FastAPI nie może ich serializować do JSON.
+`,code:`from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+
+app = FastAPI()
+
+# Dependency
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+
+# Endpoint
+@app.post("/users/", status_code=201)
+async def create_user_endpoint(
+    email: str,
+    name:  str,
+    db:    AsyncSession = Depends(get_db)
+):
+    # Sprawdź czy email zajęty
+    existing = await get_user_by_email(db, email)
+    if existing:
+        raise HTTPException(status_code=409, detail="Email already taken")
+
+    user = await create_user(db, email, name)
+    return {"id": user.id, "email": user.email}
+
+@app.get("/users/{user_id}")
+async def get_user_endpoint(user_id: int, db: AsyncSession = Depends(get_db)):
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"id": user.id, "email": user.email, "name": user.name}
+`},{name:`Async eager loading — selectinload z await`,desc:`Lazy loading jest ZAKAZANY w async SQLAlchemy — próba leniwego załadowania relacji poza async context powoduje MissingGreenlet / błąd. Zawsze używaj selectinload() lub joinedload() w async kodzie.
+`,code:`from sqlalchemy.orm import selectinload
+
+async def get_user_with_orders(session: AsyncSession, user_id: int) -> User | None:
+    result = await session.execute(
+        select(User)
+        .options(selectinload(User.orders))   # WYMAGANE w async!
+        .where(User.id == user_id)
+    )
+    return result.scalar_one_or_none()
+
+# BŁĄD — lazy loading poza async context:
+# user = await session.get(User, 1)
+# print(user.orders)  # MissingGreenlet error lub nie zadziała!
+
+# POPRAWNIE — zawsze z opcją ładowania:
+async def get_users_with_all_data(session: AsyncSession) -> list[User]:
+    result = await session.execute(
+        select(User).options(
+            selectinload(User.orders).selectinload(Order.products),
+            selectinload(User.profile),
+        )
+    )
+    return list(result.scalars().unique().all())
+`},{name:`Connection pool i optymalizacja wydajności`,desc:`Pool zarządza wielokrotnym użyciem połączeń do bazy. pool_size + max_overflow to max połączeń równoczesnych. pool_pre_ping sprawdza czy połączenie nie wygasło. Kluczowe dla aplikacji produkcyjnych pod obciążeniem.
+`,code:`from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
+
+# Produkcyjny engine z pełną konfiguracją pool
+async_engine = create_async_engine(
+    DATABASE_URL,
+    pool_size=10,           # stałe połączenia w pool
+    max_overflow=20,        # dodatkowe połączenia przy szczycie
+    pool_timeout=30,        # sekund czekania na wolne połączenie
+    pool_recycle=1800,      # odnawiaj połączenia co 30 minut (zapobiega timeout serwera)
+    pool_pre_ping=True,     # sprawdź połączenie przed użyciem (pg: SELECT 1)
+)
+
+# Dla serverless (Lambda, Cloud Functions) — brak pool, każde wywołanie nowe połączenie
+serverless_engine = create_async_engine(DATABASE_URL, poolclass=NullPool)
+
+# Monitorowanie pool:
+pool = async_engine.pool
+print(f"Aktywne:    {pool.checkedout()}")
+print(f"W pool:     {pool.checkedin()}")
+print(f"Overflow:   {pool.overflow()}")
+`}]},rywale:{title:`SQLAlchemy vs inne ORM`,items:[{name:`Django ORM`,desc:`Wbudowany ORM Django — najprostszy do uruchomienia (zero konfiguracji poza settings.py), ale ściśle powiązany z Django. Poza Django jest praktycznie bezużyteczny. SQLAlchemy jest framework-agnostic i znacznie potężniejszy dla złożonych zapytań.
+`,pros:[`Brak konfiguracji w Django — działa out-of-the-box`,`Automatyczne migracje przez makemigrations/migrate`,`Wbudowany admin panel z modelami`,`Duża społeczność Django`],cons:[`Locked-in do Django — bezużyteczny poza nim`,`Stary styl API (Model.objects.filter) — mniej ekspresywny`,`Trudne złożone zapytania — często trzeba raw SQL`,`Brak async ORM (dopiero eksperymentalnie)`],useWhen:`Budujesz pełny projekt w Django i potrzebujesz admin panelu lub ekosystemu Django.`},{name:`Tortoise ORM`,desc:`Async-first ORM inspirowany Django ORM — zaprojektowany od zera na asyncio. Prosty w użyciu, django-like API, dobry dla FastAPI/asyncio projektów. Mniejsza społeczność i mniej dojrzały niż SQLAlchemy Async.
+`,pros:[`Async-first od początku, bez warstwy sync`,`Prosty, django-like API dla prostych projektów`,`Wbudowane migracje przez aerich`,`Dobra integracja z FastAPI`],cons:[`Mała społeczność vs SQLAlchemy`,`Brak zaawansowanych funkcji (Core, złożone CTE, window functions)`,`Mniej dojrzały ekosystem, mniej driverów`,`Migracje aerich nie tak potężne jak Alembic`],useWhen:`Prosty async projekt gdzie nie potrzebujesz zaawansowanych zapytań.`},{name:`Peewee`,desc:`Lekki, minimalistyczny ORM z prostym API — doskonały do małych projektów i skryptów. Synchroniczny (brak async), ale ma peewee-async wrapper. Znacznie prostszy niż SQLAlchemy — co jest zaletą (mała krzywa uczenia) i wadą (brak zaawansowanych funkcji).
+`,pros:[`Bardzo prosty API — można się nauczyć w jeden dzień`,`Lekki, małe zużycie pamięci`,`Dobry do skryptów i małych aplikacji`,`Wbudowane migracje przez playhouse.migrate`],cons:[`Brak async (peewee-async jest community projekt)`,`Brak zaawansowanych funkcji SQLAlchemy (CTE, window functions)`,`Mało aktywny development`,`Nie nadaje się do dużych projektów`],useWhen:`Małe projekty, CLI tools, skrypty gdzie prostota ważniejsza niż funkcjonalność.`},{name:`Prisma (Python client)`,desc:`Prisma to TypeScript/Node.js ORM z auto-generowanym Python clientem. Schema definiujesz w Prisma Schema Language, a Python client generujesz przez CLI. Bardzo type-safe, ale wymaga Node.js runtime w Python projekcie.
+`,pros:[`Świetny DX — auto-generated type-safe client`,`Async-first (asyncio)`,`Automatyczne migracje przez prisma migrate`,`Dobra dokumentacja`],cons:[`Wymaga Node.js — runtime dependency w Python projekcie`,`Mniejsza społeczność niż SQLAlchemy`,`Mniej kontroli nad SQL — trudne zaawansowane zapytania`,`Świeży Python client — może brakować funkcji`],useWhen:`Projekty gdzie używasz też Node.js/TypeScript i chcesz wspólnego Prisma schema.`},{name:`Raw SQL (psycopg2 / asyncpg)`,desc:`Bezpośrednie SQL bez ORM przez psycopg2 (sync) lub asyncpg (async). Maksymalna kontrola i wydajność, zero overhead ORM. Wymaga pisania wszystkiego ręcznie — mapowania wyników, budowania zapytań, zarządzania transakcjami.
+`,pros:[`Maksymalna kontrola i wydajność`,`Brak overhead ORM — najszybsze możliwe`,`Idealne dla zaawansowanego SQL (window functions, JSONB, specyficzne PostgreSQL)`,`Brak abstrakcji = łatwiejszy debugging`],cons:[`Brak mapowania klas — ręczne row_factory lub dataclasses`,`Podatność na SQL injection (trzeba uważać na paramety)`,`Brak migracji, brak relacji, brak lazy loading`,`Dużo boilerplate`],useWhen:`Data engineering, ETL, skrypty analityczne, sytuacje gdzie ORM overhead niedopuszczalny.`}]},pluginy:{title:`Ekosystem — Alembic, SQLModel i integracje`,items:[{name:`Alembic — migracje bazy danych`,desc:`Alembic to oficjalne narzędzie do migracji SQLAlchemy — wersjonuje schemat bazy przez pliki migracji Python. alembic revision --autogenerate porównuje modele z bazą i generuje diff automatycznie.
+`,code:`# pip install alembic
+
+# Inicjalizacja
+alembic init alembic
+
+# alembic/env.py — podłącz swoje modele:
+from myapp.models import Base
+target_metadata = Base.metadata
+
+# Generuj migrację auto (porównuje modele z bazą)
+alembic revision --autogenerate -m "add users table"
+
+# Zastosuj migracje
+alembic upgrade head
+
+# Cofnij ostatnią
+alembic downgrade -1
+
+# Historia migracji
+alembic history --verbose
+
+# Przykład wygenerowanego pliku migracji:
+def upgrade() -> None:
+    op.add_column("users", sa.Column("phone", sa.String(20), nullable=True))
+    op.create_index("ix_users_phone", "users", ["phone"])
+
+def downgrade() -> None:
+    op.drop_index("ix_users_phone", "users")
+    op.drop_column("users", "phone")
+`},{name:`SQLModel — ORM + Pydantic w jednym`,desc:`SQLModel (od twórcy FastAPI) łączy SQLAlchemy ORM z Pydantic v2 — jeden model klasy służy jako tabela bazy I schema API (request/response). Idealne do FastAPI. Ostrzeżenie: SQLModel to cienka warstwa nad SQLAlchemy, czasem lagging za updates.
+`,code:`# pip install sqlmodel
+
+from sqlmodel import SQLModel, Field, Session, create_engine, select
+from typing import Optional
+
+# Jeden model = tabela bazy + Pydantic schema
+class User(SQLModel, table=True):
+    id:    Optional[int] = Field(default=None, primary_key=True)
+    email: str           = Field(unique=True, index=True)
+    name:  str
+
+# Pydantic schema (bez table=True) — do request/response
+class UserCreate(SQLModel):
+    email: str
+    name:  str
+
+# FastAPI endpoint — SQLModel jako response model
+from fastapi import FastAPI
+app = FastAPI()
+engine = create_engine("sqlite:///./test.db")
+SQLModel.metadata.create_all(engine)
+
+@app.post("/users/", response_model=User)
+def create_user(user: UserCreate):
+    db_user = User.model_validate(user)
+    with Session(engine) as session:
+        session.add(db_user)
+        session.commit()
+        session.refresh(db_user)
+        return db_user
+`},{name:`Flask-SQLAlchemy — integracja z Flask`,desc:`Flask-SQLAlchemy to extension łączący SQLAlchemy z Flask — automatyczny teardown sesji po request, db.session zamiast Session(engine), Migrate dla Alembic integration.
+`,code:`# pip install flask-sqlalchemy flask-migrate
+
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from sqlalchemy.orm import Mapped, mapped_column
+
+app = Flask(__name__)
+app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://user:pass@localhost/mydb"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+
+class User(db.Model):
+    __tablename__ = "users"
+    id:    Mapped[int] = mapped_column(db.Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(db.String(120), unique=True)
+    name:  Mapped[str] = mapped_column(db.String(80))
+
+# Flask-Migrate (Alembic przez Flask CLI):
+# flask db init       — inicjalizacja migrations/
+# flask db migrate -m "add users"
+# flask db upgrade
+
+# Endpoint
+@app.route("/users/")
+def get_users():
+    users = db.session.scalars(db.select(User)).all()
+    return [{"id": u.id, "email": u.email} for u in users]
+`},{name:`Pydantic integracja — serializacja modeli`,desc:`SQLAlchemy modele to nie Pydantic — musisz zmapować ręcznie lub przez SQLModel. Pydantic v2 obsługuje ORM objects przez model_config from_attributes=True. Wzorzec Repository Pattern oddziela logikę DB od API schemas.
+`,code:`from pydantic import BaseModel, ConfigDict
+from sqlalchemy.orm import Session
+
+# Pydantic schema dla API
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id:    int
+    email: str
+    name:  str
+
+class OrderOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id:     int
+    total:  float
+    status: str
+
+class UserWithOrders(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id:     int
+    email:  str
+    orders: list[OrderOut]
+
+# FastAPI endpoint z konwersją SQLAlchemy → Pydantic
+from sqlalchemy.orm import selectinload
+
+@app.get("/users/{user_id}", response_model=UserWithOrders)
+async def get_user(user_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.orders))
+        .where(User.id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(404)
+    return UserWithOrders.model_validate(user)  # ORM → Pydantic
+`},{name:`greenlet i asyncio — pułapki miksowania sync/async`,desc:`Sync SQLAlchemy używa greenlets wewnętrznie. Nigdy nie miksuj sync Session z async kodem (i odwrotnie). run_sync() pozwala uruchomić sync kod wewnątrz async context — przydatne do migracji lub kodu legacy.
+`,code:`from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+
+# BŁĄD — sync Session w async funkcji:
+# async def bad_function():
+#     with Session(sync_engine) as session:  # blokuje event loop!
+#         ...
+
+# POPRAWNIE — zawsze async engine + AsyncSession w async kodzie:
+async def good_function(session: AsyncSession):
+    result = await session.execute(select(User))
+    return result.scalars().all()
+
+# run_sync() — uruchom sync callable wewnątrz async context
+# Przydatne np. do create_all() schema:
+async def create_tables():
+    async with async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+# Migracje Alembic (sync) z async engine — przez connectable:
+# W alembic/env.py:
+from asyncio import run
+from sqlalchemy.ext.asyncio import async_engine_from_config
+
+def run_async_migrations():
+    connectable = async_engine_from_config(config.get_section(config.config_ini_section))
+    async def do_migrations(connection):
+        await connection.run_sync(do_run_migrations)
+    async def main():
+        async with connectable.connect() as connection:
+            await do_migrations(connection)
+    run(main())
+`}]},komendy:{title:`SQLAlchemy — komendy i snippety`,groups:[{name:`Instalacja i konfiguracja`,items:[{cmd:`pip install sqlalchemy psycopg2-binary`,desc:`SQLAlchemy + PostgreSQL sync driver`},{cmd:`pip install sqlalchemy asyncpg`,desc:`SQLAlchemy + PostgreSQL async driver (asyncio)`},{cmd:`pip install sqlalchemy aiosqlite`,desc:`SQLAlchemy + SQLite async driver`},{cmd:`pip install alembic`,desc:`Migracje bazy danych (oficjalne narzędzie SQLAlchemy)`},{cmd:`pip install sqlmodel`,desc:`SQLModel — SQLAlchemy + Pydantic v2 w jednym`}]},{name:`Engine i połączenie`,items:[{cmd:`engine = create_engine('postgresql+psycopg2://user:pass@localhost/mydb', echo=True)`,desc:`Sync engine PostgreSQL z logowaniem SQL`},{cmd:`engine = create_engine('sqlite:///./app.db')`,desc:`SQLite lokalny plik`},{cmd:`engine = create_async_engine('postgresql+asyncpg://user:pass@localhost/mydb')`,desc:`Async engine dla asyncio/FastAPI`},{cmd:`engine.dispose()`,desc:`Zamknij wszystkie połączenia w pool`},{cmd:`with engine.connect() as conn: result = conn.execute(text('SELECT 1'))`,desc:`Test połączenia z bazą (Core level)`}]},{name:`Modele ORM`,items:[{cmd:`class User(Base): id: Mapped[int] = mapped_column(primary_key=True)`,desc:`Definicja modelu (styl 2.0: Mapped + mapped_column)`},{cmd:`Base.metadata.create_all(engine)`,desc:`Utwórz wszystkie tabele (tylko jeśli nie istnieją)`},{cmd:`Base.metadata.drop_all(engine)`,desc:`Usuń wszystkie tabele (DESTRUKCYJNE — tylko dev)`},{cmd:`print(User.__table__.columns.keys())`,desc:`Lista kolumn modelu`},{cmd:`inspect(engine).get_table_names()`,desc:`Lista tabel w bazie danych (inspect z sqlalchemy)`}]},{name:`Session i CRUD`,items:[{cmd:`with Session(engine) as session: session.add(user)`,desc:`Kontekst sesji — automatyczny rollback przy wyjątku`},{cmd:`session.add(user)`,desc:`Dodaj obiekt do sesji (INSERT przy commit)`},{cmd:`session.add_all([u1, u2, u3])`,desc:`Bulk add — lista obiektów`},{cmd:`session.commit()`,desc:`Wyślij wszystkie zmiany do bazy (INSERT/UPDATE/DELETE)`},{cmd:`session.rollback()`,desc:`Cofnij wszystkie niezatwierdzone zmiany`},{cmd:`session.refresh(user)`,desc:`Odśwież obiekt z bazy (po commit, żeby mieć ID)`},{cmd:`session.get(User, user_id)`,desc:`SELECT po primary key — używa identity map cache`},{cmd:`session.delete(user)`,desc:`Usuń obiekt (DELETE przy commit)`},{cmd:`session.expunge(user)`,desc:`Usuń obiekt z sesji bez DELETE`}]},{name:`Zapytania SELECT`,items:[{cmd:`session.scalars(select(User)).all()`,desc:`SELECT * FROM users — lista wszystkich obiektów`},{cmd:`session.scalars(select(User).where(User.email == "x@y.com")).one_or_none()`,desc:`SELECT z warunkiem — jeden lub None`},{cmd:`select(User).where(User.name.like("%Jan%"))`,desc:`LIKE w warunku`},{cmd:`select(User).where(User.id.in_([1, 2, 3]))`,desc:`WHERE id IN (...)`},{cmd:`select(User).order_by(desc(User.created_at)).limit(10).offset(20)`,desc:`ORDER BY + paginacja offset`},{cmd:`session.scalar(select(func.count()).select_from(User))`,desc:`COUNT(*) — liczba rekordów`},{cmd:`select(Order.user_id, func.sum(Order.total).label("sum")).group_by(Order.user_id)`,desc:`GROUP BY z agregacją`}]},{name:`Relacje i eager loading`,items:[{cmd:`select(User).options(selectinload(User.orders))`,desc:`Eager load relacji (2 zapytania — polecany)`},{cmd:`select(User).options(joinedload(User.profile))`,desc:`Eager load przez JOIN (1 zapytanie — dla jeden-do-jeden)`},{cmd:`select(User).options(selectinload(User.orders).selectinload(Order.items))`,desc:`Zagnieżdżony eager load (3 poziomy)`},{cmd:`user.orders.append(order)`,desc:`Dodaj do relacji (INSERT do tabeli asocjacyjnej automatycznie)`},{cmd:`user.orders.remove(order)`,desc:`Usuń z relacji (delete-orphan cascade jeśli ustawione)`}]},{name:`UPDATE i DELETE przez SQL`,items:[{cmd:`session.execute(update(User).where(User.id == 5).values(name="Nowe"))`,desc:`UPDATE bez ładowania obiektu — jeden SQL`},{cmd:`session.execute(update(User).where(User.is_active == False).values(deleted_at=func.now()))`,desc:`Bulk UPDATE na wielu rekordach`},{cmd:`session.execute(delete(Order).where(Order.status == "cancelled"))`,desc:`DELETE bez ładowania obiektów`},{cmd:`result.rowcount`,desc:`Liczba zmodyfikowanych wierszy po UPDATE/DELETE`}]},{name:`Alembic — migracje`,items:[{cmd:`alembic init alembic`,desc:`Inicjalizacja — tworzy katalog alembic/ i alembic.ini`},{cmd:`alembic revision --autogenerate -m "add users table"`,desc:`Generuj migrację — porównuje modele z bazą (autogenerate)`},{cmd:`alembic revision -m "custom change"`,desc:`Pusta migracja — wypełnij upgrade/downgrade ręcznie`},{cmd:`alembic upgrade head`,desc:`Zastosuj wszystkie migracje (do najnowszej)`},{cmd:`alembic upgrade +1`,desc:`Zastosuj jedną migrację do przodu`},{cmd:`alembic downgrade -1`,desc:`Cofnij ostatnią migrację`},{cmd:`alembic downgrade base`,desc:`Cofnij wszystkie migracje (czysta baza)`},{cmd:`alembic current`,desc:`Pokaż aktualną wersję migracji w bazie`},{cmd:`alembic history --verbose`,desc:`Historia wszystkich migracji`},{cmd:`alembic show head`,desc:`Pokaż najnowszą migrację`}]},{name:`Async SQLAlchemy`,items:[{cmd:`AsyncSessionLocal = async_sessionmaker(async_engine, expire_on_commit=False)`,desc:`Fabryka sesji async — expire_on_commit=False kluczowe dla FastAPI`},{cmd:`async with AsyncSessionLocal() as session: ...`,desc:`Async context manager dla sesji`},{cmd:`result = await session.execute(select(User))`,desc:`Async SELECT — zawsze await`},{cmd:`await session.commit()`,desc:`Async commit`},{cmd:`await session.refresh(user)`,desc:`Async refresh po commit`},{cmd:`await conn.run_sync(Base.metadata.create_all)`,desc:`Uruchom sync create_all wewnątrz async context`}]},{name:`Inspekcja i debugging`,items:[{cmd:`print(select(User).where(User.id == 1).compile(compile_kwargs={"literal_binds": True}))`,desc:`Wydrukuj wygenerowany SQL z wartościami`},{cmd:`engine = create_engine(url, echo=True)`,desc:`Loguj każde zapytanie SQL do stdout`},{cmd:`from sqlalchemy import event; @event.listens_for(engine, "before_cursor_execute") def before(conn, cursor, statement, ...)`,desc:`Hook na każde zapytanie SQL (custom logging, timing)`},{cmd:`session.identity_map.items()`,desc:`Pokaż wszystkie obiekty w identity map sesji`},{cmd:`from sqlalchemy import inspect; mapper = inspect(User); print([c.key for c in mapper.columns])`,desc:`Inspekcja modelu — kolumny, relacje, właściwości`}]}]}}},Y=`podstawy`,Bn=`react`,Vn={react:Xt,fastapi:Qt,pytest:en,requests:nn,beautifulsoup:an,asyncio:sn,git:ln,docker:dn,pyautogui:pn,mcp:hn,aws:_n,postgresql:yn,redis:xn,terraform:Cn,cicd:Tn,wsl:Dn,langgraph:kn,kubernetes:jn,flask:Nn,openaisdk:Fn,anthropicsdk:Ln,sqlalchemy:zn};function Hn(e){let t=document.getElementById(`fw-detail-overlay`);if(!t)return;let n=e.name.toLowerCase().replace(/[^a-z0-9]/g,``);Bn=n,Y=`podstawy`;let r=Vn[n]||null,i=e.color||`#61dafb`,a=r&&r.meta&&r.meta.color2?r.meta.color2:i;t.style.setProperty(`--fw-color`,i),t.style.setProperty(`--fw-color-2`,a),r?Wn(e,r,t):Gn(e,t),t.classList.add(`fw-detail--visible`),document.addEventListener(`keydown`,X)}function Un(){let e=document.getElementById(`fw-detail-overlay`);e&&e.classList.remove(`fw-detail--visible`),document.removeEventListener(`keydown`,X)}function X(e){e.key===`Escape`&&(document.getElementById(`fwd-cmd-modal`)?.classList.contains(`fwd-cmd-modal--visible`)||Un())}function Wn(e,t,n){Gt(t.content.komendy||null);let r=t.meta&&t.meta.icon?t.meta.icon:e.icon,i=t.tabs.map(e=>`<button class="fwd-tab`+(e.id===Y?` active`:``)+`" onclick="switchDetailTab('`+e.id+`')">`+e.label+`</button>`).join(``);n.innerHTML=`<div class="fwd-header"><button class="fwd-back-btn" onclick="closeDetailPage()">← Powrót</button><div class="fwd-header-icon">`+r+`</div><div class="fwd-header-info"><div class="fwd-header-name" style="background:linear-gradient(90deg,var(--fw-color),var(--fw-color-2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">`+t.meta.name+`</div><div class="fwd-header-tagline">`+t.meta.tagline+`</div></div><div class="fwd-header-badges"><span class="fwd-badge">`+t.meta.lang+`</span><span class="fwd-badge">od `+t.meta.year+`</span><span class="fwd-badge">⭐ `+t.meta.stars+`</span></div></div><div class="fwd-tabs">`+i+`</div><div class="fwd-content" id="fwd-content"></div>`,Jn(Y,t)}function Gn(e,t){t.innerHTML=`<div class="fwd-header"><button class="fwd-back-btn" onclick="closeDetailPage()">← Powrót</button><div class="fwd-header-icon">`+e.icon+`</div><div class="fwd-header-info"><div class="fwd-header-name" style="color:`+(e.color||`#888`)+`">`+e.name+`</div><div class="fwd-header-tagline">`+e.desc+`</div></div></div><div class="fwd-content"><div class="fwd-coming-soon"><div class="fwd-coming-icon">`+e.icon+`</div><div>Szczegóły <strong>`+e.name+`</strong> wkrótce...</div></div></div>`}function Kn(e){Y=e,document.querySelectorAll(`.fwd-tab`).forEach(e=>e.classList.remove(`active`));let t=document.querySelector(`.fwd-tab[onclick*="'`+e+`'"]`);t&&t.classList.add(`active`);let n=Vn[Bn];n&&Jn(e,n)}function Z(e){return e&&Array.isArray(e.items)}function qn(e){return e&&Array.isArray(e.items)&&e.items.length>0&&e.items[0].tagline!==void 0}function Jn(e,t){let n=document.getElementById(`fwd-content`);if(!n)return;n.scrollTop=0;let r=t.meta||{};switch(e){case`podstawy`:n.innerHTML=It(t.content.podstawy,r);break;case`komponenty`:n.innerHTML=Z(t.content.komponenty)?K(t.content.komponenty,r):Lt(t.content.komponenty,r);break;case`hooki`:n.innerHTML=Z(t.content.hooki)?K(t.content.hooki,r):Rt(t.content.hooki);break;case`routing`:n.innerHTML=Z(t.content.routing)?K(t.content.routing,r):zt(t.content.routing,r);break;case`state`:n.innerHTML=Z(t.content.state)?K(t.content.state,r):Bt(t.content.state);break;case`rywale`:n.innerHTML=qn(t.content.rywale)?Ht(t.content.rywale):Z(t.content.rywale)?K(t.content.rywale,r):Vt(t.content.rywale);break;case`pluginy`:n.innerHTML=Z(t.content.pluginy)?K(t.content.pluginy,r):Ut(t.content.pluginy);break;case`komendy`:n.innerHTML=Wt(t.content.komendy);break;default:n.innerHTML=`<div class="fwd-coming-soon"><div>Wkrótce...</div></div>`}}document.addEventListener(`DOMContentLoaded`,function(){if(!document.getElementById(`fw-detail-overlay`)){let e=document.createElement(`div`);e.id=`fw-detail-overlay`,document.body.appendChild(e)}});var Yn={from:{opis:`Importuje konkretną funkcję lub klasę z modułu.`,przyklad:`from os import path`,kat:`słowo kluczowe`},import:{opis:`Ładuje moduł (bibliotekę) żebyś mógł użyć jego funkcji.`,przyklad:`import os`,kat:`słowo kluczowe`},def:{opis:`Definiuje nową funkcję — blok kodu który można wielokrotnie wywoływać.`,przyklad:`def powitaj(imie): ...`,kat:`słowo kluczowe`},return:{opis:`Kończy funkcję i zwraca wartość do miejsca wywołania.`,przyklad:`return wynik`,kat:`słowo kluczowe`},if:{opis:`Sprawdza warunek — kod w środku wykona się tylko gdy warunek jest prawdziwy.`,przyklad:`if x > 0: ...`,kat:`słowo kluczowe`},else:{opis:`Wykonuje się gdy żaden wcześniejszy if/elif nie był prawdziwy.`,przyklad:`else: ...`,kat:`słowo kluczowe`},elif:{opis:`Sprawdza kolejny warunek gdy poprzedni if był fałszywy.`,przyklad:`elif x == 0: ...`,kat:`słowo kluczowe`},for:{opis:`Pętla — powtarza blok kodu dla każdego elementu w kolekcji.`,przyklad:`for element in lista: ...`,kat:`słowo kluczowe`},while:{opis:`Pętla — powtarza blok kodu dopóki warunek jest prawdziwy.`,przyklad:`while x > 0: ...`,kat:`słowo kluczowe`},with:{opis:`Otwiera zasób (np. plik) i automatycznie go zamyka po wyjściu z bloku.`,przyklad:`with open('plik.txt') as f: ...`,kat:`słowo kluczowe`},try:{opis:`Blok kodu który może rzucić wyjątek — Python próbuje go wykonać.`,przyklad:`try: ...`,kat:`słowo kluczowe`},except:{opis:`Łapie wyjątek (błąd) i pozwala go obsłużyć zamiast zatrzymywać program.`,przyklad:`except ValueError as e: ...`,kat:`słowo kluczowe`},raise:{opis:`Rzuca wyjątek — sygnalizuje że coś poszło nie tak.`,przyklad:`raise ValueError('Zła wartość')`,kat:`słowo kluczowe`},class:{opis:`Definiuje nową klasę — szablon do tworzenia obiektów.`,przyklad:`class Samochod: ...`,kat:`słowo kluczowe`},lambda:{opis:`Tworzy małą anonimową funkcję w jednej linii.`,przyklad:`podwoj = lambda x: x * 2`,kat:`słowo kluczowe`},yield:{opis:`Zwraca wartość z generatora i pauzuje funkcję — nie kończy jej jak return.`,przyklad:`yield wartosc`,kat:`słowo kluczowe`},async:{opis:`Oznacza funkcję jako asynchroniczną — może być wstrzymana bez blokowania.`,przyklad:`async def pobierz(): ...`,kat:`słowo kluczowe`},await:{opis:`Czeka na wynik asynchronicznej operacji nie blokując reszty programu.`,przyklad:`dane = await pobierz()`,kat:`słowo kluczowe`},in:{opis:`Sprawdza czy element należy do kolekcji.`,przyklad:`if 'a' in 'abc': ...`,kat:`słowo kluczowe`},not:{opis:`Odwraca wartość logiczną — True staje się False i odwrotnie.`,przyklad:`not True  # → False`,kat:`słowo kluczowe`},and:{opis:`Logiczne I — True tylko gdy oba warunki są prawdziwe.`,przyklad:`if x > 0 and x < 10: ...`,kat:`słowo kluczowe`},or:{opis:`Logiczne LUB — True gdy choć jeden warunek jest prawdziwy.`,przyklad:`if x < 0 or x > 100: ...`,kat:`słowo kluczowe`},as:{opis:`Nadaje alias — krótszą nazwę importowanemu modułowi lub wyjątkowi.`,przyklad:`import numpy as np`,kat:`słowo kluczowe`},pass:{opis:`Nic nie robi — placeholder gdy składnia wymaga bloku kodu.`,przyklad:`def todo(): pass`,kat:`słowo kluczowe`},break:{opis:`Natychmiast kończy pętlę for lub while.`,przyklad:`if x == 5: break`,kat:`słowo kluczowe`},continue:{opis:`Pomija resztę bieżącej iteracji i przechodzi do następnej.`,przyklad:`if x < 0: continue`,kat:`słowo kluczowe`},del:{opis:`Usuwa zmienną, element listy lub atrybut obiektu z pamięci.`,przyklad:`del lista[0]`,kat:`słowo kluczowe`},global:{opis:`Mówi że zmienna wewnątrz funkcji to ta sama co na poziomie modułu.`,przyklad:`global licznik`,kat:`słowo kluczowe`},True:{opis:`Wartość logiczna 'prawda'.`,przyklad:`x = True`,kat:`słowo kluczowe`},False:{opis:`Wartość logiczna 'fałsz'.`,przyklad:`x = False`,kat:`słowo kluczowe`},None:{opis:`Reprezentuje brak wartości — jak 'nic'. Funkcje bez return zwracają None.`,przyklad:`x = None`,kat:`słowo kluczowe`},print:{opis:`Wyświetla tekst lub wartości na ekranie.`,przyklad:`print('Witaj świecie')`,kat:`funkcja wbudowana`},len:{opis:`Zwraca liczbę elementów w liście, tekście lub innej kolekcji.`,przyklad:`len([1, 2, 3])  # → 3`,kat:`funkcja wbudowana`},range:{opis:`Generuje ciąg liczb całkowitych. Używany w pętlach for.`,przyklad:`range(0, 10)  # → 0..9`,kat:`funkcja wbudowana`},int:{opis:`Zamienia wartość na liczbę całkowitą.`,przyklad:`int('42')  # → 42`,kat:`funkcja wbudowana`},str:{opis:`Zamienia wartość na tekst.`,przyklad:`str(42)  # → '42'`,kat:`funkcja wbudowana`},float:{opis:`Zamienia wartość na liczbę zmiennoprzecinkową.`,przyklad:`float('3.14')  # → 3.14`,kat:`funkcja wbudowana`},bool:{opis:`Zamienia wartość na True lub False.`,przyklad:`bool(0)  # → False`,kat:`funkcja wbudowana`},list:{opis:`Tworzy listę — modyfikowalną kolekcję elementów.`,przyklad:`list('abc')  # → ['a','b','c']`,kat:`funkcja wbudowana`},dict:{opis:`Tworzy słownik — strukturę par klucz:wartość.`,przyklad:`dict(imie='Jan')`,kat:`funkcja wbudowana`},set:{opis:`Tworzy zbiór unikalnych elementów.`,przyklad:`set([1,2,2,3])  # → {1,2,3}`,kat:`funkcja wbudowana`},tuple:{opis:`Tworzy krotkę — niemodyfikowalną listę.`,przyklad:`tuple([1,2,3])  # → (1,2,3)`,kat:`funkcja wbudowana`},type:{opis:`Zwraca typ (klasę) obiektu.`,przyklad:`type(42)  # → <class 'int'>`,kat:`funkcja wbudowana`},isinstance:{opis:`Sprawdza czy obiekt jest określonego typu.`,przyklad:`isinstance(42, int)  # → True`,kat:`funkcja wbudowana`},enumerate:{opis:`Dodaje licznik do iteracji — zwraca pary (indeks, wartość).`,przyklad:`for i, v in enumerate(lista): ...`,kat:`funkcja wbudowana`},zip:{opis:`Łączy wiele list w pary — jak zamek błyskawiczny.`,przyklad:`zip([1,2],[3,4])  # → [(1,3),(2,4)]`,kat:`funkcja wbudowana`},map:{opis:`Stosuje funkcję do każdego elementu listy.`,przyklad:`list(map(str, [1,2,3]))`,kat:`funkcja wbudowana`},filter:{opis:`Filtruje listę — zostawia tylko elementy dla których funkcja zwraca True.`,przyklad:`list(filter(lambda x: x>0, lista))`,kat:`funkcja wbudowana`},sorted:{opis:`Zwraca nową posortowaną listę nie zmieniając oryginału.`,przyklad:`sorted([3,1,2])  # → [1,2,3]`,kat:`funkcja wbudowana`},reversed:{opis:`Zwraca iterator przechodzący przez sekwencję od końca.`,przyklad:`list(reversed([1,2,3]))`,kat:`funkcja wbudowana`},sum:{opis:`Sumuje wszystkie elementy listy.`,przyklad:`sum([1,2,3,4])  # → 10`,kat:`funkcja wbudowana`},min:{opis:`Zwraca najmniejszą wartość z listy.`,przyklad:`min([3,1,4])  # → 1`,kat:`funkcja wbudowana`},max:{opis:`Zwraca największą wartość z listy.`,przyklad:`max([3,1,4])  # → 4`,kat:`funkcja wbudowana`},abs:{opis:`Zwraca wartość bezwzględną liczby.`,przyklad:`abs(-5)  # → 5`,kat:`funkcja wbudowana`},round:{opis:`Zaokrągla liczbę do podanej liczby miejsc.`,przyklad:`round(3.14159, 2)  # → 3.14`,kat:`funkcja wbudowana`},open:{opis:`Otwiera plik do czytania lub pisania.`,przyklad:`with open('plik.txt', 'r') as f: ...`,kat:`funkcja wbudowana`},input:{opis:`Zatrzymuje program i czeka na wpisanie tekstu przez użytkownika.`,przyklad:`imie = input('Podaj imię: ')`,kat:`funkcja wbudowana`},super:{opis:`Daje dostęp do metod klasy nadrzędnej. Używane przy dziedziczeniu.`,przyklad:`super().__init__()`,kat:`funkcja wbudowana`},hasattr:{opis:`Sprawdza czy obiekt posiada dany atrybut.`,przyklad:`hasattr(obiekt, 'metoda')`,kat:`funkcja wbudowana`},getattr:{opis:`Pobiera wartość atrybutu obiektu po jego nazwie jako tekście.`,przyklad:`getattr(obiekt, 'nazwa', domyslna)`,kat:`funkcja wbudowana`},setattr:{opis:`Ustawia wartość atrybutu obiektu po nazwie.`,przyklad:`setattr(obiekt, 'nazwa', wartosc)`,kat:`funkcja wbudowana`},connect:{opis:`Otwiera połączenie z bazą danych SQLite pod podaną ścieżką.`,przyklad:`sqlite3.connect('baza.db')`,kat:`metoda`},execute:{opis:`Wykonuje zapytanie SQL na bazie danych.`,przyklad:`conn.execute('SELECT * FROM users')`,kat:`metoda`},fetchall:{opis:`Pobiera wszystkie wyniki zapytania SQL jako listę.`,przyklad:`rows = cursor.fetchall()`,kat:`metoda`},fetchone:{opis:`Pobiera jeden wynik zapytania SQL.`,przyklad:`row = cursor.fetchone()`,kat:`metoda`},append:{opis:`Dodaje element na koniec listy.`,przyklad:`lista.append(42)`,kat:`metoda listy`},extend:{opis:`Dodaje wszystkie elementy innej listy na koniec.`,przyklad:`lista.extend([4,5,6])`,kat:`metoda listy`},items:{opis:`Zwraca pary (klucz, wartość) słownika — idealne do iteracji.`,przyklad:`for k, v in slownik.items(): ...`,kat:`metoda słownika`},keys:{opis:`Zwraca wszystkie klucze słownika.`,przyklad:`slownik.keys()`,kat:`metoda słownika`},values:{opis:`Zwraca wszystkie wartości słownika.`,przyklad:`slownik.values()`,kat:`metoda słownika`},get:{opis:`Pobiera wartość klucza. Zwraca None gdy klucz nie istnieje.`,przyklad:`slownik.get('klucz', 'domyslna')`,kat:`metoda słownika`},update:{opis:`Aktualizuje słownik danymi z innego słownika.`,przyklad:`slownik.update({'nowy': 1})`,kat:`metoda słownika`},split:{opis:`Dzieli tekst na listę fragmentów według separatora.`,przyklad:`'a,b,c'.split(',')  # → ['a','b','c']`,kat:`metoda tekstu`},join:{opis:`Łączy elementy listy w jeden tekst ze separatorem.`,przyklad:`', '.join(['a','b','c'])`,kat:`metoda tekstu`},strip:{opis:`Usuwa białe znaki z początku i końca tekstu.`,przyklad:`'  hello  '.strip()  # → 'hello'`,kat:`metoda tekstu`},replace:{opis:`Zamienia wszystkie wystąpienia fragmentu tekstu na inny.`,przyklad:`'hello world'.replace('world','Python')`,kat:`metoda tekstu`},format:{opis:`Wstawia wartości w miejsca {} w tekście.`,przyklad:`'{} ma {} lat'.format('Jan', 30)`,kat:`metoda tekstu`},lower:{opis:`Zamienia wszystkie litery na małe.`,przyklad:`'HELLO'.lower()  # → 'hello'`,kat:`metoda tekstu`},upper:{opis:`Zamienia wszystkie litery na WIELKIE.`,przyklad:`'hello'.upper()  # → 'HELLO'`,kat:`metoda tekstu`},startswith:{opis:`Sprawdza czy tekst zaczyna się od podanego fragmentu.`,przyklad:`'hello'.startswith('he')  # → True`,kat:`metoda tekstu`},endswith:{opis:`Sprawdza czy tekst kończy się podanym fragmentem.`,przyklad:`'hello'.endswith('lo')  # → True`,kat:`metoda tekstu`},os:{opis:`Operacje na systemie plików — ścieżki, foldery, zmienne środowiskowe.`,przyklad:`os.path.join('folder', 'plik.txt')`,kat:`moduł`},sys:{opis:`Informacje o interpreterze — argumenty, wyjście, ścieżki importu.`,przyklad:`sys.argv  # → argumenty z linii poleceń`,kat:`moduł`},json:{opis:`Czytanie i zapisywanie danych w formacie JSON.`,przyklad:`json.dumps({'a': 1})  # → '{"a": 1}'`,kat:`moduł`},re:{opis:`Wyrażenia regularne — zaawansowane wyszukiwanie wzorców w tekście.`,przyklad:`re.findall(r'\\d+', 'abc123')`,kat:`moduł`},random:{opis:`Generowanie liczb losowych i losowe wybieranie elementów.`,przyklad:`random.choice(['a','b','c'])`,kat:`moduł`},datetime:{opis:`Praca z datami i czasem — tworzenie, formatowanie, różnice.`,przyklad:`datetime.now().strftime('%Y-%m-%d')`,kat:`moduł`},time:{opis:`Funkcje czasu — mierzenie, wstrzymywanie programu.`,przyklad:`time.sleep(1)  # czekaj 1 sekundę`,kat:`moduł`},math:{opis:`Funkcje matematyczne — pierwiastki, logarytmy, trygonometria.`,przyklad:`math.sqrt(16)  # → 4.0`,kat:`moduł`},sqlite3:{opis:`Wbudowana baza danych SQLite — prosta baza w jednym pliku.`,przyklad:`sqlite3.connect('baza.db')`,kat:`moduł`},Flask:{opis:`Klasa tworząca aplikację webową Flask. Punkt startowy każdej aplikacji Flask.`,przyklad:`app = Flask(__name__)`,kat:`Flask`},jsonify:{opis:`Zamienia słownik Pythona na odpowiedź HTTP w formacie JSON.`,przyklad:`return jsonify({'status': 'ok'})`,kat:`Flask`},route:{opis:`Dekorator Flask — przypisuje funkcję do konkretnego adresu URL.`,przyklad:`@app.route('/users')`,kat:`Flask`},request:{opis:`Obiekt Flask zawierający dane przychodzącego żądania HTTP.`,przyklad:`request.json  # → dane z body`,kat:`Flask`}},Q=document.getElementById(`dictTooltip`),Xn=document.getElementById(`dictTooltipLabel`),Zn=document.getElementById(`dictTooltipOpis`),Qn=document.getElementById(`dictTooltipPrzyklad`);function $n(){document.querySelectorAll(`.kw, .fn`).forEach(function(e){let t=e.textContent.trim();Yn[t]&&(e.setAttribute(`data-dict`,t),e.addEventListener(`mouseenter`,e=>er(e,t)),e.addEventListener(`mouseleave`,rr))})}function er(e,t){let n=Yn[t];Xn.textContent=n.kat+` · `+t,Zn.textContent=n.opis,Qn.textContent=n.przyklad,Q.style.display=`block`,tr(e)}function tr(e){nr(e.clientX,e.clientY),document.addEventListener(`mousemove`,$,{passive:!0})}function nr(e,t){let n=e+16,r=t-10,i=Q.offsetWidth,a=Q.offsetHeight;Q.style.left=(n+i>window.innerWidth?n-i-32:n)+`px`,Q.style.top=(r+a>window.innerHeight?r-a:r)+`px`}function $(e){if(Q.style.display===`none`){document.removeEventListener(`mousemove`,$);return}nr(e.clientX,e.clientY)}function rr(){Q.style.display=`none`,document.removeEventListener(`mousemove`,$)}document.addEventListener(`DOMContentLoaded`,function(){$n();let e=document.getElementById(`editor`)||document.body;new MutationObserver($n).observe(e,{childList:!0,subtree:!0})}),u({addToHistoria:he,resetDeadCode:qe,resetBadPatterns:ct,prefetchAll:wt}),ue({highlightLine:ee,renderEditor:f,getOriginalCodeText:d,resetDeadCode:qe,resetBadPatterns:ct,applyDeadCodeResults:D,applyBadPatternResults:k}),ye({getOriginalCodeText:d,addToHistoria:he}),Ae({getOriginalCodeText:d,saveHistoria:_}),Be({getOriginalCodeText:d,saveHistoria:_,refreshHistoriaIfVisible:v}),Ze({getOriginalCodeText:d,saveHistoria:_,refreshHistoriaIfVisible:v}),_t({renderujArchiwum:bt,clearDeadCodeHighlights:O,clearBadPatternHighlights:A}),Ct({saveHistoria:_,refreshHistoriaIfVisible:v}),jt({openFramework:Hn}),Object.assign(window,{showApp:Mt,onFwSearch:Pt,clearFwSearch:W,openFramework:Hn,closeDetailPage:Un,switchDetailTab:Kn,onFwDetailEscape:X,openCmdModal:Kt,closeCmdModal:J,copyCmdText:Jt,openTranslator:be,closeTranslator:xe,toggleWand:Ee,openTranslatorFromHistoria:Oe,openVivisekcja:je,closeVivisekcja:Me,toggleDeadCode:Ve,highlightDeadLines:Ke,toggleBadPatterns:tt,highlightBadPatternLines:st,handleFileUpload:m,switchEditorTab:N,handleAnalizuj:ft,selectMode:lt,setActive:yt,switchTab:vt,sendAI:P,showHistoria:y,showHistoriaDetail:pe,loadKodFromHistoria:ge,pokazModal:xt,zamknijModal:St});

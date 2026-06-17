@@ -1,0 +1,87 @@
+title: SQLAlchemy vs inne ORM
+
+items:
+  - name: Django ORM
+    desc: >
+      Wbudowany ORM Django — najprostszy do uruchomienia (zero konfiguracji poza settings.py),
+      ale ściśle powiązany z Django. Poza Django jest praktycznie bezużyteczny.
+      SQLAlchemy jest framework-agnostic i znacznie potężniejszy dla złożonych zapytań.
+    pros:
+      - Brak konfiguracji w Django — działa out-of-the-box
+      - Automatyczne migracje przez makemigrations/migrate
+      - Wbudowany admin panel z modelami
+      - Duża społeczność Django
+    cons:
+      - Locked-in do Django — bezużyteczny poza nim
+      - Stary styl API (Model.objects.filter) — mniej ekspresywny
+      - Trudne złożone zapytania — często trzeba raw SQL
+      - Brak async ORM (dopiero eksperymentalnie)
+    useWhen: Budujesz pełny projekt w Django i potrzebujesz admin panelu lub ekosystemu Django.
+
+  - name: Tortoise ORM
+    desc: >
+      Async-first ORM inspirowany Django ORM — zaprojektowany od zera na asyncio.
+      Prosty w użyciu, django-like API, dobry dla FastAPI/asyncio projektów.
+      Mniejsza społeczność i mniej dojrzały niż SQLAlchemy Async.
+    pros:
+      - Async-first od początku, bez warstwy sync
+      - Prosty, django-like API dla prostych projektów
+      - Wbudowane migracje przez aerich
+      - Dobra integracja z FastAPI
+    cons:
+      - Mała społeczność vs SQLAlchemy
+      - Brak zaawansowanych funkcji (Core, złożone CTE, window functions)
+      - Mniej dojrzały ekosystem, mniej driverów
+      - Migracje aerich nie tak potężne jak Alembic
+    useWhen: Prosty async projekt gdzie nie potrzebujesz zaawansowanych zapytań.
+
+  - name: Peewee
+    desc: >
+      Lekki, minimalistyczny ORM z prostym API — doskonały do małych projektów i skryptów.
+      Synchroniczny (brak async), ale ma peewee-async wrapper. Znacznie prostszy niż
+      SQLAlchemy — co jest zaletą (mała krzywa uczenia) i wadą (brak zaawansowanych funkcji).
+    pros:
+      - Bardzo prosty API — można się nauczyć w jeden dzień
+      - Lekki, małe zużycie pamięci
+      - Dobry do skryptów i małych aplikacji
+      - Wbudowane migracje przez playhouse.migrate
+    cons:
+      - Brak async (peewee-async jest community projekt)
+      - Brak zaawansowanych funkcji SQLAlchemy (CTE, window functions)
+      - Mało aktywny development
+      - Nie nadaje się do dużych projektów
+    useWhen: Małe projekty, CLI tools, skrypty gdzie prostota ważniejsza niż funkcjonalność.
+
+  - name: Prisma (Python client)
+    desc: >
+      Prisma to TypeScript/Node.js ORM z auto-generowanym Python clientem. Schema
+      definiujesz w Prisma Schema Language, a Python client generujesz przez CLI.
+      Bardzo type-safe, ale wymaga Node.js runtime w Python projekcie.
+    pros:
+      - Świetny DX — auto-generated type-safe client
+      - Async-first (asyncio)
+      - Automatyczne migracje przez prisma migrate
+      - Dobra dokumentacja
+    cons:
+      - Wymaga Node.js — runtime dependency w Python projekcie
+      - Mniejsza społeczność niż SQLAlchemy
+      - Mniej kontroli nad SQL — trudne zaawansowane zapytania
+      - Świeży Python client — może brakować funkcji
+    useWhen: Projekty gdzie używasz też Node.js/TypeScript i chcesz wspólnego Prisma schema.
+
+  - name: Raw SQL (psycopg2 / asyncpg)
+    desc: >
+      Bezpośrednie SQL bez ORM przez psycopg2 (sync) lub asyncpg (async). Maksymalna
+      kontrola i wydajność, zero overhead ORM. Wymaga pisania wszystkiego ręcznie —
+      mapowania wyników, budowania zapytań, zarządzania transakcjami.
+    pros:
+      - Maksymalna kontrola i wydajność
+      - Brak overhead ORM — najszybsze możliwe
+      - Idealne dla zaawansowanego SQL (window functions, JSONB, specyficzne PostgreSQL)
+      - Brak abstrakcji = łatwiejszy debugging
+    cons:
+      - Brak mapowania klas — ręczne row_factory lub dataclasses
+      - Podatność na SQL injection (trzeba uważać na paramety)
+      - Brak migracji, brak relacji, brak lazy loading
+      - Dużo boilerplate
+    useWhen: 'Data engineering, ETL, skrypty analityczne, sytuacje gdzie ORM overhead niedopuszczalny.'
