@@ -1,0 +1,85 @@
+title: LlamaIndex vs inne frameworki RAG
+
+items:
+  - name: LangChain
+    desc: >
+      LangChain to szerszy framework do aplikacji LLM — RAG, agenci, łańcuchy.
+      LlamaIndex specjalizuje się wyłącznie w RAG i danych. LlamaIndex ma lepsze
+      abstrakcje do ingestion (pipeline, loaders), LangChain ma szerszy ekosystem
+      integracji (chains, memory, callbacks).
+    pros:
+      - Ogromny ekosystem — 800+ integracji
+      - LangGraph do agentów jako grafy
+      - LCEL — deklaratywne łańcuchy komponentów
+      - Ogromna społeczność i dokumentacja
+    cons:
+      - Skomplikowane abstrakcje, trudna debugowalność
+      - Częste breaking changes między wersjami
+      - RAG jest jedną z wielu funkcji, nie priorytetem
+      - Nadmiarowość — często prościej bez LangChain
+    useWhen: Potrzebujesz agentów (LangGraph) lub szerokiej integracji z zewnętrznymi systemami.
+
+  - name: Haystack (deepset)
+    desc: >
+      Haystack to enterprise-grade framework RAG od deepset — projektowany pod
+      produkcyjne wdrożenia w firmach. Pipeline-first podejście, silny nacisk na
+      ewaluację i testowanie. Mniejsza społeczność niż LlamaIndex, ale bardziej
+      stabilne API.
+    pros:
+      - Pipeline-first — bardzo czytelna architektura
+      - Silne wsparcie dla ewaluacji (RAGAS integracja)
+      - Stabilne API — mniej breaking changes
+      - Dobra dokumentacja enterprise patterns
+    cons:
+      - Mniej data loaderów niż LlamaIndex (160+ vs ~50)
+      - Mniejsza społeczność
+      - Mniej przykładów i tutoriali
+      - Wolniejszy rozwój nowych funkcji
+    useWhen: Enterprise RAG gdzie priorytetem jest stabilność, ewaluacja i produkcyjna niezawodność.
+
+  - name: Ragas (ewaluacja RAG)
+    desc: >
+      Ragas to biblioteka wyłącznie do ewaluacji RAG — nie buduje pipeline'ów,
+      tylko mierzy ich jakość. Metryki: faithfulness, answer relevancy, context recall.
+      Uzupełnienie LlamaIndex (LlamaIndex buduje, Ragas ocenia).
+    pros:
+      - Dedykowane, precyzyjne metryki RAG
+      - Integracja z LlamaIndex i LangChain
+      - Gotowe benchmarki do porównywania konfiguracji
+      - Automatyczne generowanie testowych datasetów
+    cons:
+      - Tylko ewaluacja — nie buduje RAG
+      - Ewaluacja przez LLM = dodatkowe koszty API
+      - Może dawać fałszywe wyniki dla innych języków niż EN
+    useWhen: Mierzenie jakości RAG pipeline i porównywanie różnych konfiguracji (chunk size, embedding model).
+
+  - name: Chroma / Pinecone / Weaviate (vector stores)
+    desc: >
+      Vector stores to bazy danych dla embeddingów — nie robią RAG, tylko przechowują
+      i wyszukują wektory. LlamaIndex używa ich jako backend. ChromaDB (lokalne/cloud),
+      Pinecone (cloud, managed), Weaviate (open source, self-hosted lub cloud).
+    pros:
+      - Chroma — zero konfiguracji, świetny do dev/small scale
+      - Pinecone — managed, skaluje do miliardów wektorów, SLA
+      - Weaviate — open source, hybrid search (semantic + keyword) wbudowane
+    cons:
+      - Chroma — ograniczona skalowalność w produkcji
+      - Pinecone — kosztowny przy dużej skali
+      - Weaviate — self-hosting wymaga DevOps
+    useWhen: 'Chroma do dev i MVP, Pinecone do managed produkcji, Weaviate do self-hosted enterprise.'
+
+  - name: Surowe embeddings (bez frameworka)
+    desc: >
+      Bezpośrednie użycie OpenAI/Anthropic embeddings + pgvector/Chroma + własny kod.
+      Maksymalna kontrola, zero magii. Dobre do bardzo specyficznych przypadków.
+      Ale: dużo boilerplate (chunking, metadata, retrieval, synthesis — wszystko ręcznie).
+    pros:
+      - Pełna kontrola nad każdym krokiem
+      - Zero overhead frameworka
+      - Łatwiejszy debugging — widzisz dokładnie co się dzieje
+      - Brak vendor lock-in na framework
+    cons:
+      - Dużo boilerplate — implementujesz chunking, retrieval, synthesis od zera
+      - Brak wbudowanych loaderów, ewaluacji, retry logic
+      - Wolniejszy development
+    useWhen: Bardzo specyficzne wymagania których żaden framework nie spełnia, lub gdy uczoność jest celem.

@@ -1,0 +1,179 @@
+title: Query Pipeline i Async — zaawansowane wzorce
+
+items:
+  - name: QueryPipeline — łańcuchy komponentów
+    desc: >
+      QueryPipeline (QP) to deklaratywny sposób składania pipeline'ów — łączysz
+      komponenty grafem zależności. Lepsza czytelność niż zagnieżdżone wywołania,
+      łatwe podmienianie komponentów, wbudowane logowanie kroków.
+    code: |
+      from llama_index.core.query_pipeline import QueryPipeline, InputComponent
+      from llama_index.core.postprocessor import LLMRerank
+
+      # Reranker — LLM ocenia które nody są naprawdę relevantne po retrieval
+      reranker = LLMRerank(choice_batch_size=5, top_n=3)
+
+      # Pipeline: input → retriever → reranker → synthesizer
+      pipeline = QueryPipeline(verbose=True)
+      pipeline.add_modules({
+          "input":       InputComponent(),
+          "retriever":   index.as_retriever(similarity_top_k=10),
+          "reranker":    reranker,
+          "synthesizer": get_response_synthesizer(response_mode="compact"),
+      })
+
+      # Połącz kroki
+      pipeline.add_link("input",     "retriever")
+      pipeline.add_link("input",     "reranker",    dest_key="query_str")
+      pipeline.add_link("retriever", "reranker",    dest_key="nodes")
+      pipeline.add_link("input",     "synthesizer", dest_key="query_str")
+      pipeline.add_link("reranker",  "synthesizer", dest_key="nodes")
+
+      response = pipeline.run(input="Jakie są wymagania bezpieczeństwa API?")
+      print(response)
+
+  - name: Vector Store z persystencją — Chroma i Pinecone
+    desc: >
+      In-memory indeks ginie przy restarcie. Vector store z persystencją (ChromaDB,
+      Pinecone, Weaviate, pgvector) pozwala ingestować raz i odpytywać wielokrotnie.
+      Klucz produkcyjnego RAG.
+    code: |
+      # ChromaDB — lokalne lub cloud (pip install llama-index-vector-stores-chroma chromadb)
+      import chromadb
+      from llama_index.vector_stores.chroma import ChromaVectorStore
+      from llama_index.core import StorageContext
+
+      chroma_client = chromadb.PersistentClient(path="./chroma_db")
+      collection    = chroma_client.get_or_create_collection("docs")
+
+      vector_store     = ChromaVectorStore(chroma_collection=collection)
+      storage_context  = StorageContext.from_defaults(vector_store=vector_store)
+
+      # Przy pierwszym uruchomieniu — ingestuj
+      index = VectorStoreIndex.from_documents(documents, storage_context=storage_context)
+
+      # Przy kolejnych uruchomieniach — załaduj bez przebudowy
+      index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
+
+      # ----
+
+      # Pinecone — cloud vector store (pip install llama-index-vector-stores-pinecone)
+      from pinecone import Pinecone, ServerlessSpec
+      from llama_index.vector_stores.pinecone import PineconeVectorStore
+
+      pc = Pinecone(api_key="YOUR_API_KEY")
+      pc.create_index("docs-index", dimension=384, spec=ServerlessSpec(cloud="aws", region="us-east-1"))
+
+      pinecone_store = PineconeVectorStore(pinecone_index=pc.Index("docs-index"))
+      storage_ctx    = StorageContext.from_defaults(vector_store=pinecone_store)
+      index = VectorStoreIndex.from_documents(documents, storage_context=storage_ctx)
+
+  - name: Async QueryEngine z FastAPI
+    desc: >
+      aquery() i achat() dla async/await w FastAPI. Możesz też zrównoleglić wiele
+      zapytań przez asyncio.gather(). LlamaIndex w pełni wspiera asyncio — nie blokuje
+      event loop.
+    code: |
+      import asyncio
+      from fastapi import FastAPI, Depends
+      from llama_index.core import VectorStoreIndex
+
+      app   = FastAPI()
+      index = None  # inicjalizowany przy starcie
+
+      @app.on_event("startup")
+      async def startup():
+          global index
+          # Załaduj indeks przy starcie aplikacji
+          storage_context = StorageContext.from_defaults(persist_dir="./storage")
+          index = load_index_from_storage(storage_context)
+
+      @app.get("/ask")
+      async def ask_question(question: str):
+          engine   = index.as_query_engine(use_async=True)
+          response = await engine.aquery(question)
+          return {
+              "answer":  str(response),
+              "sources": [n.text[:100] for n in response.source_nodes],
+          }
+
+      # Równoległe pytania do różnych indeksów
+      @app.get("/multi-ask")
+      async def multi_ask(question: str):
+          engines = [hr_index.as_query_engine(use_async=True),
+                     tech_index.as_query_engine(use_async=True)]
+          responses = await asyncio.gather(*[e.aquery(question) for e in engines])
+          return {"hr": str(responses[0]), "tech": str(responses[1])}
+
+  - name: Embeddings — wybór i optymalizacja
+    desc: >
+      Embedding model ma kluczowy wpływ na jakość retrieval — wybór modelu to
+      jeden z najważniejszych decyzji w RAG projekcie. OpenAI text-embedding-3-small
+      jest dobrym balansem kosztu/jakości. Lokalne modele (HuggingFace BAAI/bge) są
+      darmowe dla produkcji.
+    code: |
+      from llama_index.core import Settings
+
+      # OpenAI — płatne, świetna jakość dla angielskiego
+      from llama_index.embeddings.openai import OpenAIEmbedding
+      Settings.embed_model = OpenAIEmbedding(
+          model="text-embedding-3-small",  # 1536 dim, $0.02/1M tokens
+      )
+
+      # HuggingFace — darmowe, działa lokalnie, świetne dla nieangielskich
+      from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+      Settings.embed_model = HuggingFaceEmbedding(
+          model_name="BAAI/bge-m3",       # multilingual, 1024 dim
+          # model_name="BAAI/bge-small-en-v1.5",  # szybszy dla angielskiego
+      )
+
+      # Anthropic SDK jako embedding (przez Voyage AI integrację)
+      from llama_index.embeddings.voyageai import VoyageEmbedding
+      Settings.embed_model = VoyageEmbedding(
+          model_name="voyage-3",
+          voyage_api_key="your_key",
+      )
+
+      # Ustaw LLM
+      from llama_index.llms.anthropic import Anthropic
+      Settings.llm = Anthropic(model="claude-sonnet-4-6", max_tokens=2048)
+
+      # Ważne: embedding model przy ingestii MUSI być taki sam jak przy query!
+
+  - name: Ewaluacja RAG — mierzenie jakości
+    desc: >
+      LlamaIndex ma wbudowane narzędzia ewaluacji RAG: FaithfulnessEvaluator (czy
+      odpowiedź jest zgodna ze źródłami), RelevancyEvaluator (czy nody są relevantne),
+      CorrectnessEvaluator (czy odpowiedź jest poprawna).
+    code: |
+      from llama_index.core.evaluation import (
+          FaithfulnessEvaluator,
+          RelevancyEvaluator,
+          BatchEvalRunner,
+      )
+
+      # Ewaluatory
+      faithfulness_eval = FaithfulnessEvaluator()  # halucynacje
+      relevancy_eval    = RelevancyEvaluator()       # jakość retrieval
+
+      # Testowy zestaw Q&A
+      queries = [
+          "Jaka jest polityka zwrotów?",
+          "Jak działa autoryzacja?",
+          "Ile kosztuje plan Enterprise?",
+      ]
+
+      runner = BatchEvalRunner(
+          {"faithfulness": faithfulness_eval, "relevancy": relevancy_eval},
+          workers=4,  # równolegle
+      )
+
+      eval_results = await runner.aevaluate_queries(
+          query_engine,
+          queries=queries,
+      )
+
+      for query, results in zip(queries, eval_results["faithfulness"]):
+          print(f"Q: {query}")
+          print(f"  Faithfulness: {'✓' if results.passing else '✗'} ({results.score:.2f})")
+          print(f"  Feedback: {results.feedback}")

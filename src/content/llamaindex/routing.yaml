@@ -1,0 +1,176 @@
+title: Agenci — ReActAgent, narzędzia i pamięć
+
+items:
+  - name: ReActAgent — agent z narzędziami
+    desc: >
+      ReActAgent implementuje wzorzec Reason+Act — cykl myślenia i działania.
+      Przekazujesz QueryEngine lub FunctionTool jako narzędzia. Agent sam decyduje
+      kiedy użyć narzędzia i jak interpretować wynik.
+    code: |
+      from llama_index.core.agent import ReActAgent
+      from llama_index.core.tools import QueryEngineTool, ToolMetadata, FunctionTool
+
+      # Narzędzie z QueryEngine (RAG)
+      docs_tool = QueryEngineTool(
+          query_engine=query_engine,
+          metadata=ToolMetadata(
+              name="docs_search",
+              description=(
+                  "Przeszukaj dokumentację produktu. "
+                  "Używaj do pytań o funkcje, konfigurację i błędy."
+              ),
+          ),
+      )
+
+      # Narzędzie jako zwykła funkcja Python
+      def get_current_time() -> str:
+          """Zwróć aktualny czas i datę."""
+          from datetime import datetime
+          return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+      time_tool = FunctionTool.from_defaults(fn=get_current_time)
+
+      # Agent
+      agent = ReActAgent.from_tools(
+          tools=[docs_tool, time_tool],
+          verbose=True,     # pokaż chain of thought
+          max_iterations=10,
+      )
+
+      response = agent.chat("Jak skonfigurować autoryzację JWT? Która wersja docs jest aktualna?")
+      print(response)
+
+  - name: FunctionCallingAgent — dla modeli z native function calling
+    desc: >
+      FunctionCallingAgent używa natywnego function calling modelu (OpenAI, Anthropic)
+      zamiast ReAct prompting. Szybszy, tańszy i bardziej niezawodny niż ReActAgent
+      dla modeli które wspierają tool use.
+    code: |
+      from llama_index.core.agent import FunctionCallingAgent
+      from llama_index.core.tools import FunctionTool
+      from llama_index.llms.anthropic import Anthropic
+
+      llm = Anthropic(model="claude-sonnet-4-6")
+
+      def calculate(expression: str) -> float:
+          """Oblicz wyrażenie matematyczne, np. '2 + 2 * 3'."""
+          return eval(expression)  # w produkcji użyj bezpiecznej eval!
+
+      def search_knowledge_base(query: str) -> str:
+          """Szukaj w bazie wiedzy firmy."""
+          results = query_engine.query(query)
+          return str(results)
+
+      calc_tool   = FunctionTool.from_defaults(fn=calculate)
+      search_tool = FunctionTool.from_defaults(fn=search_knowledge_base)
+
+      agent = FunctionCallingAgent.from_tools(
+          tools=[calc_tool, search_tool],
+          llm=llm,
+          verbose=True,
+      )
+
+      response = agent.chat(
+          "Ile kosztuje 15 sztuk produktu X jeśli jeden kosztuje 299 PLN? "
+          "Sprawdź też czy produkt X jest opisany w dokumentacji."
+      )
+
+  - name: Agent memory — pamięć rozmowy
+    desc: >
+      Agenty w LlamaIndex mają wbudowaną pamięć rozmowy (ChatMemoryBuffer).
+      agent.chat() kontynuuje konwersację, agent.reset() czyści historię.
+      Możesz też wstrzyknąć zewnętrzną historię przez chat_history parametr.
+    code: |
+      from llama_index.core.memory import ChatMemoryBuffer
+      from llama_index.core.agent import ReActAgent
+
+      # Pamięć z limitem tokenów (nie przeładuje okna kontekstu)
+      memory = ChatMemoryBuffer.from_defaults(token_limit=8192)
+
+      agent = ReActAgent.from_tools(
+          tools=tools,
+          memory=memory,
+          verbose=True,
+      )
+
+      # Multi-turn conversation
+      r1 = agent.chat("Nazywam się Łukasz i pracuję nad projektem FastAPI.")
+      r2 = agent.chat("Jak mam na imię?")      # pamięta: Łukasz
+      r3 = agent.chat("Nad czym pracuję?")     # pamięta: projekt FastAPI
+      r4 = agent.chat("Podsumuj naszą rozmowę")
+
+      # Reset pamięci
+      agent.reset()
+
+      # Wstrzyknij istniejącą historię (np. z bazy danych)
+      from llama_index.core.llms import ChatMessage
+      history = [
+          ChatMessage(role="user",      content="Poprzednia sesja..."),
+          ChatMessage(role="assistant", content="Tak, pamiętam..."),
+      ]
+      agent.chat("Kontynuuj rozmowę", chat_history=history)
+
+  - name: Multi-document Agent — agent nad wieloma indeksami
+    desc: >
+      Zamiast jednego dużego indeksu tworzysz osobny QueryEngine dla każdego dokumentu/tematu
+      i dajesz agentowi dostęp do wszystkich jako oddzielnych narzędzi. Agent sam wybiera
+      które "źródło wiedzy" odpytać. Lepsza precyzja niż jeden wielki indeks.
+    code: |
+      from llama_index.core.tools import QueryEngineTool, ToolMetadata
+      from llama_index.core.agent import ReActAgent
+      from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+
+      # Osobny indeks dla każdego działu
+      hr_docs       = SimpleDirectoryReader("./docs/hr").load_data()
+      finance_docs  = SimpleDirectoryReader("./docs/finance").load_data()
+      tech_docs     = SimpleDirectoryReader("./docs/technical").load_data()
+
+      hr_index       = VectorStoreIndex.from_documents(hr_docs)
+      finance_index  = VectorStoreIndex.from_documents(finance_docs)
+      tech_index     = VectorStoreIndex.from_documents(tech_docs)
+
+      tools = [
+          QueryEngineTool(
+              query_engine=hr_index.as_query_engine(),
+              metadata=ToolMetadata(name="hr", description="Dokumenty HR — polityki, urlopy, onboarding")
+          ),
+          QueryEngineTool(
+              query_engine=finance_index.as_query_engine(),
+              metadata=ToolMetadata(name="finance", description="Raporty finansowe, budżety, koszty")
+          ),
+          QueryEngineTool(
+              query_engine=tech_index.as_query_engine(),
+              metadata=ToolMetadata(name="technical", description="Dokumentacja techniczna, API, architektura")
+          ),
+      ]
+
+      agent = ReActAgent.from_tools(tools, verbose=True)
+      response = agent.chat("Ile wynosi budżet na szkolenia techniczne w 2025?")
+      # Agent sam zdecyduje czy pytać finance czy tech
+
+  - name: Async Agent — równoległe wywołania narzędzi
+    desc: >
+      aquery() i achat() to asynchroniczne wersje dla FastAPI i asyncio.
+      Możesz uruchamiać wielu agentów równolegle przez asyncio.gather().
+    code: |
+      import asyncio
+      from llama_index.core.agent import ReActAgent
+
+      agent = ReActAgent.from_tools(tools)
+
+      # Pojedyncze async query
+      async def answer_question(question: str) -> str:
+          response = await agent.achat(question)
+          return str(response)
+
+      # Równoległe — wiele pytań jednocześnie
+      async def answer_multiple(questions: list[str]) -> list[str]:
+          tasks = [agent.achat(q) for q in questions]
+          responses = await asyncio.gather(*tasks)
+          return [str(r) for r in responses]
+
+      # FastAPI
+      @app.post("/agent/ask")
+      async def agent_ask(question: str):
+          response = await agent.achat(question)
+          return {"answer": str(response)}

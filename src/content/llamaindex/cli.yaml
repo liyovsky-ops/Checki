@@ -1,0 +1,135 @@
+title: LlamaIndex — komendy i snippety
+
+groups:
+  - name: Instalacja
+    items:
+      - cmd: pip install llama-index
+        desc: Instalacja core LlamaIndex (wszystkie podstawowe komponenty)
+      - cmd: pip install llama-index-llms-anthropic
+        desc: Anthropic Claude jako LLM
+      - cmd: pip install llama-index-embeddings-huggingface
+        desc: Lokalne embeddingi HuggingFace (darmowe)
+      - cmd: pip install llama-index-vector-stores-chroma chromadb
+        desc: ChromaDB jako vector store
+      - cmd: pip install llama-index-vector-stores-postgres psycopg2-binary
+        desc: pgvector (PostgreSQL) jako vector store
+      - cmd: pip install llama-index-readers-notion llama-index-readers-github
+        desc: Loadery danych — Notion i GitHub
+
+  - name: Konfiguracja globalna (Settings)
+    items:
+      - cmd: 'Settings.llm = Anthropic(model="claude-sonnet-4-6", max_tokens=2048)'
+        desc: Ustaw Anthropic Claude jako LLM
+      - cmd: 'Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3")'
+        desc: Multilingual embedding model (darmowy, lokalny)
+      - cmd: 'Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")'
+        desc: OpenAI embedding model (płatny, świetna jakość)
+      - cmd: Settings.chunk_size = 512
+        desc: Globalny rozmiar chunku (w tokenach)
+      - cmd: Settings.chunk_overlap = 50
+        desc: Nakładanie między chunkami
+
+  - name: Ingestion — ładowanie danych
+    items:
+      - cmd: 'documents = SimpleDirectoryReader("./docs", recursive=True).load_data()'
+        desc: Załaduj wszystkie pliki z katalogu rekurencyjnie
+      - cmd: 'documents = SimpleDirectoryReader(input_files=["./file.pdf"]).load_data()'
+        desc: Załaduj konkretne pliki
+      - cmd: 'splitter = SentenceSplitter(chunk_size=512, chunk_overlap=50)'
+        desc: Podział dokumentów na chunki po zdaniach
+      - cmd: nodes = splitter.get_nodes_from_documents(documents)
+        desc: Wykonaj chunking ręcznie
+      - cmd: pipeline = IngestionPipeline(transformations=[splitter, embed_model])
+        desc: Pipeline ingestii z transformacjami
+      - cmd: nodes = pipeline.run(documents=documents)
+        desc: Uruchom pipeline ingestii
+      - cmd: pipeline.cache.persist("./pipeline_cache.json")
+        desc: Zapisz cache pipeline (unikaj reingestii tych samych dokumentów)
+
+  - name: Indeksowanie i persystencja
+    items:
+      - cmd: index = VectorStoreIndex.from_documents(documents)
+        desc: Zbuduj indeks z dokumentów (embeddingi automatycznie)
+      - cmd: index.storage_context.persist(persist_dir="./storage")
+        desc: Zapisz indeks na dysk
+      - cmd: 'index = load_index_from_storage(StorageContext.from_defaults(persist_dir="./storage"))'
+        desc: Załaduj indeks z dysku (bez przebudowy)
+      - cmd: index = VectorStoreIndex.from_vector_store(vector_store=chroma_store)
+        desc: Załaduj indeks z istniejącego vector store
+      - cmd: index.insert(new_document)
+        desc: Dodaj nowy dokument do istniejącego indeksu
+      - cmd: index.delete_ref_doc(doc_id)
+        desc: Usuń dokument z indeksu po ID
+
+  - name: Query Engine
+    items:
+      - cmd: query_engine = index.as_query_engine(similarity_top_k=5)
+        desc: Utwórz QueryEngine (domyślny, compact mode)
+      - cmd: 'query_engine = index.as_query_engine(response_mode="tree_summarize")'
+        desc: QueryEngine z tree summarize (dla długich dokumentów)
+      - cmd: 'query_engine = index.as_query_engine(streaming=True)'
+        desc: Streaming QueryEngine
+      - cmd: response = query_engine.query("Twoje pytanie")
+        desc: Zapytaj synchronicznie
+      - cmd: response = await query_engine.aquery("Twoje pytanie")
+        desc: Zapytaj asynchronicznie (FastAPI)
+      - cmd: response.print_response_stream()
+        desc: Wydrukuj streaming response do konsoli
+      - cmd: print(response.source_nodes)
+        desc: Pokaż nody użyte do odpowiedzi (źródła)
+      - cmd: retriever = index.as_retriever(similarity_top_k=10)
+        desc: Sam retriever (bez syntezy) — zwraca NodeWithScore
+
+  - name: Agenci
+    items:
+      - cmd: 'agent = ReActAgent.from_tools(tools, verbose=True, max_iterations=10)'
+        desc: ReActAgent z listą narzędzi
+      - cmd: 'agent = FunctionCallingAgent.from_tools(tools, llm=llm)'
+        desc: FunctionCallingAgent — szybszy niż ReAct dla modeli z native tool use
+      - cmd: response = agent.chat("Pytanie")
+        desc: Chat synchroniczny (z pamięcią rozmowy)
+      - cmd: response = await agent.achat("Pytanie")
+        desc: Chat asynchroniczny
+      - cmd: agent.reset()
+        desc: Wyczyść pamięć rozmowy
+      - cmd: 'tool = QueryEngineTool(query_engine=qe, metadata=ToolMetadata(name="docs", description="..."))'
+        desc: Opakuj QueryEngine jako narzędzie agenta
+      - cmd: 'tool = FunctionTool.from_defaults(fn=my_function)'
+        desc: Opakuj funkcję Python jako narzędzie
+
+  - name: Vector Stores
+    items:
+      - cmd: 'chroma_client = chromadb.PersistentClient(path="./chroma_db")'
+        desc: Lokalna ChromaDB z persystencją
+      - cmd: 'vector_store = ChromaVectorStore(chroma_collection=collection)'
+        desc: LlamaIndex wrapper dla ChromaDB
+      - cmd: 'pc = Pinecone(api_key=KEY); index = pc.Index("my-index")'
+        desc: Połącz z Pinecone
+      - cmd: 'vector_store = PGVectorStore.from_params(database="mydb", host="localhost", embed_dim=1024)'
+        desc: pgvector (PostgreSQL) vector store
+
+  - name: Hybrid Search i Postprocessing
+    items:
+      - cmd: 'bm25 = BM25Retriever.from_defaults(index=index, similarity_top_k=5)'
+        desc: BM25 keyword retriever
+      - cmd: 'fusion = QueryFusionRetriever(retrievers=[vector_ret, bm25_ret], num_queries=1)'
+        desc: Hybrid search — semantic + keyword (Reciprocal Rank Fusion)
+      - cmd: 'postprocessor = SimilarityPostprocessor(similarity_cutoff=0.7)'
+        desc: Odfiltruj nody poniżej progu podobieństwa
+      - cmd: 'reranker = LLMRerank(choice_batch_size=5, top_n=3)'
+        desc: LLM reranker — LLM ocenia które nody są naprawdę relevantne
+      - cmd: 'filters = MetadataFilters(filters=[MetadataFilter(key="category", value="legal")])'
+        desc: Filtruj retrieval po metadanych
+
+  - name: Ewaluacja i debugging
+    items:
+      - cmd: 'eval = FaithfulnessEvaluator(); result = await eval.aevaluate_response(query, response)'
+        desc: Ewaluacja wiarygodności odpowiedzi (halucynacje)
+      - cmd: 'eval = RelevancyEvaluator(); result = eval.evaluate_response(query, response)'
+        desc: Ewaluacja relevantności retrieval
+      - cmd: 'Settings.llm = Anthropic(model="claude-sonnet-4-6", echo=True)'
+        desc: Loguj wszystkie prompt/response (debug)
+      - cmd: 'print(response.source_nodes[0].score)'
+        desc: Similarity score pierwszego nodu
+      - cmd: 'print(response.metadata)'
+        desc: Metadata odpowiedzi (model, tokeny, źródła)

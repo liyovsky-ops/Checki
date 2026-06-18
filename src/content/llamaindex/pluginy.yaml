@@ -1,0 +1,162 @@
+title: Ekosystem — integracje i narzędzia
+
+items:
+  - name: LlamaHub — 160+ data loaders i integracje
+    desc: >
+      LlamaHub to oficjalne repozytorium integracji LlamaIndex. Loaders (sources danych),
+      tools (narzędzia dla agentów), index stores, vector stores — wszystko instalowane
+      jako osobne pakiety pip. Sprawdź llamahub.ai przed pisaniem własnych loaderów.
+    code: |
+      # Data loaders — instaluj tylko te których potrzebujesz
+      # pip install llama-index-readers-notion llama-index-readers-github
+      # pip install llama-index-readers-confluence llama-index-readers-s3
+
+      # Notion
+      from llama_index.readers.notion import NotionPageReader
+      reader = NotionPageReader(integration_token="secret_...")
+      docs   = reader.load_data(page_ids=["abc123"])
+
+      # Confluence
+      from llama_index.readers.confluence import ConfluenceReader
+      reader = ConfluenceReader(base_url="https://firma.atlassian.net")
+      docs   = reader.load_data(space_key="TECH", include_attachments=False)
+
+      # AWS S3
+      from llama_index.readers.s3 import S3Reader
+      reader = S3Reader(bucket="my-docs-bucket", region_name="eu-west-1")
+      docs   = reader.load_data()
+
+      # YouTube transcripts
+      from llama_index.readers.youtube_transcript import YoutubeTranscriptReader
+      reader = YoutubeTranscriptReader()
+      docs   = reader.load_data(ytlinks=["https://youtube.com/watch?v=..."])
+
+  - name: LlamaIndex z Anthropic — konfiguracja
+    desc: >
+      Anthropic Claude jako LLM w LlamaIndex. Pełne wsparcie streamingu, funkcji i
+      wszystkich modeli Claude. Możesz też używać prompt caching przez parametry Anthropic.
+    code: |
+      # pip install llama-index-llms-anthropic
+
+      from llama_index.llms.anthropic import Anthropic
+      from llama_index.core import Settings
+
+      # Konfiguracja Anthropic LLM
+      Settings.llm = Anthropic(
+          model="claude-sonnet-4-6",
+          max_tokens=2048,
+          api_key="sk-ant-...",   # lub z env ANTHROPIC_API_KEY
+      )
+
+      # Embedding przez Voyage AI (polecane z Anthropic)
+      # pip install llama-index-embeddings-voyageai
+      from llama_index.embeddings.voyageai import VoyageEmbedding
+      Settings.embed_model = VoyageEmbedding(
+          model_name="voyage-3",
+          voyage_api_key="pa-...",
+      )
+
+      # Streaming z Anthropic przez LlamaIndex
+      engine   = index.as_query_engine(streaming=True)
+      response = engine.query("Opisz architekturę systemu")
+      response.print_response_stream()
+
+  - name: pgvector — PostgreSQL jako vector store
+    desc: >
+      pgvector to rozszerzenie PostgreSQL do przechowywania wektorów. Idealne gdy
+      masz już PostgreSQL — brak dodatkowej bazy danych. Obsługuje HNSW i IVFFlat
+      indexy dla szybkiego wyszukiwania. LlamaIndex ma oficjalną integrację.
+    code: |
+      # pip install llama-index-vector-stores-postgres psycopg2-binary pgvector
+
+      from sqlalchemy import make_url
+      from llama_index.vector_stores.postgres import PGVectorStore
+      from llama_index.core import StorageContext, VectorStoreIndex
+
+      connection_string = "postgresql://user:pass@localhost:5432/mydb"
+      url = make_url(connection_string)
+
+      vector_store = PGVectorStore.from_params(
+          database=url.database,
+          host=url.host,
+          password=url.password,
+          port=url.port,
+          user=url.username,
+          table_name="document_embeddings",
+          embed_dim=1024,   # dopasuj do wymiaru embedding modelu
+          hnsw_kwargs={     # HNSW index — szybki ANN search
+              "hnsw_m": 16,
+              "hnsw_ef_construction": 64,
+              "hnsw_ef_search": 40,
+          },
+      )
+
+      storage_context = StorageContext.from_defaults(vector_store=vector_store)
+      index = VectorStoreIndex.from_documents(documents, storage_context=storage_context)
+
+  - name: RAGAS — ewaluacja jakości RAG
+    desc: >
+      RAGAS to standard ewaluacji RAG — mierzy faithfulness (czy odpowiedź wsparta źródłami),
+      answer relevancy, context recall i context precision. Integracja z LlamaIndex przez
+      llama-index-evaluation.
+    code: |
+      # pip install ragas llama-index
+
+      from ragas import evaluate
+      from ragas.metrics import faithfulness, answer_relevancy, context_recall
+      from datasets import Dataset
+
+      # Zbierz dane do ewaluacji
+      questions   = ["Co to jest RAG?", "Jak działa chunking?"]
+      answers     = []
+      contexts    = []
+      ground_truth = ["RAG łączy retrieval z generowaniem...", "Chunking dzieli dokumenty..."]
+
+      for q in questions:
+          response = query_engine.query(q)
+          answers.append(str(response))
+          contexts.append([n.text for n in response.source_nodes])
+
+      dataset = Dataset.from_dict({
+          "question":   questions,
+          "answer":     answers,
+          "contexts":   contexts,
+          "ground_truth": ground_truth,
+      })
+
+      result = evaluate(
+          dataset,
+          metrics=[faithfulness, answer_relevancy, context_recall],
+          llm=Settings.llm,        # LLM do oceniania
+          embeddings=Settings.embed_model,
+      )
+      print(result)
+      # DataFrame z wynikami: faithfulness=0.92, answer_relevancy=0.87...
+
+  - name: LlamaTrace / Arize Phoenix — observability
+    desc: >
+      LlamaTrace (llamatrace.com) i Arize Phoenix to narzędzia do observability RAG —
+      śledzenie zapytań, retrieval scores, latency, koszty. Niezbędne w produkcji.
+    code: |
+      # pip install llama-index-callbacks-arize-phoenix arize-phoenix
+
+      import phoenix as px
+      from llama_index.callbacks.arize_phoenix import ArizePhoenixCallbackHandler
+      from llama_index.core import Settings
+      from llama_index.core.callbacks import CallbackManager
+
+      # Uruchom Phoenix UI (localhost:6006)
+      px.launch_app()
+
+      # Podłącz do LlamaIndex
+      callback = ArizePhoenixCallbackHandler()
+      Settings.callback_manager = CallbackManager([callback])
+
+      # Teraz każde zapytanie jest śledzone automatycznie
+      response = query_engine.query("Jakie są wymagania API?")
+
+      # W Phoenix UI zobaczysz:
+      # - Latency każdego kroku (embed → retrieve → synthesize)
+      # - Retrieved nodes z scores
+      # - Pełne prompt/response
+      # - Koszty tokenów

@@ -198,6 +198,7 @@ export const FRAMEWORKS = {
     { id: 'mcp',          name: 'MCP',          icon: '🔌',  color: '#a78bfa', lang: 'Python', desc: 'Model Context Protocol' },
     { id: 'openaisdk',    name: 'OpenAI SDK',   icon: '✦',   color: '#10a37f', lang: 'Python', desc: 'Najpopularniejsze API do LLM' },
     { id: 'anthropicsdk', name: 'Anthropic SDK',icon: '✺',   color: '#D4A574', lang: 'Python', desc: 'SDK do modeli Claude' },
+    { id: 'llamaindex',   name: 'LlamaIndex',   icon: '🦙',  color: '#fbaf3f', lang: 'Python', desc: 'Framework RAG na własnych danych' },
     { id: 'pytorch',      name: 'PyTorch',      icon: '🔥',  color: '#ee4c2c', lang: 'Python', desc: 'ML/research od Meta' },
     { id: 'tensorflow',   name: 'TensorFlow',   icon: '🧠',  color: '#ff6f00', lang: 'Python', desc: 'ML na masową skalę od Google' },
   ],

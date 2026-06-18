@@ -1,0 +1,153 @@
+title: Query Engine — retrieval i synteza odpowiedzi
+
+items:
+  - name: VectorStoreIndex i QueryEngine — podstawowe zapytanie
+    desc: >
+      VectorStoreIndex.as_query_engine() to najprostszy QueryEngine — embed query,
+      retrieve top-k nodes, synthesize. similarity_top_k kontroluje ile nodów trafia
+      do LLM (więcej = lepszy recall, ale drożej). response_mode zmienia strategię syntezy.
+    code: |
+      from llama_index.core import VectorStoreIndex, StorageContext, load_index_from_storage
+
+      # Zbuduj i zapisz indeks
+      index = VectorStoreIndex.from_documents(documents)
+      index.storage_context.persist(persist_dir="./storage")
+
+      # Załaduj z dysku (bez przebudowy)
+      storage_context = StorageContext.from_defaults(persist_dir="./storage")
+      index = load_index_from_storage(storage_context)
+
+      # QueryEngine z ustawieniami
+      query_engine = index.as_query_engine(
+          similarity_top_k=5,       # ile nodów do kontekstu
+          response_mode="compact",  # compact / refine / tree_summarize / accumulate
+          streaming=False,
+      )
+
+      response = query_engine.query("Jakie są wymagania bezpieczeństwa?")
+      print(response)
+      print(response.source_nodes)  # które nody zostały użyte
+
+  - name: RetrieverQueryEngine — custom retriever
+    desc: >
+      Zamiast as_query_engine() możesz złożyć QueryEngine ręcznie z własnym retrieverem
+      i synthesizerem. To daje pełną kontrolę nad strategią retrieval bez zmiany reszty.
+    code: |
+      from llama_index.core import get_response_synthesizer
+      from llama_index.core.retrievers import VectorIndexRetriever
+      from llama_index.core.query_engine import RetrieverQueryEngine
+      from llama_index.core.postprocessor import SimilarityPostprocessor
+
+      # Retriever z progiem podobieństwa
+      retriever = VectorIndexRetriever(
+          index=index,
+          similarity_top_k=10,
+      )
+
+      # Postprocessor — odfiltruj nody poniżej progu podobieństwa
+      postprocessor = SimilarityPostprocessor(similarity_cutoff=0.7)
+
+      # Synthesizer
+      synthesizer = get_response_synthesizer(
+          response_mode="tree_summarize",  # hierarchiczne podsumowanie
+          use_async=True,
+          streaming=False,
+      )
+
+      # Złóż w QueryEngine
+      query_engine = RetrieverQueryEngine(
+          retriever=retriever,
+          response_synthesizer=synthesizer,
+          node_postprocessors=[postprocessor],
+      )
+
+      response = await query_engine.aquery("Opisz architekturę systemu")
+      print(f"Odpowiedź: {response}")
+      print(f"Użyto {len(response.source_nodes)} fragmentów")
+
+  - name: Hybrid Search — semantyczny + keyword
+    desc: >
+      Samo semantic search może przegapić dokładne dopasowania słów kluczowych
+      (numery artykułów, kody, nazwy własne). Hybrid search łączy BM25 (keyword) z
+      semantic search dla lepszego recall.
+    code: |
+      from llama_index.core.retrievers import QueryFusionRetriever
+      from llama_index.retrievers.bm25 import BM25Retriever
+
+      # Retriever semantyczny
+      vector_retriever = index.as_retriever(similarity_top_k=5)
+
+      # Retriever keyword (BM25)
+      bm25_retriever = BM25Retriever.from_defaults(
+          index=index,
+          similarity_top_k=5,
+      )
+
+      # Fusion retriever — łączy wyniki i deduplikuje przez Reciprocal Rank Fusion
+      fusion_retriever = QueryFusionRetriever(
+          retrievers=[vector_retriever, bm25_retriever],
+          num_queries=1,         # ile wariacji query generować (1 = bez augmentation)
+          use_async=True,
+          verbose=True,
+      )
+
+      # Użyj w QueryEngine
+      query_engine = RetrieverQueryEngine(retriever=fusion_retriever)
+      response = await query_engine.aquery("Artykuł 23 ust. 2 regulaminu")
+
+  - name: Response modes — strategie syntezy
+    desc: >
+      response_mode zmienia jak LLM syntetyzuje odpowiedź z wielu nodów.
+      compact (domyślny) pakuje wszystko w jeden prompt. tree_summarize rekurencyjnie
+      podsumowuje dla bardzo długich kontekstów. refine iteracyjnie poprawia — najwolniejszy.
+    code: |
+      # compact — wszystkie nody w jednym prompt (domyślny, szybki)
+      engine_compact = index.as_query_engine(response_mode="compact")
+
+      # tree_summarize — dla długich dokumentów (roczne raporty, całe książki)
+      engine_tree = index.as_query_engine(response_mode="tree_summarize")
+
+      # refine — najwyższa jakość, wolne (N nodów = N wywołań LLM)
+      engine_refine = index.as_query_engine(response_mode="refine")
+
+      # accumulate — każdy node osobno, zwraca listę odpowiedzi
+      engine_accumulate = index.as_query_engine(response_mode="accumulate")
+
+      # no_text — tylko retrieve, bez syntezy (zwraca same nody)
+      retriever_only = index.as_retriever(similarity_top_k=5)
+      nodes = retriever_only.retrieve("Jakie są opłaty?")
+      for node in nodes:
+          print(f"Score: {node.score:.3f} | {node.text[:100]}")
+
+  - name: Streaming QueryEngine
+    desc: >
+      Streaming pozwala wyświetlać odpowiedź token po tokenie zamiast czekać na całość.
+      Szczególnie ważne dla długich odpowiedzi gdzie latency bez streamingu może być 10-30s.
+    code: |
+      from llama_index.core import VectorStoreIndex
+
+      # Włącz streaming w QueryEngine
+      streaming_engine = index.as_query_engine(streaming=True)
+
+      response = streaming_engine.query(
+          "Opisz szczegółowo cały proces onboardingu w dokumentacji."
+      )
+
+      # Streamuj token po tokenie
+      response.print_response_stream()
+
+      # Lub ręcznie dla FastAPI SSE:
+      from fastapi import FastAPI
+      from fastapi.responses import StreamingResponse
+
+      app = FastAPI()
+
+      @app.get("/query")
+      async def query_stream(question: str):
+          async def generate():
+              async_engine = index.as_query_engine(streaming=True, use_async=True)
+              response = await async_engine.aquery(question)
+              async for token in response.async_response_gen():
+                  yield f"data: {token}\n\n"
+
+          return StreamingResponse(generate(), media_type="text/event-stream")

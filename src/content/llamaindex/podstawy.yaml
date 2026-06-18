@@ -1,0 +1,86 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać LlamaIndex?
+  firstComponent: Pierwsze RAG pipeline
+  firstComponentLang: python
+
+intro:
+  title: Czym jest LlamaIndex?
+  desc: >
+    LlamaIndex to framework do budowania aplikacji RAG (Retrieval-Augmented Generation) —
+    łączy Twoje własne dane z LLM. Trzy kroki: załaduj dane (Documents), zaindeksuj je
+    (VectorStoreIndex), odpytuj przez QueryEngine. Obsługuje 160+ źródeł danych
+    (PDF, bazy, API, strony www), 40+ vector stores i każdy LLM (OpenAI, Anthropic,
+    Gemini, lokalne przez Ollama). Standard w enterprise RAG — od chatbotów na
+    dokumentach po agentów z dostępem do baz wiedzy.
+
+concepts:
+  - title: Document & Node
+    desc: >
+      Document to załadowany plik (PDF, tekst, URL) z zawartością i metadanymi.
+      Node to fragment Document po podziale (chunking). Każdy Node ma text, metadata
+      i embedding. Granularność Node'ów decyduje o jakości retrieval.
+    icon: "📄"
+  - title: VectorStoreIndex
+    desc: >
+      Indeks przechowujący embeddingi Node'ów — najczęściej używany rodzaj indeksu.
+      Przy zapytaniu: embed query → znajdź top-k podobnych Node'ów → wyślij do LLM.
+      Przechowuje w pamięci (domyślnie) lub w zewnętrznym vector store (Pinecone, Chroma).
+    icon: "🗂️"
+  - title: QueryEngine
+    desc: >
+      QueryEngine = retriever + synthesizer. Retriever pobiera relevantne Node'y,
+      synthesizer wysyła je razem z zapytaniem do LLM i zwraca odpowiedź.
+      index.as_query_engine() tworzy QueryEngine z domyślnymi ustawieniami.
+    icon: "🔍"
+  - title: Retriever
+    desc: >
+      Komponent odpowiedzialny wyłącznie za retrieval — zwraca listę NodeWithScore.
+      VectorIndexRetriever (semantic search), BM25Retriever (keyword), HybridRetriever
+      (oba razem). Możesz zastąpić retriever bez zmiany reszty pipeline'u.
+    icon: "🎯"
+  - title: Response Synthesizer
+    desc: >
+      Bierze query + retrieved nodes i generuje odpowiedź przez LLM. Tryby:
+      compact (domyślny, wszystko w jednym prompcie), tree_summarize (hierarchiczne
+      podsumowanie dla dużych kontekstów), refine (iteracyjne poprawianie odpowiedzi).
+    icon: "✍️"
+  - title: ServiceContext / Settings
+    desc: >
+      Globalna konfiguracja LlamaIndex — LLM i embedding model.
+      LlamaIndex 0.10+ używa Settings (singleton): Settings.llm i Settings.embed_model.
+      Stary styl (ServiceContext) nadal działa ale jest deprecated.
+    icon: "⚙️"
+
+whenToUse:
+  - Chatbot na własnych dokumentach (PDF, Notion, confluence, S3)
+  - RAG pipeline w FastAPI — użytkownik pyta, system szuka w bazie wiedzy
+  - Agent z dostępem do wielu źródeł danych jednocześnie
+  - Semantic search po dużym zbiorze dokumentów
+  - Knowledge graph z automatyczną ekstrakcją relacji
+  - Zastąpienie prostego prompt engineering gdy kontekst przekracza okno LLM
+
+firstComponent: |
+  # pip install llama-index llama-index-llms-anthropic llama-index-embeddings-huggingface
+
+  from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
+  from llama_index.llms.anthropic import Anthropic
+  from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
+  # Konfiguracja globalna
+  Settings.llm = Anthropic(model="claude-sonnet-4-6", max_tokens=1024)
+  Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
+
+  # 1. Załaduj dokumenty z katalogu
+  documents = SimpleDirectoryReader("./docs").load_data()
+
+  # 2. Zbuduj indeks (embeddingi tworzone automatycznie)
+  index = VectorStoreIndex.from_documents(documents)
+
+  # 3. Odpytaj
+  query_engine = index.as_query_engine()
+  response = query_engine.query("Co mówi dokumentacja o autoryzacji?")
+  print(response)
+
+  # Persystuj indeks (żeby nie przebudowywać za każdym razem)
+  index.storage_context.persist(persist_dir="./storage")

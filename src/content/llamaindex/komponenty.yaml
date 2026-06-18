@@ -1,0 +1,141 @@
+title: Ingestion — ładowanie i przetwarzanie danych
+
+items:
+  - name: SimpleDirectoryReader — ładowanie plików
+    desc: >
+      SimpleDirectoryReader automatycznie wykrywa typ pliku (PDF, DOCX, MD, TXT, HTML)
+      i używa odpowiedniego loadera. Możesz też ręcznie wskazać pliki, filtrować rozszerzenia
+      lub przejść rekurencyjnie przez katalogi.
+    code: |
+      from llama_index.core import SimpleDirectoryReader
+
+      # Cały katalog rekurencyjnie
+      documents = SimpleDirectoryReader(
+          input_dir="./docs",
+          recursive=True,
+          required_exts=[".pdf", ".md", ".txt"],
+      ).load_data()
+
+      # Konkretne pliki
+      documents = SimpleDirectoryReader(
+          input_files=["./manual.pdf", "./faq.md"]
+      ).load_data()
+
+      # Każdy Document ma metadata automatycznie:
+      for doc in documents:
+          print(doc.metadata)   # {"file_name": "...", "file_path": "...", "file_size": ...}
+          print(doc.text[:200]) # content
+
+  - name: Node Parsers — chunking dokumentów
+    desc: >
+      Node Parser dzieli Document na Nodes (chunki). SentenceSplitter (domyślny) dzieli
+      po zdaniach, SemanticSplitterNodeParser używa embeddingów do inteligentnego podziału
+      na semantyczne bloki. Rozmiar chunku ma ogromny wpływ na jakość RAG.
+    code: |
+      from llama_index.core.node_parser import SentenceSplitter, SemanticSplitterNodeParser
+      from llama_index.core import Settings
+
+      # Prosty podział — chunk_size w tokenach
+      splitter = SentenceSplitter(
+          chunk_size=512,       # max tokenów w nodzie
+          chunk_overlap=50,     # nakładanie — zapobiega utracie kontekstu na granicach
+      )
+      nodes = splitter.get_nodes_from_documents(documents)
+
+      # Semantyczny podział — inteligentniejszy, droższy
+      semantic_splitter = SemanticSplitterNodeParser(
+          buffer_size=1,
+          breakpoint_percentile_threshold=95,
+          embed_model=Settings.embed_model,
+      )
+      semantic_nodes = semantic_splitter.get_nodes_from_documents(documents)
+
+      print(f"Liczba nodów: {len(nodes)}")
+      print(f"Przykładowy node: {nodes[0].text[:150]}")
+      print(f"Metadata: {nodes[0].metadata}")
+
+  - name: Ingestion Pipeline — przemysłowy ETL dla RAG
+    desc: >
+      IngestionPipeline łączy transformacje (splitter, embeddings, metadata extractors)
+      w jeden pipeline z wbudowaną deduplication i cache. Zamiast ręcznie wywoływać
+      kroki — jeden pipeline.run() obsługuje wszystko.
+    code: |
+      from llama_index.core.ingestion import IngestionPipeline, IngestionCache
+      from llama_index.core.node_parser import SentenceSplitter
+      from llama_index.core.extractors import TitleExtractor, QuestionsAnsweredExtractor
+      from llama_index.core.embeddings import resolve_embed_model
+
+      pipeline = IngestionPipeline(
+          transformations=[
+              SentenceSplitter(chunk_size=512, chunk_overlap=50),
+              TitleExtractor(nodes=5),           # wyciągnij tytuł z pierwszych 5 nodów
+              QuestionsAnsweredExtractor(questions=3),  # generuj pytania dla każdego nodu
+              resolve_embed_model("local:BAAI/bge-small-en-v1.5"),
+          ],
+          # Opcjonalnie: zapisz do vector store bezpośrednio
+          # vector_store=chroma_vector_store,
+          cache=IngestionCache(),  # pomija dokumenty już przetworzone
+      )
+
+      nodes = pipeline.run(documents=documents)
+
+      # Persystuj cache żeby przyspieszyć reingest:
+      pipeline.cache.persist("./pipeline_cache.json")
+
+  - name: Metadata i filtry
+    desc: >
+      Metadata to dict przy każdym Document/Node — możesz filtrować retrieval po
+      metadanych (tylko dokumenty z datą po 2024, tylko z kategorii "legal" itp.).
+      MetadataFilter to SQL WHERE dla vector store.
+    code: |
+      from llama_index.core.schema import Document
+      from llama_index.core.vector_stores import MetadataFilter, MetadataFilters, FilterOperator
+
+      # Ustaw metadata ręcznie przy ładowaniu
+      documents = [
+          Document(
+              text="Regulamin użytkowania...",
+              metadata={
+                  "category": "legal",
+                  "year": 2025,
+                  "source": "internal",
+                  "language": "pl",
+              }
+          )
+      ]
+
+      # Filtruj przy retrieval — tylko dokumenty z 2025, kategoria legal
+      filters = MetadataFilters(filters=[
+          MetadataFilter(key="year",     value=2025,    operator=FilterOperator.EQ),
+          MetadataFilter(key="category", value="legal", operator=FilterOperator.EQ),
+      ])
+
+      query_engine = index.as_query_engine(filters=filters)
+      response = query_engine.query("Co mówi regulamin o zwrotach?")
+
+  - name: Wczytywanie z zewnętrznych źródeł
+    desc: >
+      LlamaIndex ma 160+ data loaderów przez llama-hub — Notion, Confluence, S3, GitHub,
+      bazy SQL, Google Drive, Slack, YouTube transcripts i inne.
+    code: |
+      # pip install llama-index-readers-notion llama-index-readers-github
+
+      # Notion
+      from llama_index.readers.notion import NotionPageReader
+      notion_reader = NotionPageReader(integration_token="secret_xxx")
+      notion_docs = notion_reader.load_data(page_ids=["page_id_123"])
+
+      # GitHub — wczytaj cały repo
+      from llama_index.readers.github import GithubRepositoryReader
+      github_reader = GithubRepositoryReader(
+          github_token="ghp_xxx",
+          owner="anthropics",
+          repo="anthropic-sdk-python",
+          filter_file_extensions=([".py", ".md"], GithubRepositoryReader.FilterType.INCLUDE),
+      )
+      github_docs = github_reader.load_data(branch="main")
+
+      # SQL Database — wczytaj dane z tabel jako dokumenty
+      from llama_index.readers.database import DatabaseReader
+      db_reader = DatabaseReader(uri="postgresql://user:pass@localhost/mydb")
+      sql_docs = db_reader.load_data(query="SELECT id, content, title FROM articles")
