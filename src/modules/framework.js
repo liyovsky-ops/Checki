@@ -44,6 +44,15 @@ function applyFwTheme(theme) {
   page.style.transition = 'background 0.6s ease';
 }
 
+const CATEGORY_ACCENT = {
+  frontend: '#a78bfa',
+  backend:  '#00ff41',
+  database: '#8b5cf6',
+  devops:   '#60a5fa',
+  testing:  '#0A9EDC',
+  ai:       '#f97316',
+};
+
 function hexToRgba(hex, alpha) {
   hex = hex.replace('#', '');
   if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
@@ -56,14 +65,15 @@ function hexToRgba(hex, alpha) {
 export function renderTiles(category, containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
+  const accent = CATEGORY_ACCENT[category] || '#7c6af7';
   (FRAMEWORKS[category] || []).forEach(function(fw) {
     const tile = document.createElement('div');
     tile.className = 'fw-tile';
-    tile.style.background   = hexToRgba(fw.color, 0.07);
-    tile.style.borderColor  = hexToRgba(fw.color, 0.2);
-    tile.style.setProperty('--tc-bg',     hexToRgba(fw.color, 0.18));
-    tile.style.setProperty('--tc-border', hexToRgba(fw.color, 0.6));
-    tile.style.setProperty('--tc-glow',   hexToRgba(fw.color, 0.25));
+    tile.style.background   = hexToRgba(accent, 0.05);
+    tile.style.borderColor  = hexToRgba(accent, 0.15);
+    tile.style.setProperty('--tc-bg',     hexToRgba(accent, 0.14));
+    tile.style.setProperty('--tc-border', hexToRgba(accent, 0.55));
+    tile.style.setProperty('--tc-glow',   hexToRgba(accent, 0.22));
     tile.onclick = () => _openFramework(fw);
     tile.innerHTML =
       '<div class="fw-tile-icon">' + fw.icon + '</div>' +
