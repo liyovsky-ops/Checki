@@ -200,6 +200,7 @@ export const FRAMEWORKS = {
     { id: 'anthropicsdk', name: 'Anthropic SDK',icon: '✺',   color: '#D4A574', lang: 'Python', desc: 'SDK do modeli Claude' },
     { id: 'llamaindex',   name: 'LlamaIndex',   icon: '🦙',  color: '#fbaf3f', lang: 'Python', desc: 'Framework RAG na własnych danych' },
     { id: 'pydanticai',   name: 'Pydantic AI',  icon: '🤖',  color: '#E92063', lang: 'Python', desc: 'Type-safe agenty, model-agnostic' },
+    { id: 'huggingface',  name: 'Hugging Face', icon: '🤗',  color: '#ffd21e', lang: 'Python', desc: 'Centrum modeli i transformerów' },
     { id: 'pytorch',      name: 'PyTorch',      icon: '🔥',  color: '#ee4c2c', lang: 'Python', desc: 'ML/research od Meta' },
     { id: 'tensorflow',   name: 'TensorFlow',   icon: '🧠',  color: '#ff6f00', lang: 'Python', desc: 'ML na masową skalę od Google' },
   ],
