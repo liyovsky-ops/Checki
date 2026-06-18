@@ -1,0 +1,209 @@
+title: Ekosystem — modele, observability, integracje
+
+items:
+  - name: Modele — OpenAI, Anthropic, Gemini, Groq
+    desc: >
+      Pydantic AI jest model-agnostic — zmiana modelu to zmiana jednego stringa.
+      Każdy provider ma własny pakiet. Format: "provider:model-name".
+    code: |
+      from pydantic_ai import Agent
+
+      # Anthropic Claude (pip install pydantic-ai-slim[anthropic])
+      agent_claude = Agent(model="anthropic:claude-sonnet-4-6")
+
+      # OpenAI GPT (pip install pydantic-ai-slim[openai])
+      agent_gpt = Agent(model="openai:gpt-4o")
+
+      # Google Gemini (pip install pydantic-ai-slim[google])
+      agent_gemini = Agent(model="google-gla:gemini-2.0-flash")
+
+      # Groq — szybki inference Llama (pip install pydantic-ai-slim[groq])
+      agent_groq = Agent(model="groq:llama-3.1-70b-versatile")
+
+      # Ollama — lokalny LLM (pip install pydantic-ai-slim[openai])
+      from pydantic_ai.models.openai import OpenAIModel
+      from openai import AsyncOpenAI
+      ollama_client = AsyncOpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
+      agent_ollama  = Agent(model=OpenAIModel("llama3.2", openai_client=ollama_client))
+
+      # A/B test modeli — ten sam agent, różne modele
+      async def compare_models(question: str):
+          r_claude = await agent_claude.run(question)
+          r_gpt    = await agent_gpt.run(question)
+          return {"claude": r_claude.data, "gpt": r_gpt.data}
+
+  - name: Logfire — observability i tracing
+    desc: >
+      Logfire to oficjalne narzędzie observability od Pydantic team. Natywna integracja
+      z Pydantic AI — bez konfiguracji. Śledzi każde wywołanie agenta: model, tokeny,
+      latency, tool calls, errors. Dashboard w logfire.pydantic.dev.
+    code: |
+      # pip install logfire[pydantic-ai]
+
+      import logfire
+      from pydantic_ai import Agent
+
+      # Jedno wywołanie konfiguruje wszystko
+      logfire.configure(token="your_logfire_token")
+      logfire.instrument_pydantic_ai()  # automatyczny tracing wszystkich agentów
+
+      agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          system_prompt="Asystent sprzedaży.",
+      )
+
+      # Każde wywołanie automatycznie śledzone w Logfire:
+      result = await agent.run("Jaki jest status zamówienia #1234?")
+
+      # W dashboard widzisz:
+      # - Czas wykonania (total + per tool call)
+      # - Zużycie tokenów i koszty
+      # - Tool calls z argumentami i wynikami
+      # - Błędy i retry attempts
+      # - Cały history messages
+
+      # Dodaj własne spany
+      with logfire.span("process-order", order_id="1234"):
+          result = await agent.run("Przetwórz zamówienie")
+          logfire.info("Order processed", result=result.data)
+
+  - name: FastAPI integracja — wzorzec produkcyjny
+    desc: >
+      Pełny wzorzec FastAPI + Pydantic AI — lifespan do inicjalizacji, Depends do
+      wstrzykiwania deps, streaming przez SSE, error handling.
+    code: |
+      from contextlib import asynccontextmanager
+      from fastapi import FastAPI, Depends, HTTPException
+      from fastapi.responses import StreamingResponse
+      from pydantic import BaseModel
+      from pydantic_ai import Agent
+      import httpx
+
+      # Deps z HTTP client
+      @dataclass
+      class Deps:
+          http_client: httpx.AsyncClient
+
+      agent = Agent(model="anthropic:claude-sonnet-4-6", deps_type=Deps)
+
+      # Global HTTP client zarządzany przez lifespan
+      http_client: httpx.AsyncClient | None = None
+
+      @asynccontextmanager
+      async def lifespan(app: FastAPI):
+          global http_client
+          http_client = httpx.AsyncClient(timeout=30.0)
+          yield
+          await http_client.aclose()
+
+      app = FastAPI(lifespan=lifespan)
+
+      async def get_deps():
+          return Deps(http_client=http_client)
+
+      class ChatRequest(BaseModel):
+          message: str
+
+      @app.post("/chat")
+      async def chat(req: ChatRequest, deps: Deps = Depends(get_deps)):
+          result = await agent.run(req.message, deps=deps)
+          return {"response": result.data, "usage": result.usage().model_dump()}
+
+      @app.post("/chat/stream")
+      async def chat_stream(req: ChatRequest, deps: Deps = Depends(get_deps)):
+          async def generate():
+              async with agent.run_stream(req.message, deps=deps) as result:
+                  async for text in result.stream_text(delta=True):
+                      yield f"data: {text}\n\n"
+              yield "data: [DONE]\n\n"
+          return StreamingResponse(generate(), media_type="text/event-stream")
+
+  - name: pytest + TestModel — testowanie agentów
+    desc: >
+      Pełny setup testów dla agentów Pydantic AI — TestModel do unit testów bez API,
+      pytest.mark.asyncio, fixtures dla deps i VCR/cassetes do integracyjnych.
+    code: |
+      # pip install pytest pytest-asyncio pydantic-ai
+
+      import pytest
+      from pydantic_ai import Agent
+      from pydantic_ai.models.test import TestModel
+      from pydantic import BaseModel
+      from dataclasses import dataclass
+
+      class SummaryResult(BaseModel):
+          title: str
+          points: list[str]
+
+      @dataclass
+      class Deps:
+          db_url: str
+
+      summarizer = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          result_type=SummaryResult,
+          deps_type=Deps,
+      )
+
+      # Fixture dla deps
+      @pytest.fixture
+      def test_deps():
+          return Deps(db_url="sqlite:///test.db")
+
+      # Unit test z TestModel — deterministyczny, zero kosztów
+      @pytest.mark.asyncio
+      async def test_summarizer_returns_structured_result(test_deps):
+          test_model = TestModel(custom_result_args={
+              "title":  "Test Summary",
+              "points": ["Point A", "Point B"],
+          })
+          with summarizer.override(model=test_model):
+              result = await summarizer.run("Summarize this text", deps=test_deps)
+
+          assert isinstance(result.data, SummaryResult)
+          assert len(result.data.points) == 2
+          assert result.data.title == "Test Summary"
+
+  - name: Pydantic AI z LlamaIndex — RAG Agent
+    desc: >
+      Połączenie Pydantic AI (agenty, type safety) z LlamaIndex (RAG, ingestion).
+      Pydantic AI agent ma narzędzie które odpytuje LlamaIndex QueryEngine.
+      Idealne połączenie dla produkcyjnych chatbotów na dokumentach.
+    code: |
+      from pydantic import BaseModel
+      from pydantic_ai import Agent, RunContext
+      from llama_index.core import VectorStoreIndex
+      from dataclasses import dataclass
+
+      @dataclass
+      class RAGDeps:
+          query_engine: VectorStoreIndex
+
+      class RAGResponse(BaseModel):
+          answer: str
+          sources: list[str]
+          confidence: float  # 0.0-1.0
+
+      rag_agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          result_type=RAGResponse,
+          deps_type=RAGDeps,
+          system_prompt=(
+              "Odpowiadaj na pytania wyłącznie na podstawie narzędzia search_docs. "
+              "Jeśli nie znajdziesz odpowiedzi, powiedz to wyraźnie."
+          ),
+      )
+
+      @rag_agent.tool
+      async def search_docs(ctx: RunContext[RAGDeps], query: str) -> str:
+          """Przeszukaj bazę dokumentów."""
+          response = await ctx.deps.query_engine.aquery(query)
+          sources = [n.text[:200] for n in response.source_nodes]
+          return f"Wyniki: {response}\n\nŹródła: {sources}"
+
+      # Użycie
+      index      = VectorStoreIndex.from_documents(documents)
+      deps       = RAGDeps(query_engine=index.as_query_engine(use_async=True))
+      result     = await rag_agent.run("Co mówi polityka prywatności o danych?", deps=deps)
+      print(result.data.answer)
+      print(f"Pewność: {result.data.confidence:.0%}")

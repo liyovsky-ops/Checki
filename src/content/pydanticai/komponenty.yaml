@@ -1,0 +1,183 @@
+title: Agenci i Dependency Injection
+
+items:
+  - name: System prompt — statyczny i dynamiczny
+    desc: >
+      System prompt możesz podać jako string (statyczny) lub przez @agent.system_prompt
+      decorator (dynamiczny — ma dostęp do RunContext i deps). Możesz też łączyć oba.
+      Dynamiczny prompt generuje się przy każdym uruchomieniu agenta.
+    code: |
+      from dataclasses import dataclass
+      from pydantic_ai import Agent, RunContext
+
+      @dataclass
+      class UserDeps:
+          user_name: str
+          user_role: str
+          db_url: str
+
+      agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          deps_type=UserDeps,
+          system_prompt="Jesteś pomocnym asystentem firmy.",  # statyczny
+      )
+
+      # Dynamiczny — generowany przy każdym run()
+      @agent.system_prompt
+      async def dynamic_system_prompt(ctx: RunContext[UserDeps]) -> str:
+          return (
+              f"Rozmawiasz z {ctx.deps.user_name} (rola: {ctx.deps.user_role}). "
+              f"Dostosuj odpowiedź do poziomu użytkownika. "
+              f"Dziś jest {datetime.now().strftime('%Y-%m-%d')}."
+          )
+
+      # Uruchom z deps
+      result = await agent.run(
+          "Co mam zrobić żeby zoptymalizować bazę danych?",
+          deps=UserDeps(user_name="Łukasz", user_role="senior_dev", db_url="...")
+      )
+      print(result.data)
+
+  - name: Deps — dependency injection dla agentów
+    desc: >
+      Deps to jak FastAPI Depends — wstrzykujesz DB session, HTTP client, user context
+      do agenta zamiast używać globalnych zmiennych. Każde narzędzie i dynamic prompt
+      dostaje ctx.deps. Idealne do testowania — podmień deps na mock.
+    code: |
+      import httpx
+      from dataclasses import dataclass
+      from pydantic_ai import Agent, RunContext
+
+      @dataclass
+      class AppDeps:
+          http_client: httpx.AsyncClient
+          api_key: str
+          user_id: int
+
+      search_agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          deps_type=AppDeps,
+          system_prompt="Używaj narzędzia search żeby odpowiedzieć na pytania.",
+      )
+
+      @search_agent.tool
+      async def search_web(ctx: RunContext[AppDeps], query: str) -> str:
+          """Przeszukaj internet w poszukiwaniu informacji."""
+          response = await ctx.deps.http_client.get(
+              "https://api.search.example.com/search",
+              params={"q": query, "key": ctx.deps.api_key},
+          )
+          results = response.json()
+          return "\n".join(r["snippet"] for r in results["items"][:3])
+
+      # FastAPI endpoint
+      @app.get("/ask")
+      async def ask(question: str, user_id: int = Depends(get_current_user)):
+          async with httpx.AsyncClient() as client:
+              result = await search_agent.run(
+                  question,
+                  deps=AppDeps(http_client=client, api_key=API_KEY, user_id=user_id)
+              )
+          return {"answer": result.data}
+
+  - name: Result Validators — walidacja odpowiedzi agenta
+    desc: >
+      @agent.result_validator dekorator wywołuje się po każdym wyniku — możesz zwalidować
+      logicznie i rzucić ModelRetry żeby LLM spróbował ponownie. Idealne do wymuszania
+      reguł biznesowych których nie da się wyrazić w Pydantic schema.
+    code: |
+      from pydantic import BaseModel
+      from pydantic_ai import Agent, RunContext, ModelRetry
+
+      class SQLQuery(BaseModel):
+          query: str
+          explanation: str
+          estimated_rows: int
+
+      sql_agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          result_type=SQLQuery,
+          system_prompt="Generuj bezpieczne zapytania SQL SELECT (tylko read-only).",
+      )
+
+      @sql_agent.result_validator
+      async def validate_sql(ctx: RunContext, result: SQLQuery) -> SQLQuery:
+          q = result.query.strip().upper()
+
+          # Blokuj destrukcyjne operacje
+          forbidden = ["DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "TRUNCATE"]
+          for keyword in forbidden:
+              if keyword in q:
+                  raise ModelRetry(
+                      f"Zapytanie zawiera '{keyword}' — dozwolone tylko SELECT. Popraw."
+                  )
+
+          if not q.startswith("SELECT"):
+              raise ModelRetry("Zapytanie musi zaczynać się od SELECT.")
+
+          return result
+
+      result = await sql_agent.run("Pokaż mi 10 najnowszych zamówień z tabeli orders")
+      print(result.data.query)       # bezpieczny SELECT
+      print(result.data.explanation) # "Pobiera 10 ostatnich zamówień..."
+
+  - name: Conversation history — multi-turn
+    desc: >
+      message_history parametr w run() kontynuuje rozmowę. result.new_messages() zwraca
+      tylko nowe wiadomości (do zapisania do historii). result.all_messages() to cała historia
+      razem z nowymi.
+    code: |
+      from pydantic_ai import Agent
+      from pydantic_ai.messages import ModelMessage
+
+      agent = Agent(model="anthropic:claude-sonnet-4-6")
+
+      # Przechowuj historię rozmowy
+      conversation: list[ModelMessage] = []
+
+      async def chat(user_message: str) -> str:
+          result = await agent.run(
+              user_message,
+              message_history=conversation,
+          )
+          # Dołącz nowe wiadomości do historii
+          conversation.extend(result.new_messages())
+          return result.data
+
+      # Przykład rozmowy
+      r1 = await chat("Mam na imię Łukasz i buduję aplikację FastAPI.")
+      r2 = await chat("Jak się nazywam?")   # pamięta: "Masz na imię Łukasz"
+      r3 = await chat("Co buduję?")          # pamięta: "Budujesz aplikację FastAPI"
+
+  - name: Retry — automatyczne ponawianie przy błędzie
+    desc: >
+      retries parametr w Agent i @agent.tool kontroluje ile razy LLM może spróbować ponownie
+      przy błędzie walidacji lub ModelRetry. Domyślnie 1 retry. Przy narzędziach —
+      jeśli tool rzuci ModelRetry, LLM dostaje informację o błędzie i próbuje inaczej.
+    code: |
+      from pydantic_ai import Agent, RunContext, ModelRetry
+
+      agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          retries=3,   # max 3 próby dla result validation
+      )
+
+      @agent.tool(retries=5)   # max 5 prób dla tego konkretnego narzędzia
+      async def get_stock_price(ctx: RunContext, ticker: str) -> float:
+          """Pobierz aktualną cenę akcji."""
+          ticker = ticker.upper().strip()
+
+          if len(ticker) > 5 or not ticker.isalpha():
+              raise ModelRetry(
+                  f"'{ticker}' to nieprawidłowy ticker. "
+                  "Ticker to 1-5 wielkich liter, np. AAPL, MSFT, GOOGL."
+              )
+
+          price = await fetch_stock_api(ticker)
+          if price is None:
+              raise ModelRetry(f"Nie znaleziono tickera '{ticker}'. Sprawdź czy istnieje.")
+
+          return price
+
+      result = await agent.run("Podaj cenę akcji Apple Inc.")
+      # Jeśli LLM wyśle "Apple" zamiast "AAPL" — ModelRetry poprawia próbę

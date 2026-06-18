@@ -1,0 +1,94 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Pydantic AI?
+  firstComponent: Pierwszy agent
+  firstComponentLang: python
+
+intro:
+  title: Czym jest Pydantic AI?
+  desc: >
+    Pydantic AI to framework do budowania agentów AI w Pythonie od twórcy Pydantic —
+    Samuel Colvin. Kluczowe założenie: agenty jak zwykły Python, nie jak magiczne
+    abstrakcje. Jeden Agent może używać OpenAI, Anthropic, Gemini bez zmiany kodu —
+    model-agnostic. Typowane wejścia i wyjścia przez Pydantic BaseModel. Deps (dependencies)
+    to dependency injection dla agentów — przekazujesz context (DB, HTTP client, user)
+    przez RunContext zamiast przez global state. Natywna integracja z Logfire do
+    observability.
+
+concepts:
+  - title: Agent
+    desc: >
+      Główna klasa — definiujesz model, result_type, system_prompt i narzędzia.
+      agent.run() wykonuje synchronicznie, agent.run_sync() z async, agent.run_stream()
+      streamuje. Każde uruchomienie zwraca RunResult z typed wynikiem.
+    icon: "🤖"
+  - title: Result Type — typed output
+    desc: >
+      result_type=BaseModel wymusza żeby LLM zwrócił poprawny JSON pasujący do schematu.
+      Pydantic AI automatycznie tworzy tool "final_result" przez który LLM raportuje
+      ustrukturyzowany wynik. Brak halucynacji w formacie — retry jeśli JSON błędny.
+    icon: "📋"
+  - title: Deps — Dependency Injection
+    desc: >
+      Deps to typ przekazywany do RunContext — jak FastAPI Depends ale dla agentów.
+      Definiujesz dataclass lub BaseModel z DB session, HTTP client, user data itp.
+      Każde narzędzie i dynamic system prompt ma dostęp przez ctx.deps.
+    icon: "💉"
+  - title: RunContext
+    desc: >
+      RunContext[DepsType] przekazywany do każdego narzędzia i dynamicznego systemu.
+      Zawiera: ctx.deps (twoje deps), ctx.messages (historia), ctx.model,
+      ctx.usage (tokeny). Jedyna droga komunikacji tool → agent context.
+    icon: "🔄"
+  - title: Tool
+    desc: >
+      Narzędzie to zwykła funkcja Pythona opatrzona @agent.tool lub @agent.tool_plain.
+      Różnica: tool_plain nie ma RunContext (nie potrzebuje deps), tool ma.
+      Schema JSON generowana automatycznie z type hints i docstring.
+    icon: "🔧"
+  - title: Model-agnostic
+    desc: >
+      Ten sam Agent działa z OpenAI, Anthropic, Google, Groq, Ollama — wystarczy zmienić
+      model parametr. Modele: openai:gpt-4o, anthropic:claude-sonnet-4-6, google-gla:gemini-2.0-flash.
+      TestModel do testów jednostkowych bez kosztów API.
+    icon: "🌐"
+
+whenToUse:
+  - Agent z typowanym, ustrukturyzowanym wyjściem (zamiast parsowania stringa)
+  - Kiedy potrzebujesz dependency injection (DB, HTTP client) w narzędziach
+  - Projekt gdzie LLM może się zmienić — OpenAI dziś, Anthropic jutro
+  - Produkcyjny agent z observability przez Logfire
+  - Zastąpienie surowego SDK gdy potrzebujesz narzędzi i retry logic
+  - Multi-agent workflow gdzie jeden agent wywołuje drugi
+
+firstComponent: |
+  # pip install pydantic-ai
+
+  from pydantic import BaseModel
+  from pydantic_ai import Agent
+
+  # Typowany wynik
+  class WeatherResult(BaseModel):
+      city: str
+      temperature_c: float
+      description: str
+      recommendation: str
+
+  # Agent — model-agnostic
+  weather_agent = Agent(
+      model="anthropic:claude-sonnet-4-6",
+      result_type=WeatherResult,
+      system_prompt=(
+          "Jesteś asystentem pogodowym. Podaj wynik jako JSON "
+          "pasujący do schematu WeatherResult."
+      ),
+  )
+
+  # Uruchom synchronicznie
+  result = weather_agent.run_sync("Jaka jest pogoda w Krakowie?")
+
+  # Typed output — nie string, nie dict
+  print(result.data.city)            # "Kraków"
+  print(result.data.temperature_c)   # 22.5
+  print(result.data.recommendation)  # "Weź lekką kurtkę"
+  print(result.usage())              # Usage(tokens=...)

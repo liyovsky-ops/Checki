@@ -1,0 +1,180 @@
+title: Structured Output — typowane odpowiedzi
+
+items:
+  - name: result_type z Pydantic BaseModel
+    desc: >
+      result_type=SomeModel wymusza że LLM zwróci JSON pasujący do schema modelu.
+      Pydantic AI tworzy narzędzie "final_result" przez które LLM raportuje wynik.
+      Przy błędzie walidacji — automatyczny retry z informacją o błędzie.
+    code: |
+      from pydantic import BaseModel, Field, validator
+      from pydantic_ai import Agent
+
+      class JobCandidate(BaseModel):
+          name: str
+          years_experience: int = Field(ge=0, le=50)
+          skills: list[str]
+          seniority: str = Field(pattern="^(junior|mid|senior|lead)$")
+          estimated_salary_pln: int = Field(ge=3000, le=100000)
+          recommendation: str = Field(description="Krótkie uzasadnienie rekomendacji")
+
+      hr_agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          result_type=JobCandidate,
+          system_prompt=(
+              "Jesteś rekruterem technicznym. Przeanalizuj CV kandydata "
+              "i zwróć ustrukturyzowaną ocenę."
+          ),
+      )
+
+      cv_text = """
+      Jan Kowalski, 8 lat doświadczenia w Python/FastAPI/PostgreSQL/Docker.
+      Ostatnio: Tech Lead w startupu (2 lata). Wcześniej: senior dev (4 lata).
+      """
+
+      result = await hr_agent.run(cv_text)
+      candidate = result.data  # JobCandidate, nie string!
+
+      print(f"{candidate.name} — {candidate.seniority}")
+      print(f"Skills: {', '.join(candidate.skills)}")
+      print(f"Szacowany próg: {candidate.estimated_salary_pln:,} PLN")
+
+  - name: TypedDict jako result_type
+    desc: >
+      TypedDict jako result_type gdy nie potrzebujesz metod Pydantic, tylko typed dict.
+      Przydatne przy integracji z kodem który oczekuje zwykłych dict (JSON API).
+    code: |
+      from typing import TypedDict
+      from pydantic_ai import Agent
+
+      class SentimentResult(TypedDict):
+          sentiment: str        # "positive" | "negative" | "neutral"
+          confidence: float     # 0.0-1.0
+          keywords: list[str]   # kluczowe słowa decydujące o sentymencie
+          summary: str          # 1-2 zdaniowe podsumowanie
+
+      sentiment_agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          result_type=SentimentResult,
+          system_prompt="Analizuj sentyment tekstu i zwróć ustrukturyzowany wynik.",
+      )
+
+      result = await sentiment_agent.run(
+          "Produkt jest genialny, ale dostawa była koszmarnie wolna."
+      )
+
+      data = result.data  # SentimentResult (TypedDict)
+      print(data["sentiment"])    # "negative" lub "mixed"
+      print(data["confidence"])   # 0.82
+      print(data["keywords"])     # ["genialny", "koszmarny", "dostawa"]
+
+  - name: Union result_type — różne typy odpowiedzi
+    desc: >
+      result_type=Union[...] gdy agent może zwrócić różne rodzaje odpowiedzi.
+      LLM wybiera odpowiedni typ na podstawie kontekstu. Pydantic AI generuje
+      osobne narzędzia final_result dla każdego typu w Union.
+    code: |
+      from pydantic import BaseModel
+      from pydantic_ai import Agent
+
+      class SuccessResponse(BaseModel):
+          data: dict
+          message: str
+
+      class ErrorResponse(BaseModel):
+          error_code: str
+          error_message: str
+          suggested_fix: str
+
+      class NotFoundResponse(BaseModel):
+          query: str
+          suggestions: list[str]
+
+      routing_agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          result_type=SuccessResponse | ErrorResponse | NotFoundResponse,
+          system_prompt="Przetwarzaj zapytania i zwracaj odpowiedni typ odpowiedzi.",
+      )
+
+      result = await routing_agent.run("Znajdź użytkownika o ID 12345")
+
+      match result.data:
+          case SuccessResponse(data=d, message=m):
+              print(f"OK: {m}, dane: {d}")
+          case ErrorResponse(error_code=code, suggested_fix=fix):
+              print(f"Błąd {code}: {fix}")
+          case NotFoundResponse(suggestions=s):
+              print(f"Nie znaleziono. Może chodziło o: {', '.join(s)}")
+
+  - name: result_type=str — prosty string output
+    desc: >
+      Domyślny result_type to str — LLM odpowiada swobodnie. Używaj gdy nie potrzebujesz
+      struktury. Możesz też zdefiniować własny validator jako result_type przez
+      niestandardową Pydantic annotację.
+    code: |
+      from pydantic import BaseModel
+      from pydantic_ai import Agent
+      from typing import Annotated
+
+      # Prosty string — domyślny
+      simple_agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          system_prompt="Odpowiadaj zwięźle po polsku.",
+      )
+      result = await simple_agent.run("Co to jest REST API?")
+      print(result.data)  # string
+
+      # Lista stringów
+      list_agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          result_type=list[str],
+          system_prompt="Zwróć listę kroków jako JSON array stringów.",
+      )
+      steps = await list_agent.run("Jak wdrożyć aplikację Docker na VPS?")
+      for i, step in enumerate(steps.data, 1):
+          print(f"{i}. {step}")
+
+  - name: Wieloetapowe wyodrębnianie danych (data extraction)
+    desc: >
+      Pydantic AI świetnie nadaje się do wyciągania strukturyzowanych danych z
+      nieustrukturyzowanego tekstu — faktur, CV, emaili, logów. To alternatywa
+      dla biblioteki instructor.
+    code: |
+      from pydantic import BaseModel
+      from pydantic_ai import Agent
+      from datetime import date
+
+      class InvoiceData(BaseModel):
+          invoice_number: str
+          invoice_date: date
+          seller_name: str
+          seller_nip: str
+          buyer_name: str
+          net_amount: float
+          vat_rate: float
+          gross_amount: float
+          payment_deadline: date | None = None
+          bank_account: str | None = None
+
+      invoice_agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          result_type=InvoiceData,
+          system_prompt=(
+              "Wyciągaj dane z faktur VAT. Kwoty jako liczby float bez symbolu waluty. "
+              "Daty w formacie YYYY-MM-DD. NIP bez myślników."
+          ),
+      )
+
+      invoice_text = """
+      FAKTURA VAT nr FV/2025/03/0042
+      Data wystawienia: 15.03.2025
+      Sprzedawca: TechSolutions Sp. z o.o., NIP: 123-456-78-90
+      Nabywca: Klient ABC Sp. z o.o.
+      Wartość netto: 10 000,00 PLN, VAT 23%: 2 300,00 PLN
+      Wartość brutto: 12 300,00 PLN
+      Termin płatności: 29.03.2025
+      """
+
+      result = await invoice_agent.run(invoice_text)
+      invoice = result.data
+      print(f"FV nr {invoice.invoice_number}: {invoice.gross_amount:.2f} PLN")

@@ -1,0 +1,117 @@
+title: Pydantic AI — komendy i snippety
+
+groups:
+  - name: Instalacja
+    items:
+      - cmd: pip install pydantic-ai
+        desc: Pełna instalacja (wszystkie providerzy)
+      - cmd: 'pip install "pydantic-ai-slim[anthropic]"'
+        desc: Tylko Anthropic Claude (minimalny footprint)
+      - cmd: 'pip install "pydantic-ai-slim[openai]"'
+        desc: Tylko OpenAI GPT
+      - cmd: 'pip install "pydantic-ai-slim[anthropic,openai,google]"'
+        desc: Anthropic + OpenAI + Google Gemini
+      - cmd: pip install logfire[pydantic-ai]
+        desc: Observability — Logfire z integracją Pydantic AI
+
+  - name: Tworzenie agenta
+    items:
+      - cmd: 'agent = Agent(model="anthropic:claude-sonnet-4-6")'
+        desc: Najprostszy agent — string output, bez deps
+      - cmd: 'agent = Agent(model="anthropic:claude-sonnet-4-6", result_type=MyModel)'
+        desc: Agent z typowanym outputem (Pydantic BaseModel)
+      - cmd: 'agent = Agent(model="anthropic:claude-sonnet-4-6", deps_type=MyDeps)'
+        desc: Agent z dependency injection
+      - cmd: 'agent = Agent(model="anthropic:claude-sonnet-4-6", retries=3)'
+        desc: Max 3 próby przy błędzie walidacji
+      - cmd: 'agent = Agent(model="openai:gpt-4o")'
+        desc: Ten sam agent z GPT-4o (model-agnostic)
+      - cmd: 'agent = Agent(model="google-gla:gemini-2.0-flash")'
+        desc: Google Gemini jako model
+
+  - name: Uruchamianie agenta
+    items:
+      - cmd: result = agent.run_sync("Pytanie")
+        desc: Uruchom synchronicznie (nie-async kontekst)
+      - cmd: result = await agent.run("Pytanie")
+        desc: Uruchom asynchronicznie (FastAPI, asyncio)
+      - cmd: 'result = await agent.run("Pytanie", deps=my_deps)'
+        desc: Uruchom z dependency injection
+      - cmd: 'result = await agent.run("Odpowiedź", message_history=history)'
+        desc: Kontynuuj rozmowę z historią
+      - cmd: print(result.data)
+        desc: Typowany wynik (str, BaseModel lub TypedDict)
+      - cmd: print(result.usage())
+        desc: Zużycie tokenów (input, output, total)
+      - cmd: history.extend(result.new_messages())
+        desc: Dołącz nowe wiadomości do historii rozmowy
+
+  - name: Streaming
+    items:
+      - cmd: 'async with agent.run_stream("Pytanie") as result: ...'
+        desc: Streaming jako async context manager
+      - cmd: 'async for text in result.stream_text(): print(text)'
+        desc: Streamuj pełny tekst (każda iteracja = coraz dłuższy string)
+      - cmd: 'async for text in result.stream_text(delta=True): print(text, end="")'
+        desc: Streamuj tylko delta (nowe tokeny — szybsze dla SSE)
+      - cmd: final = await result.get_data()
+        desc: Poczekaj na kompletny wynik (walidowany Pydantic model)
+      - cmd: print(result.usage())
+        desc: Tokeny po zakończeniu streamingu
+
+  - name: Narzędzia (Tools)
+    items:
+      - cmd: '@agent.tool\nasync def my_tool(ctx: RunContext[Deps], param: str) -> str: ...'
+        desc: Narzędzie z RunContext (ma dostęp do deps)
+      - cmd: '@agent.tool_plain\ndef pure_tool(param: str) -> str: ...'
+        desc: Narzędzie bez RunContext (pure function)
+      - cmd: raise ModelRetry("Błąd — spróbuj z innymi parametrami")
+        desc: Poproś LLM o ponowne wywołanie narzędzia z poprawionymi argumentami
+      - cmd: '@agent.tool(retries=5)\nasync def flaky_tool(ctx, x: str) -> str: ...'
+        desc: Narzędzie z własnym limitem retry
+      - cmd: '@agent.tool(prepare=check_permission)\nasync def admin_tool(ctx, ...): ...'
+        desc: Narzędzie z dynamiczną kontrolą dostępu (prepare function)
+
+  - name: System prompt i walidacja
+    items:
+      - cmd: '@agent.system_prompt\nasync def dynamic_prompt(ctx: RunContext[Deps]) -> str: ...'
+        desc: Dynamiczny system prompt z dostępem do deps
+      - cmd: '@agent.result_validator\nasync def validate(ctx: RunContext, result: MyModel) -> MyModel: ...'
+        desc: Walidator logiki biznesowej po odpowiedzi LLM
+      - cmd: raise ModelRetry("Wynik niezgodny z regułami — popraw")
+        desc: W result_validator — kazuj LLM spróbować ponownie
+      - cmd: 'result_type=str | BaseModel1 | BaseModel2'
+        desc: Union result_type — LLM wybiera odpowiedni typ
+
+  - name: Modele i konfiguracja
+    items:
+      - cmd: 'from pydantic_ai.models.anthropic import AnthropicModel; model = AnthropicModel("claude-opus-4-8")'
+        desc: Zaawansowana konfiguracja modelu Anthropic
+      - cmd: 'with agent.override(model="openai:gpt-4o"): result = await agent.run(...)'
+        desc: Tymczasowo zmień model (context manager)
+      - cmd: 'from pydantic_ai.models.test import TestModel; TestModel(custom_result_text="...")'
+        desc: TestModel — mock LLM do testów jednostkowych
+      - cmd: 'with agent.override(model=TestModel(custom_result_args={...})): ...'
+        desc: Override na TestModel dla testów (zero kosztów API)
+
+  - name: Logfire — observability
+    items:
+      - cmd: logfire.configure(token="your_token")
+        desc: Konfiguracja Logfire
+      - cmd: logfire.instrument_pydantic_ai()
+        desc: Automatyczny tracing wszystkich agentów Pydantic AI
+      - cmd: 'with logfire.span("operation", key="value"): ...'
+        desc: Własny span do śledzenia operacji
+      - cmd: logfire.info("Wiadomość", **extra_data)
+        desc: Ustrukturyzowany log z danymi
+
+  - name: FastAPI wzorzec
+    items:
+      - cmd: '@asynccontextmanager\nasync def lifespan(app): http_client = httpx.AsyncClient(); yield; await http_client.aclose()'
+        desc: Lifespan — inicjalizuj HTTP client raz przy starcie aplikacji
+      - cmd: 'async def get_deps() -> Deps: return Deps(http_client=http_client)'
+        desc: FastAPI Depends dla deps agenta
+      - cmd: 'result = await agent.run(req.message, deps=await get_deps())'
+        desc: Uruchom agenta w FastAPI endpoint
+      - cmd: 'return StreamingResponse(generate(), media_type="text/event-stream")'
+        desc: Streaming SSE response w FastAPI

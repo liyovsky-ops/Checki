@@ -1,0 +1,200 @@
+title: Streaming i Multi-agent
+
+items:
+  - name: run_stream() — streaming odpowiedzi
+    desc: >
+      agent.run_stream() streamuje odpowiedź token po tokenie. Zwraca StreamedRunResult
+      jako async context manager. stream_text() streamuje tekst, usage_so_far() podaje
+      aktualne zużycie tokenów. Kluczowe dla FastAPI SSE.
+    code: |
+      from pydantic_ai import Agent
+
+      agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          system_prompt="Odpowiadaj szczegółowo.",
+      )
+
+      # Streaming do terminala
+      async with agent.run_stream("Opisz szczegółowo architekturę mikroserwisów") as result:
+          async for text in result.stream_text():
+              print(text, end="", flush=True)
+          print()
+          print(f"Tokeny: {result.usage()}")
+
+      # FastAPI SSE endpoint z streaming
+      from fastapi import FastAPI
+      from fastapi.responses import StreamingResponse
+
+      app = FastAPI()
+
+      @app.get("/stream")
+      async def stream_response(question: str):
+          async def generate():
+              async with agent.run_stream(question) as result:
+                  async for text in result.stream_text(delta=True):
+                      # delta=True = tylko nowy fragment, nie cały tekst
+                      yield f"data: {text}\n\n"
+              yield "data: [DONE]\n\n"
+
+          return StreamingResponse(generate(), media_type="text/event-stream")
+
+  - name: Streaming z typed result_type
+    desc: >
+      Przy result_type=BaseModel streaming streamuje tekst odpowiedzi, ale finalna
+      walidacja następuje po zakończeniu. stream() daje dostęp do strukturyzowanego
+      partial wyniku na bieżąco przez structured_stream().
+    code: |
+      from pydantic import BaseModel
+      from pydantic_ai import Agent
+
+      class Report(BaseModel):
+          title: str
+          summary: str
+          key_points: list[str]
+          conclusion: str
+
+      agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          result_type=Report,
+          system_prompt="Generuj szczegółowe raporty.",
+      )
+
+      async with agent.run_stream("Raport z analizy rynku AI w Polsce 2025") as result:
+          # Streamuj surowy tekst
+          async for chunk in result.stream_text(delta=True):
+              print(chunk, end="", flush=True)
+
+          print("\n--- Wynik ustrukturyzowany ---")
+          final = await result.get_data()  # czeka na kompletny wynik i waliduje
+          print(f"Tytuł: {final.title}")
+          print(f"Punkty: {len(final.key_points)}")
+          print(f"Tokeny: {result.usage()}")
+
+  - name: Agent jako narzędzie — multi-agent
+    desc: >
+      Jeden agent może wywołać inny agent przez agent.run_sync() lub await agent.run()
+      wewnątrz narzędzia. Wzorzec orchestrator/worker — główny agent deleguje
+      specjalistycznym sub-agentom.
+    code: |
+      from pydantic import BaseModel
+      from pydantic_ai import Agent, RunContext
+
+      # Sub-agenty specjalistyczne
+      class CodeReview(BaseModel):
+          issues: list[str]
+          severity: str  # "critical" | "warning" | "info"
+          fixed_code: str
+
+      code_reviewer = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          result_type=CodeReview,
+          system_prompt="Jesteś ekspertem code review. Znajdź błędy bezpieczeństwa i jakości.",
+      )
+
+      class SecurityAudit(BaseModel):
+          vulnerabilities: list[str]
+          risk_level: str  # "high" | "medium" | "low"
+          recommendations: list[str]
+
+      security_auditor = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          result_type=SecurityAudit,
+          system_prompt="Jesteś audytorem bezpieczeństwa. Szukaj luk OWASP Top 10.",
+      )
+
+      # Orchestrator łączący wyniki
+      orchestrator = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          system_prompt="Koordynujesz analizę kodu i bezpieczeństwa.",
+      )
+
+      @orchestrator.tool_plain
+      async def review_code(code: str) -> str:
+          """Wykonaj code review kodu Python."""
+          result = await code_reviewer.run(f"Przejrzyj kod:\n```python\n{code}\n```")
+          return f"Code review: {result.data.issues}, severity: {result.data.severity}"
+
+      @orchestrator.tool_plain
+      async def audit_security(code: str) -> str:
+          """Wykonaj audyt bezpieczeństwa kodu."""
+          result = await security_auditor.run(f"Zaudytuj:\n```python\n{code}\n```")
+          return f"Luki: {result.data.vulnerabilities}, ryzyko: {result.data.risk_level}"
+
+  - name: Parallel tool execution — równoległe narzędzia
+    desc: >
+      Claude (Anthropic) i GPT-4o (OpenAI) wspierają wywołanie wielu narzędzi
+      równolegle w jednej odpowiedzi. Pydantic AI obsługuje to automatycznie —
+      wszystkie tool calls z jednej odpowiedzi wykonują się przez asyncio.gather().
+    code: |
+      from pydantic_ai import Agent, RunContext
+      from dataclasses import dataclass
+      import asyncio, httpx
+
+      @dataclass
+      class Deps:
+          client: httpx.AsyncClient
+
+      agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          deps_type=Deps,
+          system_prompt="Zbieraj dane z wielu źródeł równolegle.",
+      )
+
+      @agent.tool
+      async def get_weather(ctx: RunContext[Deps], city: str) -> dict:
+          """Pobierz pogodę dla miasta."""
+          r = await ctx.deps.client.get(f"/weather/{city}")
+          return r.json()
+
+      @agent.tool
+      async def get_news(ctx: RunContext[Deps], topic: str) -> list[str]:
+          """Pobierz aktualne wiadomości na temat."""
+          r = await ctx.deps.client.get(f"/news?q={topic}")
+          return r.json()["headlines"]
+
+      @agent.tool
+      async def get_exchange_rate(ctx: RunContext[Deps], currency: str) -> float:
+          """Pobierz kurs wymiany waluty do PLN."""
+          r = await ctx.deps.client.get(f"/rates/{currency}")
+          return r.json()["rate"]
+
+      # Jeśli LLM wywoła wszystkie 3 narzędzia jednocześnie —
+      # Pydantic AI wykona je równolegle (asyncio.gather)
+      # zamiast sekwencyjnie. 3x szybsze niż sekwencyjne wywołania!
+
+  - name: TestModel — testowanie bez kosztów API
+    desc: >
+      TestModel symuluje LLM bez rzeczywistego wywołania API. Możesz ustawić custom_result_text
+      lub custom_result_args (dla typed agents). Idealny do testów jednostkowych.
+    code: |
+      from pydantic_ai import Agent
+      from pydantic_ai.models.test import TestModel
+      from pydantic import BaseModel
+      import pytest
+
+      class BookingResult(BaseModel):
+          confirmed: bool
+          booking_id: str
+          message: str
+
+      booking_agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          result_type=BookingResult,
+      )
+
+      @pytest.mark.asyncio
+      async def test_booking_agent():
+          test_model = TestModel(
+              custom_result_args={
+                  "confirmed":  True,
+                  "booking_id": "BK-12345",
+                  "message":    "Rezerwacja potwierdzona",
+              }
+          )
+          # Override modelu na TestModel
+          with booking_agent.override(model=test_model):
+              result = await booking_agent.run("Zarezerwuj stolik na 2 osoby")
+
+          assert result.data.confirmed is True
+          assert result.data.booking_id == "BK-12345"
+          # Zero kosztów API, deterministyczny wynik!

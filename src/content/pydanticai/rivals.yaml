@@ -1,0 +1,87 @@
+title: Pydantic AI vs inne frameworki agentów
+
+items:
+  - name: LangChain / LangGraph
+    desc: >
+      LangChain to najszerszy ekosystem, LangGraph to agenty jako grafy stanów.
+      Pydantic AI jest prostszy i bardziej type-safe — mniej abstrakcji, więcej Pythona.
+      LangGraph wygrywa przy złożonych multi-agent workflows z pętlami i stanem.
+    pros:
+      - Największy ekosystem — 800+ integracji, community
+      - LangGraph do złożonych agentów z kontrolą przepływu
+      - LangSmith do observability i debugowania
+      - Ogromna liczba przykładów i tutoriali
+    cons:
+      - Skomplikowane abstrakcje — trudna debugowalność
+      - Słabe type safety — dict/string wszędzie
+      - Częste breaking changes między wersjami
+      - Verbose API — dużo boilerplate
+    useWhen: Złożone multi-agent workflows, gdy potrzebujesz LangGraph state machine lub ekosystemu LangChain.
+
+  - name: Instructor
+    desc: >
+      Instructor to biblioteka wyłącznie do structured output (Pydantic z LLM) —
+      wrapuje SDK i dodaje retry/validation. Pydantic AI to pełny framework do agentów.
+      Instructor jest prostszy gdy potrzebujesz tylko extraction bez agentów.
+    pros:
+      - Minimalna biblioteka — jedna odpowiedzialność (structured output)
+      - Wsparcie dla 12+ LLM providerów
+      - Prosta integracja z istniejącym kodem
+      - Bardzo dojrzała (wcześniej niż Pydantic AI)
+    cons:
+      - Tylko structured output — brak agentów, narzędzi, dependency injection
+      - Nie ma streaming structured output
+      - Brak observability (Logfire)
+      - Nie jest model-agnostic (różna składnia per LLM)
+    useWhen: Potrzebujesz tylko wyciągania danych (extraction) bez pełnych agentów.
+
+  - name: OpenAI Agents SDK
+    desc: >
+      OpenAI's oficjalny framework do agentów (następca Swarm). Model-agnostic
+      od v1. Podobne koncepcje do Pydantic AI ale bez type safety Pydantic.
+      Pydantic AI jest bardziej Python-native i ma lepszą integrację z Pydantic v2.
+    pros:
+      - Oficjalny od OpenAI — gwarancja wsparcia
+      - Dobra integracja z OpenAI-specific features (Assistants API)
+      - Guardrails wbudowane
+      - Model-agnostic od wersji 1.0
+    cons:
+      - Słabsza integracja z Anthropic SDK
+      - Brak natywnej Pydantic walidacji (result_type)
+      - Mniejsza społeczność niż LangChain
+      - Brak odpowiednika Logfire do observability
+    useWhen: Jesteś locked-in do OpenAI i potrzebujesz oficjalnego wsparcia.
+
+  - name: CrewAI
+    desc: >
+      CrewAI to framework do tworzenia "ekip" agentów z rolami (Agent, Task, Crew).
+      Wysoki poziom abstrakcji — definiujesz role i zadania, nie kod. Pydantic AI
+      daje więcej kontroli ale wymaga więcej kodu.
+    pros:
+      - Bardzo wysoki poziom abstrakcji — szybki prototyp
+      - Intuicyjne role (researcher, writer, reviewer)
+      - Dobra dokumentacja i przykłady
+      - Wbudowany mechanizm przekazywania wyników między agentami
+    cons:
+      - Mało kontroli nad przepływem
+      - Brak type safety
+      - Trudna debugowalność — "magia" za kulisami
+      - Nie skaluje dobrze przy złożonych wymaganiach
+    useWhen: Szybki prototyp multi-agent, PoC dla klienta, gdy nie masz czasu na custom implementację.
+
+  - name: Surowy Anthropic/OpenAI SDK
+    desc: >
+      Bezpośrednie użycie SDK bez frameworka — maksymalna kontrola nad każdym wywołaniem.
+      Dobre gdy masz proste wymagania albo chcesz rozumieć co się dzieje. Pydantic AI
+      to cienka warstwa która dodaje retry, validation i DI bez utraty kontroli.
+    pros:
+      - Pełna kontrola — widzisz każde wywołanie
+      - Zero overhead frameworka
+      - Najłatwiejszy debugging
+      - Brak vendor lock-in
+    cons:
+      - Brak automatycznej walidacji output
+      - Brak retry logic przy błędzie walidacji
+      - Brak dependency injection
+      - Dużo boilerplate przy złożonych agentach
+    useWhen: Proste wywołania LLM bez agentów, lub gdy uczysz się jak działa SDK.

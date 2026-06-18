@@ -1,0 +1,160 @@
+title: Narzędzia — definiowanie i obsługa
+
+items:
+  - name: '@agent.tool — narzędzie z RunContext'
+    desc: >
+      @agent.tool dekoruje funkcję asynchroniczną lub synchroniczną. Pierwszy argument
+      MUSI być RunContext[DepsType] — przez niego dostęp do deps, messages, model.
+      Docstring staje się opisem narzędzia dla LLM. Type hints → JSON schema.
+    code: |
+      from pydantic_ai import Agent, RunContext
+      from dataclasses import dataclass
+      import httpx
+
+      @dataclass
+      class Deps:
+          http_client: httpx.AsyncClient
+
+      agent = Agent(model="anthropic:claude-sonnet-4-6", deps_type=Deps)
+
+      @agent.tool
+      async def search_docs(ctx: RunContext[Deps], query: str, limit: int = 5) -> list[dict]:
+          """Przeszukaj bazę dokumentów. Zwraca listę wyników z tytułem i fragmentem.
+
+          Args:
+              query: Fraza do wyszukania.
+              limit: Maksymalna liczba wyników (domyślnie 5).
+          """
+          resp = await ctx.http_client.get(
+              "/api/search",
+              params={"q": query, "limit": limit},
+          )
+          return resp.json()["results"]
+
+      result = await agent.run(
+          "Znajdź dokumenty o autoryzacji OAuth2",
+          deps=Deps(http_client=httpx.AsyncClient(base_url="http://localhost:8000"))
+      )
+
+  - name: '@agent.tool_plain — narzędzie bez RunContext'
+    desc: >
+      @agent.tool_plain gdy narzędzie nie potrzebuje deps ani context — prosta funkcja
+      utility. Lżejsze niż @agent.tool. Użyj kiedy narzędzie jest pure function
+      (kalkulacje, formatowanie, parsowanie) bez side effects.
+    code: |
+      from pydantic_ai import Agent
+      from datetime import datetime
+      import json
+
+      agent = Agent(model="anthropic:claude-sonnet-4-6")
+
+      @agent.tool_plain
+      def calculate_days_between(date1: str, date2: str) -> int:
+          """Oblicz liczbę dni między dwiema datami (format YYYY-MM-DD)."""
+          d1 = datetime.strptime(date1, "%Y-%m-%d")
+          d2 = datetime.strptime(date2, "%Y-%m-%d")
+          return abs((d2 - d1).days)
+
+      @agent.tool_plain
+      def format_currency(amount: float, currency: str = "PLN") -> str:
+          """Formatuj kwotę jako walutę."""
+          return f"{amount:,.2f} {currency}"
+
+      @agent.tool_plain
+      def parse_json_safely(json_string: str) -> dict | str:
+          """Spróbuj sparsować JSON — zwróć dict lub komunikat błędu."""
+          try:
+              return json.loads(json_string)
+          except json.JSONDecodeError as e:
+              return f"Błąd parsowania JSON: {e}"
+
+  - name: Tool z Pydantic modelem jako argumentem
+    desc: >
+      Argumenty narzędzia mogą być Pydantic BaseModel — LLM generuje zagnieżdżony JSON.
+      Idealne gdy narzędzie przyjmuje złożone wejście. Schema jest automatycznie
+      generowana i opisuje LLM jak wypełnić wszystkie pola.
+    code: |
+      from pydantic import BaseModel
+      from pydantic_ai import Agent, RunContext
+
+      class EmailDraft(BaseModel):
+          to: str
+          subject: str
+          body: str
+          priority: str = "normal"  # normal / high / urgent
+
+      class SearchParams(BaseModel):
+          query: str
+          filters: dict = {}
+          date_from: str | None = None
+          date_to: str | None = None
+          max_results: int = 10
+
+      agent = Agent(model="anthropic:claude-sonnet-4-6")
+
+      @agent.tool_plain
+      def send_email(draft: EmailDraft) -> str:
+          """Wyślij email na podstawie szkicu."""
+          # email_service.send(draft.to, draft.subject, draft.body, draft.priority)
+          return f"Email do {draft.to} wysłany (priorytet: {draft.priority})"
+
+      @agent.tool_plain
+      def search_database(params: SearchParams) -> list[dict]:
+          """Przeszukaj bazę danych z filtrami."""
+          return [{"id": 1, "title": f"Wynik dla: {params.query}"}]
+
+  - name: Narzędzia zarejestrowane przez prepare — dynamiczne
+    desc: >
+      prepare parametr w @agent.tool pozwala dynamicznie zdecydować czy narzędzie
+      ma być dostępne w danym wywołaniu. prepare wywołuje się przed każdym run()
+      — zwróć None żeby wyłączyć narzędzie, ToolDefinition żeby włączyć.
+    code: |
+      from pydantic_ai import Agent, RunContext
+      from pydantic_ai.tools import ToolDefinition
+
+      @dataclass
+      class Deps:
+          user_role: str  # "admin" | "user"
+
+      agent = Agent(model="anthropic:claude-sonnet-4-6", deps_type=Deps)
+
+      async def only_for_admins(
+          ctx: RunContext[Deps], tool_def: ToolDefinition
+      ) -> ToolDefinition | None:
+          """Narzędzie dostępne tylko dla adminów."""
+          if ctx.deps.user_role == "admin":
+              return tool_def   # włącz
+          return None           # wyłącz — LLM w ogóle nie wie o narzędziu
+
+      @agent.tool(prepare=only_for_admins)
+      async def delete_user(ctx: RunContext[Deps], user_id: int) -> str:
+          """Usuń użytkownika z systemu. Tylko dla administratorów."""
+          return f"Użytkownik {user_id} usunięty."
+
+  - name: Tool error handling — ToolRetryError vs wyjątek
+    desc: >
+      ToolRetryError (= ModelRetry) informuje LLM o błędzie i prosi o korektę — LLM
+      widzi błąd i próbuje z innymi parametrami. Zwykły wyjątek (ValueError, HTTPError)
+      propaguje do wywołującego i kończy agenta z błędem.
+    code: |
+      from pydantic_ai import Agent, RunContext, ModelRetry
+      import httpx
+
+      agent = Agent(model="anthropic:claude-sonnet-4-6")
+
+      @agent.tool_plain
+      async def get_user_data(user_id: int) -> dict:
+          """Pobierz dane użytkownika po ID."""
+          if user_id <= 0:
+              # LLM dostanie: "user_id musi być > 0, spróbuj ponownie"
+              raise ModelRetry(f"user_id musi być > 0, otrzymano: {user_id}")
+
+          async with httpx.AsyncClient() as client:
+              try:
+                  resp = await client.get(f"http://api/users/{user_id}")
+                  resp.raise_for_status()
+                  return resp.json()
+              except httpx.HTTPStatusError as e:
+                  if e.response.status_code == 404:
+                      raise ModelRetry(f"Użytkownik {user_id} nie istnieje. Spróbuj innego ID.")
+                  raise  # 500 = propaguj, nie retry
