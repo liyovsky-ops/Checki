@@ -1,0 +1,213 @@
+title: Czyszczenie danych
+
+items:
+  - name: Brakujące wartości — isna / dropna / fillna
+    desc: NaN (Not a Number) to reprezentacja brakujących danych w Pandas. Trzy główne strategie obsługi.
+    icon: "🕳️"
+    code: |
+      import pandas as pd
+      import numpy as np
+
+      df = pd.read_csv('dane.csv')
+
+      # Wykryj brakujące wartości
+      df.isna().sum()                    # NaN per kolumna
+      df.isna().mean() * 100             # procent NaN per kolumna
+      df[df['cena'].isna()]              # wiersze z NaN w kolumnie 'cena'
+
+      # Usuń wiersze/kolumny z NaN
+      df.dropna()                        # usuń wiersze z jakimkolwiek NaN
+      df.dropna(subset=['cena', 'wiek']) # usuń tylko jeśli NaN w tych kolumnach
+      df.dropna(thresh=5)                # usuń jeśli < 5 non-null wartości
+      df.dropna(axis=1)                  # usuń kolumny z NaN
+
+      # Uzupełnij brakujące wartości
+      df['cena'].fillna(0)               # uzupełnij zerem
+      df['miasto'].fillna('Nieznane')    # uzupełnij stałą
+      df['cena'].fillna(df['cena'].mean())   # uzupełnij średnią
+      df['cena'].fillna(method='ffill')  # forward fill (wartość z poprzedniego wiersza)
+      df['cena'].fillna(method='bfill')  # backward fill
+
+      # interpolacja (dobra dla szeregów czasowych)
+      df['temperatura'].interpolate(method='linear')
+
+  - name: Duplikaty — drop_duplicates / duplicated
+    desc: Wykrywanie i usuwanie zduplikowanych wierszy — częsty problem przy łączeniu danych z wielu źródeł.
+    icon: "👥"
+    code: |
+      # Sprawdź duplikaty
+      df.duplicated().sum()                   # liczba zduplikowanych wierszy
+      df[df.duplicated()]                     # pokaż duplikaty
+      df[df.duplicated(keep=False)]           # pokaż WSZYSTKIE kopie (też pierwszą)
+
+      # Duplikaty po wybranych kolumnach
+      df.duplicated(subset=['email'])         # duplikaty po emailu
+      df[df.duplicated(subset=['imie', 'nazwisko'], keep=False)]
+
+      # Usuń duplikaty
+      df.drop_duplicates()                    # zostaw pierwsze wystąpienie
+      df.drop_duplicates(keep='last')         # zostaw ostatnie
+      df.drop_duplicates(keep=False)          # usuń WSZYSTKIE duplikaty (też pierwsze)
+      df.drop_duplicates(subset=['email'])    # unikalne po emailu
+      df.drop_duplicates(inplace=True)        # w miejscu
+
+  - name: Operacje na stringach (str accessor)
+    desc: Pandas str accessor daje wektoryzowane operacje na kolumnach tekstowych — bez pętli.
+    icon: "🔤"
+    code: |
+      # Podstawowe transformacje
+      df['imie'] = df['imie'].str.strip()           # usuń białe znaki
+      df['email'] = df['email'].str.lower()          # małe litery
+      df['kod'] = df['kod'].str.upper()              # wielkie litery
+      df['imie'] = df['imie'].str.title()            # Pierwsze Wielkie
+
+      # Przytnij do stałej długości
+      df['skrot'] = df['opis'].str[:50]
+
+      # Zawiera / zaczyna / kończy się
+      df[df['email'].str.contains('@gmail.com', na=False)]
+      df[df['imie'].str.startswith('A')]
+      df[df['plik'].str.endswith('.csv')]
+
+      # Zamień
+      df['telefon'] = df['telefon'].str.replace('-', '', regex=False)
+      df['opis'] = df['opis'].str.replace(r'\s+', ' ', regex=True)  # wielokrotne spacje → jedna
+
+      # Podziel
+      df[['imie', 'nazwisko']] = df['pelne_imie'].str.split(' ', n=1, expand=True)
+      df['domena'] = df['email'].str.split('@').str[1]
+
+      # Wyciągnij wzorzec regex
+      df['nip'] = df['tekst'].str.extract(r'(\d{10})')
+
+  - name: Daty i czas (to_datetime / dt accessor)
+    desc: Pandas ma rozbudowane wsparcie dla dat i szeregów czasowych — dt accessor jak str dla dat.
+    icon: "📅"
+    code: |
+      import pandas as pd
+
+      # Konwersja na datetime
+      df['data'] = pd.to_datetime(df['data'])
+      df['data'] = pd.to_datetime(df['data'], format='%d.%m.%Y')  # konkretny format
+      df['data'] = pd.to_datetime(df['data'], errors='coerce')      # NaT zamiast błędu
+
+      # Ekstrakcja składowych przez dt accessor
+      df['rok'] = df['data'].dt.year
+      df['miesiac'] = df['data'].dt.month
+      df['dzien'] = df['data'].dt.day
+      df['dzien_tyg'] = df['data'].dt.dayofweek    # 0=poniedziałek
+      df['nazwa_dnia'] = df['data'].dt.day_name(locale='pl_PL')
+      df['kwartal'] = df['data'].dt.quarter
+      df['tydzien'] = df['data'].dt.isocalendar().week
+
+      # Arytmetyka dat
+      df['dni_temu'] = (pd.Timestamp.now() - df['data']).dt.days
+      df['data_plus_30'] = df['data'] + pd.Timedelta(days=30)
+
+      # Filtrowanie po zakresie dat
+      df[df['data'].between('2024-01-01', '2024-12-31')]
+
+      # Resample (agregacja po czasie)
+      df.set_index('data').resample('ME')['kwota'].sum()  # suma miesięczna
+
+  - name: apply / map / applymap
+    desc: Funkcje do stosowania własnej logiki na danych — gdy wektoryzacja nie wystarcza.
+    icon: "⚙️"
+    code: |
+      # map — na Series, element po elemencie
+      df['kategoria_pl'] = df['kategoria'].map({
+          'food': 'jedzenie',
+          'tech': 'technologia',
+          'fashion': 'moda'
+      })
+      df['wiek_sq'] = df['wiek'].map(lambda x: x ** 2)
+
+      # apply na Series — jak map ale obsługuje NaN lepiej
+      df['czysc_telefon'] = df['telefon'].apply(
+          lambda x: ''.join(filter(str.isdigit, str(x))) if pd.notna(x) else x
+      )
+
+      # apply na DataFrame po wierszach (axis=1) — wolniejsze
+      def kategoryzuj(row):
+          if row['wiek'] < 30 and row['wynagrodzenie'] > 5000:
+              return 'junior_premium'
+          return 'inne'
+
+      df['segment'] = df.apply(kategoryzuj, axis=1)
+
+      # apply po kolumnach (axis=0) — domyślne
+      df[['cena', 'koszt']].apply(lambda col: col - col.mean())
+
+      # map (Pandas 2.1+) zastępuje applymap dla DataFrame
+      df[['imie', 'miasto']].map(str.lower)
+
+  - name: replace — zamiana wartości
+    desc: Wszechstronne narzędzie do zamiany wartości w DataFrame — obsługuje dict, regex, listy.
+    icon: "🔄"
+    code: |
+      # Zamień konkretne wartości
+      df['status'] = df['status'].replace({'active': 1, 'inactive': 0, 'pending': -1})
+
+      # Zamień na jedną wartość
+      df['ocena'].replace([-1, 0], pd.NA)  # -1 i 0 → NA
+
+      # W całym DataFrame
+      df.replace('brak', pd.NA)
+      df.replace({'', pd.NA})  # puste stringi → NA
+
+      # Regex replace
+      df['opis'] = df['opis'].replace(r'\bN/A\b', pd.NA, regex=True)
+
+      # Zakres wartości
+      df['wynik'] = df['wynik'].clip(lower=0, upper=100)  # przytnij do zakresu [0, 100]
+
+  - name: Zmiana kształtu danych (melt / stack / unstack)
+    desc: Pivotowanie między formatem szerokim (wide) a długim (long) — kluczowe przy normalizacji danych.
+    icon: "🔀"
+    code: |
+      # melt — wide → long (un-pivot)
+      df_long = df.melt(
+          id_vars=['data', 'region'],
+          value_vars=['Q1', 'Q2', 'Q3', 'Q4'],
+          var_name='kwartal',
+          value_name='sprzedaz'
+      )
+
+      # pivot — long → wide
+      df_wide = df_long.pivot(
+          index='data',
+          columns='kwartal',
+          values='sprzedaz'
+      )
+
+      # stack — kolumny → indeks (MultiIndex)
+      stacked = df.stack()        # ostatni poziom kolumn → indeks
+
+      # unstack — indeks → kolumny
+      unstacked = stacked.unstack()  # powrót do oryginału
+
+  - name: Walidacja i asercje danych
+    desc: Sprawdzanie jakości danych po transformacji — czy pipeline działa poprawnie.
+    icon: "✅"
+    code: |
+      # Podstawowe asercje
+      assert df.shape[0] > 0, "DataFrame jest pusty!"
+      assert df['id'].nunique() == len(df), "Są zduplikowane ID!"
+      assert df['cena'].min() >= 0, "Są ujemne ceny!"
+
+      # Sprawdź zakres dat
+      assert df['data'].between('2020-01-01', '2025-12-31').all(), "Data poza zakresem!"
+
+      # Sprawdź wymagane kolumny
+      required = ['id', 'data', 'kwota']
+      missing = set(required) - set(df.columns)
+      assert not missing, f"Brakuje kolumn: {missing}"
+
+      # Sprawdź brak NaN w kluczowych kolumnach
+      assert df['id'].notna().all(), "ID ma wartości NaN!"
+
+      # Raport jakości danych
+      print("Shape:", df.shape)
+      print("NaN per col:", df.isna().sum()[df.isna().sum() > 0])
+      print("Duplikaty:", df.duplicated().sum())
+      print("Dtypes:", df.dtypes)

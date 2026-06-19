@@ -1,0 +1,318 @@
+title: Przepisy Pandas (snippety kodu)
+
+groups:
+  - name: Eksploracja danych
+    icon: "🔍"
+    commands:
+      - cmd: df.head(10)
+        desc: Podgląd pierwszych 10 wierszy
+        detail:
+          what: Zwraca pierwsze N wierszy DataFrame. Domyślnie 5.
+          how: Szybki podgląd struktury danych po wczytaniu.
+          tips:
+            - 'df.tail(10) — ostatnie wiersze'
+            - 'df.sample(10) — losowe wiersze (lepsze dla dużych zbiorów)'
+      - cmd: df.info()
+        desc: Podsumowanie struktury — typy, NaN, pamięć
+        detail:
+          what: Drukuje dtypes per kolumna, liczbę non-null wartości i szacunkowe użycie pamięci.
+          how: Pierwsza komenda po wczytaniu danych — diagnostyka jednym spojrzeniem.
+          tips:
+            - 'df.info(memory_usage="deep") — dokładne użycie pamięci (wolniejsze)'
+            - Kolumna z małą liczbą non-null → dużo NaN — sprawdź fillna/dropna
+      - cmd: df.describe()
+        desc: Statystyki opisowe dla kolumn liczbowych
+        detail:
+          what: Generuje count, mean, std, min, 25%, 50%, 75%, max dla każdej kolumny numerycznej.
+          how: Szybki przegląd rozkładu danych, wykrywanie outlierów (porównaj min/max z percentylami).
+          tips:
+            - 'df.describe(include="all") — też dla kolumn object/category'
+            - 'df.describe(percentiles=[.05, .25, .5, .75, .95]) — własne percentyle'
+      - cmd: "df.dtypes"
+        desc: Typy danych każdej kolumny
+        detail:
+          what: Zwraca Series z typem danych (dtype) dla każdej kolumny.
+          how: Sprawdź czy daty są datetime64, liczby float/int, stringi object lub category.
+          tips:
+            - 'df.select_dtypes(include="number") — tylko kolumny numeryczne'
+            - 'df.select_dtypes(include="object") — tylko stringowe'
+      - cmd: df.isna().sum()
+        desc: Liczba brakujących wartości per kolumna
+        detail:
+          what: Liczy NaN w każdej kolumnie. Zwraca Series z wynikami.
+          how: Pierwsza diagnostyka jakości danych — decyzja o dropna/fillna.
+          tips:
+            - 'df.isna().mean() * 100 — procent NaN per kolumna'
+            - 'df.isna().any(axis=1) — wiersze z jakimkolwiek NaN'
+      - cmd: df['kolumna'].value_counts()
+        desc: Częstość każdej unikalnej wartości w kolumnie
+        detail:
+          what: Zlicza wystąpienia każdej wartości, domyślnie sortuje malejąco.
+          how: Podstawowa analiza rozkładu dla kolumn kategorycznych.
+          tips:
+            - 'df["kol"].value_counts(normalize=True) — proporcje (0.0 - 1.0)'
+            - 'df["kol"].value_counts(dropna=False) — pokaż też NaN'
+      - cmd: df.shape
+        desc: Krotka (wiersze, kolumny) — rozmiar DataFrame
+        detail:
+          what: Zwraca tuple (n_rows, n_cols) — szybka inspekcja rozmiaru danych.
+          how: df.shape[0] = liczba wierszy, df.shape[1] = liczba kolumn.
+          tips:
+            - 'len(df) — sama liczba wierszy'
+            - 'df.size — wiersze × kolumny (łączna liczba komórek)'
+
+  - name: Filtrowanie i selekcja
+    icon: "🎯"
+    commands:
+      - cmd: "df[df['kolumna'] > 100]"
+        desc: Filtruj wiersze gdzie kolumna > 100
+        detail:
+          what: Boolean indexing — zwraca wiersze spełniające warunek.
+          how: Pandas ocenia warunek dla każdego wiersza, zwraca True/False, wybiera True.
+          tips:
+            - 'df[(df["a"] > 0) & (df["b"] < 10)] — AND (nawiasy obowiązkowe!)'
+            - 'df[(df["a"] > 0) | (df["b"] < 10)] — OR'
+      - cmd: "df.query(\"wiek > 30 and miasto == 'Kraków'\")"
+        desc: Filtruj przez SQL-like query string
+        detail:
+          what: query() przyjmuje string z warunkiem — czytelniejsze niż boolean indexing dla złożonych warunków.
+          how: Parsuje wyrażenie i tworzy boolean mask wewnętrznie.
+          tips:
+            - 'Zmienne zewnętrzne: df.query("wiek > @min_wiek") — prefiks @'
+            - 'query() jest też nieco szybszy niż boolean indexing dla dużych DataFrame'
+      - cmd: "df.loc[df['id'].isin([1, 2, 3])]"
+        desc: Filtruj wiersze gdzie id jest na liście
+        detail:
+          what: isin() sprawdza przynależność wartości do listy — odpowiednik SQL IN (...).
+          how: Zwraca boolean Series, którą przekazujesz do .loc lub [].
+          tips:
+            - '~df["id"].isin([1, 2]) — NOT IN (negacja)'
+            - 'Działa też na całym DataFrame: df.isin({"kol": [val1, val2]})'
+      - cmd: "df.loc[:, 'imie':'wiek']"
+        desc: Wybierz zakres kolumn po nazwie
+        detail:
+          what: .loc z zakresem kolumn wybiera wszystkie kolumny od 'imie' do 'wiek' (włącznie).
+          how: Wygodne gdy kolumny są ułożone w logicznym porządku.
+          tips:
+            - 'df[["imie", "wiek", "miasto"]] — tylko te kolumny (lista)'
+            - 'df.filter(like="kwota") — kolumny których nazwa zawiera "kwota"'
+      - cmd: "df.nlargest(10, 'kwota')"
+        desc: Top 10 wierszy z największą kwotą
+        detail:
+          what: Zwraca N wierszy z największymi wartościami w podanej kolumnie. Szybsze niż sort_values().head().
+          how: Używa algorytmu partial sort — efektywniejszy dla dużych DataFrame.
+          tips:
+            - 'df.nsmallest(10, "kwota") — 10 najmniejszych'
+            - 'df.nlargest(5, ["kwota", "wiek"]) — sortowanie po wielu kolumnach'
+      - cmd: "df.drop_duplicates(subset=['email'], keep='first')"
+        desc: Usuń duplikaty po kolumnie email, zostaw pierwsze wystąpienie
+        detail:
+          what: Zwraca DataFrame bez zduplikowanych wierszy (po podanym podzbioru kolumn).
+          how: keep='first' zostaw pierwszy, 'last' ostatni, False usuń wszystkie kopie.
+          tips:
+            - 'df.duplicated(subset=["email"]).sum() — ile duplikatów przed usunięciem'
+            - 'Zawsze sprawdź ile wierszy tracisz: len(df) vs len(df.drop_duplicates())'
+
+  - name: Czyszczenie danych
+    icon: "🧹"
+    commands:
+      - cmd: "df['cena'].fillna(df['cena'].median())"
+        desc: Uzupełnij NaN medianą kolumny
+        detail:
+          what: fillna() zastępuje brakujące wartości podaną wartością lub strategią.
+          how: Mediana odporna na outliery — lepsza niż średnia dla kolumn z asymetrycznym rozkładem.
+          tips:
+            - 'df.fillna(method="ffill") — forward fill (wartość z poprzedniego wiersza)'
+            - 'df.fillna({"cena": 0, "miasto": "Nieznane"}) — różne wartości per kolumna'
+      - cmd: "df['imie'] = df['imie'].str.strip().str.title()"
+        desc: Usuń białe znaki i zamień na Title Case
+        detail:
+          what: str.strip() usuwa spacje z początku/końca, str.title() zmienia na "Pierwsze Wielkie".
+          how: Str accessor daje wektoryzowane operacje na stringowych kolumnach bez pętli.
+          tips:
+            - 'str.strip() — obie strony; str.lstrip() — lewa; str.rstrip() — prawa'
+            - 'str.lower() / str.upper() — pełna zmiana wielkości'
+      - cmd: "df['data'] = pd.to_datetime(df['data'], errors='coerce')"
+        desc: Konwertuj kolumnę na datetime, błędne → NaT
+        detail:
+          what: to_datetime() parsuje stringi/liczby na datetime64. errors='coerce' zamienia niemożliwe do sparsowania na NaT.
+          how: NaT (Not a Time) to odpowiednik NaN dla dat — można filtrować przez .notna().
+          tips:
+            - "format='%d.%m.%Y' — podaj format jeśli parsowanie jest powolne"
+            - 'df["data"].dt.year — wyciągnij rok przez dt accessor'
+      - cmd: "df['kwota'] = pd.to_numeric(df['kwota'], errors='coerce')"
+        desc: Konwertuj kolumnę na liczby, błędne → NaN
+        detail:
+          what: to_numeric() obsługuje stringi z liczbami. errors='coerce' zamienia niekonwertowalne na NaN.
+          how: Przydatne gdy kolumna zawiera mix liczb i tekstu (np. "brak", "", "N/A").
+          tips:
+            - 'downcast="integer" — automatycznie wybierz najmniejszy typ int'
+            - 'Po konwersji sprawdź: df["kwota"].isna().sum() — ile błędów było'
+      - cmd: "df.columns = df.columns.str.lower().str.replace(' ', '_')"
+        desc: Znormalizuj nazwy kolumn (snake_case)
+        detail:
+          what: Zmienia wszystkie nazwy kolumn na małe litery i zamienia spacje na podkreślenia.
+          how: Standardowa normalizacja po wczytaniu danych z Excela lub zewnętrznych źródeł.
+          tips:
+            - 'df.columns.str.replace(r"[^a-z0-9_]", "", regex=True) — usuń inne znaki specjalne'
+            - 'df.rename(columns=lambda c: c.strip().lower().replace(" ", "_")) — alternatywa'
+      - cmd: "df['kategoria'] = df['kategoria'].astype('category')"
+        desc: Zmień typ kolumny z object na category (mniej pamięci)
+        detail:
+          what: Category dtype przechowuje unikalne wartości raz — oszczędza pamięć dla kolumn z małą liczbą unikalnych wartości.
+          how: Kolumna z 1M wierszy i 10 unikalnych stringów zajmie 10x mniej pamięci jako category.
+          tips:
+            - 'Sprawdź oszczędność: df.memory_usage(deep=True).sum() przed i po'
+            - 'Dodaj ordered=True dla kategorii z naturalną kolejnością (np. niski/sredni/wysoki)'
+
+  - name: Agregacja i grupowanie
+    icon: "📦"
+    commands:
+      - cmd: "df.groupby('region')['kwota'].agg(['sum', 'mean', 'count'])"
+        desc: Suma, średnia i liczba transakcji per region
+        detail:
+          what: groupby() dzieli DataFrame na grupy, agg() stosuje wiele funkcji naraz.
+          how: Zwraca DataFrame z wynikami — jedna kolumna per funkcja.
+          tips:
+            - 'Named agg: .agg(suma=("kwota", "sum"), srednia=("kwota", "mean"))'
+            - 'Własna funkcja: .agg(lambda x: x.quantile(0.9)) — 90. percentyl'
+      - cmd: "df.groupby('region')['kwota'].transform('mean')"
+        desc: Dodaj kolumnę ze średnią grupową (zachowaj kształt)
+        detail:
+          what: transform() jak agg() ale zwraca Series o tym samym rozmiarze co oryginał — bez reduce.
+          how: Przydatne do dodawania kolumn pochodnych (np. odchylenie od średniej grupy).
+          tips:
+            - 'df["odchylenie"] = df["kwota"] - df.groupby("region")["kwota"].transform("mean")'
+            - 'transform("rank") — ranking w grupie'
+      - cmd: "df.pivot_table(values='kwota', index='region', columns='kategoria', aggfunc='sum', fill_value=0)"
+        desc: Tabela przestawna — suma kwot per region × kategoria
+        detail:
+          what: pivot_table() tworzy wielowymiarową tabelę agregacyjną — jak tabela przestawna w Excelu.
+          how: index = wiersze, columns = kolumny, values = wartości, aggfunc = funkcja agregująca.
+          tips:
+            - 'margins=True — dodaj wiersz/kolumnę sumy całkowitej'
+            - 'aggfunc=["sum", "count"] — wiele funkcji naraz'
+      - cmd: "df.groupby('miesiac').apply(lambda g: g.nlargest(3, 'kwota'))"
+        desc: Top 3 transakcje per miesiąc
+        detail:
+          what: apply() na groupby daje pełny dostęp do każdej grupy jako DataFrame — maksymalna elastyczność.
+          how: Funkcja dostaje całą grupę (DataFrame), zwraca wynik (DataFrame lub scalar).
+          tips:
+            - 'Po apply() często .reset_index(drop=True) żeby naprawić indeks'
+            - 'Pandas 2.2+: include_groups=False aby uniknąć DeprecationWarning'
+      - cmd: "df['kwota'].rolling(window=7).mean()"
+        desc: 7-dniowa średnia krocząca
+        detail:
+          what: rolling() tworzy okno kroczące N ostatnich obserwacji. .mean() oblicza średnią dla każdego okna.
+          how: Pierwsze N-1 obserwacji będą NaN (niepełne okno). Użyj min_periods=1 aby je wypełnić.
+          tips:
+            - 'rolling("7D").mean() — okno po czasie (wymaga datetime index)'
+            - 'expanding().sum() — okno od początku do bieżącego wiersza (kumulatywne)'
+
+  - name: Łączenie danych
+    icon: "🔗"
+    commands:
+      - cmd: "pd.merge(df_a, df_b, on='id', how='left')"
+        desc: LEFT JOIN — wszystkie wiersze z df_a, pasujące z df_b
+        detail:
+          what: merge() łączy DataFrame jak SQL JOIN. how='left' zachowuje wszystkie wiersze z lewego DataFrame.
+          how: Brakujące wartości z prawego DataFrame uzupełniane NaN.
+          tips:
+            - "validate='1:1' — sprawdź czy to 1:1 join (brak duplikatów)"
+            - 'indicator=True — dodaj kolumnę "_merge" pokazującą źródło wiersza'
+      - cmd: "pd.concat([df1, df2, df3], ignore_index=True)"
+        desc: Sklej wiersze z wielu DataFrame pionowo
+        detail:
+          what: concat() skleja DataFrame wzdłuż osi — domyślnie wiersze (axis=0).
+          how: ignore_index=True resetuje indeks od 0 — bez tego indeksy mogą się dublować.
+          tips:
+            - 'keys=["a", "b"] — dodaj etykietę źródła jako poziom MultiIndex'
+            - 'axis=1 — sklejaj kolumny poziomo (jak SQL CROSS JOIN bez klucza)'
+      - cmd: "df_a.merge(df_b, on='id', how='outer', indicator=True)"
+        desc: OUTER JOIN z informacją o źródle wiersza
+        detail:
+          what: how='outer' zwraca wszystkie wiersze z obu DataFrame. indicator=True dodaje kolumnę "_merge".
+          how: '"_merge" ma wartości ''left_only'', ''right_only'', ''both'' — diagnostyka joinów.'
+          tips:
+            - 'df[df["_merge"] == "left_only"] — wiersze tylko z lewego DataFrame (brak w prawym)'
+            - 'Przydatne do analizy różnic między dwoma zestawami danych'
+
+  - name: I/O — zapis i odczyt
+    icon: "💾"
+    commands:
+      - cmd: "df = pd.read_csv('dane.csv', parse_dates=['data'], dtype={'id': str})"
+        desc: Wczytaj CSV z parsowaniem dat i typami kolumn
+        detail:
+          what: parse_dates automatycznie konwertuje kolumny na datetime64. dtype zapobiega błędom typów.
+          how: Ustawienie dtype='str' dla ID zapobiega utracie wiodących zer (np. kod pocztowy "01-234").
+          tips:
+            - "sep=';' — dla plików z polskim separatorem (Excel eksport)"
+            - 'encoding="utf-8-sig" — dla plików BOM z Windows'
+      - cmd: "df.to_parquet('dane.parquet', compression='snappy', index=False)"
+        desc: Zapisz DataFrame jako Parquet z kompresją
+        detail:
+          what: Parquet to format kolumnowy — mniejszy od CSV, szybszy do wczytania, zachowuje dtypes.
+          how: snappy to szybka kompresja (dobra dla częstego odczytu). zstd = lepsza kompresja.
+          tips:
+            - 'pd.read_parquet("dane.parquet", columns=["id", "kwota"]) — wczytaj wybrane kolumny'
+            - 'Zastąp CSV Parquetem w pipeline — 5-10x mniejszy plik'
+      - cmd: "for chunk in pd.read_csv('duzy.csv', chunksize=50_000): process(chunk)"
+        desc: Przetwarzaj duży CSV kawałkami (chunksize)
+        detail:
+          what: read_csv z chunksize zwraca iterator DataFrame — każdy chunk to N wierszy.
+          how: Przetwarza plik bez wczytywania całości do RAM — niezbędne dla plików > kilka GB.
+          tips:
+            - 'Zbieraj wyniki: results = []; for chunk in reader: results.append(chunk["kol"].sum())'
+            - 'Polars lub DuckDB są lepsze dla bardzo dużych plików — brak chunksize potrzebny'
+      - cmd: "df.to_sql('tabela', con=engine, if_exists='append', index=False, chunksize=1000)"
+        desc: Zapisz DataFrame do tabeli SQL (batch insert)
+        detail:
+          what: to_sql() wstawia wiersze DataFrame do bazy przez SQLAlchemy. chunksize = batch size.
+          how: if_exists='append' dodaje do istniejącej tabeli. 'replace' usuwa i tworzy od nowa.
+          tips:
+            - 'method="multi" — wstaw wiele wierszy w jednym INSERT (szybsze)'
+            - 'Dla PostgreSQL: method=psycopg2.extras.execute_batch (najszybsze)'
+
+  - name: Optymalizacja wydajności
+    icon: "⚡"
+    commands:
+      - cmd: "df['kat'] = df['kat'].astype('category')"
+        desc: Zmień typ string → category (oszczędność pamięci)
+        detail:
+          what: Category przechowuje unikalne wartości raz w słowniku — reszta to indeksy int.
+          how: "Kolumna z 1M wierszy i 50 unikalnych stringów: object = ~64MB, category = ~4MB."
+          tips:
+            - 'pd.Categorical(df["kat"], ordered=True, categories=["niski","sredni","wysoki"])'
+            - 'Sprawdź efekt: df.memory_usage(deep=True).sum() przed i po'
+      - cmd: "df.eval('netto = cena * (1 - rabat)', inplace=True)"
+        desc: Oblicz nową kolumnę przez eval() — szybsze niż assign
+        detail:
+          what: eval() parsuje wyrażenie string i wykonuje je wektorowo. Szybsze niż operacje Python dla dużych DataFrame.
+          how: Unika tworzenia tymczasowych tablic — mniejszy footprint pamięci.
+          tips:
+            - 'df.query("cena > @min_cena") — podobna optymalizacja dla filtrowania'
+            - 'Wymaga nazw kolumn bez spacji i bez polskich znaków'
+      - cmd: "df[['a', 'b', 'c']].apply(np.vectorize(moja_fn), axis=1)"
+        desc: Zastosuj własną funkcję wektoryzowaną zamiast apply
+        detail:
+          what: np.vectorize() opakowuje funkcję Python tak że działa na tablicach — szybsze niż apply() na wierszach.
+          how: apply(axis=1) to pętla w Pythonie — dla 1M wierszy może trwać minuty. Wektoryzacja = sekundy.
+          tips:
+            - 'Jeszcze szybsze: przepisz logikę na operacje kolumnowe bez apply'
+            - 'np.where() i np.select() zastępują większość warunkowych apply'
+      - cmd: "pd.read_parquet('dane.parquet', columns=['id', 'kwota', 'data'])"
+        desc: Wczytaj tylko potrzebne kolumny z Parquet (column pruning)
+        detail:
+          what: Parquet jest kolumnowy — wczytuje tylko wskazane kolumny, nie cały plik. Ogromna oszczędność I/O.
+          how: CSV nie ma tej możliwości — musisz wczytać całość i potem wybrać. Parquet robi to na poziomie pliku.
+          tips:
+            - 'Migruj CSV → Parquet dla często wczytywanych danych'
+            - 'filters=[("rok", "==", 2024)] — partition pruning dla skomplikowanych Dataset'
+      - cmd: "df.memory_usage(deep=True).sort_values(ascending=False)"
+        desc: Sprawdź użycie pamięci per kolumna (malejąco)
+        detail:
+          what: memory_usage() zwraca pamięć zajmowaną przez każdą kolumnę w bajtach. deep=True dla obiektów.
+          how: Pozwala znaleźć "pożeraczy pamięci" — kolumny object (string) są zazwyczaj największe.
+          tips:
+            - 'Podziel przez 1024**2 żeby dostać MB'
+            - 'Największe kolumny: zamień object → category, int64 → int32, float64 → float32'

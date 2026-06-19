@@ -1,0 +1,92 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Pandas?
+  firstComponent: Pierwsze kroki z Pandas
+  firstComponentLang: Python
+
+intro:
+  title: Czym jest Pandas?
+  desc: >
+    Pandas to otwarta biblioteka Pythona do analizy i manipulacji danymi tabelarycznymi.
+    Wprowadza dwie centralne struktury danych — DataFrame (tabela 2D) i Series (kolumna/wekttor 1D) —
+    które umożliwiają wygodną pracę z danymi w stylu podobnym do SQL i arkuszy kalkulacyjnych.
+    Pandas jest standardem de facto w data science, EDA (Exploratory Data Analysis) i inżynierii danych w Pythonie.
+
+concepts:
+  - title: DataFrame
+    desc: >
+      Dwuwymiarowa tabela z etykietowanymi wierszami (indeks) i kolumnami.
+      Odpowiednik tabeli SQL lub arkusza Excel. Każda kolumna to Series.
+      Podstawowa struktura danych Pandas — prawie wszystko robi się na DataFrames.
+    icon: "📊"
+  - title: Series
+    desc: >
+      Jednowymiarowa tablica z etykietowanym indeksem. Jak kolumna w DataFrame lub lista z etykietami.
+      Każda kolumna DataFrame to osobna Series. Obsługuje operacje wektorowe bez pętli.
+    icon: "📈"
+  - title: Indeks
+    desc: >
+      Każdy DataFrame i Series ma indeks — etykiety wierszy (domyślnie 0, 1, 2, ...).
+      Możesz ustawić dowolną kolumnę jako indeks (daty, ID). Indeks przyspiesza wyszukiwanie i łączenie.
+    icon: "🔑"
+  - title: Dtype — typy danych
+    desc: >
+      Każda kolumna ma jeden typ danych (dtype): int64, float64, object (string), bool, datetime64, category.
+      Poprawne dtype to klucz do wydajności — category zamiast object dla powtarzalnych stringów.
+    icon: "🏷️"
+  - title: Wektoryzacja
+    desc: >
+      Pandas operacje działają na całych kolumnach naraz (wektoryzacja przez NumPy/C).
+      Unikaj pętli Python — operuj na kolumnach bezpośrednio. 10-100x szybsze niż pętle.
+    icon: "⚡"
+  - title: Broadcasting i wyrównanie
+    desc: >
+      Pandas automatycznie wyrównuje dane po indeksie przy operacjach na dwóch DataFrame.
+      Brakujące wartości po wyrównaniu stają się NaN — pamiętaj o tym przy merge/join.
+    icon: "🔄"
+  - title: Widoki vs kopie
+    desc: >
+      Niektóre operacje zwracają widok (view) oryginalnych danych, inne kopię (copy).
+      Modyfikacja widoku zmienia oryginał. Bezpiecznie: df.copy() lub .loc[] do modyfikacji.
+    icon: "🪞"
+  - title: Chained Indexing (antypattern)
+    desc: >
+      df['col']['row'] = val — SettingWithCopyWarning. Zawsze używaj df.loc[row, col] = val.
+      Łańcuchowe indeksowanie często tworzy kopię zamiast modyfikować oryginał.
+    icon: "⚠️"
+
+whenToUse:
+  - Eksploracja i analiza danych tabelarycznych (EDA)
+  - Czyszczenie i transformacja danych przed ML lub bazą danych
+  - Agregacja i raportowanie (groupby, pivot_table)
+  - Wczytywanie i konwersja formatów: CSV, Excel, JSON, Parquet, SQL
+  - Preprocessing danych dla scikit-learn i innych bibliotek ML
+  - "Prototypowanie pipeline'ów ETL zanim przejdziesz na Spark/Dask"
+  - Analiza szeregów czasowych (time series) i danych finansowych
+
+firstComponent: |
+  import pandas as pd
+  import numpy as np
+
+  # Wczytaj dane
+  df = pd.read_csv('sprzedaz.csv', parse_dates=['data'])
+
+  # Podgląd struktury
+  print(df.shape)          # (wiersze, kolumny)
+  print(df.dtypes)         # typy kolumn
+  print(df.head())         # pierwsze 5 wierszy
+  print(df.describe())     # statystyki: count, mean, std, min, max, quartile
+
+  # Sprawdź brakujące wartości
+  print(df.isna().sum())   # liczba NaN per kolumna
+
+  # Podstawowe filtrowanie
+  top = df[df['kwota'] > 1000]
+  print(top[['data', 'klient', 'kwota']].head(10))
+
+  # Agregacja
+  miesiac = df.groupby(df['data'].dt.to_period('M'))['kwota'].sum()
+  print(miesiac)
+
+  # Zapis wyniku
+  top.to_csv('wynik.csv', index=False)

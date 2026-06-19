@@ -1,0 +1,99 @@
+title: Pandas vs inne narzędzia
+
+items:
+  - name: Polars
+    icon: "🐻‍❄️"
+    color: "#CD792C"
+    tagline: Ultraszybka biblioteka DataFrames w Rust — lazy evaluation, multi-threaded
+    pros:
+      - 5-50x szybszy od Pandas na tych samych danych
+      - Lazy API — plan zapytania optymalizowany przed wykonaniem
+      - Multi-threaded domyślnie (Pandas jest single-threaded)
+      - Brak SettingWithCopyWarning — zawsze kopie (Copy-on-Write)
+      - Natywna obsługa streaming i out-of-core
+    cons:
+      - Mniejszy ekosystem niż Pandas (mniej tutoriali, integracji)
+      - Inne API niż Pandas — migracja wymaga przepisania kodu
+      - Mniej bibliotek ML oczekuje Polars niż Pandas (scikit-learn, xgboost)
+      - Niektóre operacje mniej intuicyjne niż w Pandas (szczególnie groupby.apply)
+    vs: "Polars dla nowych projektów wymagających wydajności lub danych > 1GB. Pandas dla istniejących pipelines, gdy zależy Ci na ekosystemie ML i masz dane < 1GB."
+
+  - name: Vaex
+    icon: "💨"
+    color: "#2196F3"
+    tagline: Out-of-core DataFrame — przetwarza miliardy wierszy bez wczytywania do RAM
+    pros:
+      - Przetwarza pliki większe niż RAM przez memory-mapped files
+      - Bardzo szybkie operacje na dużych plikach HDF5/Arrow
+      - Lazy evaluation — nie przetwarza dopóki nie wywołasz .compute()
+      - Dobre wizualizacje (hexbin, scatter dla miliardów punktów)
+    cons:
+      - Mniejsza społeczność i mniej aktywny development
+      - Mniejszy podzbiór API niż Pandas
+      - Problemy z niektórymi operacjami (groupby.apply jest wolny)
+      - Mniej integracji z ekosystemem ML
+    vs: "Vaex gdy masz pliki > RAM i nie chcesz instalować Dask/Spark. Pandas gdy dane mieszczą się w pamięci."
+
+  - name: Dask
+    icon: "🔀"
+    color: "#FDA061"
+    tagline: Pandas na wielu rdzeniach i maszynach — API identyczne z Pandas
+    pros:
+      - API prawie identyczne z Pandas — mała krzywa uczenia
+      - Skaluje na wiele rdzeni i wiele maszyn (klaster)
+      - Lazy evaluation z grafem zależności
+      - Integracja z dask-ml, XGBoost, RAPIDS (GPU)
+      - Obsługa plików większych niż RAM
+    cons:
+      - Overhead przy małych danych — gorszy niż Pandas poniżej 1GB
+      - Nie wszystkie operacje Pandas są dostępne
+      - .compute() wywołuje wszystko naraz — może wyczerpać pamięć
+      - Trudniejsze debugowanie (leniwe obliczenia)
+    vs: "Dask gdy dane > RAM lub chcesz użyć wielu rdzeni/maszyn z minimalną zmianą kodu Pandas. Pandas dla prototypowania i danych < 1GB."
+
+  - name: NumPy
+    icon: "🔢"
+    color: "#4dabcf"
+    tagline: Niskopoziomowe tablice N-D — fundament Pandas i całego ekosystemu naukowego
+    pros:
+      - Szybszy niż Pandas dla czystych operacji numerycznych
+      - Niższy overhead pamięciowy (brak indeksów, etykiet)
+      - Podstawa całego ekosystemu: Pandas, scikit-learn, TensorFlow
+      - Pełna kontrola nad kształtem tablic i broadcastingiem
+    cons:
+      - Brak etykiet kolumn/wierszy (tylko pozycje numeryczne)
+      - Brak wbudowanej obsługi brakujących danych, NaN
+      - Brak operacji grupujących (groupby, pivot)
+      - Brak read_csv, read_excel — trzeba ręcznie parsować dane
+    vs: "NumPy dla operacji macierzowych, ML kerneli i gdy potrzebujesz maksymalnej szybkości bez overhead etykiet. Pandas gdy pracujesz z danymi tabelarycznymi i chcesz wygody."
+
+  - name: R data.frame / dplyr
+    icon: "📊"
+    color: "#276DC3"
+    tagline: Klasyczna analiza danych w R — tidyverse to konkurent Pandas
+    pros:
+      - tidyverse (dplyr, tidyr, ggplot2) to elegancki i spójny ekosystem
+      - ggplot2 produkuje publikacyjne wykresy łatwiej niż Matplotlib
+      - Wbudowane testy statystyczne, modele liniowe
+      - CRAN — ogromna biblioteka pakietów naukowych
+    cons:
+      - Inne środowisko niż Python — osobna krzywa uczenia
+      - Słabsza integracja z ML (scikit-learn, TensorFlow są Python-only)
+      - Wolniejszy od Pandas w production pipeline'ach
+      - Mniejszy ekosystem DevOps (FastAPI, Celery, Docker bardziej Python)
+    vs: "R gdy głównie statystyka i wizualizacja danych naukowych. Pandas gdy Python jest już Twoim językiem i potrzebujesz integracji z ML, API, bazami danych."
+
+  - name: DuckDB
+    icon: "🦆"
+    color: "#f5c518"
+    tagline: Analityczna baza SQL in-process — SQL bezpośrednio na Pandas DataFrame
+    pros:
+      - Wykonuje SQL bezpośrednio na DataFrame bez kopiowania danych
+      - Bardzo szybkie zapytania analityczne (kolumnowa baza)
+      - Obsługuje pliki Parquet, CSV, JSON bez wczytywania do RAM
+      - Przenosi złożone GROUP BY / JOIN z Pandas do SQL (bardziej czytelne)
+    cons:
+      - Wymaga znajomości SQL
+      - Nie zastępuje Pandas — narzędzie uzupełniające
+      - Mniej operacji niż Pandas (brak apply, transform z własną funkcją)
+    vs: "DuckDB jako uzupełnienie Pandas — gdy masz złożone SQL-owe zapytania lub duże Parquet. Pandas pozostaje do transformacji i ML preprocessing."

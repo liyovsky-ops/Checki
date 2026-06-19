@@ -1,0 +1,222 @@
+title: Ekosystem Pandas
+
+items:
+  - name: NumPy — fundament Pandas
+    desc: NumPy jest wewnętrznym silnikiem Pandas. Bezpośredni dostęp do array przydaje się dla operacji numerycznych.
+    icon: "🔢"
+    code: |
+      import pandas as pd
+      import numpy as np
+
+      # Konwersja DataFrame → numpy array
+      arr = df[['cena', 'kwota']].to_numpy()    # (n, 2) numpy array
+      arr = df['cena'].values                    # 1D array (Series.values)
+
+      # Numpy w kolumnach Pandas
+      df['log_cena'] = np.log(df['cena'])
+      df['sqrt_kwota'] = np.sqrt(df['kwota'])
+      df['clip'] = np.clip(df['cena'], 0, 1000)  # przytnie do [0, 1000]
+
+      # np.where — warunkowa wartość (szybsze niż apply)
+      df['kategoria'] = np.where(df['kwota'] > 1000, 'premium', 'standard')
+
+      # np.select — wiele warunków
+      conditions = [df['kwota'] < 100, df['kwota'] < 500, df['kwota'] >= 500]
+      choices = ['niski', 'sredni', 'wysoki']
+      df['tier'] = np.select(conditions, choices, default='unknown')
+
+  - name: Matplotlib / Seaborn — wizualizacja
+    desc: Pandas ma wbudowaną integrację z Matplotlib przez .plot(). Seaborn rozszerza o statystyczne wykresy.
+    icon: "📈"
+    code: |
+      import pandas as pd
+      import matplotlib.pyplot as plt
+      import seaborn as sns
+
+      # Pandas .plot() — szybkie wykresy
+      df['kwota'].plot(title='Kwoty')
+      df.plot(x='data', y='kwota', kind='line')
+      df['kategoria'].value_counts().plot(kind='bar')
+      df[['Q1', 'Q2', 'Q3']].plot(kind='box')
+
+      # Histogram
+      df['wiek'].plot(kind='hist', bins=20, figsize=(10, 6))
+      plt.show()
+
+      # Seaborn — czytelne wykresy statystyczne
+      sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm')
+      sns.boxplot(data=df, x='kategoria', y='kwota')
+      sns.scatterplot(data=df, x='wiek', y='wynagrodzenie', hue='miasto')
+      sns.histplot(data=df, x='kwota', kde=True)  # histogram + KDE
+
+      plt.tight_layout()
+      plt.savefig('wykres.png', dpi=150, bbox_inches='tight')
+
+  - name: SQLAlchemy — read_sql i to_sql
+    desc: SQLAlchemy to most między Pandas a relacyjnymi bazami — wczytuj i zapisuj DataFrame przez SQL.
+    icon: "🗄️"
+    code: |
+      import pandas as pd
+      from sqlalchemy import create_engine, text
+
+      # Połączenia z różnymi bazami
+      engine_pg   = create_engine('postgresql+psycopg2://user:pass@host/db')
+      engine_mysql = create_engine('mysql+pymysql://user:pass@host/db')
+      engine_sqlite = create_engine('sqlite:///local.db')
+
+      # Wczytaj całą tabelę
+      df = pd.read_sql_table('orders', con=engine_pg)
+
+      # Wczytaj wynik SQL
+      df = pd.read_sql("SELECT * FROM orders WHERE year = 2024", con=engine_pg)
+
+      # Parametryzowane zapytanie
+      with engine_pg.connect() as con:
+          df = pd.read_sql(
+              text("SELECT * FROM orders WHERE region = :r"),
+              con=con,
+              params={'r': 'Kraków'}
+          )
+
+      # Zapisz DataFrame do bazy
+      df_wynik.to_sql('analysis_results', con=engine_pg,
+                       if_exists='replace', index=False)
+
+  - name: PyArrow — Parquet i Arrow format
+    desc: PyArrow to silnik za Parquet w Pandas. Umożliwia też interoperabilność z Polars, Spark, DuckDB.
+    icon: "🏹"
+    code: |
+      import pandas as pd
+      import pyarrow as pa
+      import pyarrow.parquet as pq
+
+      # Pandas → PyArrow Table
+      table = pa.Table.from_pandas(df)
+
+      # PyArrow Table → Pandas
+      df = table.to_pandas()
+
+      # Zapis Parquet przez PyArrow (więcej kontroli)
+      pq.write_table(table, 'dane.parquet', compression='zstd')
+
+      # Wczytaj tylko wybrane kolumny (column pruning)
+      table = pq.read_table('dane.parquet', columns=['id', 'kwota'])
+      df = table.to_pandas()
+
+      # Parquet Dataset — folder z wieloma plikami
+      dataset = pq.ParquetDataset('dane_folder/')
+      df = dataset.read().to_pandas()
+
+      # Pandas z ArrowDtype (backend PyArrow) — szybsze dla stringów
+      df = pd.read_parquet('dane.parquet', dtype_backend='pyarrow')
+
+  - name: openpyxl — Excel zaawansowany
+    desc: openpyxl jest silnikiem Pandas dla .xlsx. Pozwala na formatowanie, style, formule w Excel.
+    icon: "📊"
+    code: |
+      import pandas as pd
+      from openpyxl import load_workbook
+      from openpyxl.styles import Font, PatternFill, Alignment
+      from openpyxl.utils.dataframe import dataframe_to_rows
+
+      # Zapis z formatowaniem przez ExcelWriter
+      with pd.ExcelWriter('raport.xlsx', engine='openpyxl') as writer:
+          df.to_excel(writer, sheet_name='Dane', index=False)
+
+          # Dostęp do arkusza przez openpyxl
+          ws = writer.sheets['Dane']
+
+          # Formatuj nagłówek
+          for cell in ws[1]:
+              cell.font = Font(bold=True, color='FFFFFF')
+              cell.fill = PatternFill(fill_type='solid', fgColor='150458')
+              cell.alignment = Alignment(horizontal='center')
+
+          # Ustaw szerokość kolumn
+          for col in ws.columns:
+              ws.column_dimensions[col[0].column_letter].width = 15
+
+  - name: scikit-learn — ML pipeline
+    desc: Pandas i scikit-learn ściśle współpracują — DataFrame jako wejście do Pipeline, preprocessorów, modeli.
+    icon: "🤖"
+    code: |
+      import pandas as pd
+      from sklearn.pipeline import Pipeline
+      from sklearn.preprocessing import StandardScaler, OneHotEncoder
+      from sklearn.compose import ColumnTransformer
+      from sklearn.ensemble import RandomForestClassifier
+      from sklearn.model_selection import train_test_split
+
+      df = pd.read_csv('dane.csv')
+
+      X = df.drop('target', axis=1)
+      y = df['target']
+
+      numeric_cols = X.select_dtypes(include='number').columns.tolist()
+      cat_cols = X.select_dtypes(include='object').columns.tolist()
+
+      preprocessor = ColumnTransformer([
+          ('num', StandardScaler(), numeric_cols),
+          ('cat', OneHotEncoder(handle_unknown='ignore'), cat_cols)
+      ])
+
+      pipeline = Pipeline([
+          ('prep', preprocessor),
+          ('model', RandomForestClassifier(n_estimators=100))
+      ])
+
+      X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+      pipeline.fit(X_train, y_train)
+      score = pipeline.score(X_test, y_test)
+      print(f"Accuracy: {score:.3f}")
+
+  - name: pandas-profiling / ydata-profiling — EDA raport
+    desc: Jeden wywołanie generuje kompletny raport HTML z całościową analizą DataFrame — idealny do EDA.
+    icon: "🔍"
+    code: |
+      # pip install ydata-profiling
+      from ydata_profiling import ProfileReport
+
+      df = pd.read_csv('dane.csv')
+
+      # Generuj raport
+      profile = ProfileReport(df, title="Analiza danych sprzedaży", explorative=True)
+      profile.to_file("raport.html")
+
+      # Raport zawiera:
+      # - podsumowanie (kształt, typy, duplikaty, NaN)
+      # - per kolumna: histogram, percentyle, wartości unikalne, korelacja
+      # - macierz korelacji (Pearson, Spearman, Cramér's V)
+      # - interaktywna analiza brakujących wartości
+
+      # Lżejszy tryb dla dużych danych
+      profile = ProfileReport(df, minimal=True)
+
+  - name: DuckDB — SQL na DataFrame
+    desc: DuckDB może wykonywać SQL bezpośrednio na Pandas DataFrame — zero kopiowania, maksymalna wydajność.
+    icon: "🦆"
+    code: |
+      # pip install duckdb
+      import duckdb
+      import pandas as pd
+
+      df = pd.read_parquet('sprzedaz.parquet')
+
+      # SQL bezpośrednio na DataFrame (zero copy)
+      wynik = duckdb.sql("""
+          SELECT
+              region,
+              DATE_TRUNC('month', data) as miesiac,
+              SUM(kwota) as suma,
+              COUNT(DISTINCT klient_id) as klienci
+          FROM df
+          WHERE kwota > 100
+          GROUP BY 1, 2
+          ORDER BY 1, 2
+      """).df()   # .df() → Pandas DataFrame
+
+      # Obsługa plików Parquet bez wczytywania do RAM
+      duckdb.sql("SELECT * FROM 'folder/*.parquet' LIMIT 10").df()
+
+      # Przydatne gdy masz złożone GROUP BY / window functions
+      # które są trudne do zapisania w Pandas

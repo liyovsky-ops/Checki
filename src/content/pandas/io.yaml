@@ -1,0 +1,232 @@
+title: I/O & Formaty
+
+items:
+  - name: read_csv — opcje zaawansowane
+    desc: read_csv to najczęściej używana funkcja Pandas. Zna jej opcje — zaoszczędzi czas i pamięć.
+    icon: "📄"
+    code: |
+      import pandas as pd
+
+      # Podstawowe wczytanie
+      df = pd.read_csv('dane.csv')
+
+      # Pełna kontrola parsowania
+      df = pd.read_csv(
+          'dane.csv',
+          sep=';',                           # separator (domyślnie ',')
+          decimal=',',                       # separator dziesiętny
+          encoding='utf-8-sig',              # BOM dla plików Windows
+          header=0,                          # numer wiersza nagłówka (lub None)
+          names=['id', 'data', 'kwota'],     # własne nazwy kolumn (jeśli brak header)
+          dtype={'id': str, 'kwota': float}, # typy kolumn z góry
+          parse_dates=['data', 'data_mod'],  # automatyczny parse dat
+          index_col='id',                    # ustaw kolumnę jako indeks
+          usecols=['id', 'data', 'kwota'],   # wczytaj tylko wybrane kolumny
+          nrows=1000,                        # wczytaj tylko N pierwszych wierszy
+          skiprows=[1, 2],                   # pomiń te wiersze
+          na_values=['NA', 'brak', '-'],     # dodatkowe wartości traktowane jako NaN
+          low_memory=False                   # wyłącz chunked parsing (szybsze)
+      )
+
+      # Duże pliki — czytaj kawałkami
+      for chunk in pd.read_csv('duzy.csv', chunksize=10_000):
+          process(chunk)  # każdy chunk to DataFrame 10k wierszy
+
+  - name: read_excel / to_excel
+    desc: Pandas obsługuje pliki .xlsx i .xls przez openpyxl. Wczytywanie z konkretnych arkuszy, zakresów.
+    icon: "📊"
+    code: |
+      # Wczytaj Excel
+      df = pd.read_excel('raport.xlsx')
+      df = pd.read_excel('raport.xlsx', sheet_name='Sprzedaż')   # konkretny arkusz
+      df = pd.read_excel('raport.xlsx', sheet_name=0)             # pierwszy arkusz
+
+      # Wczytaj wiele arkuszy naraz
+      all_sheets = pd.read_excel('raport.xlsx', sheet_name=None)  # dict {nazwa: DataFrame}
+      df_all = pd.concat(all_sheets.values(), ignore_index=True)
+
+      # Opcje parsowania
+      df = pd.read_excel(
+          'raport.xlsx',
+          header=2,           # nagłówki w 3. wierszu
+          usecols='A:E',      # kolumny A do E
+          dtype={'ID': str}
+      )
+
+      # Zapis do Excel
+      df.to_excel('wynik.xlsx', index=False)
+
+      # Wiele arkuszy w jednym pliku
+      with pd.ExcelWriter('raport.xlsx', engine='openpyxl') as writer:
+          df_q1.to_excel(writer, sheet_name='Q1', index=False)
+          df_q2.to_excel(writer, sheet_name='Q2', index=False)
+
+  - name: read_json / to_json
+    desc: JSON to naturalny format dla danych z API. Pandas rozumie różne orientacje JSON.
+    icon: "📋"
+    code: |
+      import pandas as pd
+
+      # Z pliku
+      df = pd.read_json('dane.json')
+
+      # Z URL (np. publiczne API)
+      df = pd.read_json('https://api.example.com/data')
+
+      # Orientacje JSON
+      df = pd.read_json('dane.json', orient='records')    # [{col: val, ...}, ...]
+      df = pd.read_json('dane.json', orient='columns')    # {col: {idx: val, ...}, ...}
+      df = pd.read_json('dane.json', orient='index')      # {idx: {col: val, ...}, ...}
+      df = pd.read_json('dane.json', orient='split')      # {columns: [...], data: [...]}
+
+      # Zagnieżdżony JSON — normalize
+      import json
+      with open('nested.json') as f:
+          data = json.load(f)
+
+      df = pd.json_normalize(data, record_path='orders', meta=['customer_id', 'name'])
+
+      # Zapis do JSON
+      df.to_json('wynik.json', orient='records', indent=2)
+
+  - name: read_sql — baza danych
+    desc: Pandas łączy się z bazami danych przez SQLAlchemy lub DBAPI2 — wyniki zapytań jako DataFrame.
+    icon: "🗄️"
+    code: |
+      import pandas as pd
+      from sqlalchemy import create_engine
+
+      # Połączenie przez SQLAlchemy
+      engine = create_engine('postgresql+psycopg2://user:pass@localhost/dbname')
+
+      # Wczytaj tabelę
+      df = pd.read_sql_table('zamowienia', con=engine)
+
+      # Wczytaj wynik zapytania SQL
+      df = pd.read_sql(
+          "SELECT id, klient, kwota FROM zamowienia WHERE rok = 2024",
+          con=engine
+      )
+
+      # Z parametrami (bezpieczne)
+      df = pd.read_sql(
+          "SELECT * FROM zamowienia WHERE region = %(region)s",
+          con=engine,
+          params={'region': 'Kraków'}
+      )
+
+      # Duże tabele — chunk
+      for chunk in pd.read_sql("SELECT * FROM big_table", con=engine, chunksize=5000):
+          process(chunk)
+
+      # Zapis DataFrame do bazy
+      df.to_sql('wynik_analizy', con=engine, if_exists='replace', index=False)
+      df.to_sql('logi', con=engine, if_exists='append', index=False, chunksize=1000)
+
+  - name: Parquet — format kolumnowy
+    desc: Parquet to najlepszy format dla danych analitycznych — kolumnowy, skompresowany, szybki. Zastąp CSV.
+    icon: "⚡"
+    code: |
+      import pandas as pd
+
+      # Wymagane: pip install pyarrow
+
+      # Zapis do Parquet
+      df.to_parquet('dane.parquet', index=False)
+
+      # Z kompresją (domyślnie snappy)
+      df.to_parquet('dane.parquet', compression='snappy')   # szybka kompresja
+      df.to_parquet('dane.parquet', compression='zstd')     # lepsza kompresja
+      df.to_parquet('dane.parquet', compression='gzip')     # zgodność
+
+      # Wczytaj Parquet
+      df = pd.read_parquet('dane.parquet')
+
+      # Wczytaj tylko wybrane kolumny (przewaga nad CSV!)
+      df = pd.read_parquet('dane.parquet', columns=['id', 'data', 'kwota'])
+
+      # Wczytaj cały folder z plikami Parquet (partition)
+      df = pd.read_parquet('dane_folder/')
+
+      # Dlaczego Parquet > CSV?
+      # 1. 5-10x mniejszy plik (kompresja per kolumna)
+      # 2. Zachowuje dtypes (nie trzeba re-parsować)
+      # 3. Wczytanie tylko potrzebnych kolumn (column pruning)
+      # 4. Natywna obsługa przez Spark, DuckDB, BigQuery
+
+  - name: read_html — scraping tabel ze stron WWW
+    desc: pd.read_html() wyciąga tabele HTML ze stron internetowych — przydatne dla danych finansowych, wiki.
+    icon: "🌐"
+    code: |
+      import pandas as pd
+
+      # Pobierz wszystkie tabele ze strony
+      tables = pd.read_html('https://pl.wikipedia.org/wiki/Lista_państw')
+      df = tables[0]  # pierwsza tabela
+
+      # Z lokal pliku HTML
+      tables = pd.read_html('raport.html')
+
+      # Z atrybutem id/class tabeli
+      tables = pd.read_html(url, attrs={'id': 'main-table'})
+      tables = pd.read_html(url, match='Przychody')  # tabela zawierająca ten tekst
+
+      # Uwaga: wymaga lxml
+      # pip install lxml
+
+      # Realistyczny przykład — kursy walut NBP
+      url = 'https://www.nbp.pl/home.aspx?f=/kursy/kursya.html'
+      tables = pd.read_html(url)
+      df_kursy = tables[0]
+      df_kursy.columns = ['waluta', 'kod', 'kurs_kupno', 'kurs_sprzedaz']
+
+  - name: Kompresja — gzip / zip / bz2
+    desc: Pandas transparentnie obsługuje skompresowane pliki — read_csv działa na .csv.gz bez dodatkowego kodu.
+    icon: "🗜️"
+    code: |
+      # Wczytaj skompresowany CSV
+      df = pd.read_csv('dane.csv.gz')           # gzip
+      df = pd.read_csv('dane.csv.bz2')          # bzip2
+      df = pd.read_csv('dane.csv.zip')          # zip
+      df = pd.read_csv('dane.csv.xz')           # lzma
+
+      # Zapisz skompresowany CSV
+      df.to_csv('wynik.csv.gz', index=False, compression='gzip')
+      df.to_csv('wynik.csv.bz2', index=False, compression='bz2')
+
+      # Zaawansowane opcje kompresji
+      df.to_csv('wynik.csv.gz', compression={
+          'method': 'gzip',
+          'compresslevel': 9   # 1-9, wyżej = lepsza kompresja ale wolniej
+      })
+
+      # Porównanie rozmiarów:
+      # dane.csv       → 100 MB
+      # dane.csv.gz    → 15 MB (gzip)
+      # dane.parquet   → 8 MB (parquet+snappy)
+
+  - name: to_csv — eksport z opcjami
+    desc: Eksport DataFrame do CSV z pełną kontrolą nad formatem — separator, kodowanie, daty, indeks.
+    icon: "💾"
+    code: |
+      # Podstawowy eksport
+      df.to_csv('wynik.csv', index=False)
+
+      # Pełna kontrola
+      df.to_csv(
+          'wynik.csv',
+          sep=';',                      # separator (Excel PL używa ;)
+          decimal=',',                  # separator dziesiętny
+          encoding='utf-8-sig',         # BOM dla Excel/Windows
+          index=False,                  # bez kolumny indeksu
+          float_format='%.2f',          # format liczb zmiennoprzecinkowych
+          date_format='%d.%m.%Y',       # format dat
+          na_rep='',                    # reprezentacja NaN (domyślnie pusty string)
+          columns=['id', 'data', 'kwota']  # tylko wybrane kolumny
+      )
+
+      # Zapis do StringIO (np. do wysłania przez HTTP)
+      from io import StringIO
+      buffer = StringIO()
+      df.to_csv(buffer, index=False)
+      csv_string = buffer.getvalue()

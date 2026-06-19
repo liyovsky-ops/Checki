@@ -1,0 +1,209 @@
+title: Analiza & Agregacja
+
+items:
+  - name: groupby — podstawy
+    desc: Podziel dane na grupy i oblicz agregaty. Odpowiednik GROUP BY z SQL — najważniejsza operacja w Pandas.
+    icon: "📦"
+    code: |
+      import pandas as pd
+
+      df = pd.read_csv('sprzedaz.csv')
+
+      # Suma per kategoria
+      df.groupby('kategoria')['kwota'].sum()
+
+      # Wiele funkcji naraz
+      df.groupby('kategoria')['kwota'].agg(['sum', 'mean', 'count', 'std'])
+
+      # Różne funkcje per kolumna
+      df.groupby('region').agg({
+          'kwota': 'sum',
+          'klient': 'nunique',    # liczba unikalnych klientów
+          'data': 'max'           # ostatnia transakcja
+      })
+
+      # Grupowanie po wielu kolumnach
+      df.groupby(['rok', 'miesiac', 'kategoria'])['kwota'].sum().reset_index()
+
+      # Named aggregations (pandas 0.25+)
+      df.groupby('region').agg(
+          suma_kwot=('kwota', 'sum'),
+          srednia=('kwota', 'mean'),
+          liczba_klientow=('klient', 'nunique')
+      )
+
+  - name: groupby transform — zachuj kształt DataFrame
+    desc: transform() zwraca Series tego samego rozmiaru co oryginał — idealne do dodawania kolumn agregowanych.
+    icon: "🔄"
+    code: |
+      # Dodaj kolumnę ze średnią grupową (bez reduce)
+      df['srednia_kategorii'] = df.groupby('kategoria')['kwota'].transform('mean')
+
+      # Rank w grupie
+      df['rank_w_grupie'] = df.groupby('region')['kwota'].transform('rank', ascending=False)
+
+      # Procent grupy
+      df['pct_kwoty_region'] = (
+          df['kwota'] / df.groupby('region')['kwota'].transform('sum') * 100
+      )
+
+      # Kumulatywna suma per klient
+      df = df.sort_values(['klient', 'data'])
+      df['suma_kumulatywna'] = df.groupby('klient')['kwota'].transform('cumsum')
+
+      # Czy kwota powyżej mediany dla swojej kategorii?
+      mediana = df.groupby('kategoria')['kwota'].transform('median')
+      df['ponad_mediana'] = df['kwota'] > mediana
+
+  - name: pivot_table
+    desc: Tabela przestawna jak w Excelu — grupowanie po wielu wymiarach jednocześnie, z automatyczną agregacją.
+    icon: "📊"
+    code: |
+      # Podstawowa tabela przestawna
+      pivot = df.pivot_table(
+          values='kwota',
+          index='region',
+          columns='kategoria',
+          aggfunc='sum',
+          fill_value=0        # zamiast NaN
+      )
+
+      # Wiele funkcji
+      pivot2 = df.pivot_table(
+          values='kwota',
+          index=['rok', 'region'],
+          columns='kategoria',
+          aggfunc=['sum', 'count'],
+          margins=True        # dodaj wiersz/kolumnę "All" z sumami
+      )
+
+      # Crosstab — specjalny przypadek pivot_table dla zliczania
+      pd.crosstab(df['region'], df['kategoria'])
+      pd.crosstab(df['region'], df['kategoria'], values=df['kwota'], aggfunc='sum')
+      pd.crosstab(df['region'], df['kategoria'], normalize='index')  # % per wiersz
+
+  - name: merge i join — łączenie DataFrame
+    desc: Odpowiednik SQL JOIN — łącz dane z wielu tabel po wspólnych kluczach.
+    icon: "🔗"
+    code: |
+      # merge — podstawowy JOIN
+      wynik = pd.merge(df_zamowienia, df_klienci, on='klient_id')
+
+      # Różne typy joinów
+      inner = pd.merge(A, B, on='id', how='inner')   # tylko pasujące z obu
+      left  = pd.merge(A, B, on='id', how='left')    # wszystkie z A, pasujące z B
+      right = pd.merge(A, B, on='id', how='right')   # wszystkie z B, pasujące z A
+      outer = pd.merge(A, B, on='id', how='outer')   # wszystkie z obu (NaN tam gdzie brak)
+
+      # Różne nazwy kluczy
+      pd.merge(df_A, df_B, left_on='customer_id', right_on='id')
+
+      # Merge po indeksie
+      pd.merge(df_A, df_B, left_index=True, right_index=True)
+
+      # join — skrót dla merge po indeksie
+      df_A.join(df_B, how='left', rsuffix='_b')
+
+      # Sprawdź po merge — czy są duplikaty?
+      pd.merge(A, B, on='id', validate='1:1')   # błąd jeśli nie 1:1
+
+  - name: concat — łączenie i sklejanie
+    desc: Sklejanie DataFrame pionowo (wiersze) lub poziomo (kolumny) — bez kluczy łączenia.
+    icon: "📎"
+    code: |
+      # Stos wierszy (pioneer axis=0)
+      df_all = pd.concat([df_2022, df_2023, df_2024], ignore_index=True)
+
+      # Z kluczem identyfikującym źródło
+      df_all = pd.concat(
+          [df_2022, df_2023],
+          keys=['2022', '2023'],
+          names=['rok', 'original_idx']
+      )
+
+      # Dodaj kolumny (axis=1)
+      df_rozszerzony = pd.concat([df_podstawowy, df_dodatkowe_kolumny], axis=1)
+
+      # Typowy wzorzec — lista DataFrame z pętli
+      parts = []
+      for plik in ['q1.csv', 'q2.csv', 'q3.csv', 'q4.csv']:
+          parts.append(pd.read_csv(plik))
+      df_rok = pd.concat(parts, ignore_index=True)
+
+  - name: describe / corr / value_counts
+    desc: Statystyki opisowe, korelacje i rozkład wartości — podstawa EDA (Exploratory Data Analysis).
+    icon: "📈"
+    code: |
+      # Statystyki opisowe
+      df.describe()              # dla kolumn numerycznych
+      df.describe(include='all') # dla wszystkich kolumn
+
+      # Konkretne statystyki
+      df['kwota'].mean()
+      df['kwota'].median()
+      df['kwota'].std()
+      df['kwota'].quantile([0.25, 0.5, 0.75, 0.95])
+      df['kwota'].skew()        # skośność
+      df['kwota'].kurt()        # kurtoza
+
+      # Korelacja
+      df.corr(numeric_only=True)             # macierz korelacji Pearsona
+      df.corr(method='spearman')   # Spearman (dla nieparametrycznych)
+      df['kwota'].corr(df['rabat'])  # korelacja dwóch kolumn
+
+      # Rozkład wartości
+      df['kategoria'].value_counts()
+      df['kategoria'].value_counts(normalize=True) * 100  # procenty
+
+      # Grupowanie w przedziały (bins)
+      df['wiek_grupa'] = pd.cut(df['wiek'], bins=[0, 25, 35, 50, 100],
+                                 labels=['<25', '25-35', '35-50', '50+'])
+      df['kwota_qcut'] = pd.qcut(df['kwota'], q=4, labels=['Q1', 'Q2', 'Q3', 'Q4'])
+
+  - name: groupby apply — zaawansowane transformacje
+    desc: apply() na groupby daje pełną elastyczność — funkcja dostaje całą grupę jako DataFrame.
+    icon: "🛠️"
+    code: |
+      # Top N per grupa
+      def top3(group):
+          return group.nlargest(3, 'kwota')
+
+      top3_per_region = df.groupby('region').apply(top3).reset_index(drop=True)
+
+      # Normalizacja per grupa (z-score)
+      def zscore(group):
+          return (group['kwota'] - group['kwota'].mean()) / group['kwota'].std()
+
+      df['kwota_z'] = df.groupby('kategoria').apply(zscore).reset_index(level=0, drop=True)
+
+      # Okno kroczące per klient
+      def rolling_mean(group):
+          return group.set_index('data')['kwota'].rolling('30D').mean()
+
+      result = df.groupby('klient').apply(rolling_mean)
+
+  - name: window functions — rolling / expanding / ewm
+    desc: Funkcje okna kroczącego — analiza trendów i wygładzanie szeregów czasowych.
+    icon: "🪟"
+    code: |
+      df = df.set_index('data').sort_index()
+
+      # Okno kroczące (ostatnie N obserwacji)
+      df['ma_7d'] = df['kwota'].rolling(window=7).mean()         # 7-dniowa średnia krocząca
+      df['sum_30d'] = df['kwota'].rolling(window=30).sum()       # suma 30 dni
+      df['max_7d'] = df['kwota'].rolling(window=7).max()
+
+      # Okno po czasie (nie liczbie wierszy)
+      df['ma_week'] = df['kwota'].rolling('7D').mean()            # 7 dni wstecz
+
+      # Expanding — od początku do bieżącego wiersza
+      df['kum_suma'] = df['kwota'].expanding().sum()
+      df['kum_max'] = df['kwota'].expanding().max()
+
+      # Exponentially weighted mean (EWM) — nowsze dane ważniejsze
+      df['ewm_14'] = df['kwota'].ewm(span=14).mean()
+
+      # Shift — poprzednia wartość
+      df['poprzednia_kwota'] = df['kwota'].shift(1)
+      df['zmiana'] = df['kwota'] - df['kwota'].shift(1)
+      df['zmiana_pct'] = df['kwota'].pct_change() * 100
