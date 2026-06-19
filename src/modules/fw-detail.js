@@ -24,6 +24,8 @@ import { FW_ANTHROPIC_DATA }   from '../data/fw_anthropic.js';
 import { FW_SQLALCHEMY_DATA }  from '../data/fw_sqlalchemy.js';
 import { FW_LLAMAINDEX_DATA }  from '../data/fw_llamaindex.js';
 import { FW_PYDANTICAI_DATA }  from '../data/fw_pydanticai.js';
+import { FW_DJANGO_DATA }      from '../data/fw_django.js';
+import { FW_PANDAS_DATA }      from '../data/fw_pandas.js';
 
 let activeTab = 'podstawy';
 let activeFw  = 'react';
@@ -38,7 +40,8 @@ const FW_DATA_MAP = {
   kubernetes: FW_KUBERNETES_DATA, flask: FW_FLASK_DATA,
   openaisdk: FW_OPENAI_DATA, anthropicsdk: FW_ANTHROPIC_DATA,
   sqlalchemy: FW_SQLALCHEMY_DATA, llamaindex: FW_LLAMAINDEX_DATA,
-  pydanticai: FW_PYDANTICAI_DATA,
+  pydanticai: FW_PYDANTICAI_DATA, django: FW_DJANGO_DATA,
+  pandas: FW_PANDAS_DATA,
 };
 
 export function openFramework(fw) {

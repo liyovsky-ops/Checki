@@ -1,0 +1,319 @@
+title: ORM & Modele Django
+
+items:
+  - name: Definiowanie modeli
+    desc: >
+      Model Django to klasa Python dziedzicząca z models.Model.
+      Każde pole to instancja Field class — CharField, IntegerField, DateTimeField, ForeignKey itp.
+      Django automatycznie dodaje pole id (AutoField) jako klucz główny.
+      Meta class wewnątrz modelu kontroluje ordering, db_table, verbose_name, constraints.
+    icon: "📋"
+    code: |
+      from django.db import models
+
+      class Category(models.Model):
+          name = models.CharField(max_length=100, unique=True)
+          slug = models.SlugField(max_length=100, unique=True)
+
+          class Meta:
+              ordering = ['name']
+              verbose_name_plural = 'categories'
+
+          def __str__(self):
+              return self.name
+
+      class Article(models.Model):
+          STATUS = [
+              ('draft', 'Draft'),
+              ('published', 'Published'),
+          ]
+          title     = models.CharField(max_length=250)
+          content   = models.TextField()
+          created   = models.DateTimeField(auto_now_add=True)
+          updated   = models.DateTimeField(auto_now=True)
+          status    = models.CharField(max_length=10, choices=STATUS, default='draft')
+          category  = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='articles')
+          tags      = models.ManyToManyField('Tag', blank=True)
+          author    = models.ForeignKey('auth.User', on_delete=models.CASCADE)
+
+          class Meta:
+              ordering = ['-created']
+              indexes  = [models.Index(fields=['status', 'created'])]
+
+          def __str__(self):
+              return self.title
+
+  - name: QuerySet API — pobieranie danych
+    desc: >
+      QuerySet to leniwa kolekcja obiektów z bazy danych. SQL jest wykonywany dopiero
+      przy ewaluacji (iteracja, list(), print, slicing). Można łączyć metody w łańcuch.
+      Podstawowe metody: all(), filter(), exclude(), get(), first(), last(), count().
+    icon: "🔍"
+    code: |
+      from blog.models import Article, Category
+
+      # Wszystkie obiekty
+      articles = Article.objects.all()
+
+      # Filtrowanie (WHERE)
+      published = Article.objects.filter(status='published')
+      recent    = Article.objects.filter(created__year=2024)
+      by_author = Article.objects.filter(author__username='jan')
+
+      # Wykluczanie
+      not_draft = Article.objects.exclude(status='draft')
+
+      # Jeden obiekt — rzuca wyjątek jeśli nie ma lub jest wiele
+      article = Article.objects.get(pk=1)      # MultipleObjectsReturned / DoesNotExist
+      latest  = Article.objects.latest('created')
+
+      # Bezpieczne pobieranie
+      article = Article.objects.filter(pk=1).first()  # None jeśli brak
+      # lub helper:
+      from django.shortcuts import get_object_or_404
+      article = get_object_or_404(Article, pk=1, status='published')
+
+      # Wycinanie i limit
+      top5  = Article.objects.all()[:5]
+      page2 = Article.objects.all()[5:10]
+
+      # Sortowanie
+      asc  = Article.objects.order_by('title')
+      desc = Article.objects.order_by('-created', 'title')
+
+  - name: Relacje — ForeignKey, M2M, OneToOne
+    desc: >
+      ForeignKey tworzy relację wiele-do-jednego (many-to-one). ManyToManyField tworzy
+      tabelę pośrednią automatycznie. OneToOneField to ForeignKey z unique=True — np. profil użytkownika.
+      related_name określa nazwę odwrotnego dostępu. on_delete określa co się dzieje z powiązanymi
+      obiektami przy usunięciu: CASCADE, PROTECT, SET_NULL, SET_DEFAULT.
+    icon: "🔗"
+    code: |
+      # Dostęp do powiązanych obiektów
+      article = Article.objects.get(pk=1)
+
+      # Forward — dostęp do powiązanego obiektu
+      author_name = article.author.username
+      category    = article.category.name
+
+      # Reverse — dostęp z powiązanego obiektu (related_name)
+      user     = User.objects.get(pk=1)
+      articles = user.article_set.all()        # domyślna nazwa: <model>_set
+      # lub z related_name='articles':
+      articles = category.articles.all()       # dzięki related_name='articles'
+
+      # ManyToMany
+      article.tags.all()
+      article.tags.add(tag1, tag2)
+      article.tags.remove(tag1)
+      article.tags.clear()
+      article.tags.set([tag1, tag2])
+
+      # OneToOne — rozszerzenie User profile
+      class Profile(models.Model):
+          user   = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+          bio    = models.TextField(blank=True)
+          avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
+
+      # Dostęp dwukierunkowy
+      user.profile.bio
+      profile.user.email
+
+  - name: select_related i prefetch_related
+    desc: >
+      Problem N+1 queries: pętla po 100 artykułach odpytuje bazę 100 razy po autorze.
+      select_related rozwiązuje to przez JOIN (dla ForeignKey i OneToOne) — jeden SQL.
+      prefetch_related rozwiązuje M2M i odwrotne relacje — dwa osobne zapytania z Python-side joining.
+      Zawsze używaj gdy iterujesz po QuerySecie z powiązanymi obiektami.
+    icon: "⚡"
+    code: |
+      # Problem N+1 (ZLE — 1 + N zapytań)
+      articles = Article.objects.all()
+      for article in articles:
+          print(article.author.username)  # osobne SQL dla każdego autora!
+
+      # select_related — jeden JOIN SQL (dobrze dla FK i O2O)
+      articles = Article.objects.select_related('author', 'category').all()
+      for article in articles:
+          print(article.author.username)  # ZERO dodatkowych SQL
+
+      # prefetch_related — dla M2M i reverse FK
+      articles = Article.objects.prefetch_related('tags').all()
+      for article in articles:
+          print(article.tags.all())  # zapytanie już wykonane, z cache
+
+      # Kombinacja obu
+      articles = (
+          Article.objects
+          .select_related('author', 'category')
+          .prefetch_related('tags', 'comments')
+          .filter(status='published')
+      )
+
+      # Debugowanie — ile SQL wykonano?
+      from django.db import connection
+      print(len(connection.queries))
+      # lub django-debug-toolbar w przeglądarce
+
+  - name: Agregacje i annotacje
+    desc: >
+      aggregate() oblicza wartość dla całego QuerySetu — COUNT, SUM, AVG, MAX, MIN.
+      annotate() dodaje obliczone pole do każdego obiektu w QuerySecie.
+      Potężne combo z groupby (values()) — grupuj i agreguj bez pisania SQL.
+    icon: "📊"
+    code: |
+      from django.db.models import Count, Sum, Avg, Max, Min, Q
+
+      # aggregate — jedna wartość dla całego QS
+      result = Article.objects.aggregate(
+          total=Count('id'),
+          avg_length=Avg('content_length'),
+      )
+      # result = {'total': 42, 'avg_length': 850.5}
+
+      # annotate — pole per obiekt
+      cats = Category.objects.annotate(
+          article_count=Count('articles'),
+          latest_article=Max('articles__created'),
+      ).order_by('-article_count')
+
+      for cat in cats:
+          print(f"{cat.name}: {cat.article_count} artykułów")
+
+      # GROUP BY z values() + annotate
+      from django.db.models.functions import TruncMonth
+      monthly = (
+          Article.objects
+          .annotate(month=TruncMonth('created'))
+          .values('month')
+          .annotate(count=Count('id'))
+          .order_by('month')
+      )
+
+      # Filtrowanie z Q objects (OR, AND, NOT)
+      results = Article.objects.filter(
+          Q(status='published') | Q(author__is_staff=True),
+          Q(created__year=2024),
+      )
+
+  - name: Tworzenie, update i delete
+    desc: >
+      Podstawowe operacje CRUD — create(), save(), update(), delete(). QuerySet.update()
+      jest najwydajniejszy przy masowych aktualizacjach — jeden SQL UPDATE bez ładowania obiektów.
+      get_or_create() i update_or_create() eliminują boilerplate dla "upsert" operacji.
+      bulk_create() i bulk_update() do masowego wstawiania bez N SQL.
+    icon: "✏️"
+    code: |
+      # CREATE
+      article = Article.objects.create(
+          title='Nowy artykuł',
+          content='Treść...',
+          author=request.user,
+          status='draft',
+      )
+      # lub przez save()
+      article = Article(title='Test', author=request.user)
+      article.content = 'Treść'
+      article.save()
+
+      # UPDATE — jeden obiekt
+      article.title = 'Zaktualizowany tytuł'
+      article.save(update_fields=['title'])  # SQL tylko dla zmienionych pól
+
+      # UPDATE masowy — jeden SQL, bez ładowania obiektów
+      Article.objects.filter(status='draft', created__year=2023).update(status='archived')
+
+      # get_or_create — atomiczne
+      category, created = Category.objects.get_or_create(
+          slug='python',
+          defaults={'name': 'Python'},
+      )
+
+      # update_or_create
+      obj, created = Article.objects.update_or_create(
+          title='Tytuł',
+          defaults={'content': 'Nowa treść', 'status': 'published'},
+      )
+
+      # DELETE
+      Article.objects.filter(status='draft', created__year=2020).delete()
+
+      # bulk_create — wiele insertów jednym SQL
+      articles = [Article(title=f'Post {i}', content='...', author=user) for i in range(100)]
+      Article.objects.bulk_create(articles, batch_size=50)
+
+  - name: Transakcje i atomowość
+    desc: >
+      Django domyślnie jest w autocommit mode — każde save() commituje osobną transakcję.
+      atomic() opakowuje operacje w jedną transakcję — albo wszystkie się udają, albo rollback.
+      on_commit() wywołuje callback dopiero po commicie transakcji — bezpieczne dla asynchronicznych tasków.
+    icon: "🔒"
+    code: |
+      from django.db import transaction
+
+      # Transakcja przez context manager
+      with transaction.atomic():
+          user = User.objects.create_user(username='jan', password='secret')
+          Profile.objects.create(user=user, bio='Nowy użytkownik')
+          # Jeśli Profile.create() rzuci wyjątek — cofnięty też User.create()
+
+      # Dekorator
+      @transaction.atomic
+      def transfer_funds(from_account, to_account, amount):
+          from_account.balance -= amount
+          from_account.save()
+          to_account.balance += amount
+          to_account.save()
+
+      # Savepoints — nested atomic
+      with transaction.atomic():
+          do_something()
+          try:
+              with transaction.atomic():  # savepoint
+                  do_risky_thing()       # może się nie udać
+          except SomeError:
+              pass  # rollback do savepoint, outer transaction trwa
+          do_something_else()
+
+      # on_commit — safe dla Celery tasks
+      from django.db import transaction
+
+      def create_user(data):
+          with transaction.atomic():
+              user = User.objects.create(**data)
+              # send_welcome_email() tutaj — niebezpieczne, task może pobiec przed commitem
+              transaction.on_commit(lambda: send_welcome_email.delay(user.pk))
+
+  - name: Model Managers i QuerySet custom
+    desc: >
+      Manager to interfejs do operacji QuerySet na modelu. objects to domyślny Manager.
+      Custom Manager pozwala enkapsulować często używane filtry. Custom QuerySet
+      pozwala łączyć metody. Wzorzec: QuerySet klasa + Manager jako proxy.
+    icon: "🛠️"
+    code: |
+      class PublishedQuerySet(models.QuerySet):
+          def published(self):
+              return self.filter(status='published')
+
+          def by_author(self, user):
+              return self.filter(author=user)
+
+          def recent(self, days=30):
+              from django.utils import timezone
+              cutoff = timezone.now() - timezone.timedelta(days=days)
+              return self.filter(created__gte=cutoff)
+
+      class ArticleManager(models.Manager):
+          def get_queryset(self):
+              return PublishedQuerySet(self.model, using=self._db)
+
+          def published(self):
+              return self.get_queryset().published()
+
+      class Article(models.Model):
+          # ...pola...
+          objects  = models.Manager()      # domyślny
+          articles = ArticleManager()       # custom
+
+      # Użycie
+      Article.articles.published().by_author(user).recent(days=7)

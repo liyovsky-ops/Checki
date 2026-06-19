@@ -1,0 +1,92 @@
+title: Django vs alternatywy webowe
+
+items:
+  - name: FastAPI
+    icon: "🚀"
+    color: "#009688"
+    tagline: Nowoczesny, async, type-safe — auto-dokumentacja i Pydantic wbudowane
+    pros:
+      - "Async/await natywnie — 2-3x szybszy od Django na I/O-bound requestach"
+      - "Automatyczna dokumentacja Swagger/OpenAPI z type hints — zero konfiguracji"
+      - "Pydantic walidacja danych — silne typowanie i serializacja"
+      - "Dependency Injection wbudowany — elegancki sposób na auth, db session, config"
+      - "Lżejszy od Django — mniej pamięci RAM, szybszy cold start (Lambda, containers)"
+    cons:
+      - "Brak ORM — musisz wybrać i skonfigurować (SQLAlchemy, Tortoise-ORM)"
+      - "Brak admina — FastAPI nie generuje panelu CRUD sam z siebie"
+      - "Brak systemu migracji — Alembic wymaga konfiguracji"
+      - "Brak wbudowanej auth — JWT lub sesje musisz zbudować sam"
+      - "Mniejszy ekosystem niż Django — mniej gotowych rozwiązań"
+    vs: "FastAPI dla nowych REST API i mikroserwisów, szczególnie gdy priorytet to wydajność i auto-dokumentacja. Django gdy potrzebujesz gotowego admin panelu, systemu auth, ORM i full-stack — lub gdy pracujesz z legacy kodem Django."
+
+  - name: Flask
+    icon: "🌶️"
+    color: "#E8402C"
+    tagline: Mikro-framework — minimalizm, elastyczność, wolność wyboru
+    pros:
+      - "Minimalna trudność wejścia — 5 linii kodu i masz działający serwer"
+      - "Pełna swoboda architektoniczna — wybierasz ORM, auth, szablony, wszystko"
+      - "Świetny dla prototypów i MVP — mniej narzutów konwencji Django"
+      - "Bogaty ekosystem rozszerzeń (Flask-SQLAlchemy, Flask-Login, Flask-JWT)"
+      - "WSGI — dojrzały, stabilny, szeroka kompatybilność"
+    cons:
+      - "Brak wbudowanego ORM — Flask-SQLAlchemy to osobna konfiguracja"
+      - "Brak admin panelu — musisz użyć Flask-Admin lub zbudować sam"
+      - "Brak systemu migracji — Flask-Migrate (Alembic) wymaga konfiguracji"
+      - "Więcej decyzji architektonicznych — może paraliżować na początku projektu"
+      - "N+1 queries i inne anty-wzorce łatwiej się zakradają bez struktury Django"
+    vs: "Flask dla mikrousług, prostych API gdzie Django byłoby overkill. Django dla projektów wymagających szybkiego dostarczenia pełnej aplikacji — admin, auth, ORM w cenie. Flask ma mniejszy narzut dla małych serwisów, Django wygrywa produktywnością na średnich i dużych projektach."
+
+  - name: Ruby on Rails
+    icon: "💎"
+    color: "#CC0000"
+    tagline: Konwencja nad konfigurację — Ruby odpowiednik Django, pionier MVC
+    pros:
+      - "Convention over configuration — szybkie tworzenie scaffold CRUD"
+      - "Active Record ORM — bardziej ekspresywne API niż Django ORM"
+      - "Bogaty ekosystem (Gems) — autoryzacja (Devise), API (Grape), testy (RSpec)"
+      - "Asset pipeline i Webpack wbudowane — zero konfiguracji frontendu"
+      - "Hotwire/Turbo — SPA-like UX bez JavaScript frameworka"
+    cons:
+      - "Ruby jest wolniejszy niż Python w benchmarkach"
+      - "Mniej ofert pracy niż Python/Django w Polsce i Europie"
+      - "Magia Rails (metaprogramowanie Ruby) — trudniejszy debugging"
+      - "Ekosystem mniejszy niż Python (AI/ML biblioteki to Python-first)"
+      - "Migracja do mikroserwisów trudniejsza niż w Pythonie"
+    vs: "Rails i Django są najblizszymi odpowiednikami — oba batteries-included, oba mają ORM i admin. Wybierz Django jeśli znasz Python lub potrzebujesz AI/ML integracji. Rails jeśli pracujesz z zespołem Ruby lub projektem już opartym na Rails."
+
+  - name: Laravel
+    icon: "🔴"
+    color: "#FF2D20"
+    tagline: PHP framework — Eloquent ORM, Blade szablony, ekosystem jak Django w PHP
+    pros:
+      - "Eloquent ORM — Active Record, intuicyjne API relacji"
+      - "Artisan CLI — odpowiednik manage.py z bogatymi generatorami kodu"
+      - "Blade szablony — czystszy składnia niż Django Template Language"
+      - "Laravel Forge/Vapor — deployment infrastructure jako usługa"
+      - "Hosting PHP jest tańszy i wszędzie dostępny (shared hosting)"
+    cons:
+      - "PHP jako język — mniej prestiżowy w branży niż Python"
+      - "Zero bibliotek AI/ML — w Pythonie NumPy, Pandas, scikit-learn są natywne"
+      - "PHP mniej wydajny od Python w aplikacjach obliczeniowych"
+      - "Mniejsza adopcja w enterprise niż Django (szczególnie w dużych firmach tech)"
+      - "Ekosystem data science — Python wygrywa bez dyskusji"
+    vs: "Laravel gdy projekt jest pisany w PHP lub hosting PHP jest wymagany. Django gdy chcesz Python i dostęp do ekosystemu AI/ML, data science. Oba są dobry wyborem dla tradycyjnych aplikacji webowych — Django ma silniejszą pozycję w branży tech."
+
+  - name: Gin / Echo (Go)
+    icon: "🔷"
+    color: "#00ACD7"
+    tagline: Go web frameworks — ekstremalna wydajność, statyczne typowanie, niskie zużycie pamięci
+    pros:
+      - "Wydajność — Gin obsługuje 10x więcej requestów/s niż Django"
+      - "Niskie zużycie pamięci — idealne dla mikroserwisów i serverless"
+      - "Statyczne typowanie — błędy kompilacji zamiast runtime"
+      - "Goroutines — prawdziwy async bez event loop"
+      - "Binarny deployment — jeden plik, zero runtime dependencies"
+    cons:
+      - "Brak ORM na poziomie Django — GORM jest mniej dojrzały"
+      - "Brak admin panelu — musisz budować od zera"
+      - "Mniej czytelny kod niż Python dla złożonej logiki biznesowej"
+      - "Ekosystem mniejszy — mniej gotowych bibliotek niż Python"
+      - "Trudniejszy onboarding nowych developerów"
+    vs: "Go/Gin dla serwisów wymagających ekstremalnej wydajności i niskiego zużycia zasobów (API gateway, real-time). Django dla aplikacji biznesowych gdzie produktywność i czas dostarczenia są ważniejsze niż raw performance. Instagram skalował Django do miliardów requestów dziennie — Django rzadko jest wąskim gardłem."

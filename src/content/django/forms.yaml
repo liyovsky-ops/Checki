@@ -1,0 +1,310 @@
+title: Formularze Django
+
+items:
+  - name: Form i ModelForm
+    desc: >
+      Form to klasa Python definiująca pola i walidację. ModelForm automatycznie generuje
+      pola na podstawie modelu — zero duplikacji kodu. ModelForm.save() tworzy lub aktualizuje
+      instancję modelu. Oba obsługują walidację danych i generowanie HTML.
+    icon: "📝"
+    code: |
+      from django import forms
+      from .models import Article, Category
+
+      # Zwykły Form — niezwiązany z modelem
+      class ContactForm(forms.Form):
+          name    = forms.CharField(max_length=100, label='Imię i nazwisko')
+          email   = forms.EmailField()
+          message = forms.CharField(widget=forms.Textarea(attrs={'rows': 6}))
+          subject = forms.ChoiceField(choices=[
+              ('general', 'Ogólne'),
+              ('support', 'Wsparcie'),
+              ('sales', 'Sprzedaż'),
+          ])
+          newsletter = forms.BooleanField(required=False, label='Zapisz mnie na newsletter')
+
+      # ModelForm — generuje pola z modelu
+      class ArticleForm(forms.ModelForm):
+          class Meta:
+              model   = Article
+              fields  = ['title', 'content', 'status', 'category', 'tags']
+              # lub: exclude = ['author', 'created', 'updated']
+              labels  = {
+                  'title': 'Tytuł artykułu',
+                  'content': 'Treść',
+              }
+              widgets = {
+                  'content':  forms.Textarea(attrs={'rows': 15, 'class': 'editor'}),
+                  'title':    forms.TextInput(attrs={'placeholder': 'Wpisz tytuł...'}),
+                  'category': forms.Select(attrs={'class': 'select2'}),
+              }
+              help_texts = {
+                  'title': 'Maksymalnie 250 znaków — widoczny w przeglądarce.',
+              }
+
+      # Użycie w view
+      def article_create(request):
+          if request.method == 'POST':
+              form = ArticleForm(request.POST, request.FILES)
+              if form.is_valid():
+                  article = form.save(commit=False)
+                  article.author = request.user
+                  article.save()
+                  form.save_m2m()  # wymagane gdy commit=False i M2M
+                  return redirect(article.get_absolute_url())
+          else:
+              form = ArticleForm()
+          return render(request, 'blog/article_form.html', {'form': form})
+
+  - name: Walidacja — clean methods
+    desc: >
+      Walidacja w Django ma kilka poziomów. Field-level: clean_<fieldname>() waliduje jedno pole.
+      Form-level: clean() waliduje kilka pól razem (np. password confirmation).
+      validators=[...] dla wielokrotnego użycia logiki walidacji.
+      ValidationError z code pozwala testować konkretne błędy. errors dict mapuje pola na błędy.
+    icon: "✅"
+    code: |
+      from django import forms
+      from django.core.exceptions import ValidationError
+      from django.core.validators import MinLengthValidator, RegexValidator
+
+      class RegistrationForm(forms.Form):
+          username = forms.CharField(
+              max_length=50,
+              validators=[
+                  MinLengthValidator(3),
+                  RegexValidator(r'^[a-zA-Z0-9_]+$', 'Tylko litery, cyfry i podkreślnik'),
+              ]
+          )
+          email    = forms.EmailField()
+          password = forms.CharField(widget=forms.PasswordInput, min_length=8)
+          confirm  = forms.CharField(widget=forms.PasswordInput, label='Potwierdź hasło')
+
+          # Walidacja jednego pola — clean_<fieldname>()
+          def clean_username(self):
+              username = self.cleaned_data['username']
+              if User.objects.filter(username__iexact=username).exists():
+                  raise ValidationError(
+                      'Nazwa użytkownika "%(value)s" jest zajęta.',
+                      code='duplicate_username',
+                      params={'value': username},
+                  )
+              return username.lower()  # normalizuj na małe litery
+
+          def clean_email(self):
+              email = self.cleaned_data['email']
+              domain = email.split('@')[1]
+              blocked = ['tempmail.com', 'throwaway.email']
+              if domain in blocked:
+                  raise ValidationError('Tymczasowe adresy email są niedozwolone.')
+              return email
+
+          # Walidacja formularza jako całości — clean()
+          def clean(self):
+              cleaned = super().clean()
+              password = cleaned.get('password')
+              confirm  = cleaned.get('confirm')
+
+              if password and confirm and password != confirm:
+                  self.add_error('confirm', 'Hasła nie są identyczne.')
+              return cleaned
+
+      # Custom validator wielokrotnego użycia
+      def validate_not_profanity(value):
+          banned = ['spam', 'xxx']
+          for word in banned:
+              if word in value.lower():
+                  raise ValidationError(f'Pole zawiera niedozwolone słowo: {word}')
+
+  - name: Formsets — wiele formularzy
+    desc: >
+      Formset to kolekcja formularzy tego samego typu — np. wiele pozycji faktury na raz.
+      ModelFormSet obsługuje kolekcje powiązanych modeli. InlineFormSet obsługuje FK relacje.
+      Formsets mają własną walidację, dynamiczne dodawanie/usuwanie (JavaScript), zarządzanie przez management form.
+    icon: "📋"
+    code: |
+      from django.forms import modelformset_factory, inlineformset_factory
+
+      # Formset dla modelu
+      ArticleFormSet = modelformset_factory(
+          Article,
+          fields=('title', 'status'),
+          extra=3,       # 3 puste formularze na dole
+          can_delete=True,
+          max_num=10,
+      )
+
+      # InlineFormSet — powiązane przez FK
+      # Wiele komentarzy do jednego artykułu
+      CommentInlineFormSet = inlineformset_factory(
+          Article,   # parent model
+          Comment,   # child model (FK -> Article)
+          fields=('content', 'author'),
+          extra=1,
+          can_delete=True,
+      )
+
+      # View obsługujący oba formularze i formset naraz
+      def article_edit(request, pk):
+          article = get_object_or_404(Article, pk=pk)
+          ArticleForm_with_comments = CommentInlineFormSet
+
+          if request.method == 'POST':
+              form    = ArticleForm(request.POST, instance=article)
+              formset = CommentInlineFormSet(request.POST, instance=article)
+              if form.is_valid() and formset.is_valid():
+                  form.save()
+                  formset.save()
+                  return redirect('article-detail', pk=pk)
+          else:
+              form    = ArticleForm(instance=article)
+              formset = CommentInlineFormSet(instance=article)
+
+          return render(request, 'blog/edit.html', {'form': form, 'formset': formset})
+
+  - name: Widgets — customizacja renderowania
+    desc: >
+      Widget kontroluje jak pole formularza jest renderowane jako HTML i jak parsuje dane wejściowe.
+      Django ma wbudowane widgety dla wszystkich typów pól. Custom widget pozwala renderować
+      dowolny HTML — np. color picker, date picker, select z wyszukiwaniem.
+    icon: "🎨"
+    code: |
+      from django import forms
+
+      class ArticleForm(forms.ModelForm):
+          class Meta:
+              model   = Article
+              fields  = ['title', 'content', 'published_at', 'color', 'images']
+              widgets = {
+                  # Textarea z atrybutami HTML
+                  'content': forms.Textarea(attrs={
+                      'rows': 20,
+                      'class': 'prose-editor',
+                      'data-toolbar': 'bold,italic,link',
+                  }),
+                  # Date picker
+                  'published_at': forms.DateTimeInput(
+                      attrs={'type': 'datetime-local'},
+                      format='%Y-%m-%dT%H:%M'
+                  ),
+                  # Checkboxes zamiast select dla M2M
+                  'tags': forms.CheckboxSelectMultiple(),
+                  # Ukryte pole
+                  'draft_key': forms.HiddenInput(),
+              }
+
+      # Custom widget
+      class StarRatingWidget(forms.Widget):
+          template_name = 'widgets/star_rating.html'
+
+          def __init__(self, max_stars=5, **kwargs):
+              super().__init__(**kwargs)
+              self.max_stars = max_stars
+
+          def get_context(self, name, value, attrs):
+              ctx = super().get_context(name, value, attrs)
+              ctx['widget']['max_stars'] = self.max_stars
+              return ctx
+
+      class ReviewForm(forms.Form):
+          rating  = forms.IntegerField(widget=StarRatingWidget(max_stars=5), min_value=1, max_value=5)
+          comment = forms.CharField(widget=forms.Textarea)
+
+  - name: Renderowanie formularzy w szablonach
+    desc: >
+      Django automatycznie generuje HTML dla formularzy. Możesz renderować cały formularz
+      (as_table, as_p, as_ul) lub pole po polu — pełna kontrola nad HTML.
+      Crispy Forms to popularna biblioteka do ładniejszego renderowania Bootstrap/Tailwind.
+    icon: "🖥️"
+    code: |
+      {# Prosty render — jako paragraf #}
+      <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Wyślij</button>
+      </form>
+
+      {# Ręczny render — pełna kontrola #}
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        {% for field in form %}
+          <div class="form-group {% if field.errors %}has-error{% endif %}">
+            <label for="{{ field.id_for_label }}">
+              {{ field.label }}
+              {% if field.field.required %}<span class="required">*</span>{% endif %}
+            </label>
+            {{ field }}
+            {% if field.help_text %}
+              <small class="help-text">{{ field.help_text }}</small>
+            {% endif %}
+            {% for error in field.errors %}
+              <div class="error">{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+
+        {# Błędy nie przypisane do pola #}
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {% for error in form.non_field_errors %}
+              <p>{{ error }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary">Zapisz</button>
+      </form>
+
+  - name: Formularz z plikami (upload)
+    desc: >
+      Obsługa uploadu plików wymaga enctype="multipart/form-data" w HTML i request.FILES
+      w view. Django automatycznie waliduje rozmiar i typ przez FileField/ImageField.
+      MEDIA_ROOT i MEDIA_URL muszą być skonfigurowane. ImageField wymaga Pillow.
+    icon: "📁"
+    code: |
+      # Model z plikami
+      from django.db import models
+
+      class Document(models.Model):
+          title  = models.CharField(max_length=200)
+          file   = models.FileField(upload_to='documents/%Y/%m/')
+          image  = models.ImageField(upload_to='images/', null=True, blank=True)
+          size   = models.PositiveIntegerField(editable=False, default=0)
+
+          def save(self, *args, **kwargs):
+              if self.file:
+                  self.size = self.file.size
+              super().save(*args, **kwargs)
+
+      # Form
+      class DocumentForm(forms.ModelForm):
+          class Meta:
+              model  = Document
+              fields = ['title', 'file', 'image']
+
+          def clean_file(self):
+              file = self.cleaned_data.get('file')
+              if file:
+                  if file.size > 10 * 1024 * 1024:  # 10 MB
+                      raise forms.ValidationError('Plik nie może przekraczać 10 MB.')
+                  allowed = ['.pdf', '.doc', '.docx']
+                  ext = os.path.splitext(file.name)[1].lower()
+                  if ext not in allowed:
+                      raise forms.ValidationError(f'Dozwolone formaty: {", ".join(allowed)}')
+              return file
+
+      # View
+      def upload_doc(request):
+          if request.method == 'POST':
+              form = DocumentForm(request.POST, request.FILES)  # FILES!
+              if form.is_valid():
+                  form.save()
+                  return redirect('doc-list')
+          else:
+              form = DocumentForm()
+          return render(request, 'docs/upload.html', {'form': form})
+
+      # settings.py
+      # MEDIA_URL  = '/media/'
+      # MEDIA_ROOT = BASE_DIR / 'media'

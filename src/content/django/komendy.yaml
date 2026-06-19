@@ -1,0 +1,368 @@
+title: Komendy Django (manage.py)
+
+groups:
+  - name: Migracje
+    icon: "🔄"
+    commands:
+      - cmd: python manage.py makemigrations
+        desc: Wygeneruj pliki migracji na podstawie zmian w modelach
+        detail:
+          what: Porównuje aktualne modele Python z ostatnim stanem i generuje pliki migracji (SQL do bazy).
+          how: "Pliki lądują w migrations/ każdej app. Commituj do gita — to historia schematu bazy."
+          flags:
+            - flag: "--name 'opis'"
+              desc: Nadaj własną nazwę migracji
+            - flag: "--empty blog"
+              desc: Pusta migracja dla ręcznych SQL operacji
+            - flag: --check
+              desc: Sprawdź czy są niezapisane zmiany (exit code != 0)
+          tips:
+            - 'python manage.py makemigrations blog — tylko dla jednej app'
+            - 'python manage.py makemigrations --name "add_slug_to_article" blog'
+
+      - cmd: python manage.py migrate
+        desc: Zastosuj wszystkie niezastosowane migracje na bazę danych
+        detail:
+          what: Wykonuje SQL z plików migracji na bieżącej bazie danych. Bezpieczne — każda migracja ma up() i down().
+          how: Django śledzi zastosowane migracje w tabeli django_migrations. Idempotentne — drugie wywołanie nic nie zmienia.
+          flags:
+            - flag: blog 0003
+              desc: Migruj do konkretnej wersji (forward lub backward)
+            - flag: blog zero
+              desc: Cofnij wszystkie migracje dla app blog
+            - flag: --fake
+              desc: Oznacz jako zastosowane bez wykonywania SQL
+          tips:
+            - 'python manage.py migrate --plan — pokaż co zostanie wykonane bez wykonywania'
+            - 'Zawsze uruchamiaj przed deployem — za migracją stoi schema bazy'
+
+      - cmd: python manage.py showmigrations
+        desc: Pokaż status wszystkich migracji (zastosowane / oczekujące)
+        detail:
+          what: Wyświetla listę migracji z zaznaczeniem [X] zastosowane lub [ ] oczekujące.
+          how: Przydatne do sprawdzenia stanu bazy i debugowania problemów z migracjami.
+          flags:
+            - flag: blog
+              desc: Tylko migracje app blog
+            - flag: --list
+              desc: Format listy (domyślny)
+            - flag: --plan
+              desc: Kolejność wykonania z zależnościami
+          tips:
+            - 'python manage.py showmigrations --verbosity 2 — z SQL dla każdej migracji'
+
+      - cmd: python manage.py sqlmigrate blog 0001
+        desc: Pokaż SQL który zostanie wykonany przez migrację
+        detail:
+          what: Wyświetla SQL generowany przez konkretną migrację — bez wykonywania go na bazie.
+          how: Przydatne do code review migracji i optymalizacji przed deployment na produkcję.
+          tips:
+            - 'Zawsze sprawdzaj SQL dla migracji zmieniających duże tabele produkcyjne'
+            - 'Dodaj --backwards żeby zobaczyć SQL dla cofnięcia migracji'
+
+      - cmd: python manage.py squashmigrations blog 0001 0020
+        desc: Scal wiele migracji w jedną (squash)
+        detail:
+          what: Scala zakres migracji w jeden plik — przyspiesza startup po długiej historii projektu.
+          how: Tworzy nową migrację squashed_0001_squashed_0020. Stare migracje zostają do czasu gdy squashed zostanie zastosowana wszędzie.
+          tips:
+            - 'Przydatne gdy masz 100+ migracji w dojrzałym projekcie'
+            - 'Nie usuwaj starych migracji od razu — zostaw do następnego release cycle'
+
+  - name: Development
+    icon: "🛠️"
+    commands:
+      - cmd: python manage.py runserver
+        desc: Uruchom serwer deweloperski Django na localhost:8000
+        detail:
+          what: Startuje wbudowany serwer developerski z auto-reload przy zmianach plików Python i szablonów.
+          how: NIE używaj na produkcji — brak SSL, brak wieloprocesowości, brak wydajności. Tylko dev.
+          flags:
+            - flag: 0.0.0.0:8000
+              desc: Dostępny z sieci lokalnej (nie tylko localhost)
+            - flag: '8001'
+              desc: Inny port (gdy 8000 zajęty)
+            - flag: --noreload
+              desc: Wyłącz auto-reload
+            - flag: --nothreading
+              desc: Wyłącz wielowątkowość
+          tips:
+            - 'python manage.py runserver --settings=myproject.settings.local — inne settings'
+            - 'DJANGO_SETTINGS_MODULE=myproject.settings.local python manage.py runserver'
+
+      - cmd: python manage.py shell
+        desc: Interaktywny Python shell z załadowanym Django
+        detail:
+          what: Uruchamia Python REPL z pełnym kontekstem Django — możesz importować modele, używać ORM, wysyłać emaile.
+          how: Przydatne do one-off operacji, debugowania i testowania zapytań ORM przed napisaniem kodu.
+          flags:
+            - flag: --interface bpython
+              desc: Użyj bpython zamiast domyślnego REPL (lepszy UX)
+            - flag: --interface ipython
+              desc: Użyj IPython z kolorowaniem i historią
+          tips:
+            - 'pip install django-extensions shell_plus — zamiast shell, automatycznie importuje wszystkie modele'
+            - 'python manage.py shell_plus --print-sql — pokazuje SQL dla każdego ORM query'
+
+      - cmd: python manage.py shell_plus --ipython
+        desc: Zaawansowany shell z auto-importem modeli (django-extensions)
+        detail:
+          what: shell_plus (z django-extensions) automatycznie importuje wszystkie modele Django i zewnętrzne biblioteki.
+          how: Nie musisz ręcznie pisać from blog.models import Article — wszystko już dostępne.
+          tips:
+            - 'pip install django-extensions ipython'
+            - "Dodaj 'django_extensions' do INSTALLED_APPS w settings"
+            - 'python manage.py shell_plus --print-sql — debuguj SQL queries na żywo'
+
+      - cmd: python manage.py dbshell
+        desc: Otwórz shell bazy danych (psql, mysql, sqlite3)
+        detail:
+          what: Uruchamia natywny klient bazy danych skonfigurowanej w DATABASES — psql dla PostgreSQL, mysql dla MySQL, sqlite3 dla SQLite.
+          how: Przydatne do bezpośrednich zapytań SQL, sprawdzenia struktury tabel, naprawy danych.
+          tips:
+            - 'Wymagane narzędzia klienta bazy muszą być zainstalowane (np. postgresql-client)'
+            - '\dt — lista tabel w psql; .tables — lista tabel w SQLite'
+
+      - cmd: django-admin startproject myproject .
+        desc: Utwórz nowy projekt Django w bieżącym katalogu
+        detail:
+          what: Generuje strukturę projektu Django z manage.py, settings.py, urls.py, wsgi.py, asgi.py.
+          how: Kropka na końcu = projekt w bieżącym katalogu (bez dodatkowego katalogu). Bez kropki tworzy katalog myproject/.
+          tips:
+            - 'Zalecane z kropką na końcu — unikasz podwójnego katalogu myproject/myproject/'
+            - 'cd my-project && django-admin startproject myproject . — typowy workflow'
+
+      - cmd: python manage.py startapp blog
+        desc: Utwórz nową Django app w projekcie
+        detail:
+          what: Generuje szkielet aplikacji Django z models.py, views.py, admin.py, apps.py, tests.py, migrations/.
+          how: App to moduł projektu — rejestruj w INSTALLED_APPS po stworzeniu.
+          tips:
+            - "Pamiętaj dodać 'blog' lub 'blog.apps.BlogConfig' do INSTALLED_APPS"
+            - 'Jedna app = jedna odpowiedzialność — np. blog, accounts, payments, api'
+
+  - name: Testowanie
+    icon: "🧪"
+    commands:
+      - cmd: python manage.py test
+        desc: Uruchom wszystkie testy Django
+        detail:
+          what: Odkrywa i uruchamia testy z plików test*.py we wszystkich aplikacjach. Tworzy tymczasową bazę testową.
+          how: Django automatycznie tworzy bazę test_{DATABASE_NAME} z pełną migracją przed testami.
+          flags:
+            - flag: blog
+              desc: Tylko testy z app blog
+            - flag: blog.tests.ArticleTestCase
+              desc: Konkretna klasa testowa
+            - flag: blog.tests.ArticleTestCase.test_create
+              desc: Jeden konkretny test
+            - flag: '--verbosity 2'
+              desc: Verbose output — nazwy każdego testu
+            - flag: '--failfast'
+              desc: Zatrzymaj po pierwszym błędzie
+            - flag: '--keepdb'
+              desc: Zachowaj bazę testową między uruchomieniami (szybciej)
+          tips:
+            - 'python manage.py test --parallel — uruchom testy równolegle (szybciej na wielu CPU)'
+            - 'python manage.py test --debug-mode — włącz DEBUG=True w testach'
+
+      - cmd: python manage.py test --verbosity=2 --failfast blog
+        desc: Testy z verbose output dla jednej app — zatrzymaj przy błędzie
+        detail:
+          what: Uruchamia testy tylko dla app blog z pełnymi nazwami testów i zatrzymuje się na pierwszym błędzie.
+          how: Szybki feedback loop — nie czekasz na wszystkie testy gdy masz błąd.
+          tips:
+            - 'Użyj razem z --keepdb dla jeszcze szybszego looping'
+            - 'pytest też działa z Django — pip install pytest-django — często szybszy'
+
+      - cmd: python manage.py check
+        desc: Sprawdź projekt pod kątem błędów konfiguracji
+        detail:
+          what: Uruchamia wbudowane checkers Django — brakujące migracje, błędna konfiguracja, problemy z bezpieczeństwem.
+          how: Zero side-effects — tylko odczyt. Przydatne w CI/CD przed deployem.
+          flags:
+            - flag: --deploy
+              desc: Sprawdź konfigurację pod kątem bezpieczeństwa produkcji
+            - flag: --tag security
+              desc: Tylko testy bezpieczeństwa
+          tips:
+            - 'python manage.py check --deploy — przed każdym deployem produkcyjnym'
+            - 'Wychwyci brakujące SECRET_KEY, DEBUG=True, brak HTTPS ustawień'
+
+      - cmd: python manage.py diffsettings
+        desc: Pokaż różnice między bieżącymi settings a domyślnymi Django
+        detail:
+          what: Wyświetla wszystkie settings które różnią się od domyślnych wartości Django.
+          how: Przydatne do audytu konfiguracji i porównania środowisk.
+          tips:
+            - 'python manage.py diffsettings --output unified — format diff'
+            - 'Sprawdź czy nie masz DEBUG=True na prod accidentally'
+
+  - name: Deployment
+    icon: "🚢"
+    commands:
+      - cmd: python manage.py collectstatic
+        desc: Zbierz pliki statyczne do STATIC_ROOT
+        detail:
+          what: Kopiuje pliki statyczne ze wszystkich zainstalowanych apps i STATICFILES_DIRS do STATIC_ROOT.
+          how: Wymagane przed każdym deployem produkcyjnym — Nginx lub WhiteNoise serwuje z STATIC_ROOT.
+          flags:
+            - flag: --noinput
+              desc: Nie pytaj o potwierdzenie (dla CI/CD)
+            - flag: --clear
+              desc: Wyczyść STATIC_ROOT przed zebraniem
+          tips:
+            - 'python manage.py collectstatic --noinput — standard w Dockerfile CMD lub CI pipeline'
+            - 'Ustaw STATIC_ROOT = BASE_DIR / "staticfiles" w settings.py'
+
+      - cmd: python manage.py createsuperuser
+        desc: Utwórz konto administratora
+        detail:
+          what: Interaktywnie tworzy konto superusera z dostępem do panelu admin (/admin/).
+          how: Pyta o username, email i hasło. Superuser ma wszystkie uprawnienia bez przypisywania ich ręcznie.
+          tips:
+            - "DJANGO_SUPERUSER_PASSWORD=... python manage.py createsuperuser --noinput --username admin --email a@a.com — non-interactive dla CI"
+            - 'Zmień hasło po pierwszym loginie na produkcji'
+
+      - cmd: python manage.py changepassword jan
+        desc: Zmień hasło użytkownika przez CLI
+        detail:
+          what: Interaktywnie ustawia nowe hasło dla wskazanego username bez potrzeby logowania.
+          how: Przydatne gdy użytkownik zapomniał hasła a reset email nie działa.
+          tips:
+            - 'Wymaga dostępu do serwera — opcja awaryjna dla adminów'
+            - 'Hasło jest hashowane przez Django — bezpieczne'
+
+      - cmd: python manage.py sendtestemail
+        desc: Wyślij testowy email do sprawdzenia konfiguracji SMTP
+        detail:
+          what: Wysyła testowy email używając aktualnej konfiguracji EMAIL_* w settings.py.
+          how: Weryfikuje czy konfiguracja SMTP działa przed wdrożeniem na produkcję.
+          tips:
+            - 'python manage.py sendtestemail admin@firma.pl — na konkretny adres'
+            - 'EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend" — wydruk w terminalu (dev)'
+
+      - cmd: python manage.py check --deploy
+        desc: Sprawdź bezpieczeństwo konfiguracji przed produkcją
+        detail:
+          what: Uruchamia checklist bezpieczeństwa Django — SECRET_KEY, HTTPS, HSTS, CSRF, cookies, DEBUG.
+          how: Zwraca warnings i errors dla potencjalnych problemów bezpieczeństwa konfiguracji produkcyjnej.
+          tips:
+            - 'Uruchamiaj w CI pipeline z produkcyjnymi settings przed każdym deployem'
+            - 'Wszystkie warnings należy naprawić przed production release'
+
+  - name: ORM w shellu — gotowe przepisy
+    icon: "🐍"
+    commands:
+      - cmd: "Article.objects.select_related('author').filter(status='published').count()"
+        desc: Zlicz opublikowane artykuły z jednym SQL (bez N+1)
+        detail:
+          what: Wykonuje COUNT(*) z JOIN — efektywne zapytanie bez ładowania obiektów do pamięci.
+          how: count() jest lazy-ewaluowane dopiero przy wywołaniu — nie ładuje obiektów, tylko COUNT SQL.
+          tips:
+            - 'Użyj exists() zamiast count() > 0 do sprawdzenia czy cokolwiek istnieje — szybsze'
+            - 'Article.objects.filter(status="published").exists() — jeden SELECT 1'
+
+      - cmd: "Article.objects.values('status').annotate(count=Count('id'))"
+        desc: Grupuj artykuły po statusie z licznikiem
+        detail:
+          what: Wykonuje GROUP BY status, COUNT(*) — odpowiednik SQL SELECT status, COUNT(*) FROM articles GROUP BY status.
+          how: values() przed annotate() tworzy GROUP BY. Wynik to lista słowników, nie obiektów modelu.
+          tips:
+            - 'from django.db.models import Count — wymagany import'
+            - "Dodaj .order_by('status') dla stabilnego sortowania"
+
+      - cmd: "User.objects.filter(date_joined__date=date.today()).select_related('profile')"
+        desc: Pobierz dzisiejszych nowych użytkowników z profilem
+        detail:
+          what: Filtruje po dacie (bez czasu) i robi JOIN z profilem — jeden SQL zamiast N+1.
+          how: "__date lookup — ekstrakt tylko daty z DateTimeField. select_related dla FK."
+          tips:
+            - 'date.today() z from datetime import date'
+            - "Inne lookups: __year, __month, __day, __hour, __week_day"
+
+      - cmd: "Article.objects.filter(tags__name='python').distinct()"
+        desc: Artykuły z tagiem python (M2M query)
+        detail:
+          what: Filtruje przez M2M relację — Django robi JOIN przez tabelę pośrednią automatycznie.
+          how: distinct() wymagane bo bez niego duplikaty przy wiele tagów na artykuł.
+          tips:
+            - 'Q(tags__name="python") | Q(tags__name="django") — OR po tagach'
+            - 'article.tags.all().values_list("name", flat=True) — lista nazw tagów'
+
+      - cmd: "Article.objects.bulk_create([Article(title=f'Post {i}') for i in range(1000)])"
+        desc: Wstaw 1000 artykułów jednym SQL INSERT
+        detail:
+          what: bulk_create wysyła jeden INSERT z wieloma wierszami zamiast 1000 osobnych INSERT.
+          how: 10-100x szybsze od pętli z save() dla dużych zbiorów danych.
+          tips:
+            - 'bulk_create(objects, batch_size=100) — kontroluj rozmiar batcha'
+            - 'Nie wywołuje sygnałów post_save — pamiętaj o tym przy signals'
+
+  - name: Dumpdata i Loaddata
+    icon: "💾"
+    commands:
+      - cmd: python manage.py dumpdata blog --indent 2 > fixtures/blog.json
+        desc: Eksportuj dane z app blog do pliku JSON
+        detail:
+          what: Serializuje wszystkie obiekty z wskazanej app do JSON/XML/YAML. Przydatne do backupów i fixtures.
+          how: Fixtures to dane początkowe — commitujesz do repo i ładujesz w nowych środowiskach.
+          flags:
+            - flag: '--format yaml'
+              desc: Eksport do YAML zamiast JSON
+            - flag: '--exclude contenttypes'
+              desc: Pomiń konkretne modele
+            - flag: '--natural-foreign'
+              desc: Użyj naturalnych kluczy zamiast ID (przenośniejsze)
+          tips:
+            - 'python manage.py dumpdata auth.user --indent 2 > fixtures/users.json — tylko usery'
+            - 'python manage.py dumpdata --exclude auth.permission --exclude contenttypes > full_backup.json'
+
+      - cmd: python manage.py loaddata fixtures/blog.json
+        desc: Załaduj dane z pliku fixtures do bazy
+        detail:
+          what: Wczytuje dane z pliku JSON/XML/YAML do bazy danych. Aktualizuje istniejące lub tworzy nowe.
+          how: Django szuka fixtures w fixtures/ w każdej app, FIXTURES_DIRS i ścieżce bezwzględnej.
+          tips:
+            - 'Użyj w testach do ładowania testowych danych: setUpTestData z fixtures'
+            - 'FIXTURE_DIRS = [BASE_DIR / "fixtures"] — centralny katalog fixtures w settings'
+
+      - cmd: python manage.py flush
+        desc: Usuń wszystkie dane z bazy (zachowaj strukturę tabel)
+        detail:
+          what: Czyści wszystkie dane z bazy bez usuwania tabel — przydatne do resetu w developmencie.
+          how: Wykonuje DELETE FROM wszystkich tabel Django. Zachowuje migracje i strukturę.
+          tips:
+            - 'Używaj tylko w dev/staging — na produkcji NIGDY'
+            - 'Połącz z loaddata żeby załadować fresh fixtures po flush'
+
+  - name: django-admin — komendy globalne
+    icon: "🌐"
+    commands:
+      - cmd: django-admin startproject myproject
+        desc: Utwórz nowy projekt Django (przed uruchomieniem manage.py)
+        detail:
+          what: Globalny CLI Django dostępny przed stworzeniem projektu — używany jednorazowo do inicjalizacji.
+          how: Po stworzeniu projektu używasz python manage.py, nie django-admin bezpośrednio.
+          tips:
+            - 'django-admin startproject myproject . — w bieżącym katalogu (zalecane)'
+            - 'Wymaga Django zainstalowanego globalnie lub w aktywnym venv'
+
+      - cmd: python manage.py inspectdb
+        desc: Generuj modele Django z istniejącej bazy danych
+        detail:
+          what: Odwraca inżynierię bazy danych — generuje kod modeli Python z istniejących tabel SQL.
+          how: Przydatne przy migracji z legacy bazy do Django. Wygenerowany kod wymaga dopracowania.
+          tips:
+            - 'python manage.py inspectdb > models.py — zapisz do pliku'
+            - 'python manage.py inspectdb auth_user — konkretna tabela'
+            - 'Wygenerowane modele mają managed = False — zmień na True gdy chcesz migracje'
+
+      - cmd: python manage.py migrate --run-syncdb
+        desc: Twórz tabele bez migracji (dla unmanaged models)
+        detail:
+          what: syncdb tworzy tabele dla modeli które nie mają migracji (managed=False lub brakujące migrations/).
+          how: Historycznie to był pierwotny sposób tworzenia tabel — teraz używany tylko w edge cases.
+          tips:
+            - 'Normalnie używaj makemigrations + migrate'
+            - 'Przydatne dla modeli z managed=False które chcesz stworzyć w test DB'

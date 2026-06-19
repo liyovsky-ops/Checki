@@ -1,0 +1,151 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Django?
+  firstComponent: Twój pierwszy projekt Django
+  firstComponentLang: python
+
+intro:
+  title: Czym jest Django?
+  desc: >
+    Django to pełnostackowy framework webowy dla Pythona — zawiera wszystko czego potrzebujesz
+    w standardowej bibliotece. ORM do bazy danych, panel admina generowany automatycznie,
+    system autoryzacji i uprawnień, silnik szablonów, obsługa formularzy, cache, email, RSS, sitemapy —
+    zero konfiguracji zero zewnętrznych bibliotek do podstawowego projektu.
+    Filozofia "batteries-included" oznacza, że Django preferuje jeden dobry sposób robienia rzeczy.
+    Używany przez Instagram, Pinterest, Disqus, Mozilla, National Geographic.
+
+concepts:
+  - title: MTV — Model, Template, View
+    desc: >
+      Django stosuje wzorzec MTV (zamiast MVC). Model definiuje dane (ORM),
+      Template to HTML z logiką Jinja-like, View to funkcja/klasa obsługująca request HTTP.
+      URLs.py mapuje URL na widok. Podział odpowiedzialności wymuszony przez framework.
+    icon: "🏗️"
+  - title: ORM — Object-Relational Mapper
+    desc: >
+      Django ORM pozwala pracować z bazą danych przez klasy Python zamiast SQL.
+      Zdefiniuj model — Django tworzy tabelę, generuje migracje, udostępnia QuerySet API.
+      Obsługuje PostgreSQL, MySQL, SQLite, Oracle. QuerySet API jest lazy — SQL wykonuje się
+      tylko przy faktycznym dostępie do danych (iteracja, list(), str()).
+    icon: "🗄️"
+  - title: Migracje
+    desc: >
+      System migracji Django śledzi zmiany w modelach i generuje SQL do aktualizacji schematu bazy.
+      makemigrations wykrywa zmiany — migrate stosuje je. Historia migracji to jednocześnie
+      historia schematu bazy. Migracje są plikami Python — można je commitować do gita.
+    icon: "🔄"
+  - title: Admin Panel
+    desc: >
+      Django automatycznie generuje pełny panel CRUD dla zarejestrowanych modeli.
+      admin.py — jedna linijka i masz tabele, wyszukiwanie, filtry, relacje.
+      Customizacja przez ModelAdmin — list_display, search_fields, inline models, custom actions.
+      Zero pisania HTML dla backoffice — to zabójcza feature Django.
+    icon: "⚙️"
+  - title: Settings i konfiguracja
+    desc: >
+      settings.py centralizuje całą konfigurację — DATABASE, INSTALLED_APPS, MIDDLEWARE,
+      STATIC_URL, MEDIA_ROOT, EMAIL_BACKEND. Jedno miejsce dla całego projektu.
+      Wzorzec: base.py + settings/local.py + settings/production.py — jeden config per środowisko.
+    icon: "🔧"
+  - title: Apps — modularność projektu
+    desc: >
+      Django projekt = kolekcja apps. Każda app to niezależny moduł z własnym models.py,
+      views.py, urls.py, admin.py. Możesz reużywać apps między projektami.
+      INSTALLED_APPS w settings.py aktywuje apps. django.contrib.* to wbudowane apps Django.
+    icon: "📦"
+  - title: Middleware
+    desc: >
+      Middleware to warstwa przetwarzania między requestem a view — sesje, CSRF, auth, cache, CORS.
+      Każde żądanie przechodzi przez cały stos middleware po kolei (request) i odwrotnie (response).
+      MIDDLEWARE lista w settings.py — kolejność ma znaczenie (np. SessionMiddleware przed AuthMiddleware).
+    icon: "🔀"
+  - title: Django REST Framework (DRF)
+    desc: >
+      Dla API zamiast HTML używa się Django REST Framework — biblioteki nadbudowanej na Django.
+      Serializery, ViewSets, Routers, Permissions, Throttling, Pagination. De-facto standard
+      dla REST API w Pythonie. Razem z Django daje najpotężniejsze combo webowe w ekosystemie Python.
+    icon: "🌐"
+
+whenToUse:
+  - Tradycyjne aplikacje webowe z renderowaniem server-side (HTML)
+  - CMS, portale, platformy e-commerce — admin panel w cenie
+  - REST API z DRF — szczególnie gdy potrzebujesz pełnej auth, permissions i dojrzałego ekosystemu
+  - Projekty gdzie liczy się szybkość dostarczenia — mniej boilerplate niż Flask
+  - Aplikacje z rozbudowanym modelem danych — Django ORM i migracje są bardzo dojrzałe
+  - Gdy pracujesz w zespole — konwencje Django redukują konflikty architektoniczne
+  - Startup MVP z potencjałem skalowania — Instagram zbudował się na Django
+
+firstComponent: |
+  # Instalacja Django
+  pip install django
+
+  # Nowy projekt
+  django-admin startproject mysite .
+  # lub: django-admin startproject mysite (tworzy katalog mysite/mysite/)
+
+  # Nowa app
+  python manage.py startapp blog
+
+  # mysite/settings.py — zarejestruj app
+  INSTALLED_APPS = [
+      'django.contrib.admin',
+      'django.contrib.auth',
+      'django.contrib.contenttypes',
+      'django.contrib.sessions',
+      'django.contrib.messages',
+      'django.contrib.staticfiles',
+      'blog',  # ← dodaj swoją app
+  ]
+
+  # blog/models.py
+  from django.db import models
+
+  class Post(models.Model):
+      title   = models.CharField(max_length=200)
+      content = models.TextField()
+      created = models.DateTimeField(auto_now_add=True)
+      author  = models.ForeignKey('auth.User', on_delete=models.CASCADE)
+
+      class Meta:
+          ordering = ['-created']
+
+      def __str__(self):
+          return self.title
+
+  # blog/views.py
+  from django.shortcuts import render, get_object_or_404
+  from .models import Post
+
+  def post_list(request):
+      posts = Post.objects.all()
+      return render(request, 'blog/post_list.html', {'posts': posts})
+
+  def post_detail(request, pk):
+      post = get_object_or_404(Post, pk=pk)
+      return render(request, 'blog/post_detail.html', {'post': post})
+
+  # blog/urls.py
+  from django.urls import path
+  from . import views
+
+  urlpatterns = [
+      path('', views.post_list, name='post-list'),
+      path('post/<int:pk>/', views.post_detail, name='post-detail'),
+  ]
+
+  # mysite/urls.py — include blog URLs
+  from django.contrib import admin
+  from django.urls import path, include
+
+  urlpatterns = [
+      path('admin/', admin.site.urls),
+      path('blog/', include('blog.urls')),
+  ]
+
+  # Migracje i uruchomienie
+  python manage.py makemigrations
+  python manage.py migrate
+  python manage.py createsuperuser
+  python manage.py runserver
+  # → http://localhost:8000/blog/
+  # → http://localhost:8000/admin/

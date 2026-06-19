@@ -1,0 +1,348 @@
+title: Views & URLs
+
+items:
+  - name: FBV — Function-Based Views
+    desc: >
+      Function-Based Views to najprostszy typ view w Django — funkcja przyjmująca request
+      i zwracająca response. Explicit, łatwe do zrozumienia, idealne dla prostych endpointów.
+      Dekoratory (login_required, permission_required) dodają zachowania bez dziedziczenia.
+    icon: "⚡"
+    code: |
+      from django.shortcuts import render, redirect, get_object_or_404
+      from django.contrib.auth.decorators import login_required, permission_required
+      from django.views.decorators.http import require_http_methods
+      from django.http import JsonResponse, HttpResponse
+      from .models import Article
+      from .forms import ArticleForm
+
+      # Prosty view
+      def article_list(request):
+          articles = Article.objects.filter(status='published').select_related('author')
+          return render(request, 'blog/article_list.html', {'articles': articles})
+
+      # GET + POST w jednym
+      @login_required
+      def article_create(request):
+          if request.method == 'POST':
+              form = ArticleForm(request.POST)
+              if form.is_valid():
+                  article = form.save(commit=False)
+                  article.author = request.user
+                  article.save()
+                  return redirect('article-detail', pk=article.pk)
+          else:
+              form = ArticleForm()
+          return render(request, 'blog/article_form.html', {'form': form})
+
+      # Dekoratory
+      @login_required(login_url='/auth/login/')
+      @permission_required('blog.change_article')
+      @require_http_methods(['GET', 'POST'])
+      def article_edit(request, pk):
+          article = get_object_or_404(Article, pk=pk, author=request.user)
+          # ...
+
+      # JSON response
+      def api_articles(request):
+          data = list(Article.objects.values('id', 'title', 'status'))
+          return JsonResponse({'articles': data})
+
+  - name: CBV — Class-Based Views
+    desc: >
+      Class-Based Views enkapsulują logikę HTTP methods w metodach klasy (get, post, put, delete).
+      Django dostarcza gotowe generic views — ListView, DetailView, CreateView, UpdateView, DeleteView.
+      Dziedziczenie i mixiny pozwalają reużywać logikę. Kod jest bardziej zwięzły dla CRUD operacji.
+    icon: "🏗️"
+    code: |
+      from django.views import View
+      from django.views.generic import (
+          ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
+      )
+      from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+      from django.urls import reverse_lazy
+      from .models import Article
+      from .forms import ArticleForm
+
+      # Bazowy CBV
+      class ArticleView(View):
+          def get(self, request, pk):
+              article = get_object_or_404(Article, pk=pk)
+              return render(request, 'blog/detail.html', {'article': article})
+
+          def post(self, request, pk):
+              # obsługa POST
+              pass
+
+      # Generic Views — minimalna konfiguracja
+      class ArticleListView(LoginRequiredMixin, ListView):
+          model         = Article
+          template_name = 'blog/article_list.html'
+          context_object_name = 'articles'
+          paginate_by   = 10
+
+          def get_queryset(self):
+              return Article.objects.filter(status='published').select_related('author')
+
+          def get_context_data(self, **kwargs):
+              ctx = super().get_context_data(**kwargs)
+              ctx['total'] = self.get_queryset().count()
+              return ctx
+
+      class ArticleDetailView(DetailView):
+          model         = Article
+          template_name = 'blog/article_detail.html'
+
+      class ArticleCreateView(LoginRequiredMixin, CreateView):
+          model         = Article
+          form_class    = ArticleForm
+          template_name = 'blog/article_form.html'
+          success_url   = reverse_lazy('article-list')
+
+          def form_valid(self, form):
+              form.instance.author = self.request.user
+              return super().form_valid(form)
+
+      class ArticleUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+          model               = Article
+          form_class          = ArticleForm
+          permission_required = 'blog.change_article'
+          success_url         = reverse_lazy('article-list')
+
+      class ArticleDeleteView(LoginRequiredMixin, DeleteView):
+          model       = Article
+          success_url = reverse_lazy('article-list')
+
+  - name: URL Configuration
+    desc: >
+      urls.py mapuje URL pattern na view. path() dla prostych URL, re_path() dla regex.
+      include() pozwala dzielić URL konfigurację na moduły (app urls.py).
+      Parametry URL (int, str, slug, uuid) są przekazywane jako argumenty do view.
+      Namespace izoluje nazwy URL między aplikacjami.
+    icon: "🗺️"
+    code: |
+      # blog/urls.py
+      from django.urls import path, re_path
+      from . import views
+
+      app_name = 'blog'  # namespace
+
+      urlpatterns = [
+          # Prosta ścieżka
+          path('', views.ArticleListView.as_view(), name='article-list'),
+          path('<int:pk>/', views.ArticleDetailView.as_view(), name='article-detail'),
+          path('<int:pk>/edit/', views.ArticleUpdateView.as_view(), name='article-edit'),
+          path('<int:pk>/delete/', views.ArticleDeleteView.as_view(), name='article-delete'),
+          path('new/', views.ArticleCreateView.as_view(), name='article-create'),
+
+          # Typy konwerterów URL
+          path('slug/<slug:slug>/', views.by_slug, name='by-slug'),
+          path('user/<uuid:token>/', views.by_uuid, name='by-uuid'),
+
+          # Regex
+          re_path(r'^archive/(?P<year>[0-9]{4})/$', views.archive, name='archive'),
+      ]
+
+      # mysite/urls.py — include z namespace
+      from django.urls import path, include
+      from django.contrib import admin
+
+      urlpatterns = [
+          path('admin/', admin.site.urls),
+          path('blog/', include('blog.urls', namespace='blog')),
+          path('api/', include('api.urls', namespace='api')),
+          path('accounts/', include('django.contrib.auth.urls')),
+      ]
+
+      # Linkowanie w kodzie
+      from django.urls import reverse
+      url = reverse('blog:article-detail', kwargs={'pk': 1})  # '/blog/1/'
+
+      # W szablonie
+      # {% url 'blog:article-detail' article.pk %}
+
+  - name: Mixiny — reużywalne zachowania
+    desc: >
+      Mixiny to klasy dodające konkretne zachowania do CBV przez wielodziedziczenie.
+      Django wbudowane: LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin.
+      Custom mixiny enkapsulują logikę przekrojową — cache, logging, throttling, context.
+    icon: "🔀"
+    code: |
+      from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+      from django.views.generic import ListView
+
+      # Custom mixin — właściciel obiektu
+      class OwnerRequiredMixin(UserPassesTestMixin):
+          def test_func(self):
+              obj = self.get_object()
+              return obj.author == self.request.user
+
+      # Custom mixin — dodaj context
+      class PaginationMixin:
+          paginate_by = 20
+
+          def get_context_data(self, **kwargs):
+              ctx = super().get_context_data(**kwargs)
+              page = ctx.get('page_obj')
+              if page:
+                  ctx['page_range'] = range(
+                      max(1, page.number - 2),
+                      min(page.paginator.num_pages + 1, page.number + 3)
+                  )
+              return ctx
+
+      # Custom mixin — cache
+      from django.views.decorators.cache import cache_page
+      from django.utils.decorators import method_decorator
+
+      @method_decorator(cache_page(60 * 15), name='dispatch')
+      class CachedListView(ListView):
+          pass
+
+      # Kombinacja mixinów
+      class MyArticleEditView(
+          LoginRequiredMixin,
+          OwnerRequiredMixin,
+          PaginationMixin,
+          UpdateView
+      ):
+          model = Article
+
+  - name: Middleware
+    desc: >
+      Middleware przechwytuje każdy request i response. Możesz pisać własne middleware
+      jako callable class lub funkcję. Zastosowania: logging, rate limiting, custom auth,
+      tenant isolation, request ID, A/B testing. Kolejność w MIDDLEWARE liście ma znaczenie.
+    icon: "🔗"
+    code: |
+      # myapp/middleware.py
+
+      import time
+      import logging
+      logger = logging.getLogger(__name__)
+
+      # Nowy styl (callable class)
+      class RequestTimingMiddleware:
+          def __init__(self, get_response):
+              self.get_response = get_response
+
+          def __call__(self, request):
+              start = time.time()
+
+              response = self.get_response(request)  # view wywołany tutaj
+
+              duration = time.time() - start
+              logger.info(f'{request.method} {request.path} — {duration:.3f}s')
+              response['X-Response-Time'] = f'{duration:.3f}s'
+              return response
+
+      # Middleware z process_exception
+      class ErrorLoggingMiddleware:
+          def __init__(self, get_response):
+              self.get_response = get_response
+
+          def __call__(self, request):
+              return self.get_response(request)
+
+          def process_exception(self, request, exception):
+              logger.error(f'Exception on {request.path}: {exception}', exc_info=True)
+              # return None — exception propaguje dalej (domyślne zachowanie)
+              # return response — przechwyć i zwróć custom response
+
+      # settings.py — rejestracja
+      MIDDLEWARE = [
+          'django.middleware.security.SecurityMiddleware',
+          'myapp.middleware.RequestTimingMiddleware',  # ← własne na początku
+          'django.contrib.sessions.middleware.SessionMiddleware',
+          # ...
+      ]
+
+  - name: Szablony Django
+    desc: >
+      Django Template Language (DTL) — silnik szablonów z dziedziczeniem, blokami, filtrami i tagami.
+      Dziedziczenie szablonów (extends/block) eliminuje powtarzanie HTML.
+      Filtry modyfikują zmienne — date, truncatechars, capfirst, linebreaks.
+      Custom template tags i filtry dla logiki specyficznej dla projektu.
+    icon: "📄"
+    code: |
+      {# base.html — bazowy szablon #}
+      <!DOCTYPE html>
+      <html>
+      <head>
+          <title>{% block title %}Mój Blog{% endblock %}</title>
+          {% block css %}{% endblock %}
+      </head>
+      <body>
+          {% block content %}{% endblock %}
+          {% block scripts %}{% endblock %}
+      </body>
+      </html>
+
+      {# blog/article_list.html #}
+      {% extends "base.html" %}
+      {% load humanize %}
+
+      {% block title %}Artykuły — {{ block.super }}{% endblock %}
+
+      {% block content %}
+        <h1>Artykuły</h1>
+
+        {% for article in articles %}
+          <article>
+            <h2>{{ article.title }}</h2>
+            <p>{{ article.content|truncatechars:200 }}</p>
+            <p>{{ article.created|date:"d M Y" }} — {{ article.author.get_full_name }}</p>
+            <a href="{% url 'blog:article-detail' article.pk %}">Czytaj dalej</a>
+          </article>
+        {% empty %}
+          <p>Brak artykułów.</p>
+        {% endfor %}
+
+        {# Paginacja #}
+        {% if is_paginated %}
+          {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}">← Poprzednia</a>
+          {% endif %}
+          Strona {{ page_obj.number }} z {{ page_obj.paginator.num_pages }}
+          {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}">Następna →</a>
+          {% endif %}
+        {% endif %}
+      {% endblock %}
+
+  - name: Request i Response
+    desc: >
+      HttpRequest zawiera wszystkie dane przychodzącego żądania — metoda, nagłówki, body, pliki, user.
+      HttpResponse to klasa bazowa odpowiedzi. Specialne response: JsonResponse, FileResponse,
+      StreamingHttpResponse, HttpResponseRedirect. Status kody jako atrybuty klasy lub jako
+      argument status= konstruktora.
+    icon: "📨"
+    code: |
+      from django.http import (
+          JsonResponse, HttpResponse, HttpResponseRedirect,
+          HttpResponseNotFound, HttpResponseForbidden, FileResponse
+      )
+
+      def my_view(request):
+          # Dane requestu
+          method  = request.method            # 'GET', 'POST', 'PUT', ...
+          user    = request.user              # AnonymousUser lub User instance
+          is_auth = request.user.is_authenticated
+          data    = request.GET.get('q', '')  # query params
+          body    = request.POST              # form data
+          json    = request.body             # raw body (dla JSON API: json.loads())
+          files   = request.FILES            # uploaded files
+
+          # Headers
+          ua = request.META.get('HTTP_USER_AGENT', '')
+          ip = request.META.get('REMOTE_ADDR')
+
+          # Response types
+          return HttpResponse('<h1>Hello</h1>', content_type='text/html', status=200)
+          return JsonResponse({'key': 'value'}, status=201)
+          return JsonResponse({'error': 'Not found'}, status=404)
+          return HttpResponseRedirect('/other-url/')
+
+          # Plik do pobrania
+          from pathlib import Path
+          file_path = Path('/media/docs/report.pdf')
+          return FileResponse(open(file_path, 'rb'), as_attachment=True, filename='report.pdf')
