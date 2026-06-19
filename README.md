@@ -1,107 +1,185 @@
-# Checki — AI Code Learning Tool
+# Checki
 
-> Upload any code. Understand it instantly. Learn from it step by step.
+**Interactive encyclopedia of frameworks and libraries for developers — with AI-powered code analysis.**
 
-![Status](https://img.shields.io/badge/status-in%20progress-yellow)
-![Stack](https://img.shields.io/badge/stack-Next.js%20%7C%20FastAPI%20%7C%20Gemini%20AI-blue)
+Checki is an enterprise-grade developer tool: browse detailed cards for 24 frameworks across 6 categories, then paste your code into the built-in editor and run AI analysis powered by Gemini 2.5 Flash. Designed as both a daily reference and a portfolio project.
 
----
-
-## What is Checki?
-
-Checki is a tool for people learning to program. You paste or upload code and get:
-
-- a plain-Polish explanation of what every line does
-- a step-by-step breakdown of the entire file (like a book with footnotes)
-- inline tooltips on every line — one click, one explanation
-- code rewritten in 5 different programming styles
-
-Built for learners. Useful for anyone who reads unfamiliar code.
-
----
-
-## Live Demo
-
-Open `demo_v2.html` in a browser (with backend running on port 8000).
+> 🖥️ [demo GIF — coming soon]
 
 ---
 
 ## Features
 
-| Feature | Status | Description |
-|---------|--------|-------------|
-| **Tłumacz kodu** | ✅ Done | Line-by-line Polish translation — footnote view + magic wand merges into prose |
-| **Vivisekcja kodu** | ✅ Done | Step-by-step analysis — each block gets a table of explanations + mental model |
-| **Opis linii** | ✅ Done | One AI call analyzes the whole file, tooltips served locally — zero extra LLM calls |
-| **Tryb programowania** | ✅ Done | Rewrites code in 5 styles: Eco / Comfort / Sport / Enterprise / Security |
-| **Wbudowane funkcje** | ✅ Done | Detects Python tokens, shows hover tooltips from a 194-entry dictionary |
-| **Archiwum bibliotek** | ✅ Done | 108 Python libraries, 10 categories, search + detail modal |
-| **Checki.framework** | ✅ Done | 120+ frameworks in a tile library with scroll-snap and full-text search |
-| Martwy kod | 🔜 Planned | Detects unreachable / unused code |
-| Złe wzorce | 🔜 Planned | Flags dangerous or inefficient patterns |
-| Text → Kod | 🔜 Planned | Describe in Polish, get working code |
-| Agenci specjaliści | 🔜 Planned | 5 specialist agents: Architecture, Security, Performance, Clean Code, Testing |
-| Akademia | 🔜 Planned | Collect Python commands like Pokémon — mark each as known 🟢, familiar 🟡, or unknown 🔴 |
+- 📚 **24 frameworks** as an interactive knowledge library — each with its own full detail card
+- 🗂️ **Up to 9 tabs per framework** — Basics, Components/ORM, Hooks, Routing, State, Rivals, Ecosystem, Commands
+- 🔍 **Framework search** — instant full-text search across all entries
+- 🎨 **6 categories** — Frontend, Backend, Database, DevOps, Testing, AI
+- 🤖 **AI features** — code translator, vivisekcja (line-by-line dissection), dead code detection, bad pattern detection — *powered by Gemini 2.5 Flash*
+- ⚡ **Vite** — instant HMR, zero framework overhead on the frontend
+- 🗂️ **YAML-driven content** — each framework is defined entirely in YAML files, no hardcoding in JS
 
 ---
 
-## Tech Stack
+## Frameworks
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend (app) | Next.js 14, Tailwind CSS, TypeScript |
-| Frontend (demo) | Vanilla JS, modular HTML/CSS |
-| Backend | Python 3.12, FastAPI, Uvicorn |
-| AI | Google Gemini 2.5 Flash |
+### Frontend
+
+| Framework | Lang | Description |
+|-----------|------|-------------|
+| ⚛️ React | JavaScript | UI library from Meta |
+| ▲ Next.js | JavaScript | Full-stack with React and SSR |
+| 💚 Vue.js | JavaScript | Progressive UI framework |
+| 🔥 Svelte | JavaScript | Compiled, zero runtime |
+| 🔺 Angular | TypeScript | Framework from Google |
+| 🌊 Tailwind CSS | CSS | Utility-first CSS framework |
+
+### Backend
+
+| Framework | Lang | Description |
+|-----------|------|-------------|
+| 🚀 FastAPI | Python | Modern API with type hints |
+| 🌐 requests | Python | HTTP for humans |
+| ⚡ asyncio | Python | Asynchronous Python |
+| 🍲 BeautifulSoup | Python | HTML and XML parsing |
+| 🖱️ PyAutoGUI | Python | UI and GUI automation |
+| 🌶️ Flask | Python | Micro web framework |
+| 🎸 Django | Python | Batteries-included web framework |
+| 🐼 Pandas | Python | Data analysis and manipulation |
+
+### Database
+
+| Framework | Lang | Description |
+|-----------|------|-------------|
+| 🐘 PostgreSQL | SQL | Advanced relational database |
+| 🍃 MongoDB | NoSQL | Document database |
+| ⚡ Redis | In-Memory | Cache and key-value store |
+| 🗄️ SQLAlchemy | Python | ORM and SQL toolkit |
+| ◈ Prisma | TypeScript | Type-safe ORM |
+| 🔥 Firebase | NoSQL | BaaS from Google |
+
+### DevOps
+
+| Framework | Lang | Description |
+|-----------|------|-------------|
+| 🌿 Git | Shell | Distributed version control |
+| 🐳 Docker | YAML | Application containerization |
+| 🏗️ Terraform | HCL | Infrastructure as code |
+| 🔁 CI/CD | YAML | Continuous integration and deployment |
+| 🐧 WSL | Shell | Linux on Windows |
+| ☸️ Kubernetes | YAML | Container orchestration |
+
+### Testing
+
+| Framework | Lang | Description |
+|-----------|------|-------------|
+| 🧪 pytest | Python | Most popular Python test runner |
+| 🎭 Playwright | TypeScript | Cross-browser E2E testing |
+| 🃏 Jest | JavaScript | Most popular JS test runner |
+| ⚡ Vitest | TypeScript | Vite-native test runner |
+| 🌲 Cypress | JavaScript | E2E testing for the web |
+| 🔬 Selenium | Python | Classic UI automation |
+
+### AI
+
+| Framework | Lang | Description |
+|-----------|------|-------------|
+| 🕸️ LangGraph | Python | Agents as state graphs |
+| 🔌 MCP | Python | Model Context Protocol |
+| ✦ OpenAI SDK | Python | Most popular LLM API |
+| ✺ Anthropic SDK | Python | SDK for Claude models |
+| 🦙 LlamaIndex | Python | RAG framework for your data |
+| 🤖 Pydantic AI | Python | Type-safe, model-agnostic agents |
+| 🤗 Hugging Face | Python | Hub for models and transformers |
+| 🔥 PyTorch | Python | ML/research from Meta |
+| 🧠 TensorFlow | Python | Large-scale ML from Google |
 
 ---
 
-## Project Structure
+## Architecture
 
 ```
 Checki/
-├── backend/
-│   ├── features/
-│   │   ├── translator/        # Line-by-line translation
-│   │   ├── vivisekcja/        # Step-by-step analysis
-│   │   ├── line_tooltip/      # Per-line explanations
-│   │   ├── programming_mode/  # 5-style code rewriter
-│   │   └── builtins/          # Python token dictionary (194 entries)
-│   ├── shared/                # Gemini client
-│   └── main.py
-├── frontend/                  # Next.js app (in progress)
-├── demo_v2.html               # Interactive prototype
-└── demo_assets/               # Modular JS + CSS for the demo
-    ├── css/                   # Split by theme
-    ├── js/                    # One file per feature
-    └── data/                  # Libraries, frameworks, dictionary
+├── Frontend (Vite + vanilla JS)
+│   ├── src/main.js               — entry point, dependency injection
+│   ├── src/modules/              — UI logic (framework grid, tabs, editor, AI features)
+│   ├── src/data/frameworks.js    — ALL_FRAMEWORKS list + FRAMEWORKS tile grid
+│   ├── src/data/fw_{name}.js     — per-framework importer (bridges YAML → JS object)
+│   └── src/content/{fw}/        — YAML files per framework (9 files each)
+│       ├── meta.yaml             — metadata + tab definitions
+│       ├── podstawy.yaml         — Basics tab
+│       ├── cli.yaml              — Commands tab
+│       ├── rivals.yaml           — Rivals tab
+│       └── {custom}.yaml         — remaining tabs
+│
+└── Backend (FastAPI)
+    ├── main.py                   — FastAPI app, CORS, router registration
+    ├── shared/gemini_client.py   — single Gemini client: ask_gemini(prompt)
+    └── features/
+        ├── translator/           — POST /translator/explain
+        ├── vivisekcja/           — POST /vivisekcja/analyze
+        ├── dead_code/            — POST /dead-code/detect
+        ├── bad_patterns/         — POST /bad-patterns/detect
+        ├── line_tooltip/         — per-line code explanations
+        └── programming_mode/     — AI code style analysis
 ```
 
-Each backend feature lives in its own folder with a `README.md` explaining endpoints and data format.
+**Data flow:** `FRAMEWORKS tile click → fw-detail.js → FW_DATA_MAP[key] → fw_{name}.js imports → YAML files → rendered tabs`
 
 ---
 
-## Run Locally
+## Getting Started
 
 ```bash
-# Backend
+# Frontend
+npm install
+npm run dev      # http://localhost:5173
+```
+
+```bash
+# Backend (optional — required for AI features)
 cd backend
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env        # add your GEMINI_API_KEY
-uvicorn main:app --reload
-
-# Demo (no build needed)
-open demo_v2.html
+cp .env.example .env   # add GEMINI_API_KEY
+uvicorn main:app --reload --port 8000
+# Swagger docs: http://localhost:8000/docs
 ```
 
 ---
 
-## Why I Built This
+## Adding a New Framework
 
-I started learning programming and struggled to understand what code actually does just by reading it. I wanted a tool that explains code the way a patient mentor would — step by step, in plain language, with no jargon.
+Each framework is defined by 9 YAML files in `src/content/{fw}/` and one importer JS file in `src/data/fw_{name}.js`. Register the importer in `FW_DATA_MAP` (in `src/modules/fw-detail.js`) and add a tile entry to `src/data/frameworks.js`. No changes to any renderer code required.
 
-Checki is that tool.
+For the full step-by-step protocol (including YAML schema, key naming rules, and common pitfalls), see [AGENT_README.md](./AGENT_README.md).
+
+---
+
+## Stack
+
+| Technology | Role |
+|-----------|------|
+| Vite | Frontend bundler, HMR, YAML plugin |
+| Vanilla JS (ESM) | Frontend logic — no framework overhead |
+| `@modyfi/vite-plugin-yaml` | YAML files imported as ES modules |
+| FastAPI | Backend API, endpoint routing |
+| Google Gemini 2.5 Flash | AI model for all analysis features |
+| `google-genai` | Python SDK for Gemini |
+| YAML | Framework content — all data lives here |
+
+---
+
+## Project Status
+
+```
+✅ 24 frameworks complete (React, FastAPI, pytest, Flask, Django, PostgreSQL,
+   Redis, Docker, Git, Kubernetes, Terraform, CI/CD, WSL, LangGraph, MCP,
+   SQLAlchemy, OpenAI SDK, Anthropic SDK, LlamaIndex, Pydantic AI,
+   requests, BeautifulSoup, asyncio, PyAutoGUI)
+✅ AI features: translator, vivisekcja, dead code, bad patterns
+🚧 Code assistance system — in progress
+📅 Portfolio-ready target: September 2026
+```
 
 ---
 
