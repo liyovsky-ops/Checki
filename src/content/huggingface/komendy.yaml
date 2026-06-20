@@ -1,0 +1,230 @@
+title: "Komendy Hugging Face"
+
+groups:
+  - name: "Hub CLI"
+    icon: "🌐"
+    commands:
+      - cmd: "huggingface-cli login"
+        desc: "Zaloguj się do Hugging Face Hub"
+        detail:
+          what: "Interaktywny login — pyta o token dostępu z Hub Settings -> Access Tokens."
+          how: "Token zapisywany lokalnie w ~/.huggingface/token. Wymagany do push_to_hub i prywatnych modeli."
+          tips:
+            - "huggingface-cli login --token hf_... — nieinteraktywny (dla CI/CD)"
+            - "Alternatywa: export HF_TOKEN=hf_... w .env"
+      - cmd: "huggingface-cli whoami"
+        desc: "Sprawdź zalogowanego użytkownika"
+        detail:
+          what: "Wyświetla nazwę użytkownika i informacje o tokenie dostępu."
+          how: "Przydatne do weryfikacji że jesteś zalogowany przed push_to_hub."
+          tips:
+            - "Zwraca 'Not logged in' jeśli brak tokenu"
+            - "huggingface-cli env — wyświetla zmienne środowiskowe HF"
+      - cmd: "huggingface-cli download bert-base-uncased"
+        desc: "Pobierz model z Hub do lokalnego cache"
+        detail:
+          what: "Pobiera wszystkie pliki modelu (wagi, config, tokenizer) do ~/.cache/huggingface/hub/."
+          how: "Przydatne do pobierania modeli z wyprzedzeniem przed inferecją offline."
+          tips:
+            - "huggingface-cli download bert-base-uncased --local-dir ./bert — do konkretnego katalogu"
+            - "huggingface-cli download owner/repo filename.bin — konkretny plik"
+      - cmd: "huggingface-cli upload moj-model ./model-dir"
+        desc: "Wgraj katalog z modelem na Hub"
+        detail:
+          what: "Uploaduje wszystkie pliki z katalogu do repozytorium na Hub."
+          how: "Wymaga zalogowania. Automatycznie tworzy repozytorium jeśli nie istnieje."
+          tips:
+            - "huggingface-cli upload --repo-type dataset moj-dataset ./data-dir — upload datasetu"
+            - "Automatyczny LFS dla plików > 10MB"
+      - cmd: "huggingface-cli scan-cache"
+        desc: "Skanuj lokalny cache Hub — pokaż pobrane modele i rozmiary"
+        detail:
+          what: "Wyświetla wszystkie modele i datasety w ~/.cache/huggingface/hub/ z rozmiarami."
+          how: "Pomaga zarządzać miejscem na dysku — modele LLM zajmują gigabajty."
+          tips:
+            - "huggingface-cli delete-cache — interaktywne usuwanie niepotrzebnych modeli"
+            - "Cache może rosnąć do setek GB jeśli testujesz wiele modeli"
+
+  - name: "Ładowanie modeli"
+    icon: "📥"
+    commands:
+      - cmd: "from transformers import AutoModelForSequenceClassification, AutoTokenizer"
+        desc: "Import Auto klas — automatyczny wybór architektury"
+        detail:
+          what: "Auto klasy wykrywają architekturę z config.json modelu bez konieczności znajomości nazwy klasy."
+          how: "AutoModel, AutoTokenizer, AutoModelForSequenceClassification, AutoModelForCausalLM i wiele innych."
+          tips:
+            - "Preferuj Auto klasy nad konkretnymi (BertForSequenceClassification) — przenośne dla różnych modeli"
+            - "AutoModel.from_pretrained zwraca właściwy model dla podanego checkpoint"
+      - cmd: "model = AutoModel.from_pretrained('bert-base-uncased', cache_dir='/my/cache')"
+        desc: "Załaduj model z niestandardowego cache"
+        detail:
+          what: "cache_dir wskazuje gdzie zapisać/szukać modelu. Domyślnie ~/.cache/huggingface/hub/."
+          how: "Przydatne w środowiskach współdzielonych lub gdy dysk systemowy ma mało miejsca."
+          tips:
+            - "Ustaw HF_HOME=/path/to/cache jako zmienną środowiskową — zmienia domyślny cache"
+            - "local_files_only=True — tylko lokalny cache, bez internet"
+      - cmd: "model = AutoModel.from_pretrained('model', device_map='auto', torch_dtype=torch.float16)"
+        desc: "Załaduj duży model z automatycznym podziałem na GPU/CPU"
+        detail:
+          what: "device_map='auto' automatycznie rozdziela warstwy na dostępne urządzenia (multi-GPU, CPU offload)."
+          how: "torch_dtype=float16 zmniejsza VRAM 2x. load_in_4bit=True zmniejsza jeszcze bardziej (QLoRA)."
+          tips:
+            - "device_map='balanced' — równomierne rozdzielenie na GPU"
+            - "max_memory={0: '20GiB', 'cpu': '30GiB'} — limit pamięci per urządzenie"
+      - cmd: "tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased', use_fast=True)"
+        desc: "Szybki tokenizer (Rust backend) — 10-100x szybszy od tokenizera Python"
+        detail:
+          what: "use_fast=True (domyślnie) używa tokenizera napisanego w Rust przez bibliotekę tokenizers."
+          how: "Fast tokenizers obsługują batch processing równolegle — niezbędne przy dużych datasetach."
+          tips:
+            - "tokenizer.is_fast — sprawdź czy używasz szybkiego tokenizera"
+            - "Przy problemach z fast tokenizer: use_fast=False — fallback do Python"
+
+  - name: "Pipeline inference"
+    icon: "🔧"
+    commands:
+      - cmd: "pipe = pipeline('text-classification', model='...')"
+        desc: "Utwórz pipeline dla klasyfikacji tekstu"
+        detail:
+          what: "Pipeline łączy tokenizer + model + post-processing. Obsługuje batch inference automatycznie."
+          how: "Zadania: text-classification, token-classification, question-answering, summarization, translation, text-generation."
+          tips:
+            - "pipe = pipeline(..., device=0) — uruchom na GPU 0"
+            - "pipe(texts, batch_size=32) — batch inference (szybsze)"
+      - cmd: "results = pipe(texts, batch_size=32, truncation=True)"
+        desc: "Batch inference przez pipeline"
+        detail:
+          what: "Przetwarza listę tekstów batchami — wydajniejsze niż jeden po drugim."
+          how: "batch_size kontroluje ile przykładów GPU przetwarza naraz. Dostosuj do dostępnej VRAM."
+          tips:
+            - "Dla dużych datasetów użyj pipe(dataset, batch_size=32) — streaming z Dataset"
+            - "return_all_scores=True — zwróć prawdopodobieństwa dla wszystkich klas"
+      - cmd: "generator = pipeline('text-generation', model='gpt2', max_new_tokens=100)"
+        desc: "Pipeline do generowania tekstu"
+        detail:
+          what: "Generuje tekst na podstawie promptu. max_new_tokens kontroluje długość wyjścia."
+          how: "Domyślnie greedy search. Dodaj do_sample=True, temperature, top_p dla kreatywności."
+          tips:
+            - "num_return_sequences=3 — generuj kilka wariantów"
+            - "pad_token_id=tokenizer.eos_token_id — zapobiega ostrzeżeniu o braku pad tokenu"
+
+  - name: "Dataset ops"
+    icon: "📊"
+    commands:
+      - cmd: "ds = load_dataset('imdb', split='train')"
+        desc: "Załaduj dataset z Hub"
+        detail:
+          what: "load_dataset pobiera i cache'uje dataset lokalnie. Obsługuje arrow format dla szybkiego dostępu."
+          how: "Dostępne datasety: huggingface.co/datasets — ponad 100k zestawów."
+          tips:
+            - "split='train[:10%]' — załaduj tylko 10% danych"
+            - "download_mode='force_redownload' — wymuś ponowne pobranie"
+      - cmd: "ds = ds.map(tokenize_fn, batched=True, num_proc=4)"
+        desc: "Tokenizuj dataset wielowątkowo z cache'owaniem"
+        detail:
+          what: "map() przetwarza każdy przykład i cache'uje wynik — ponowne uruchomienie używa cache."
+          how: "batched=True przetwarza batchami (szybsze tokenizatory obsługują batch). num_proc=4 to 4 procesy."
+          tips:
+            - "remove_columns=['text'] — usuń niepotrzebne kolumny po tokenizacji"
+            - "Cache zapisywany w ~/.cache/huggingface/datasets/"
+      - cmd: "ds.push_to_hub('username/dataset-name')"
+        desc: "Opublikuj dataset na Hub"
+        detail:
+          what: "Pushuje dataset do publicznego lub prywatnego repozytorium na Hub."
+          how: "Wymaga zalogowania przez huggingface-cli login lub HF_TOKEN env."
+          tips:
+            - "private=True — prywatne repozytorium"
+            - "DatasetDict({'train': train, 'test': test}).push_to_hub(...) — push wielu splitów"
+      - cmd: "ds.save_to_disk('./dataset_arrow') && ds = load_from_disk('./dataset_arrow')"
+        desc: "Zapisz i załaduj dataset lokalnie (Arrow format)"
+        detail:
+          what: "save_to_disk zapisuje w wydajnym Arrow format. load_from_disk ładuje bez pobierania z Hub."
+          how: "Arrow format szybszy niż CSV/JSON — idealny dla dużych datasetów używanych wielokrotnie."
+          tips:
+            - "Dużo szybszy niż to_pandas().to_csv() i z powrotem"
+            - "Zachowuje schemę danych (dtypes, feature names)"
+
+  - name: "Trainer i trening"
+    icon: "🏋️"
+    commands:
+      - cmd: "trainer = Trainer(model=model, args=training_args, train_dataset=train_ds)"
+        desc: "Inicjalizuj Trainer"
+        detail:
+          what: "Trainer zarządza pełną pętlą trenowania z ewaluacją, checkpointami, logowaniem."
+          how: "training_args zawiera konfigurację (batch_size, lr, epochs, fp16, ewaluacja)."
+          tips:
+            - "eval_dataset=eval_ds, compute_metrics=fn — dodaj ewaluację"
+            - "callbacks=[EarlyStoppingCallback()] — early stopping"
+      - cmd: "trainer.train(resume_from_checkpoint=True)"
+        desc: "Wznów trening od ostatniego checkpointu"
+        detail:
+          what: "resume_from_checkpoint=True szuka ostatniego checkpointu w output_dir."
+          how: "Przydatne po przerwaniu treningu (crash, timeout). Wczytuje stan optimizera."
+          tips:
+            - "resume_from_checkpoint='./results/checkpoint-500' — konkretny checkpoint"
+            - "save_steps=100, save_total_limit=3 — oszczędzaj miejsce (max 3 checkpointy)"
+      - cmd: "trainer.evaluate()"
+        desc: "Ewaluacja na zbiorze walidacyjnym"
+        detail:
+          what: "Uruchamia pętlę ewaluacyjną i zwraca metryki zdefiniowane w compute_metrics."
+          how: "Można wywołać ręcznie w dowolnym momencie lub automatycznie przez eval_strategy."
+          tips:
+            - "trainer.predict(test_dataset) — predykcje + metryki na zbiorze testowym"
+            - "trainer.save_model('./final') — zapisz model po treningu"
+
+  - name: "Zarządzanie modelami"
+    icon: "📦"
+    commands:
+      - cmd: "model.save_pretrained('./my-model') && tokenizer.save_pretrained('./my-model')"
+        desc: "Zapisz model i tokenizer lokalnie"
+        detail:
+          what: "Zapisuje wagi (safetensors), config.json i pliki tokenizatora do katalogu."
+          how: "Kompletny snapshot potrzebny do odtworzenia modelu bez połączenia z Hub."
+          tips:
+            - "safe_serialization=True (domyślnie) — format safetensors zamiast pkl"
+            - "Nie zapomnij save tokenizera! Model bez tokenizera to połowa obrazu"
+      - cmd: "model.push_to_hub('username/my-model')"
+        desc: "Wypchnij model na Hugging Face Hub"
+        detail:
+          what: "Pushuje wagi, config i tokenizer do repozytorium na Hub."
+          how: "Automatycznie tworzy repo jeśli nie istnieje. Obsługuje LFS dla dużych plików."
+          tips:
+            - "private=True — prywatne repo"
+            - "commit_message='Training complete, epoch 3' — opisz push"
+      - cmd: "from huggingface_hub import snapshot_download; snapshot_download('bert-base-uncased', local_dir='./bert')"
+        desc: "Pobierz cały snapshot modelu do katalogu"
+        detail:
+          what: "snapshot_download pobiera wszystkie pliki modelu (wagi, config, tokenizer, README)."
+          how: "Lepsza alternatywa dla huggingface-cli download gdy potrzebujesz pełnego katalogu modelu."
+          tips:
+            - "ignore_patterns=['*.safetensors'] — pomiń pewne pliki"
+            - "revision='main' — konkretna gałąź/commit/tag"
+
+  - name: "Inference snippets"
+    icon: "⚡"
+    commands:
+      - cmd: "with torch.inference_mode(): outputs = model(**inputs)"
+        desc: "Inference mode — szybszy i mniejszy niż no_grad"
+        detail:
+          what: "torch.inference_mode() wyłącza śledzenie gradientów. Szybszy od no_grad i zapobiega accidental autograd."
+          how: "Zawsze używaj podczas inferecji — zmniejsza zużycie pamięci i przyspiesza obliczenia."
+          tips:
+            - "@torch.inference_mode() jako dekorator funkcji inferecji"
+            - "Nie mylić z model.eval() — oba potrzebne: eval() wyłącza dropout, inference_mode wyłącza autograd"
+      - cmd: "model = torch.compile(model)"
+        desc: "Skompiluj model PyTorch 2.0+ (do 2x szybciej)"
+        detail:
+          what: "torch.compile() kompiluje model przez TorchDynamo/Inductor — eliminuje overhead Python."
+          how: "Pierwsze wywołanie wolne (kompilacja). Kolejne 30-200% szybsze."
+          tips:
+            - "mode='reduce-overhead' — dla małych batch sizes"
+            - "mode='max-autotune' — maksymalna optymalizacja (najdłuższa kompilacja)"
+      - cmd: "inputs = tokenizer(text, return_tensors='pt').to(device)"
+        desc: "Tokenizuj i przenieś na GPU"
+        detail:
+          what: "Tokenizuje tekst i konwertuje do tensorów PyTorch, następnie przenosi na urządzenie modelu."
+          how: "Model i dane muszą być na tym samym urządzeniu. Brak .to(device) powoduje błąd."
+          tips:
+            - "device = 'cuda' if torch.cuda.is_available() else 'cpu'"
+            - "inputs = {k: v.to(device) for k, v in inputs.items()} — alternatywna składnia"

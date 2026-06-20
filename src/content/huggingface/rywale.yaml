@@ -1,0 +1,68 @@
+title: "Hugging Face vs inne platformy AI"
+
+items:
+  - name: "OpenAI API"
+    icon: "🤖"
+    color: "#10a37f"
+    tagline: "Zamknięte API z modelami GPT-4 — łatwy start, ale vendor lock-in i koszty per token"
+    pros:
+      - "Najlepsze modele na rynku (GPT-4o, o1) bez konfiguracji"
+      - "Jedno API dla czatu, embeddings, vision, audio, fine-tuningu"
+      - "Zero DevOps — nie musisz zarządzać infrastrukturą"
+      - "Doskonała dokumentacja i niezawodność produkcyjna"
+    cons:
+      - "Vendor lock-in — zmiana providera wymaga przepisania kodu"
+      - "Koszty per token rosną logarytmicznie z użyciem"
+      - "Brak kontroli nad danymi — wysyłasz dane do OpenAI"
+      - "Brak możliwości fine-tuningu na własnym sprzęcie"
+      - "Modele zamknięte — nie wiadomo co dokładnie robią"
+    vs: "Hugging Face daje pełną kontrolę nad modelem i danymi — możesz uruchamiać lokalnie, fine-tunować, wdrożyć na własnym serwerze. OpenAI API to black box, ale najszybszy start dla prototypowania."
+
+  - name: "Ollama"
+    icon: "🦙"
+    color: "#000000"
+    tagline: "Lokalne uruchamianie LLM bez konfiguracji — prywatność i offline przez CLI lub API"
+    pros:
+      - "Zero konfiguracji — jeden plik binarny, jeden command"
+      - "Pełna prywatność — dane nie opuszczają maszyny"
+      - "REST API kompatybilne z OpenAI API"
+      - "Działa offline bez połączenia z internetem"
+      - "Automatyczna optymalizacja dla Apple Silicon (Metal)"
+    cons:
+      - "Ograniczony wybór modeli (nie wszystkie z HF Hub)"
+      - "Brak ekosystemu do trenowania i fine-tuningu"
+      - "Mniej kontroli nad parametrami modeli"
+      - "Gorsze wsparcie dla modeli vision i multimodal"
+    vs: "Ollama dla szybkiego uruchomienia LLM lokalnie do chatbota/asystenta. Hugging Face gdy potrzebujesz pełnego kontroli — fine-tuning, niestandarowe modele, custom inference pipeline."
+
+  - name: "TensorFlow Hub"
+    icon: "🧠"
+    color: "#FF6F00"
+    tagline: "Repozytorium modeli Google — TensorFlow/Keras native, mniejszy ekosystem niż HF"
+    pros:
+      - "Natywna integracja z TensorFlow i Keras"
+      - "Modele Google (BERT, Universal Sentence Encoder, EfficientNet)"
+      - "Proste API dla transfer learningu w Keras"
+      - "Silna integracja z TensorFlow Serving i TFLite"
+    cons:
+      - "Dużo mniejszy wybór modeli niż Hugging Face Hub (900k+ vs ~10k)"
+      - "Prawie wyłącznie TensorFlow — nie ma PyTorch native"
+      - "Mniejsza społeczność i mniej aktualnych modeli"
+      - "Brak narzędzi do fine-tuningu jak Trainer API"
+    vs: "TensorFlow Hub gdy jesteś already w ekosystemie TF/Keras i potrzebujesz modeli Google. Hugging Face daje 10x więcej modeli, lepsze narzędzia treningowe i aktywniejszy research community."
+
+  - name: "LangChain"
+    icon: "🦜"
+    color: "#1C3C3C"
+    tagline: "Framework nad LLM — nie zastępuje HF, ale często używany razem z Transformers jako backend"
+    pros:
+      - "Łatwe łączenie modeli w chains i agents"
+      - "Gotowe integracje z wektorowymi bazami danych"
+      - "RAG out of the box — dokumenty, retrieval, generacja"
+      - "Działa z HuggingFacePipeline jako backend"
+    cons:
+      - "Abstrakcja ukrywa co dzieje się pod spodem — trudne debugowanie"
+      - "Szybko zmieniające się API — breaking changes co kilka wersji"
+      - "Overhead gdy potrzebujesz prostego wywołania modelu"
+      - "Nie trenuje ani nie fine-tunuje modeli"
+    vs: "LangChain i Hugging Face to uzupełniające się narzędzia — HF dostarcza modele i trening, LangChain orkiestruje workflow. Użyj HF bezpośrednio gdy budujesz pipeline ML; LangChain gdy budujesz chatbota lub RAG."

@@ -1,0 +1,192 @@
+title: "Ekosystem Hugging Face"
+
+items:
+  - name: "Accelerate"
+    icon: "🚀"
+    desc: "Uruchamiaj kod PyTorch na jednym GPU, wielu GPU, TPU i CPU bez zmiany kodu — jeden skrypt dla wszystkiego"
+    code: |
+      from accelerate import Accelerator
+      import torch
+      from torch.utils.data import DataLoader
+
+      accelerator = Accelerator(
+          mixed_precision="fp16",      # automatyczny mixed precision
+          gradient_accumulation_steps=4
+      )
+
+      model, optimizer, train_loader = accelerator.prepare(
+          model, optimizer, train_loader
+      )
+
+      for batch in train_loader:
+          with accelerator.accumulate(model):
+              outputs = model(**batch)
+              loss = outputs.loss
+              accelerator.backward(loss)
+              optimizer.step()
+              optimizer.zero_grad()
+
+      # Uruchomienie na wielu GPU
+      # accelerate launch --num_processes 4 train.py
+
+      # Konfiguracja przez CLI
+      # accelerate config  -> interaktywna konfiguracja
+
+  - name: "PEFT"
+    icon: "🎯"
+    desc: "Parameter-Efficient Fine-Tuning — LoRA, QLoRA, Prefix Tuning, Prompt Tuning; fine-tunuj LLM z małym VRAM"
+    code: |
+      from peft import LoraConfig, get_peft_model, TaskType, PeftModel
+      from transformers import AutoModelForCausalLM
+
+      # Dodaj LoRA do modelu
+      lora_config = LoraConfig(
+          task_type=TaskType.CAUSAL_LM,
+          r=16,                        # ranga LoRA
+          lora_alpha=32,
+          target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],
+          lora_dropout=0.05,
+      )
+
+      base_model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-2-7b-hf")
+      peft_model = get_peft_model(base_model, lora_config)
+      peft_model.print_trainable_parameters()
+      # trainable params: 4,194,304 || all params: 6,742,609,920
+
+      # Zapisz tylko adaptery LoRA (bardzo mały plik)
+      peft_model.save_pretrained("./lora-adapters")
+
+      # Załaduj i połącz z modelem bazowym
+      merged = PeftModel.from_pretrained(base_model, "./lora-adapters")
+      merged = merged.merge_and_unload()  # scal adaptery z wagami
+
+  - name: "Diffusers"
+    icon: "🎨"
+    desc: "Generowanie obrazów i wideo — Stable Diffusion, DALL-E, text-to-image, image-to-image, inpainting"
+    code: |
+      from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
+      import torch
+
+      # Załaduj pipeline Stable Diffusion
+      model_id = "runwayml/stable-diffusion-v1-5"
+      pipe = StableDiffusionPipeline.from_pretrained(
+          model_id,
+          torch_dtype=torch.float16
+      )
+      pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+      pipe = pipe.to("cuda")
+
+      # Generuj obraz
+      prompt = "a photo of an astronaut riding a horse on mars, photorealistic, 8k"
+      negative_prompt = "blurry, low quality, distorted"
+
+      image = pipe(
+          prompt=prompt,
+          negative_prompt=negative_prompt,
+          num_inference_steps=25,
+          guidance_scale=7.5,
+          height=512,
+          width=512,
+      ).images[0]
+
+      image.save("astronaut.png")
+      print("Obraz zapisany jako astronaut.png")
+
+  - name: "Evaluate"
+    icon: "📏"
+    desc: "Unified interface do metryk ML — accuracy, F1, BLEU, ROUGE, BERTScore dla NLP i CV"
+    code: |
+      import evaluate
+      import numpy as np
+
+      # Załaduj metryki z Hub
+      accuracy = evaluate.load("accuracy")
+      f1 = evaluate.load("f1")
+      bleu = evaluate.load("bleu")
+      rouge = evaluate.load("rouge")
+
+      # Ewaluacja klasyfikacji
+      predictions = [0, 1, 1, 0, 1]
+      references  = [0, 1, 0, 0, 1]
+
+      acc = accuracy.compute(predictions=predictions, references=references)
+      print(f"Accuracy: {acc['accuracy']:.2f}")  # 0.80
+
+      f1_score = f1.compute(predictions=predictions, references=references)
+      print(f"F1: {f1_score['f1']:.2f}")
+
+      # ROUGE dla summarization
+      predictions_text = ["The cat sat on the mat"]
+      references_text  = ["The cat is sitting on the mat"]
+      rouge_score = rouge.compute(predictions=predictions_text, references=references_text)
+      print(f"ROUGE-L: {rouge_score['rougeL']:.3f}")
+
+      # Kombinuj wiele metryk
+      combined = evaluate.combine(["accuracy", "f1", "recall", "precision"])
+      results = combined.compute(predictions=predictions, references=references)
+      print(results)
+
+  - name: "Optimum"
+    icon: "⚡"
+    desc: "Optymalizacja modeli HF — eksport do ONNX, TensorRT, Intel OpenVINO, Apple Neural Engine"
+    code: |
+      from optimum.onnxruntime import ORTModelForSequenceClassification
+      from optimum.intel import OVModelForSequenceClassification  # OpenVINO
+      from transformers import AutoTokenizer, pipeline
+
+      tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+
+      # Export i inference przez ONNX Runtime
+      ort_model = ORTModelForSequenceClassification.from_pretrained(
+          "distilbert-base-uncased-finetuned-sst-2-english",
+          export=True,          # eksportuj do ONNX
+          provider="CPUExecutionProvider"
+      )
+      ort_model.save_pretrained("./ort_model")
+
+      # Pipeline z ONNX modelem (szybszy na CPU)
+      ort_pipe = pipeline("text-classification", model=ort_model, tokenizer=tokenizer)
+      result = ort_pipe("This is great!")
+      print(result)
+
+      # Quantization przez ONNX Runtime
+      from optimum.onnxruntime import ORTQuantizer
+      from optimum.onnxruntime.configuration import AutoQuantizationConfig
+
+      quantizer = ORTQuantizer.from_pretrained(ort_model)
+      qconfig = AutoQuantizationConfig.arm64(is_static=False, per_channel=False)
+      quantizer.quantize(save_dir="./quantized_model", quantization_config=qconfig)
+
+  - name: "Sentence-Transformers"
+    icon: "🔗"
+    desc: "Semantyczne embeddingi zdań — szybkie, wysokiej jakości wektory do wyszukiwania, klasteringu i RAG"
+    code: |
+      from sentence_transformers import SentenceTransformer, util
+      import numpy as np
+
+      # Załaduj model embeddings
+      model = SentenceTransformer("all-MiniLM-L6-v2")
+
+      # Enkoduj zdania
+      sentences = [
+          "Machine learning is a subfield of AI",
+          "Deep learning uses neural networks",
+          "Python is a popular programming language",
+          "Cats are furry animals",
+      ]
+      embeddings = model.encode(sentences, show_progress_bar=True)
+      print(f"Shape: {embeddings.shape}")  # (4, 384)
+
+      # Podobieństwo cosinusowe
+      query = "What is artificial intelligence?"
+      query_emb = model.encode(query)
+
+      similarities = util.cos_sim(query_emb, embeddings)
+      best_idx = similarities.argmax().item()
+      print(f"Najbardziej podobne: '{sentences[best_idx]}'")
+
+      # Semantic search nad dużą kolekcją
+      corpus_embeddings = model.encode(sentences, convert_to_tensor=True)
+      results = util.semantic_search(query_emb, corpus_embeddings, top_k=2)
+      for hit in results[0]:
+          print(f"Score: {hit['score']:.3f} — {sentences[hit['corpus_id']]}")

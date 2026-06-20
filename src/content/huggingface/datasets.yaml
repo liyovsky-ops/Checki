@@ -1,0 +1,196 @@
+title: "Datasets"
+
+items:
+  - name: "load_dataset()"
+    icon: "📂"
+    desc: "Załaduj zbiory danych z Hugging Face Hub lub lokalnych plików — CSV, JSON, Parquet, text i wiele innych"
+    code: |
+      from datasets import load_dataset
+
+      # Z Hub (automatyczne cache'owanie)
+      dataset = load_dataset("imdb")
+      print(dataset)
+      # DatasetDict({'train': Dataset({features: ['text', 'label'], num_rows: 25000}),
+      #              'test': Dataset({features: ['text', 'label'], num_rows: 25000})})
+
+      # Dostęp do splitów
+      train = dataset["train"]
+      print(train[0])   # {'text': 'I rented I AM ...', 'label': 1}
+      print(train[:3])  # 3 pierwsze przykłady
+
+      # Załaduj z lokalnego CSV
+      custom = load_dataset("csv", data_files={"train": "train.csv", "test": "test.csv"})
+
+      # Konkretny split z procentem danych
+      small = load_dataset("imdb", split="train[:10%]")
+      print(f"Załadowano {len(small)} przykładów")
+
+  - name: "DatasetDict"
+    icon: "📚"
+    desc: "Słownik splitów danych (train/validation/test) — zarządzaj wszystkimi podziałami jako jeden obiekt"
+    code: |
+      from datasets import load_dataset, DatasetDict, Dataset
+
+      # Załaduj i podziel ręcznie
+      raw = load_dataset("ag_news", split="train")
+      splits = raw.train_test_split(test_size=0.1, seed=42)
+
+      dataset = DatasetDict({
+          "train": splits["train"],
+          "test":  splits["test"],
+      })
+
+      print(dataset)
+      print(f"Train: {len(dataset['train'])} examples")
+      print(f"Test:  {len(dataset['test'])} examples")
+
+      # Iteracja przez wszystkie splity
+      for split_name, split_data in dataset.items():
+          print(f"{split_name}: {split_data.features}")
+
+      # Tworzenie DatasetDict z listy słowników
+      from datasets import Dataset
+      data = {"text": ["Hello!", "Goodbye!"], "label": [0, 1]}
+      my_dataset = Dataset.from_dict(data)
+      print(my_dataset)
+
+  - name: "Dataset.map()"
+    icon: "🔄"
+    desc: "Transformuj przykłady — tokenizacja, augmentacja, normalizacja — z automatycznym cache'owaniem wyników"
+    code: |
+      from datasets import load_dataset
+      from transformers import AutoTokenizer
+
+      dataset = load_dataset("imdb")
+      tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+
+      def tokenize_function(examples):
+          return tokenizer(
+              examples["text"],
+              padding="max_length",
+              truncation=True,
+              max_length=512
+          )
+
+      # Przetwórz cały dataset (z cache'owaniem!)
+      tokenized = dataset.map(
+          tokenize_function,
+          batched=True,        # przetwarza batchami (szybsze)
+          batch_size=1000,
+          num_proc=4,          # wielowątkowe przetwarzanie
+          remove_columns=["text"],  # usuń oryginalne kolumny
+          desc="Tokenizing"
+      )
+
+      print(tokenized)
+      # Kolumny: input_ids, attention_mask, label
+
+  - name: "Dataset.filter()"
+    icon: "🎯"
+    desc: "Filtruj przykłady po dowolnym warunku — usuń krótkie teksty, wrong labels, duplikaty"
+    code: |
+      from datasets import load_dataset
+
+      dataset = load_dataset("imdb", split="train")
+
+      # Filtruj po długości tekstu
+      long_texts = dataset.filter(lambda x: len(x["text"].split()) > 50)
+      print(f"Długie teksty: {len(long_texts)} z {len(dataset)}")
+
+      # Filtruj po etykiecie
+      positive = dataset.filter(lambda x: x["label"] == 1)
+      print(f"Pozytywne recenzje: {len(positive)}")
+
+      # Filtruj batched (szybsze)
+      def filter_short(examples):
+          return [len(t.split()) > 30 for t in examples["text"]]
+
+      filtered = dataset.filter(filter_short, batched=True)
+      print(f"Po filtrze: {filtered}")
+
+  - name: "Dataset.select()"
+    icon: "✂️"
+    desc: "Wybierz podzbiór przykładów po indeksach — twórz małe datasety do prototypowania i testów"
+    code: |
+      from datasets import load_dataset
+
+      dataset = load_dataset("imdb", split="train")
+
+      # Wybierz pierwsze 100 przykładów
+      small = dataset.select(range(100))
+      print(f"Mały dataset: {len(small)} przykładów")
+
+      # Przetasuj i weź próbkę
+      shuffled = dataset.shuffle(seed=42)
+      sample = shuffled.select(range(500))
+
+      # Wybierz co n-ty element
+      every_10th = dataset.select(range(0, len(dataset), 10))
+      print(f"Co 10. przykład: {len(every_10th)}")
+
+      # Stratified split z select
+      pos = dataset.filter(lambda x: x["label"] == 1).select(range(100))
+      neg = dataset.filter(lambda x: x["label"] == 0).select(range(100))
+
+      from datasets import concatenate_datasets
+      balanced = concatenate_datasets([pos, neg]).shuffle(seed=42)
+
+  - name: "push_to_hub()"
+    icon: "☁️"
+    desc: "Opublikuj przetworzone dane na Hugging Face Hub — dziel się datasetami i wersjonuj przez git-lfs"
+    code: |
+      from datasets import load_dataset, Dataset
+      from huggingface_hub import login
+
+      # Zaloguj się (raz na sesję lub użyj HF_TOKEN env)
+      login(token="hf_...")
+
+      # Załaduj i przetwórz lokalnie
+      data = {
+          "text": ["First example", "Second example"],
+          "label": [0, 1],
+          "source": ["web", "book"]
+      }
+      dataset = Dataset.from_dict(data)
+
+      # Push na Hub
+      dataset.push_to_hub("twoj_username/moj_dataset")
+
+      # Push z podziałem na splity
+      from datasets import DatasetDict
+      splits = DatasetDict({"train": dataset, "test": dataset})
+      splits.push_to_hub("twoj_username/moj_dataset")
+
+      # Załaduj z powrotem
+      loaded = load_dataset("twoj_username/moj_dataset")
+
+  - name: "Streaming Dataset"
+    icon: "🌊"
+    desc: "Przetwarzaj wieloterabajtowe datasety bez pobierania — streaming ładuje przykłady on-demand"
+    code: |
+      from datasets import load_dataset
+
+      # Streaming mode — nie pobiera danych z góry
+      dataset = load_dataset(
+          "HuggingFaceFW/fineweb",
+          name="sample-10BT",
+          split="train",
+          streaming=True  # kluczowe!
+      )
+
+      # Iteruj przez przykłady (pobierane na bieżąco)
+      for i, example in enumerate(dataset):
+          print(example["text"][:100])
+          if i >= 4:
+              break
+
+      # Take() — pobierz N przykładów
+      first_100 = dataset.take(100)
+      for example in first_100:
+          process(example)
+
+      # Skip() — pomiń N przykładów
+      dataset_skip = dataset.skip(1000)
+
+      # Shuffle bufferowany
+      shuffled = dataset.shuffle(seed=42, buffer_size=10_000)

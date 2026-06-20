@@ -1,0 +1,96 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Hugging Face?
+  firstComponent: Pierwsze kroki z Hugging Face
+  firstComponentLang: Python
+
+intro:
+  title: Czym jest Hugging Face?
+  desc: >
+    Hugging Face to platforma open-source i zestaw bibliotek Pythona dla modeli NLP, wizji komputerowej i audio.
+    Kluczowe komponenty to Transformers (gotowe modele pre-trained), Datasets (gotowe zbiory danych),
+    Tokenizers (szybkie tokenizatory) i Hub (repozytorium ponad 900 000 modeli).
+    Hugging Face stał się de facto standardem w ekosystemie ML dla modeli pre-trained i fine-tuningu.
+
+concepts:
+  - title: Hub
+    desc: >
+      Centralne repozytorium modeli, datasetów i aplikacji Spaces. Ponad 900 000 modeli open-source
+      dostępnych do pobrania i użycia jedną linią kodu. Obsługuje wersjonowanie przez git-lfs.
+    icon: "🌐"
+  - title: Pipeline
+    desc: >
+      Najwyższy poziom abstrakcji — jeden obiekt obsługuje pełny workflow (tokenizacja, inference, dekodowanie).
+      Pipeline automatycznie dobiera model, tokenizer i konfigurację dla danego zadania.
+    icon: "🔧"
+  - title: AutoModel i AutoTokenizer
+    desc: >
+      Klasy Auto automatycznie wybierają właściwą architekturę na podstawie identyfikatora modelu z Hub.
+      AutoTokenizer.from_pretrained('bert-base-uncased') ładuje odpowiedni tokenizer bez znajomości architektury.
+    icon: "🤖"
+  - title: Tokenizer
+    desc: >
+      Tokenizer zamienia tekst na numeryczne reprezentacje (token IDs) zrozumiałe dla modelu.
+      Każdy model ma swój tokenizer dopasowany do słownika. Obsługuje padding, truncation, attention masks.
+    icon: "📝"
+  - title: Model Weights
+    desc: >
+      Wagi modeli przechowywane w formatach safetensors lub pytorch_model.bin.
+      Można je pobrać lokalnie lub ładować bezpośrednio z Hub z cache'owaniem.
+      Plik config.json zawiera architekturę, tokenizer_config.json parametry tokenizatora.
+    icon: "⚖️"
+  - title: Inference Mode
+    desc: >
+      Przy inferecji wyłącz gradient obliczenia przez torch.no_grad() lub @torch.inference_mode().
+      Zmniejsza zużycie pamięci i przyspiesza obliczenia. Model.eval() wyłącza dropout i batch norm.
+    icon: "⚡"
+  - title: Fine-tuning
+    desc: >
+      Dostrajanie modelu pre-trained na własnych danych. Możliwe przez Trainer API lub PEFT/LoRA
+      (Parameter-Efficient Fine-Tuning) — dostrajaj tylko ułamek wag, drastycznie zmniejszając VRAM.
+    icon: "🎯"
+  - title: Model Card
+    desc: >
+      Każdy model na Hub ma Model Card z dokumentacją użycia, limitów, danych trenujących i bias.
+      Dobra praktyka — czytaj Model Card przed użyciem modelu w produkcji.
+    icon: "📋"
+
+whenToUse:
+  - Korzystanie z gotowych modeli pre-trained (BERT, GPT-2, T5, ViT, Whisper)
+  - Fine-tuning modeli na własnych danych klasyfikacji, NER, summarization
+  - "Budowanie pipeline'ów NLP: klasyfikacja tekstu, ekstrakcja encji, tłumaczenie"
+  - Tworzenie aplikacji demo przez Gradio Spaces na Hugging Face Hub
+  - Trenowanie modeli z własnym DataLoaderem lub przez Trainer API
+  - Generowanie obrazów (Stable Diffusion przez diffusers)
+  - Speech-to-text (Whisper) i text-to-speech
+  - Porównywanie modeli i benchmarking na zbiorach danych z Hub
+
+firstComponent: |
+  from transformers import pipeline
+
+  # Najprostszy start — pipeline automatycznie wybiera model
+  classifier = pipeline("text-classification")
+  result = classifier("Hugging Face is amazing!")
+  print(result)
+  # [{'label': 'POSITIVE', 'score': 0.9998}]
+
+  # Sentiment analysis po polsku z konkretnym modelem
+  from transformers import pipeline
+
+  nlp = pipeline(
+      "text-classification",
+      model="cardiffnlp/twitter-roberta-base-sentiment-latest"
+  )
+  texts = ["I love this product!", "This is terrible."]
+  results = nlp(texts)
+  for text, result in zip(texts, results):
+      print(f"{text} => {result['label']} ({result['score']:.2f})")
+
+  # Generowanie tekstu
+  generator = pipeline("text-generation", model="gpt2")
+  output = generator(
+      "Once upon a time",
+      max_new_tokens=50,
+      num_return_sequences=1
+  )
+  print(output[0]['generated_text'])

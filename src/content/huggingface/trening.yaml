@@ -1,0 +1,235 @@
+title: "Trening"
+
+items:
+  - name: "TrainingArguments"
+    icon: "⚙️"
+    desc: "Konfiguracja pętli trenowania — batch size, learning rate, scheduler, ewaluacja, checkpointy"
+    code: |
+      from transformers import TrainingArguments
+
+      training_args = TrainingArguments(
+          output_dir="./results",            # gdzie zapisywać checkpointy
+          num_train_epochs=3,
+          per_device_train_batch_size=16,
+          per_device_eval_batch_size=32,
+          learning_rate=2e-5,
+          weight_decay=0.01,
+          warmup_steps=500,
+          lr_scheduler_type="linear",        # linear warmup + decay
+
+          # Ewaluacja
+          eval_strategy="epoch",             # lub "steps"
+          eval_steps=500,                    # jeśli eval_strategy="steps"
+          save_strategy="epoch",
+          load_best_model_at_end=True,
+          metric_for_best_model="f1",
+
+          # Logowanie
+          logging_dir="./logs",
+          logging_steps=100,
+          report_to="tensorboard",           # lub "wandb"
+
+          # Optymalizacja pamięci
+          fp16=True,                         # mixed precision (GPU)
+          gradient_accumulation_steps=4,     # symuluj większy batch
+          dataloader_num_workers=4,
+      )
+
+  - name: "Trainer"
+    icon: "🏋️"
+    desc: "Pełna pętla trenowania z ewaluacją, checkpointami i logowaniem — wystarczy podać model, dane i argumenty"
+    code: |
+      from transformers import (
+          AutoModelForSequenceClassification,
+          AutoTokenizer,
+          Trainer,
+          TrainingArguments
+      )
+      from datasets import load_dataset
+
+      # Dane
+      dataset = load_dataset("imdb")
+      tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+
+      def tokenize(examples):
+          return tokenizer(examples["text"], truncation=True, padding="max_length", max_length=256)
+
+      tokenized = dataset.map(tokenize, batched=True, remove_columns=["text"])
+      tokenized = tokenized.rename_column("label", "labels")
+      tokenized.set_format("torch")
+
+      # Model
+      model = AutoModelForSequenceClassification.from_pretrained(
+          "bert-base-uncased", num_labels=2
+      )
+
+      training_args = TrainingArguments(
+          output_dir="./bert-imdb",
+          num_train_epochs=2,
+          per_device_train_batch_size=16,
+          per_device_eval_batch_size=32,
+          eval_strategy="epoch",
+          save_strategy="epoch",
+          load_best_model_at_end=True,
+          fp16=True,
+      )
+
+      trainer = Trainer(
+          model=model,
+          args=training_args,
+          train_dataset=tokenized["train"],
+          eval_dataset=tokenized["test"],
+      )
+
+      trainer.train()
+      trainer.save_model("./bert-imdb-final")
+
+  - name: "compute_metrics"
+    icon: "📊"
+    desc: "Własna funkcja metryk przekazywana do Trainer — accuracy, F1, precision, recall przez evaluate library"
+    code: |
+      import numpy as np
+      import evaluate
+
+      accuracy_metric = evaluate.load("accuracy")
+      f1_metric = evaluate.load("f1")
+
+      def compute_metrics(eval_pred):
+          logits, labels = eval_pred
+          predictions = np.argmax(logits, axis=-1)
+
+          accuracy = accuracy_metric.compute(
+              predictions=predictions, references=labels
+          )
+          f1 = f1_metric.compute(
+              predictions=predictions, references=labels, average="weighted"
+          )
+
+          return {
+              "accuracy": accuracy["accuracy"],
+              "f1": f1["f1"],
+          }
+
+      # Przekaż do Trainer
+      trainer = Trainer(
+          model=model,
+          args=training_args,
+          train_dataset=train_dataset,
+          eval_dataset=eval_dataset,
+          compute_metrics=compute_metrics,  # <-- tutaj
+      )
+
+      trainer.train()
+      eval_results = trainer.evaluate()
+      print(f"Accuracy: {eval_results['eval_accuracy']:.4f}")
+      print(f"F1: {eval_results['eval_f1']:.4f}")
+
+  - name: "DataCollatorWithPadding"
+    icon: "📦"
+    desc: "Dynamiczny padding w batch — padduje sekwencje do najdłuższej w batch zamiast globalnego max_length"
+    code: |
+      from transformers import AutoTokenizer, DataCollatorWithPadding
+      from datasets import load_dataset
+      from torch.utils.data import DataLoader
+
+      tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+
+      # Tokenizuj BEZ padding (dynamiczny padding lepszy)
+      def tokenize(examples):
+          return tokenizer(examples["text"], truncation=True, max_length=512)
+
+      dataset = load_dataset("imdb")
+      tokenized = dataset.map(tokenize, batched=True, remove_columns=["text"])
+      tokenized = tokenized.rename_column("label", "labels")
+
+      # DataCollator padduje każdy batch do najdłuższego w tym batch
+      data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+      # DataLoader z collate_fn
+      train_loader = DataLoader(
+          tokenized["train"].with_format("torch"),
+          batch_size=32,
+          shuffle=True,
+          collate_fn=data_collator
+      )
+
+      # Batch ma różne długości per iterację
+      for batch in train_loader:
+          print(batch["input_ids"].shape)  # (32, zmienna_dlugosc)
+          break
+
+  - name: "PEFT / LoRA Fine-tuning"
+    icon: "🎯"
+    desc: "Parameter-Efficient Fine-Tuning — dostrajaj tylko ułamek wag przez Low-Rank Adapters, 10-100x mniej VRAM"
+    code: |
+      from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments, Trainer
+      from peft import LoraConfig, get_peft_model, TaskType
+
+      # Załaduj model bazowy
+      model_name = "meta-llama/Llama-2-7b-hf"
+      tokenizer = AutoTokenizer.from_pretrained(model_name)
+      model = AutoModelForCausalLM.from_pretrained(
+          model_name,
+          load_in_4bit=True,     # 4-bit quantization (QLoRA)
+          device_map="auto",
+      )
+
+      # Konfiguracja LoRA
+      lora_config = LoraConfig(
+          task_type=TaskType.CAUSAL_LM,
+          r=16,                  # ranga dekomozycji macierzy
+          lora_alpha=32,         # skala LoRA
+          target_modules=["q_proj", "v_proj"],  # które warstwy adaptować
+          lora_dropout=0.05,
+          bias="none",
+      )
+
+      model = get_peft_model(model, lora_config)
+      model.print_trainable_parameters()
+      # trainable params: 4,194,304 || all params: 6,742,609,920 || trainable%: 0.06%
+
+      # Trening jak normalnie przez Trainer
+      training_args = TrainingArguments(
+          output_dir="./llama-lora",
+          num_train_epochs=1,
+          per_device_train_batch_size=4,
+          gradient_accumulation_steps=8,
+          learning_rate=2e-4,
+          fp16=True,
+      )
+
+  - name: "Ewaluacja modelu"
+    icon: "🔬"
+    desc: "Ocena modelu po treningu — prediction loop, macierz konfuzji, analiza błędów na zbiorze testowym"
+    code: |
+      import numpy as np
+      from transformers import Trainer
+
+      # Predykcje na zbiorze testowym
+      predictions, labels, metrics = trainer.predict(test_dataset)
+      print(f"Test metrics: {metrics}")
+
+      # Predykcje jako logity → klasy
+      pred_classes = np.argmax(predictions, axis=-1)
+
+      # Macierz konfuzji
+      from sklearn.metrics import classification_report, confusion_matrix
+      print(classification_report(labels, pred_classes,
+                                  target_names=["Negative", "Positive"]))
+      print(confusion_matrix(labels, pred_classes))
+
+      # Analiza błędów
+      test_data = load_dataset("imdb", split="test")
+      errors = []
+      for i, (pred, true) in enumerate(zip(pred_classes, labels)):
+          if pred != true:
+              errors.append({
+                  "text": test_data[i]["text"][:200],
+                  "predicted": pred,
+                  "true": true,
+              })
+
+      print(f"Liczba błędów: {len(errors)}")
+      for err in errors[:3]:
+          print(f"Predicted: {err['predicted']}, True: {err['true']}")
+          print(err["text"][:100])

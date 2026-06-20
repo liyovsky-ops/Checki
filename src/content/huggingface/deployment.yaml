@@ -1,0 +1,205 @@
+title: "Deployment"
+
+items:
+  - name: "save_pretrained()"
+    icon: "💾"
+    desc: "Zapisz model i tokenizer lokalnie — pełny snapshot wag, konfiguracji i tokenizatora w jednym katalogu"
+    code: |
+      from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+      # Po treningu
+      model_path = "./my-bert-classifier"
+
+      model.save_pretrained(model_path)
+      tokenizer.save_pretrained(model_path)
+
+      # Katalog zawiera:
+      # config.json           - architektura i hyperparametry
+      # model.safetensors     - wagi (lub pytorch_model.bin)
+      # tokenizer_config.json - konfiguracja tokenizatora
+      # vocab.txt             - słownik tokenizatora
+      # special_tokens_map.json
+
+      # Załaduj z powrotem
+      loaded_model = AutoModelForSequenceClassification.from_pretrained(model_path)
+      loaded_tokenizer = AutoTokenizer.from_pretrained(model_path)
+
+      # Szybkie sprawdzenie
+      inputs = loaded_tokenizer("Test sentence", return_tensors="pt")
+      with __import__('torch').no_grad():
+          output = loaded_model(**inputs)
+      print(output.logits)
+
+  - name: "from_pretrained() — lokalnie"
+    icon: "📂"
+    desc: "Ładuj modele offline z lokalnych plików — produkcja bez dostępu do internetu, prywatność danych"
+    code: |
+      from transformers import AutoModel, AutoTokenizer
+      import os
+
+      # Ustaw tryb offline — nie próbuje łączyć z Hub
+      os.environ["TRANSFORMERS_OFFLINE"] = "1"
+      os.environ["HF_DATASETS_OFFLINE"] = "1"
+
+      # Ładuj z lokalnego katalogu
+      model = AutoModel.from_pretrained("/models/bert-base-uncased")
+      tokenizer = AutoTokenizer.from_pretrained("/models/bert-base-uncased")
+
+      # Ładuj z konkretnym urządzeniem
+      import torch
+      device = "cuda" if torch.cuda.is_available() else "cpu"
+
+      model = AutoModel.from_pretrained(
+          "/models/llama-7b",
+          torch_dtype=torch.float16,  # float16 zmniejsza VRAM
+          device_map="auto",          # automatycznie rozdziela na dostępne GPU
+      )
+
+      # Cache Hub — domyślna lokalizacja
+      # Linux: ~/.cache/huggingface/hub/
+      cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+      print(os.listdir(cache_dir))
+
+  - name: "ONNX Export"
+    icon: "📦"
+    desc: "Eksportuj model do ONNX — szybszy inference na CPU, kompatybilność z TensorRT, OpenVINO, ONNX Runtime"
+    code: |
+      from optimum.onnxruntime import ORTModelForSequenceClassification
+      from transformers import AutoTokenizer
+      import onnxruntime as ort
+
+      # Eksport modelu do ONNX przez optimum
+      model = ORTModelForSequenceClassification.from_pretrained(
+          "distilbert-base-uncased-finetuned-sst-2-english",
+          export=True
+      )
+      tokenizer = AutoTokenizer.from_pretrained(
+          "distilbert-base-uncased-finetuned-sst-2-english"
+      )
+
+      # Zapisz model ONNX
+      model.save_pretrained("./onnx_model")
+
+      # Inference przez ONNX Runtime (szybszy na CPU)
+      ort_model = ORTModelForSequenceClassification.from_pretrained("./onnx_model")
+      inputs = tokenizer("This is amazing!", return_tensors="pt")
+
+      import torch
+      with torch.no_grad():
+          outputs = ort_model(**inputs)
+
+      prediction = outputs.logits.argmax(-1).item()
+      labels = {0: "NEGATIVE", 1: "POSITIVE"}
+      print(f"Prediction: {labels[prediction]}")
+
+  - name: "Inference API (Hub)"
+    icon: "🌐"
+    desc: "Korzystaj z modeli przez REST API bez pobierania wag — Inference API Hugging Face lub lokalny Inference Endpoint"
+    code: |
+      import requests
+      import os
+
+      # Klucz API z Hub (Settings -> Access Tokens)
+      HF_TOKEN = os.getenv("HF_TOKEN")
+      MODEL = "distilbert-base-uncased-finetuned-sst-2-english"
+      API_URL = f"https://api-inference.huggingface.co/models/{MODEL}"
+
+      headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+
+      def query(payload):
+          response = requests.post(API_URL, headers=headers, json=payload)
+          return response.json()
+
+      # Klasyfikacja tekstu
+      result = query({"inputs": "Hugging Face is revolutionizing AI!"})
+      print(result)
+      # [[{'label': 'POSITIVE', 'score': 0.9998}]]
+
+      # Generowanie tekstu
+      gen_url = "https://api-inference.huggingface.co/models/gpt2"
+      result = query.__class__(
+          requests.post(gen_url, headers=headers,
+                        json={"inputs": "Once upon a time"}).json()
+      )
+
+      # InferenceClient (oficjalny SDK — lepszy)
+      from huggingface_hub import InferenceClient
+      client = InferenceClient(model=MODEL, token=HF_TOKEN)
+      result = client.text_classification("I love this product!")
+      print(result)
+
+  - name: "Gradio Demo"
+    icon: "🎮"
+    desc: "Zbuduj interaktywne demo modelu w kilku liniach — automatyczne UI, hosting na Hugging Face Spaces"
+    code: |
+      import gradio as gr
+      from transformers import pipeline
+
+      # Załaduj model raz (cache)
+      classifier = pipeline(
+          "text-classification",
+          model="distilbert-base-uncased-finetuned-sst-2-english"
+      )
+
+      def predict(text):
+          result = classifier(text)[0]
+          return {result["label"]: result["score"]}
+
+      # Prosty interface
+      demo = gr.Interface(
+          fn=predict,
+          inputs=gr.Textbox(placeholder="Enter text...", label="Text"),
+          outputs=gr.Label(label="Sentiment"),
+          title="Sentiment Analysis",
+          description="Classify text as POSITIVE or NEGATIVE",
+          examples=[
+              ["This movie is amazing!"],
+              ["The service was terrible."],
+          ]
+      )
+
+      demo.launch(
+          server_port=7860,
+          share=True,      # publiczny link (tunnel przez HF)
+      )
+
+      # Deploy na Spaces — po prostu push repo na Hub
+      # requirements.txt: transformers, gradio, torch
+
+  - name: "torch.compile() i optymalizacja"
+    icon: "⚡"
+    desc: "Przyspiesz inference przez kompilację modelu, quantization i batch processing z optymalnymi ustawieniami"
+    code: |
+      import torch
+      from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+      model = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased")
+      model.eval()
+
+      # torch.compile() — PyTorch 2.0+ (do 2x szybszy)
+      compiled_model = torch.compile(model)
+
+      # 4-bit quantization przez bitsandbytes
+      model_4bit = AutoModelForSequenceClassification.from_pretrained(
+          "bert-base-uncased",
+          load_in_4bit=True,
+          device_map="auto",
+      )
+
+      # Batch inference (szybsze niż pojedyncze przykłady)
+      tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+      texts = ["text 1", "text 2", "text 3"] * 100  # 300 tekstów
+
+      def batch_predict(texts, batch_size=32):
+          results = []
+          for i in range(0, len(texts), batch_size):
+              batch = texts[i:i + batch_size]
+              inputs = tokenizer(batch, padding=True, truncation=True,
+                                 return_tensors="pt")
+              with torch.inference_mode():
+                  logits = model(**inputs).logits
+              results.extend(logits.argmax(-1).tolist())
+          return results
+
+      predictions = batch_predict(texts)
+      print(f"Predicted {len(predictions)} examples")
