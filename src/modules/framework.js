@@ -16,8 +16,11 @@ export function showApp(app) {
     fw.style.display = 'flex';
     btnChecki.classList.remove('active');
     btnFw.classList.add('active');
-    applyFwTheme('search');
-    document.getElementById('fw-search-input')?.focus();
+    applyFwTheme('frontend');
+    setTimeout(() => {
+      const s = document.querySelector('.fw-section[data-theme="frontend"]');
+      if (s) s.scrollIntoView({ behavior: 'instant' });
+    }, 0);
   } else {
     fw.style.display = 'none';
     checki.style.display = 'flex';
@@ -128,3 +131,12 @@ function initScrollTheme() {
   }) : null;
 }
 
+document.addEventListener('DOMContentLoaded', function() {
+  renderTiles('frontend', 'fw-tiles-frontend');
+  renderTiles('backend',  'fw-tiles-backend');
+  renderTiles('database', 'fw-tiles-database');
+  renderTiles('devops',   'fw-tiles-devops');
+  renderTiles('ai',       'fw-tiles-ai');
+  renderTiles('testing',  'fw-tiles-testing');
+  initScrollTheme();
+});
