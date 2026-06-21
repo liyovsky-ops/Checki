@@ -1,0 +1,135 @@
+title: "I/O i serializacja"
+
+items:
+  - name: "np.save / np.load — format .npy"
+    icon: "💾"
+    desc: "Natywny binarny format — najszybszy i najwierniejszy zapis pojedynczej tablicy"
+    code: |
+      import numpy as np
+
+      a = np.arange(1000).reshape(10, 100)
+
+      # Zapis (rozszerzenie .npy dodawane automatycznie)
+      np.save("array.npy", a)
+
+      # Odczyt — odtwarza shape i dtype dokładnie
+      b = np.load("array.npy")
+      print(np.array_equal(a, b))   # True
+
+      # Bezpieczeństwo: allow_pickle=False (domyślnie)
+      c = np.load("array.npy", allow_pickle=False)
+
+      # .npy jest szybsze i mniejsze niż CSV dla danych liczbowych
+
+  - name: "np.savez — wiele tablic w archiwum"
+    icon: "📦"
+    desc: "Pakowanie wielu nazwanych tablic do jednego pliku .npz (z opcjonalną kompresją)"
+    code: |
+      import numpy as np
+
+      X_train = np.random.rand(1000, 20)
+      y_train = np.random.randint(0, 3, 1000)
+
+      # Zapis wielu tablic z nazwami
+      np.savez("dataset.npz", X=X_train, y=y_train)
+
+      # Z kompresją (mniejszy plik, wolniejszy zapis)
+      np.savez_compressed("dataset_c.npz", X=X_train, y=y_train)
+
+      # Odczyt — leniwe ładowanie (dostęp po nazwie)
+      data = np.load("dataset.npz")
+      print(data.files)        # ['X', 'y']
+      X = data["X"]
+      y = data["y"]
+
+  - name: "Tekstowy I/O — CSV"
+    icon: "📄"
+    desc: "Czytelny zapis i odczyt do plików tekstowych — loadtxt, savetxt, genfromtxt"
+    code: |
+      import numpy as np
+
+      a = np.random.rand(5, 3)
+
+      # Zapis do CSV
+      np.savetxt("data.csv", a, delimiter=",", fmt="%.4f",
+                 header="col1,col2,col3", comments="")
+
+      # Odczyt
+      b = np.loadtxt("data.csv", delimiter=",", skiprows=1)
+
+      # genfromtxt — obsługuje brakujące wartości
+      c = np.genfromtxt("data.csv", delimiter=",", skip_header=1,
+                        filling_values=0.0)
+
+      # Dla złożonych CSV (mieszane typy, nagłówki) lepszy pandas.read_csv
+
+  - name: "memmap — dane większe niż RAM"
+    icon: "🗄️"
+    desc: "Mapowanie pliku na dysku jako tablicy — fragmenty ładowane na żądanie"
+    code: |
+      import numpy as np
+
+      # Utwórz duży plik na dysku (np. 10000x10000 float32 = 400MB)
+      mm = np.memmap("big.dat", dtype="float32", mode="w+",
+                     shape=(10000, 10000))
+
+      # Pisz fragmenty — nie ładuje całości do RAM
+      mm[0] = np.arange(10000)
+      mm.flush()   # zapisz zmiany na dysk
+
+      # Odczyt fragmentów (lazy)
+      mm_r = np.memmap("big.dat", dtype="float32", mode="r",
+                       shape=(10000, 10000))
+      chunk = mm_r[100:200]    # ładuje tylko te wiersze
+
+      # Pozwala pracować z tablicami większymi niż pamięć
+
+  - name: "HDF5 przez h5py"
+    icon: "🐘"
+    desc: "Hierarchiczny format dla dużych danych naukowych — grupy, datasety, kompresja, metadane"
+    code: |
+      # pip install h5py
+      import h5py
+      import numpy as np
+
+      # Zapis z kompresją i metadanymi
+      with h5py.File("data.h5", "w") as f:
+          f.create_dataset("X", data=np.random.rand(10000, 50),
+                           compression="gzip", chunks=True)
+          f.create_dataset("y", data=np.arange(10000))
+          f.attrs["created"] = "2026-06-21"   # metadane
+
+      # Odczyt — leniwy, slicing bez ładowania całości
+      with h5py.File("data.h5", "r") as f:
+          print(list(f.keys()))        # ['X', 'y']
+          batch = f["X"][:100]         # ładuje tylko 100 wierszy
+          meta = f.attrs["created"]
+
+  - name: "Konwersja między formatami"
+    icon: "🔄"
+    desc: "Most między NumPy a innymi bibliotekami — Pandas, PyTorch, listy, bajty"
+    code: |
+      import numpy as np
+
+      a = np.arange(12).reshape(3, 4)
+
+      # NumPy <-> Python list
+      lst = a.tolist()
+      back = np.array(lst)
+
+      # NumPy <-> bajty (serializacja niskopoziomowa)
+      raw = a.tobytes()
+      restored = np.frombuffer(raw, dtype=a.dtype).reshape(a.shape)
+
+      # NumPy <-> Pandas
+      # import pandas as pd
+      # df = pd.DataFrame(a)
+      # arr = df.to_numpy()
+
+      # NumPy <-> PyTorch (współdzielona pamięć na CPU!)
+      # import torch
+      # t = torch.from_numpy(a)     # zero-copy
+      # arr = t.numpy()
+
+      # Pickle dla obiektów (ostrożnie — bezpieczeństwo)
+      np.save("obj.npy", np.array([{"k": 1}], dtype=object), allow_pickle=True)

@@ -1,0 +1,123 @@
+title: "Typy danych i struktury"
+
+items:
+  - name: "ndarray — podstawowa struktura"
+    icon: "🧮"
+    desc: "N-wymiarowa tablica jednorodnego typu — ciągły blok pamięci z shape, dtype i strides"
+    code: |
+      import numpy as np
+
+      a = np.arange(24).reshape(2, 3, 4)
+
+      # Atrybuty opisujące tablicę
+      print(a.shape)      # (2, 3, 4) — rozmiary osi
+      print(a.ndim)       # 3 — liczba wymiarów
+      print(a.size)       # 24 — łączna liczba elementów
+      print(a.dtype)      # int64 — typ elementów
+      print(a.itemsize)   # 8 — bajtów na element
+      print(a.nbytes)     # 192 — całkowity rozmiar
+      print(a.strides)    # (96, 32, 8) — kroki w bajtach per oś
+      print(a.flags['C_CONTIGUOUS'])  # czy ciągła w pamięci (row-major)
+
+  - name: "dtype — typy danych"
+    icon: "🔤"
+    desc: "Precyzyjna kontrola typów — int8..int64, float16..float64, complex, bool, datetime"
+    code: |
+      import numpy as np
+
+      # Typy całkowite i zmiennoprzecinkowe
+      i8 = np.array([1, 2], dtype=np.int8)        # -128..127
+      u8 = np.array([1, 2], dtype=np.uint8)       # 0..255 (np. piksele)
+      f32 = np.array([1.0], dtype=np.float32)     # połowa pamięci float64
+      f16 = np.array([1.0], dtype=np.float16)     # half precision (ML/GPU)
+
+      # Boolean i complex
+      mask = np.array([True, False], dtype=bool)
+      c = np.array([1 + 2j], dtype=np.complex128)
+
+      # Konwersja i informacje o typie
+      print(np.finfo(np.float32))   # zakres, epsilon, precyzja
+      print(np.iinfo(np.int32))     # min/max dla intów
+      a32 = f32.astype(np.float64)  # konwersja (kopia)
+
+  - name: "Structured arrays"
+    icon: "🗂️"
+    desc: "Tablice z nazwanymi polami różnych typów — jak tabela/rekord w jednej tablicy"
+    code: |
+      import numpy as np
+
+      # Definicja struktury (jak wiersz tabeli)
+      dt = np.dtype([("name", "U10"), ("age", "i4"), ("weight", "f4")])
+      people = np.array([
+          ("Alice", 30, 65.5),
+          ("Bob", 25, 80.2),
+      ], dtype=dt)
+
+      # Dostęp przez nazwy pól
+      print(people["name"])         # ['Alice' 'Bob']
+      print(people["age"].mean())   # 27.5
+      print(people[0])              # ('Alice', 30, 65.5)
+
+      # Filtrowanie po polu
+      adults = people[people["age"] >= 28]
+      # Dla złożonych danych tabelarycznych lepszy jest pandas
+
+  - name: "Masked arrays"
+    icon: "🎭"
+    desc: "Tablice z maską brakujących/nieprawidłowych wartości — operacje ignorują maskowane elementy"
+    code: |
+      import numpy as np
+      import numpy.ma as ma
+
+      data = np.array([1.0, 2.0, -999, 4.0, -999])
+
+      # Maskuj wartości sentinel (-999 = brak danych)
+      masked = ma.masked_equal(data, -999)
+      print(masked)              # [1.0 2.0 -- 4.0 --]
+      print(masked.mean())       # 2.333 — ignoruje maskowane
+
+      # Maska po warunku
+      m2 = ma.masked_where(data < 0, data)
+      print(m2.compressed())     # [1. 2. 4.] — tylko niemaskowane
+
+      # Operacje automatycznie pomijają maskowane elementy
+      print(masked.sum())        # 7.0
+
+  - name: "matrix (przestarzałe) i alternatywy"
+    icon: "⚠️"
+    desc: "np.matrix był 2D z operatorem * jako mnożenie macierzy — DZIŚ używaj ndarray z @"
+    code: |
+      import numpy as np
+
+      # NIE używaj np.matrix (deprecated) — tu tylko dla świadomości
+      # m = np.matrix([[1, 2], [3, 4]])  # * = mnożenie macierzy
+
+      # POPRAWNIE: zwykły ndarray + operator @
+      A = np.array([[1, 2], [3, 4]])
+      B = np.array([[5, 6], [7, 8]])
+
+      print(A @ B)        # mnożenie macierzy (zalecane)
+      print(A * B)        # mnożenie element-wise
+      print(A.T)          # transpozycja
+      print(np.linalg.matrix_power(A, 3))  # A do potęgi 3
+
+  - name: "Specjalne wartości: NaN, Inf"
+    icon: "♾️"
+    desc: "Obsługa brakujących (NaN) i nieskończoności (Inf) — wykrywanie i operacje odporne"
+    code: |
+      import numpy as np
+
+      a = np.array([1.0, np.nan, 3.0, np.inf, -np.inf])
+
+      # Wykrywanie
+      print(np.isnan(a))     # [False True False False False]
+      print(np.isinf(a))     # [False False False True True]
+      print(np.isfinite(a))  # [True False True False False]
+
+      # Operacje odporne na NaN
+      print(np.nanmean(a[:3]))   # ignoruje NaN
+      print(np.nansum(a[:3]))
+
+      # Zastępowanie
+      clean = np.nan_to_num(a, nan=0.0, posinf=1e10, neginf=-1e10)
+      # NaN nie równa się sobie: np.nan == np.nan -> False!

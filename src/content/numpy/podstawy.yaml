@@ -1,0 +1,97 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać NumPy?
+  firstComponent: Pierwsze kroki z NumPy
+  firstComponentLang: Python
+
+intro:
+  title: Czym jest NumPy?
+  desc: >
+    NumPy to fundament naukowego Pythona — dostarcza wydajną, wielowymiarową tablicę ndarray
+    oraz setki operacji wektorowych pisanych w C. Zamiast wolnych pętli Pythona liczysz na całych
+    tablicach naraz (wektoryzacja). NumPy jest podstawą Pandas, scikit-learn, SciPy, PyTorch i TensorFlow —
+    praktycznie cały stack data science i ML bazuje na jego tablicach i broadcastingu.
+
+concepts:
+  - title: ndarray
+    desc: >
+      N-wymiarowa tablica jednorodnego typu — serce NumPy. Przechowuje dane w ciągłym bloku
+      pamięci, co umożliwia szybkie operacje wektorowe w C. Wszystkie elementy mają ten sam dtype.
+    icon: "🧮"
+  - title: dtype
+    desc: >
+      Typ danych elementów (int32, float64, bool, complex...). Determinuje rozmiar w pamięci
+      i precyzję. Jednorodność dtype to powód, dla którego NumPy jest tak szybki.
+    icon: "🔤"
+  - title: shape i ndim
+    desc: >
+      shape to krotka rozmiarów wzdłuż każdej osi (np. (3, 4)), ndim to liczba wymiarów.
+      Reshaping zmienia interpretację tych samych danych bez ich kopiowania.
+    icon: "📐"
+  - title: strides
+    desc: >
+      Liczba bajtów do przeskoczenia w pamięci, by przejść do następnego elementu wzdłuż osi.
+      Strides pozwalają na widoki (views), transpozycje i slicing bez kopiowania danych.
+    icon: "👣"
+  - title: Broadcasting
+    desc: >
+      Automatyczne dopasowanie tablic o różnych kształtach w operacjach. Mniejsza tablica jest
+      wirtualnie 'rozciągana' do większej bez kopiowania — pisz a + b zamiast pętli.
+    icon: "📡"
+  - title: Wektoryzacja
+    desc: >
+      Operacje na całych tablicach zamiast pętli element po elemencie. Kod jest krótszy
+      i 10-100x szybszy, bo obliczenia wykonują się w skompilowanym C, nie w interpreterze Pythona.
+    icon: "⚡"
+  - title: View vs Copy
+    desc: >
+      Slicing zwraca widok (view) współdzielący pamięć z oryginałem — modyfikacja wpływa na oba.
+      Fancy indexing i .copy() tworzą niezależną kopię. Kluczowe dla wydajności i poprawności.
+    icon: "🪞"
+  - title: ufunc
+    desc: >
+      Universal functions — np.add, np.sin, np.exp działają element-wise na całych tablicach
+      z obsługą broadcastingu, typowania i akumulacji (reduce, accumulate). Napisane w C.
+    icon: "🔧"
+
+whenToUse:
+  - Obliczenia numeryczne na dużych tablicach liczb (wektory, macierze, tensory)
+  - Fundament pod Pandas, scikit-learn, SciPy, PyTorch — manipulacja danymi
+  - Algebra liniowa — mnożenie macierzy, rozkłady, układy równań
+  - Przetwarzanie sygnałów i obrazów (obraz = tablica pikseli)
+  - Symulacje naukowe i Monte Carlo (np.random)
+  - Wektoryzacja wolnych pętli Pythona dla przyspieszenia 10-100x
+  - Statystyka opisowa i agregacje na danych liczbowych
+  - Preprocessing danych przed treningiem modeli ML
+
+firstComponent: |
+  import numpy as np
+
+  # Tworzenie tablic
+  a = np.array([1, 2, 3, 4])           # 1D z listy
+  b = np.arange(12).reshape(3, 4)      # 2D: 0..11 w kształcie 3x4
+  zeros = np.zeros((2, 3))             # same zera
+  rng = np.random.default_rng(42)      # nowoczesny generator losowy
+  r = rng.standard_normal((3, 3))      # losowe N(0,1)
+
+  print(b.shape, b.dtype, b.ndim)      # (3, 4) int64 2
+
+  # Wektoryzacja — bez pętli!
+  squared = a ** 2                     # [1, 4, 9, 16]
+  total = a.sum()                      # 10
+  mean_per_col = b.mean(axis=0)        # średnia po kolumnach
+
+  # Broadcasting — różne kształty
+  matrix = np.ones((3, 4))
+  row = np.array([10, 20, 30, 40])
+  result = matrix + row                # row dodany do każdego wiersza
+
+  # Indeksowanie i slicing
+  print(b[1, 2])                       # element wiersz 1, kolumna 2
+  print(b[:, 0])                       # cała pierwsza kolumna
+  print(b[b > 5])                      # boolean masking — elementy > 5
+
+  # Algebra liniowa
+  A = np.array([[1, 2], [3, 4]])
+  print(A @ A)                         # mnożenie macierzy
+  print(np.linalg.inv(A))              # odwrotność

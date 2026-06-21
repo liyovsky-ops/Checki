@@ -1,0 +1,145 @@
+title: "Tablice i operacje"
+
+items:
+  - name: "Tworzenie tablic"
+    icon: "🧱"
+    desc: "Wiele sposobów inicjalizacji — z danych, fabryki, sekwencje, losowe"
+    code: |
+      import numpy as np
+
+      # Z danych Pythona
+      a = np.array([1, 2, 3])
+      b = np.array([[1, 2], [3, 4]])
+
+      # Fabryki stałych
+      zeros = np.zeros((3, 4))
+      ones = np.ones((2, 3))
+      full = np.full((2, 2), 7)
+      empty = np.empty((3, 3))     # niezainicjalizowana (szybka)
+
+      # Sekwencje
+      r = np.arange(0, 10, 2)      # [0 2 4 6 8]
+      lin = np.linspace(0, 1, 5)   # [0. 0.25 0.5 0.75 1.]
+
+      # Jak istniejąca tablica
+      like = np.zeros_like(b)      # zera w kształcie b
+
+      # Losowe
+      rng = np.random.default_rng(0)
+      rand = rng.standard_normal((3, 3))
+
+  - name: "Reshape i zmiana wymiarów"
+    icon: "📐"
+    desc: "Reinterpretacja danych w nowym kształcie — reshape, ravel, flatten, newaxis"
+    code: |
+      import numpy as np
+
+      a = np.arange(12)
+
+      # Reshape (zwykle widok — bez kopiowania)
+      m = a.reshape(3, 4)
+      auto = a.reshape(2, -1)      # -1 = oblicz automatycznie -> (2, 6)
+
+      # Spłaszczanie
+      flat_view = m.ravel()        # widok 1D (jeśli możliwe)
+      flat_copy = m.flatten()      # zawsze kopia 1D
+
+      # Dodawanie/usuwanie osi
+      col = a[:, None]             # (12,) -> (12, 1)
+      expanded = np.expand_dims(a, axis=0)  # (1, 12)
+      squeezed = col.squeeze()    # usuń wymiary rozmiaru 1
+
+      print(m.shape, col.shape, squeezed.shape)
+
+  - name: "Stacking i łączenie"
+    icon: "🔗"
+    desc: "Składanie tablic — concatenate, stack, vstack, hstack, column_stack"
+    code: |
+      import numpy as np
+
+      a = np.array([[1, 2], [3, 4]])
+      b = np.array([[5, 6], [7, 8]])
+
+      # Concatenate wzdłuż istniejącej osi
+      v = np.concatenate([a, b], axis=0)   # (4, 2) — wiersze
+      h = np.concatenate([a, b], axis=1)   # (2, 4) — kolumny
+
+      # Wygodne aliasy
+      print(np.vstack([a, b]).shape)       # (4, 2)
+      print(np.hstack([a, b]).shape)       # (2, 4)
+
+      # Stack TWORZY nową oś
+      s = np.stack([a, b], axis=0)         # (2, 2, 2)
+
+      # Sklejanie 1D jako kolumny
+      x, y = np.array([1, 2, 3]), np.array([4, 5, 6])
+      print(np.column_stack([x, y]))       # [[1 4] [2 5] [3 6]]
+
+  - name: "Splitting — dzielenie tablic"
+    icon: "✂️"
+    desc: "Podział tablicy na części — split, array_split, hsplit, vsplit"
+    code: |
+      import numpy as np
+
+      a = np.arange(12).reshape(4, 3)
+
+      # Równy podział (split wymaga równych części)
+      parts = np.split(a, 2, axis=0)       # 2 tablice po 2 wiersze
+
+      # Nierówny podział
+      uneven = np.array_split(np.arange(10), 3)  # [4, 3, 3] elementy
+
+      # Podział po indeksach
+      at_idx = np.split(np.arange(10), [3, 7])   # [0:3], [3:7], [7:]
+
+      # Poziomy / pionowy
+      left, right = np.hsplit(a, [1])      # kolumny [0] i [1:]
+      top, bottom = np.vsplit(a, [2])      # wiersze [0:2] i [2:]
+
+  - name: "Operacje wektorowe (ufunc)"
+    icon: "⚡"
+    desc: "Operacje element-wise na całych tablicach — bez pętli, w skompilowanym C"
+    code: |
+      import numpy as np
+
+      a = np.array([1.0, 4.0, 9.0, 16.0])
+
+      # Element-wise — cała tablica naraz
+      print(np.sqrt(a))        # [1. 2. 3. 4.]
+      print(a ** 2)
+      print(np.exp(a))
+      print(np.log(a))
+
+      # Porównanie z pętlą (NumPy 10-100x szybszy)
+      b = a * 2 + 1            # zamiast for w pętli
+
+      # ufunc methods
+      print(np.add.reduce(a))      # suma (jak a.sum())
+      print(np.add.accumulate(a))  # cumsum
+      print(np.maximum.reduce(a))  # max
+
+      # In-place dla oszczędności pamięci
+      np.sqrt(a, out=a)
+
+  - name: "Agregacje po osiach"
+    icon: "📊"
+    desc: "Redukcje wzdłuż wybranych osi — sum, mean, max z parametrem axis i keepdims"
+    code: |
+      import numpy as np
+
+      a = np.arange(12).reshape(3, 4)
+
+      # axis=0 redukuje wiersze (wynik per kolumna)
+      print(a.sum(axis=0))     # [12 15 18 21]
+      # axis=1 redukuje kolumny (wynik per wiersz)
+      print(a.sum(axis=1))     # [6 22 38]
+      # bez axis — cała tablica
+      print(a.sum())           # 66
+
+      # keepdims zachowuje wymiar (do broadcastingu)
+      col_mean = a.mean(axis=1, keepdims=True)  # (3, 1)
+      centered = a - col_mean                    # broadcasting
+
+      # Wiele osi naraz
+      b = np.arange(24).reshape(2, 3, 4)
+      print(b.sum(axis=(1, 2)))  # redukuj 2 osie

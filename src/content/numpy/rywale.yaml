@@ -1,0 +1,78 @@
+title: "NumPy vs inne podejścia"
+
+items:
+  - name: "Python lists"
+    icon: "🐍"
+    color: "#ffd43b"
+    tagline: "Wbudowane listy Pythona — elastyczne, ale wolne i pamięciożerne dla liczb"
+    pros:
+      - "Wbudowane, bez instalacji"
+      - "Heterogeniczne — mogą mieszać typy"
+      - "Dynamiczne — łatwe dodawanie/usuwanie elementów"
+      - "Wystarczające dla małych, nieliczbowych danych"
+    cons:
+      - "10-100x wolniejsze od NumPy dla operacji numerycznych"
+      - "Brak wektoryzacji — wymagają pętli"
+      - "Duży narzut pamięci (każdy element to obiekt Pythona)"
+      - "Brak broadcastingu, algebry liniowej, operacji wielowymiarowych"
+    vs: "Listy dla małych, mieszanych kolekcji i logiki sterującej. NumPy gdy liczysz na liczbach — wektoryzacja daje ogromne przyspieszenie. Konwersja list -> np.array jednorazowa, potem operacje wektorowe."
+
+  - name: "Pandas"
+    icon: "🐼"
+    color: "#150458"
+    tagline: "Tabelaryczne dane z etykietami — zbudowany NA NumPy, dodaje indeksy i typy mieszane"
+    pros:
+      - "Etykietowane wiersze/kolumny (DataFrame, Series)"
+      - "Mieszane typy w kolumnach, obsługa brakujących danych"
+      - "Wczytywanie CSV/Excel/SQL, groupby, join, pivot"
+      - "Bogate operacje na danych tabelarycznych i czasowych"
+    cons:
+      - "Wolniejszy i cięższy niż czysty NumPy"
+      - "Narzut na operacjach czysto numerycznych"
+      - "Większe zużycie pamięci"
+    vs: "Komplementarne — Pandas bazuje na NumPy. Pandas dla danych tabelarycznych z etykietami i mieszanymi typami; NumPy dla czystych obliczeń numerycznych i tablic wielowymiarowych. df.to_numpy() gdy potrzebujesz wydajności."
+
+  - name: "PyTorch tensors"
+    icon: "🔥"
+    color: "#ee4c2c"
+    tagline: "Tensory z GPU i autogradem — API wzorowane na NumPy, do deep learningu"
+    pros:
+      - "Akceleracja GPU/TPU (NumPy tylko CPU)"
+      - "Automatyczne różniczkowanie (autograd)"
+      - "API bardzo podobne do NumPy — łatwa migracja"
+      - "Niezbędne dla sieci neuronowych"
+    cons:
+      - "Cięższa instalacja i zależności"
+      - "Przesada dla zwykłych obliczeń numerycznych na CPU"
+      - "Inny ekosystem niż klasyczne scientific Python"
+    vs: "torch.from_numpy i .numpy() konwertują zero-copy na CPU. NumPy dla klasycznych obliczeń CPU i preprocessingu; PyTorch gdy potrzebujesz GPU lub gradientów. Wiele kodu NumPy działa prawie bez zmian w PyTorch."
+
+  - name: "TensorFlow / JAX arrays"
+    icon: "🧠"
+    color: "#ff6f00"
+    tagline: "Tablice frameworków ML — JIT, GPU/TPU, JAX prawie kopiuje API NumPy"
+    pros:
+      - "JAX: jax.numpy to niemal drop-in replacement NumPy + JIT/grad/vmap"
+      - "GPU/TPU acceleration i kompilacja XLA"
+      - "Automatyczne różniczkowanie wyższych rzędów (JAX)"
+      - "vmap/pmap — automatyczna wektoryzacja i parallelizm"
+    cons:
+      - "JAX: immutable arrays (inne podejście niż in-place NumPy)"
+      - "Cięższy stack, dłuższe czasy startu (kompilacja)"
+      - "Przesada dla prostych zadań CPU"
+    vs: "JAX to w zasadzie NumPy na sterydach — ten sam interfejs plus JIT, grad i GPU/TPU. Dla prototypowania i klasycznych obliczeń NumPy prostszy; dla wydajności na akceleratorach z autogradem — JAX. import jax.numpy as jnp i większość kodu działa."
+
+  - name: "CuPy"
+    icon: "⚡"
+    color: "#76b900"
+    tagline: "NumPy na GPU od NVIDIA — niemal identyczne API, ale liczone na CUDA"
+    pros:
+      - "Drop-in replacement: import cupy as cp zamiast numpy"
+      - "Ogromne przyspieszenie na dużych tablicach (GPU)"
+      - "Wspiera większość funkcji NumPy i SciPy"
+      - "Łatwa migracja istniejącego kodu NumPy"
+    cons:
+      - "Wymaga karty NVIDIA i CUDA"
+      - "Narzut transferu CPU<->GPU dla małych danych"
+      - "Nie wszystkie funkcje NumPy zaimplementowane"
+    vs: "CuPy to NumPy na GPU — ten sam kod, inne urządzenie. NumPy dla CPU i małych danych (transfer GPU się nie opłaca); CuPy dla dużych tablic gdy masz GPU NVIDIA. cp.asnumpy() i cp.asarray() do konwersji."

@@ -1,0 +1,144 @@
+title: "Ekosystem NumPy"
+
+items:
+  - name: "SciPy"
+    icon: "🔬"
+    desc: "Naukowe rozszerzenie NumPy — optymalizacja, statystyka, sygnały, sparse, całki, interpolacja"
+    code: |
+      # pip install scipy
+      from scipy import optimize, stats, signal, sparse
+      from scipy.spatial.distance import cdist
+      import numpy as np
+
+      # Optymalizacja — minimalizacja funkcji
+      res = optimize.minimize(lambda x: (x - 3)**2, x0=0)
+      print(res.x)              # ~3
+
+      # Statystyka — testy, rozkłady
+      t, p = stats.ttest_ind(np.random.randn(100), np.random.randn(100))
+      print(stats.norm.cdf(1.96))   # dystrybuanta
+
+      # Macierze rzadkie (efektywne dla danych z wieloma zerami)
+      M = sparse.csr_matrix(np.eye(1000))
+
+      # Odległości między zbiorami punktów (szybsze niż broadcasting)
+      D = cdist(np.random.rand(100, 3), np.random.rand(50, 3))
+
+  - name: "Pandas"
+    icon: "🐼"
+    desc: "Tabelaryczne dane zbudowane na NumPy — DataFrame, etykiety, mieszane typy, I/O"
+    code: |
+      # pip install pandas
+      import pandas as pd
+      import numpy as np
+
+      # Pandas bazuje na ndarray pod spodem
+      df = pd.DataFrame(np.random.rand(5, 3), columns=["a", "b", "c"])
+
+      # Most NumPy <-> Pandas
+      arr = df.to_numpy()              # DataFrame -> ndarray
+      df2 = pd.DataFrame(arr)          # ndarray -> DataFrame
+
+      # Operacje NumPy działają na kolumnach
+      df["d"] = np.log1p(df["a"])
+      df["scaled"] = (df["a"] - df["a"].mean()) / df["a"].std()
+
+      # values to czysty ndarray (do scikit-learn itp.)
+      X = df[["a", "b", "c"]].values
+
+  - name: "CuPy — NumPy na GPU"
+    icon: "⚡"
+    desc: "Drop-in replacement NumPy działający na GPU NVIDIA przez CUDA — to samo API"
+    code: |
+      # pip install cupy-cuda12x
+      import cupy as cp
+      import numpy as np
+
+      # Ten sam kod co NumPy, ale na GPU
+      a_gpu = cp.random.rand(10000, 10000)
+      b_gpu = cp.random.rand(10000, 10000)
+      c_gpu = a_gpu @ b_gpu            # mnożenie na GPU (szybkie!)
+
+      # Transfer CPU <-> GPU
+      a_cpu = np.random.rand(1000, 1000)
+      a_gpu = cp.asarray(a_cpu)        # CPU -> GPU
+      result = cp.asnumpy(c_gpu)       # GPU -> CPU
+
+      # Większość funkcji NumPy ma odpowiednik w cp.*
+      print(cp.linalg.norm(a_gpu))
+
+  - name: "Numba — kompilacja JIT"
+    icon: "🚀"
+    desc: "Kompiluje funkcje NumPy/Python do kodu maszynowego — przyspieszenie pętli bez przepisywania na C"
+    code: |
+      # pip install numba
+      from numba import njit, prange
+      import numpy as np
+
+      # @njit kompiluje funkcję do natywnego kodu
+      @njit
+      def sum_squares(arr):
+          total = 0.0
+          for x in arr:           # pętla jest OK — Numba ją skompiluje!
+              total += x * x
+          return total
+
+      a = np.random.rand(1_000_000)
+      print(sum_squares(a))       # szybkie jak C po pierwszym wywołaniu
+
+      # Parallel z prange
+      @njit(parallel=True)
+      def parallel_op(arr):
+          out = np.empty_like(arr)
+          for i in prange(len(arr)):
+              out[i] = arr[i] ** 2 + np.sin(arr[i])
+          return out
+
+  - name: "JAX — NumPy + autograd + JIT"
+    icon: "🧠"
+    desc: "API NumPy z automatycznym różniczkowaniem, kompilacją JIT i akceleracją GPU/TPU"
+    code: |
+      # pip install jax
+      import jax.numpy as jnp
+      from jax import grad, jit, vmap
+      import numpy as np
+
+      # jnp to niemal drop-in replacement numpy
+      x = jnp.array([1.0, 2.0, 3.0])
+      y = jnp.sum(x ** 2)
+
+      # Automatyczne różniczkowanie
+      f = lambda x: jnp.sum(x ** 2)
+      df = grad(f)
+      print(df(x))                # [2. 4. 6.]
+
+      # JIT compilation — przyspieszenie
+      fast_f = jit(f)
+
+      # vmap — automatyczna wektoryzacja funkcji
+      batched = vmap(f)(jnp.ones((10, 3)))
+
+      # Uwaga: JAX arrays są immutable (inaczej niż NumPy)
+
+  - name: "Dask — NumPy na danych większych niż RAM"
+    icon: "🗂️"
+    desc: "Równoległe, leniwe tablice z API NumPy — przetwarzanie danych większych niż pamięć i klastry"
+    code: |
+      # pip install dask
+      import dask.array as da
+      import numpy as np
+
+      # Tablica podzielona na bloki (chunks) — leniwa
+      x = da.random.random((100000, 100000), chunks=(10000, 10000))
+
+      # Operacje jak w NumPy, ale leniwe (graf zadań)
+      result = (x + x.T).mean(axis=0)
+
+      # Obliczenie dopiero przy .compute()
+      value = result.compute()        # wykonuje równolegle, blokami
+
+      # Konwersja z NumPy
+      arr = np.ones((1000, 1000))
+      dx = da.from_array(arr, chunks=(100, 100))
+
+      # Pozwala pracować z tablicami większymi niż RAM i na klastrach
