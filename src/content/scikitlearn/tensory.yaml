@@ -1,0 +1,124 @@
+title: "Typy danych"
+
+items:
+  - name: "Feature matrix X i target y"
+    icon: "🧮"
+    desc: "Fundamentalna konwencja sklearn — X to macierz cech 2D, y to wektor celu 1D"
+    code: |
+      import numpy as np
+
+      # X: (n_samples, n_features) — ZAWSZE 2D
+      X = np.array([
+          [5.1, 3.5, 1.4, 0.2],
+          [4.9, 3.0, 1.4, 0.2],
+          [6.3, 3.3, 6.0, 2.5],
+      ])  # 3 próbki, 4 cechy
+
+      # y: (n_samples,) — 1D wektor etykiet/wartości
+      y = np.array([0, 0, 2])
+
+      print(X.shape)  # (3, 4)
+      print(y.shape)  # (3,)
+
+      # Pojedyncza próbka MUSI być 2D do predict
+      single = X[0].reshape(1, -1)   # (1, 4)
+      # clf.predict(single)
+
+  - name: "NumPy arrays"
+    icon: "🔢"
+    desc: "Domyślny format danych w sklearn — gęste tablice numpy float64"
+    code: |
+      import numpy as np
+      from sklearn.preprocessing import StandardScaler
+
+      X = np.random.randn(1000, 20).astype(np.float64)
+
+      # Większość transformerów zwraca numpy array
+      X_scaled = StandardScaler().fit_transform(X)
+      print(type(X_scaled))      # <class 'numpy.ndarray'>
+      print(X_scaled.dtype)      # float64
+
+      # Konwersja typu dla oszczędności pamięci (np. dla ONNX)
+      X32 = X.astype(np.float32)
+
+  - name: "Sparse matrices"
+    icon: "🕸️"
+    desc: "Rzadkie macierze SciPy — efektywne dla danych z dużą liczbą zer (tekst, one-hot)"
+    code: |
+      from sklearn.feature_extraction.text import TfidfVectorizer
+      from scipy.sparse import csr_matrix
+
+      docs = ["machine learning", "deep learning", "learning python"]
+
+      # TfidfVectorizer zwraca sparse matrix (CSR)
+      X_sparse = TfidfVectorizer().fit_transform(docs)
+      print(type(X_sparse))      # scipy.sparse._csr.csr_matrix
+      print(X_sparse.shape)      # (3, n_words)
+      print(X_sparse.nnz)        # liczba niezerowych elementów
+
+      # Wiele modeli obsługuje sparse natywnie (LogisticRegression, SVM, NB)
+      X_dense = X_sparse.toarray()   # konwersja do gęstej (ostrożnie z pamięcią!)
+
+  - name: "Pandas DataFrames"
+    icon: "🐼"
+    desc: "DataFrame jako wejście — sklearn akceptuje DataFrame i może zachować nazwy kolumn"
+    code: |
+      import pandas as pd
+      from sklearn import set_config
+      from sklearn.preprocessing import StandardScaler
+
+      df = pd.DataFrame({
+          "age": [25, 32, 47],
+          "income": [50000, 60000, 80000],
+          "city": ["A", "B", "A"],
+      })
+
+      X = df[["age", "income"]]
+      y = df["city"]
+
+      # Zachowaj DataFrame na wyjściu transformerów
+      set_config(transform_output="pandas")
+      X_scaled = StandardScaler().fit_transform(X)
+      print(X_scaled.columns.tolist())   # ['age', 'income']
+
+  - name: "Target: klasyfikacja vs regresja"
+    icon: "🎯"
+    desc: "Format y zależy od zadania — etykiety klas, wartości ciągłe lub multi-output"
+    code: |
+      import numpy as np
+
+      # Klasyfikacja binarna: 0/1
+      y_binary = np.array([0, 1, 1, 0])
+
+      # Klasyfikacja wieloklasowa: 0..n_classes-1
+      y_multi = np.array([0, 2, 1, 2])
+
+      # Multi-label (multilabel-indicator)
+      y_multilabel = np.array([[1, 0, 1], [0, 1, 0]])
+
+      # Regresja: wartości ciągłe
+      y_reg = np.array([3.2, 5.1, 2.8])
+
+      # Multi-output regression: (n_samples, n_targets)
+      y_multireg = np.array([[1.0, 2.0], [3.0, 4.0]])
+
+  - name: "Wbudowane datasety i generatory"
+    icon: "📦"
+    desc: "sklearn.datasets — gotowe zbiory do nauki i generatory danych syntetycznych"
+    code: |
+      from sklearn.datasets import (
+          load_iris, load_diabetes, fetch_openml,
+          make_classification, make_blobs, make_regression,
+      )
+
+      # Toy datasets
+      X, y = load_iris(return_X_y=True)
+      X, y = load_iris(return_X_y=True, as_frame=True)   # jako DataFrame
+
+      # Pobierz prawdziwy dataset z OpenML
+      mnist = fetch_openml("mnist_784", version=1, as_frame=False)
+
+      # Generatory syntetyczne — kontrola trudności
+      X, y = make_classification(n_samples=1000, n_features=20,
+                                  n_informative=15, n_classes=3, weights=[0.7, 0.2, 0.1])
+      X, y = make_blobs(n_samples=300, centers=4, cluster_std=1.0)

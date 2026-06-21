@@ -1,0 +1,77 @@
+title: "Scikit-learn vs inne biblioteki ML"
+
+items:
+  - name: "XGBoost"
+    icon: "🚀"
+    color: "#137cbd"
+    tagline: "Gradient boosting o najwyższej dokładności — król konkursów Kaggle na danych tabelarycznych"
+    pros:
+      - "Zwykle najwyższa dokładność na danych tabelarycznych"
+      - "Natywna obsługa braków, regularyzacja, wczesne zatrzymanie"
+      - "API zgodne ze sklearn — działa w Pipeline i GridSearchCV"
+      - "GPU acceleration i trening rozproszony"
+    cons:
+      - "Więcej hiperparametrów do strojenia niż RandomForest"
+      - "Wolniejszy trening niż HistGradientBoosting na CPU"
+      - "Osobna zależność (nie wbudowane w sklearn)"
+    vs: "XGBoost przewyższa dokładnością modele sklearn na danych tabelarycznych, ale sklearn ma HistGradientBoosting jako wbudowaną, szybką alternatywę. W praktyce: prototypuj w sklearn, sięgnij po XGBoost gdy walczysz o ostatnie procenty."
+
+  - name: "LightGBM"
+    icon: "💡"
+    color: "#9acd32"
+    tagline: "Boosting od Microsoftu — najszybszy na bardzo dużych danych, leaf-wise growth"
+    pros:
+      - "Najszybszy trening na dużych datasetach (miliony wierszy)"
+      - "Niskie zużycie pamięci dzięki binowaniu histogramowemu"
+      - "Natywna obsługa cech kategorycznych (bez one-hot)"
+      - "API zgodne ze sklearn"
+    cons:
+      - "Leaf-wise growth łatwiej przeucza na małych danych"
+      - "Czulszy na hiperparametry (num_leaves, min_child_samples)"
+      - "Osobna zależność"
+    vs: "LightGBM bije sklearn i często XGBoost na szybkości przy dużych danych. sklearn's HistGradientBoosting jest nim mocno inspirowany. Wybierz LightGBM dla milionów wierszy, sklearn dla wygody i mniejszych zbiorów."
+
+  - name: "CatBoost"
+    icon: "🐈"
+    color: "#ffcc00"
+    tagline: "Boosting od Yandex — mistrz cech kategorycznych, świetne wyniki bez tuningu"
+    pros:
+      - "Najlepsza natywna obsługa cech kategorycznych (ordered target encoding)"
+      - "Bardzo dobre domyślne hiperparametry — działa bez tuningu"
+      - "Odporny na przeuczenie, wsparcie GPU"
+      - "API zgodne ze sklearn"
+    cons:
+      - "Wolniejszy trening niż LightGBM"
+      - "Większy rozmiar modeli"
+      - "Osobna zależność, mniejsza społeczność"
+    vs: "CatBoost wygrywa ze sklearn gdy masz dużo cech kategorycznych i mało czasu na tuning. sklearn wymaga ręcznego OneHotEncoder/OrdinalEncoder. Dla szybkiego, mocnego baseline na danych z kategoriami — CatBoost."
+
+  - name: "PyTorch / TensorFlow (deep learning)"
+    icon: "🔥"
+    color: "#ee4c2c"
+    tagline: "Frameworki głębokiego uczenia — sieci neuronowe na surowych danych (obraz, tekst, audio)"
+    pros:
+      - "Niezbędne dla obrazów, tekstu, audio, sekwencji"
+      - "GPU/TPU, automatyczne różniczkowanie, dowolne architektury"
+      - "Skalują na ogromne datasety i modele (miliardy parametrów)"
+      - "Transfer learning z pre-trained modeli"
+    cons:
+      - "Przesada dla małych danych tabelarycznych"
+      - "Wymagają więcej kodu, danych i mocy obliczeniowej"
+      - "Trudniejsze w debugowaniu i interpretacji"
+    vs: "Komplementarne, nie konkurencyjne. sklearn dla danych tabelarycznych i klasycznego ML; PyTorch/TF dla deep learningu na surowych danych. Na tabelach drzewa (XGBoost/sklearn) wciąż często biją sieci neuronowe."
+
+  - name: "statsmodels"
+    icon: "📐"
+    color: "#3b5998"
+    tagline: "Statystyka inferencyjna — modele z p-wartościami, przedziałami ufności i testami"
+    pros:
+      - "Pełna inferencja statystyczna (p-wartości, CI, testy hipotez)"
+      - "Bogate podsumowania regresji (summary() jak w R)"
+      - "Modele szeregów czasowych (ARIMA, SARIMAX, VAR)"
+      - "Formuły w stylu R (y ~ x1 + x2)"
+    cons:
+      - "Skupiony na wnioskowaniu, nie na predykcji/skali"
+      - "Brak spójnego fit/predict API jak w sklearn"
+      - "Brak narzędzi ML (CV, pipeline, tuning)"
+    vs: "statsmodels gdy potrzebujesz WYJAŚNIĆ (które cechy istotne, p-wartości); sklearn gdy chcesz PRZEWIDYWAĆ jak najlepiej. Ekonometria i badania -> statsmodels; produkcyjny ML -> sklearn."

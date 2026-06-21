@@ -1,0 +1,126 @@
+title: "Deployment"
+
+items:
+  - name: "joblib.dump / joblib.load"
+    icon: "💾"
+    desc: "Standardowy zapis i wczytanie modeli sklearn — zawsze zapisuj CAŁY pipeline"
+    code: |
+      import joblib
+
+      # Zapisz cały pipeline (preprocessing + model)
+      joblib.dump(pipeline, "model.joblib", compress=3)
+
+      # Wczytaj — gotowy do predict bez ręcznego preprocessingu
+      model = joblib.load("model.joblib")
+      preds = model.predict(X_new)
+
+      # Zapisz metadane razem z modelem
+      bundle = {
+          "model": pipeline,
+          "sklearn_version": sklearn.__version__,
+          "features": feature_names,
+          "trained_at": "2026-06-21",
+      }
+      joblib.dump(bundle, "model_bundle.joblib")
+
+  - name: "Eksport do ONNX"
+    icon: "🔄"
+    desc: "Konwersja do ONNX — uruchamiaj model w C++, .NET, Java, przeglądarce bez sklearn"
+    code: |
+      # pip install skl2onnx onnxruntime
+      import numpy as np
+      from skl2onnx import to_onnx
+      import onnxruntime as rt
+
+      # Konwersja (podaj przykładowy input dla kształtów)
+      onx = to_onnx(pipeline, X_train[:1].astype(np.float32))
+      with open("model.onnx", "wb") as f:
+          f.write(onx.SerializeToString())
+
+      # Inferencja przez ONNX Runtime — bez instalacji sklearn
+      sess = rt.InferenceSession("model.onnx")
+      input_name = sess.get_inputs()[0].name
+      preds = sess.run(None, {input_name: X_new.astype(np.float32)})[0]
+
+  - name: "Eksport do PMML"
+    icon: "📜"
+    desc: "PMML — XML-owy standard ML dla środowisk enterprise / Java (Spark, JPMML)"
+    code: |
+      # pip install sklearn2pmml  (wymaga zainstalowanej Javy)
+      from sklearn2pmml import sklearn2pmml
+      from sklearn2pmml.pipeline import PMMLPipeline
+      from sklearn.ensemble import RandomForestClassifier
+
+      pipeline = PMMLPipeline([
+          ("classifier", RandomForestClassifier(n_estimators=200)),
+      ])
+      pipeline.fit(X_train, y_train)
+
+      sklearn2pmml(pipeline, "model.pmml", with_repr=True)
+      # Plik .pmml uruchamiany w JPMML, Spark MLlib, KNIME, SAS
+
+  - name: "Serwowanie przez FastAPI"
+    icon: "🚀"
+    desc: "REST API dla modelu — wczytaj raz na starcie, endpoint /predict zwraca predykcje"
+    code: |
+      # app.py
+      import joblib
+      import numpy as np
+      from fastapi import FastAPI
+      from pydantic import BaseModel
+
+      app = FastAPI()
+      model = joblib.load("model.joblib")   # raz, globalnie
+
+      class Features(BaseModel):
+          values: list[float]
+
+      @app.post("/predict")
+      def predict(payload: Features):
+          X = np.array(payload.values).reshape(1, -1)
+          pred = model.predict(X)[0]
+          proba = model.predict_proba(X)[0].tolist()
+          return {"prediction": int(pred), "probabilities": proba}
+
+      # uvicorn app:app --host 0.0.0.0 --port 8000
+
+  - name: "Konteneryzacja przez Docker"
+    icon: "🐳"
+    desc: "Spakuj model + API w obraz Dockera dla powtarzalnego deploymentu"
+    code: |
+      # Dockerfile
+      # FROM python:3.12-slim
+      # WORKDIR /app
+      # COPY requirements.txt .
+      # RUN pip install --no-cache-dir -r requirements.txt
+      # COPY model.joblib app.py ./
+      # CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+      # requirements.txt
+      # scikit-learn==1.5.0   <- PRZYPNIJ tę samą wersję co przy treningu!
+      # fastapi
+      # uvicorn
+      # joblib
+
+      # docker build -t ml-model .
+      # docker run -p 8000:8000 ml-model
+
+  - name: "Wersjonowanie i reprodukowalność"
+    icon: "📌"
+    desc: "Kluczowe zasady produkcyjne — przypnij wersje, loguj metadane, monitoruj drift"
+    code: |
+      import sklearn, joblib
+
+      # 1) Przypnij wersję sklearn — modele NIE są kompatybilne między wersjami
+      print("Trenowano na:", sklearn.__version__)
+
+      # 2) Zapisz schemat danych (kolejność i nazwy cech)
+      metadata = {
+          "feature_names": list(X_train.columns),
+          "sklearn_version": sklearn.__version__,
+          "metrics": {"f1_macro": 0.92},
+      }
+      joblib.dump({"model": pipeline, "meta": metadata}, "model.joblib")
+
+      # 3) Wczytuj tylko zaufane pliki (joblib wykonuje kod przy load)
+      # 4) Monitoruj data drift w produkcji (np. evidently, alibi-detect)

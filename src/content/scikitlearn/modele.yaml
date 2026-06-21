@@ -1,0 +1,232 @@
+title: "Modele"
+
+items:
+  - name: "LinearRegression / Ridge / Lasso"
+    icon: "📈"
+    desc: "Modele liniowe do regresji — szybkie, interpretowalne, z regularyzacją L1/L2"
+    code: |
+      from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
+
+      # Zwykła regresja (OLS)
+      lr = LinearRegression().fit(X_train, y_train)
+      print("Współczynniki:", lr.coef_)
+      print("R²:", lr.score(X_test, y_test))
+
+      # Ridge — regularyzacja L2 (przeciw współliniowości)
+      ridge = Ridge(alpha=1.0).fit(X_train, y_train)
+
+      # Lasso — regularyzacja L1 (selekcja cech, zeruje wagi)
+      lasso = Lasso(alpha=0.1).fit(X_train, y_train)
+      print("Niezerowych cech:", (lasso.coef_ != 0).sum())
+
+      # ElasticNet — kombinacja L1 + L2
+      enet = ElasticNet(alpha=0.1, l1_ratio=0.5).fit(X_train, y_train)
+
+  - name: "LogisticRegression"
+    icon: "🎯"
+    desc: "Liniowy klasyfikator zwracający prawdopodobieństwa — najlepszy baseline klasyfikacji"
+    code: |
+      from sklearn.linear_model import LogisticRegression
+
+      clf = LogisticRegression(
+          C=1.0,                    # odwrotność siły regularyzacji
+          max_iter=1000,
+          class_weight="balanced",  # dla niezbalansowanych klas
+          n_jobs=-1,
+      ).fit(X_train, y_train)
+
+      proba = clf.predict_proba(X_test)   # (n_samples, n_classes)
+      preds = clf.predict(X_test)
+      print("Współczynniki:", clf.coef_.shape)
+
+      # Multinomial dla wielu klas
+      multi = LogisticRegression(multi_class="multinomial").fit(X_train, y_train)
+
+  - name: "RandomForest"
+    icon: "🌲"
+    desc: "Ensemble drzew z baggingiem — mocny, odporny domyślny model dla klasyfikacji i regresji"
+    code: |
+      from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+
+      clf = RandomForestClassifier(
+          n_estimators=300,
+          max_depth=None,
+          max_features="sqrt",
+          n_jobs=-1,
+          random_state=42,
+      ).fit(X_train, y_train)
+
+      # Ważność cech od razu
+      import numpy as np
+      importances = clf.feature_importances_
+      for idx in np.argsort(importances)[::-1][:5]:
+          print(f"feature_{idx}: {importances[idx]:.3f}")
+
+      # OOB score bez osobnego zbioru walidacyjnego
+      clf_oob = RandomForestClassifier(oob_score=True, n_estimators=300).fit(X_train, y_train)
+      print("OOB:", clf_oob.oob_score_)
+
+  - name: "GradientBoosting / HistGradientBoosting"
+    icon: "⚡"
+    desc: "Boosting sekwencyjny drzew — najwyższa dokładność na danych tabelarycznych"
+    code: |
+      from sklearn.ensemble import GradientBoostingClassifier, HistGradientBoostingClassifier
+
+      # Klasyczny gradient boosting
+      gb = GradientBoostingClassifier(
+          n_estimators=200,
+          learning_rate=0.1,
+          max_depth=3,
+          subsample=0.8,        # stochastic boosting
+      ).fit(X_train, y_train)
+
+      # Histogram-based — DUŻO szybszy (jak LightGBM), obsługuje NaN
+      hgb = HistGradientBoostingClassifier(
+          max_iter=300,
+          learning_rate=0.1,
+          early_stopping=True,
+      ).fit(X_train, y_train)
+      print("Accuracy:", hgb.score(X_test, y_test))
+
+  - name: "SVM (SVC / SVR / LinearSVC)"
+    icon: "🛡️"
+    desc: "Support Vector Machines — separacja z maksymalnym marginesem; wymaga skalowania cech"
+    code: |
+      from sklearn.svm import SVC, SVR, LinearSVC
+      from sklearn.pipeline import make_pipeline
+      from sklearn.preprocessing import StandardScaler
+
+      # SVM ZAWSZE w pipeline ze skalowaniem!
+      svm = make_pipeline(
+          StandardScaler(),
+          SVC(kernel="rbf", C=1.0, gamma="scale", probability=True),
+      ).fit(X_train, y_train)
+
+      # LinearSVC — szybki dla dużych/liniowych danych
+      linsvc = make_pipeline(StandardScaler(), LinearSVC(C=1.0)).fit(X_train, y_train)
+
+      # SVR — regresja
+      svr = make_pipeline(StandardScaler(), SVR(kernel="rbf", C=10)).fit(X_train, y_train)
+
+  - name: "KNeighbors"
+    icon: "👥"
+    desc: "Klasyfikacja/regresja przez najbliższych sąsiadów — lazy learner, wymaga skalowania"
+    code: |
+      from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+      from sklearn.pipeline import make_pipeline
+      from sklearn.preprocessing import StandardScaler
+
+      knn = make_pipeline(
+          StandardScaler(),
+          KNeighborsClassifier(
+              n_neighbors=5,
+              weights="distance",   # bliżsi sąsiedzi ważą więcej
+              metric="minkowski",
+              n_jobs=-1,
+          ),
+      ).fit(X_train, y_train)
+
+      print("Accuracy:", knn.score(X_test, y_test))
+      # Uwaga: wolny przy predykcji na dużych zbiorach
+
+  - name: "XGBoost / LightGBM (sklearn-compatible)"
+    icon: "🚀"
+    desc: "Zewnętrzne biblioteki boostingowe z API zgodnym ze sklearn — działają w Pipeline i GridSearchCV"
+    code: |
+      # pip install xgboost lightgbm
+      from xgboost import XGBClassifier
+      from lightgbm import LGBMClassifier
+
+      # XGBoost z API sklearn — fit/predict jak każdy estymator
+      xgb = XGBClassifier(
+          n_estimators=300,
+          learning_rate=0.1,
+          max_depth=6,
+          tree_method="hist",
+          n_jobs=-1,
+      ).fit(X_train, y_train)
+
+      # LightGBM — szybszy na bardzo dużych danych
+      lgbm = LGBMClassifier(n_estimators=300, num_leaves=31).fit(X_train, y_train)
+
+      # Działają w GridSearchCV, cross_val_score i Pipeline jak natywne modele
+      print("XGB:", xgb.score(X_test, y_test))
+
+  - name: "KMeans / DBSCAN"
+    icon: "🔮"
+    desc: "Klasteryzacja bez nadzoru — KMeans dla okrągłych klastrów, DBSCAN dla gęstościowych i szumu"
+    code: |
+      from sklearn.cluster import KMeans, DBSCAN
+      from sklearn.preprocessing import StandardScaler
+
+      Xs = StandardScaler().fit_transform(X)
+
+      # KMeans — podaj liczbę klastrów
+      km = KMeans(n_clusters=4, n_init="auto", random_state=42).fit(Xs)
+      print("Inertia:", km.inertia_)
+      print("Centroidy:", km.cluster_centers_.shape)
+
+      # DBSCAN — auto-wykrywa liczbę, oznacza szum jako -1
+      db = DBSCAN(eps=0.5, min_samples=5).fit(Xs)
+      n_clusters = len(set(db.labels_)) - (1 if -1 in db.labels_ else 0)
+      print("Wykryte klastry:", n_clusters)
+
+  - name: "PCA"
+    icon: "📉"
+    desc: "Analiza głównych składowych — redukcja wymiarów, kompresja cech, wizualizacja"
+    code: |
+      from sklearn.decomposition import PCA
+      from sklearn.preprocessing import StandardScaler
+      from sklearn.pipeline import make_pipeline
+
+      # Redukcja do 2D dla wizualizacji
+      pca = PCA(n_components=2)
+      X_2d = pca.fit_transform(StandardScaler().fit_transform(X))
+      print("Wyjaśniona wariancja:", pca.explained_variance_ratio_)
+
+      # Zachowaj 95% wariancji (auto-dobór liczby składowych)
+      pca95 = PCA(n_components=0.95).fit(X)
+      print("Składowych dla 95%:", pca95.n_components_)
+
+      # W pipeline jako redukcja przed modelem
+      pipe = make_pipeline(StandardScaler(), PCA(n_components=50), LogisticRegression())
+
+  - name: "StandardScaler i transformery"
+    icon: "🧹"
+    desc: "Preprocessing: skalowanie, kodowanie, imputacja — fundament każdego pipeline ML"
+    code: |
+      from sklearn.preprocessing import StandardScaler, OneHotEncoder, MinMaxScaler
+      from sklearn.impute import SimpleImputer
+
+      # Skalowanie — fit na train, transform na test
+      scaler = StandardScaler()
+      X_train_s = scaler.fit_transform(X_train)
+      X_test_s = scaler.transform(X_test)   # ten sam scaler!
+
+      # Kodowanie kategorii
+      ohe = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
+      X_cat_enc = ohe.fit_transform(X_cat)
+
+      # Imputacja braków
+      imputer = SimpleImputer(strategy="median")
+      X_filled = imputer.fit_transform(X)
+
+  - name: "Pipeline jako model"
+    icon: "🔗"
+    desc: "Cały pipeline (preprocessing + model) zachowuje się jak pojedynczy estymator"
+    code: |
+      from sklearn.pipeline import Pipeline
+      from sklearn.compose import ColumnTransformer
+      from sklearn.preprocessing import StandardScaler, OneHotEncoder
+      from sklearn.impute import SimpleImputer
+      from sklearn.ensemble import RandomForestClassifier
+
+      num = Pipeline([("imp", SimpleImputer(strategy="median")), ("sc", StandardScaler())])
+      cat = Pipeline([("imp", SimpleImputer(strategy="most_frequent")),
+                      ("ohe", OneHotEncoder(handle_unknown="ignore"))])
+
+      pre = ColumnTransformer([("num", num, num_cols), ("cat", cat, cat_cols)])
+
+      model = Pipeline([("pre", pre), ("clf", RandomForestClassifier(n_estimators=300))])
+      model.fit(X_train, y_train)        # fit/predict jak zwykły model
+      print(model.score(X_test, y_test))

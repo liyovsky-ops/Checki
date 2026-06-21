@@ -1,0 +1,94 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać scikit-learn?
+  firstComponent: Pierwsze kroki ze scikit-learn
+  firstComponentLang: Python
+
+intro:
+  title: Czym jest scikit-learn?
+  desc: >
+    Scikit-learn to najpopularniejsza biblioteka Pythona do klasycznego uczenia maszynowego.
+    Oparta na NumPy, SciPy i matplotlib, dostarcza spójne, eleganckie API (fit / predict / transform)
+    dla setek algorytmów: klasyfikacji, regresji, klasteryzacji, redukcji wymiarów i preprocessingu.
+    To pierwszy wybór dla danych tabelarycznych — szybka, dobrze udokumentowana i sprawdzona w produkcji.
+
+concepts:
+  - title: Estimator API
+    desc: >
+      Każdy model implementuje ten sam interfejs: fit(X, y) uczy, predict(X) przewiduje.
+      Transformery dodają transform(X). Ta spójność pozwala wymieniać modele jedną linijką kodu.
+    icon: "🔌"
+  - title: fit / predict / transform
+    desc: >
+      Trzy metody które definiują całe API. fit() uczy się parametrów z danych,
+      predict() zwraca predykcje, transform() przekształca dane. fit_transform() łączy oba kroki.
+    icon: "🔄"
+  - title: Pipeline
+    desc: >
+      Łańcuch transformerów zakończony estymatorem. Pipeline zapobiega data leakage —
+      preprocessing uczy się tylko na zbiorze treningowym i automatycznie aplikuje się na test.
+    icon: "🔗"
+  - title: train_test_split
+    desc: >
+      Podział danych na zbiór treningowy i testowy. Stratyfikacja (stratify=y) zachowuje
+      proporcje klas. Random_state gwarantuje reprodukowalność eksperymentów.
+    icon: "✂️"
+  - title: Cross-validation
+    desc: >
+      cross_val_score i KFold dzielą dane na k foldów, trenują k razy i uśredniają wynik.
+      Daje rzetelniejszą ocenę modelu niż pojedynczy podział train/test.
+    icon: "🔁"
+  - title: Feature matrix X, target y
+    desc: >
+      Konwencja: X to macierz cech (n_samples, n_features), y to wektor celu (n_samples,).
+      X zwykle 2D numpy array lub DataFrame, y zwykle 1D array etykiet lub wartości.
+    icon: "🧮"
+  - title: Preprocessing
+    desc: >
+      Skalowanie (StandardScaler), kodowanie kategorii (OneHotEncoder), imputacja braków (SimpleImputer).
+      Większość modeli wymaga przeskalowanych cech — szczególnie SVM, KNN i sieci.
+    icon: "🧹"
+  - title: Hyperparameter tuning
+    desc: >
+      GridSearchCV i RandomizedSearchCV automatycznie przeszukują przestrzeń hiperparametrów
+      z cross-validation i wybierają najlepszą kombinację według wybranej metryki.
+    icon: "🎛️"
+
+whenToUse:
+  - Klasyfikacja i regresja na danych tabelarycznych (CSV, DataFrame)
+  - Szybki baseline przed sięgnięciem po deep learning
+  - Klasteryzacja i wykrywanie struktury w danych bez etykiet
+  - Redukcja wymiarów (PCA, t-SNE) i wizualizacja danych wysokowymiarowych
+  - Feature engineering, skalowanie i preprocessing w pipeline
+  - Model selection — porównanie wielu algorytmów i tuning hiperparametrów
+  - Małe i średnie datasety które mieszczą się w RAM (do milionów wierszy)
+  - Produkcyjne modele ML bez GPU — joblib, ONNX, PMML
+
+firstComponent: |
+  from sklearn.datasets import load_iris
+  from sklearn.model_selection import train_test_split
+  from sklearn.preprocessing import StandardScaler
+  from sklearn.pipeline import Pipeline
+  from sklearn.ensemble import RandomForestClassifier
+  from sklearn.metrics import classification_report
+
+  # Wczytaj dane (X = cechy, y = etykiety)
+  X, y = load_iris(return_X_y=True)
+
+  # Podział z zachowaniem proporcji klas
+  X_train, X_test, y_train, y_test = train_test_split(
+      X, y, test_size=0.2, stratify=y, random_state=42
+  )
+
+  # Pipeline: skalowanie + model (zapobiega data leakage)
+  clf = Pipeline([
+      ("scaler", StandardScaler()),
+      ("model", RandomForestClassifier(n_estimators=200, random_state=42)),
+  ])
+
+  # Trening i predykcja — to samo API dla KAŻDEGO modelu
+  clf.fit(X_train, y_train)
+  y_pred = clf.predict(X_test)
+
+  print(f"Accuracy: {clf.score(X_test, y_test):.3f}")
+  print(classification_report(y_test, y_pred))

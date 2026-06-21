@@ -1,0 +1,135 @@
+title: "Ekosystem scikit-learn"
+
+items:
+  - name: "imbalanced-learn"
+    icon: "⚖️"
+    desc: "Techniki dla niezbalansowanych klas — SMOTE, undersampling, oversampling; zgodne z Pipeline"
+    code: |
+      # pip install imbalanced-learn
+      from imblearn.over_sampling import SMOTE, ADASYN
+      from imblearn.under_sampling import RandomUnderSampler
+      from imblearn.pipeline import Pipeline   # WAŻNE: imblearn Pipeline
+      from sklearn.ensemble import RandomForestClassifier
+
+      # SMOTE generuje syntetyczne próbki klasy mniejszościowej
+      pipe = Pipeline([
+          ("smote", SMOTE(random_state=42)),
+          ("under", RandomUnderSampler(random_state=42)),
+          ("clf", RandomForestClassifier(n_estimators=300)),
+      ])
+      pipe.fit(X_train, y_train)   # resampling TYLKO na train fold
+
+      # BalancedRandomForestClassifier — wbudowany balans
+      from imblearn.ensemble import BalancedRandomForestClassifier
+      brf = BalancedRandomForestClassifier().fit(X_train, y_train)
+
+  - name: "scikit-optimize (skopt)"
+    icon: "🎯"
+    desc: "Optymalizacja bayesowska hiperparametrów — mądrzejsza niż grid/random search"
+    code: |
+      # pip install scikit-optimize
+      from skopt import BayesSearchCV
+      from skopt.space import Real, Integer, Categorical
+      from sklearn.svm import SVC
+
+      # Bayesowskie przeszukiwanie — uczy się z poprzednich prób
+      search = BayesSearchCV(
+          SVC(),
+          {
+              "C": Real(1e-3, 1e3, prior="log-uniform"),
+              "gamma": Real(1e-4, 1e1, prior="log-uniform"),
+              "kernel": Categorical(["rbf", "poly"]),
+          },
+          n_iter=32,
+          cv=5,
+          n_jobs=-1,
+      )
+      search.fit(X_train, y_train)
+      print(search.best_params_, search.best_score_)
+      # Alternatywa: Optuna — popularniejsza, nowocześniejsza
+
+  - name: "yellowbrick"
+    icon: "📊"
+    desc: "Wizualna diagnostyka modeli ML — ROC, confusion matrix, learning curves jako 'Visualizer'"
+    code: |
+      # pip install yellowbrick
+      from yellowbrick.classifier import ROCAUC, ClassificationReport, ConfusionMatrix
+      from yellowbrick.model_selection import LearningCurve, ValidationCurve
+      from yellowbrick.features import Rank2D, PCA as YBPCA
+
+      # Wizualizer ma fit/score/show jak estymator
+      viz = ROCAUC(model, classes=["neg", "pos"])
+      viz.fit(X_train, y_train)
+      viz.score(X_test, y_test)
+      viz.show()
+
+      # Raport klasyfikacji jako heatmapa
+      ClassificationReport(model, support=True).fit(X_train, y_train).show()
+
+      # Korelacje cech
+      Rank2D(algorithm="pearson").fit_transform(X)
+
+  - name: "scikit-multilearn"
+    icon: "🏷️"
+    desc: "Klasyfikacja multi-label — gdy próbka może należeć do wielu klas naraz"
+    code: |
+      # pip install scikit-multilearn
+      from skmultilearn.problem_transform import BinaryRelevance, LabelPowerset, ClassifierChain
+      from sklearn.svm import SVC
+
+      # Binary Relevance — osobny klasyfikator per etykieta
+      clf = BinaryRelevance(classifier=SVC(), require_dense=[False, True])
+      clf.fit(X_train, y_train)        # y: macierz (n_samples, n_labels)
+      preds = clf.predict(X_test)
+
+      # ClassifierChain — uwzględnia zależności między etykietami
+      chain = ClassifierChain(classifier=SVC())
+      chain.fit(X_train, y_train)
+
+      # LabelPowerset — traktuje kombinacje etykiet jako klasy
+      lp = LabelPowerset(classifier=SVC()).fit(X_train, y_train)
+
+  - name: "mlxtend"
+    icon: "🧩"
+    desc: "Rozszerzenia ML — stacking, voting, reguły asocjacyjne, wykresy granic decyzyjnych"
+    code: |
+      # pip install mlxtend
+      from mlxtend.classifier import StackingCVClassifier, EnsembleVoteClassifier
+      from mlxtend.plotting import plot_decision_regions
+      from mlxtend.frequent_patterns import apriori, association_rules
+
+      # Stacking — meta-model uczy się na predykcjach modeli bazowych
+      stack = StackingCVClassifier(
+          classifiers=[clf1, clf2, clf3],
+          meta_classifier=LogisticRegression(),
+          cv=5,
+      )
+      stack.fit(X_train, y_train)
+
+      # Wizualizacja granic decyzyjnych (2D)
+      plot_decision_regions(X_2d, y, clf=model)
+
+      # Market basket analysis — reguły asocjacyjne
+      rules = association_rules(apriori(df, min_support=0.05), metric="lift")
+
+  - name: "sklearn-pandas i SHAP"
+    icon: "🔍"
+    desc: "Interpretowalność i integracja z DataFrame — wyjaśnij predykcje modelu cecha po cesze"
+    code: |
+      # pip install shap
+      import shap
+      from sklearn.ensemble import RandomForestClassifier
+
+      model = RandomForestClassifier().fit(X_train, y_train)
+
+      # SHAP — wkład każdej cechy w pojedynczą predykcję
+      explainer = shap.TreeExplainer(model)
+      shap_values = explainer.shap_values(X_test)
+
+      shap.summary_plot(shap_values, X_test)        # globalna ważność
+      shap.force_plot(explainer.expected_value[1],
+                      shap_values[1][0], X_test.iloc[0])  # pojedyncza predykcja
+
+      # Wbudowana alternatywa sklearn: permutation_importance
+      from sklearn.inspection import permutation_importance, PartialDependenceDisplay
+      r = permutation_importance(model, X_test, y_test, n_repeats=10)

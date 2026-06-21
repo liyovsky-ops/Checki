@@ -205,5 +205,7 @@ export const FRAMEWORKS = {
     { id: 'huggingface',  name: 'Hugging Face', icon: '🤗',  color: '#ffd21e', lang: 'Python', desc: 'Centrum modeli i transformerów' },
     { id: 'pytorch',      name: 'PyTorch',      icon: '🔥',  color: '#ee4c2c', lang: 'Python', desc: 'ML/research od Meta' },
     { id: 'tensorflow',   name: 'TensorFlow',   icon: '🧠',  color: '#ff6f00', lang: 'Python', desc: 'ML na masową skalę od Google' },
+    { id: 'scikitlearn',  name: 'Scikit-learn', icon: '⚙️',  color: '#f89939', lang: 'Python', desc: 'Klasyczne ML, data science' },
+    { id: 'numpy',        name: 'NumPy',        icon: '🔢',  color: '#4dabcf', lang: 'Python', desc: 'Fundament obliczeń numerycznych' },
   ],
 };

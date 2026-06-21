@@ -1,0 +1,478 @@
+title: "Komendy scikit-learn"
+
+groups:
+  - name: "Dane i preprocessing"
+    icon: "🧹"
+    commands:
+      - cmd: "from sklearn.model_selection import train_test_split; X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)"
+        desc: "Podziel dane na train/test z zachowaniem proporcji klas"
+        detail:
+          what: "Losowo dzieli X i y na zbiory treningowy i testowy. stratify=y zachowuje rozkład klas."
+          how: "test_size=0.2 — 20% na test. random_state gwarantuje ten sam podział przy każdym uruchomieniu."
+          tips:
+            - "Zawsze używaj stratify=y dla niezbalansowanej klasyfikacji"
+            - "shuffle=False dla szeregów czasowych — nie mieszaj chronologii"
+      - cmd: "from sklearn.preprocessing import StandardScaler; X_scaled = StandardScaler().fit_transform(X_train)"
+        desc: "Standaryzacja cech — średnia 0, odchylenie 1"
+        detail:
+          what: "StandardScaler odejmuje średnią i dzieli przez odchylenie standardowe (z-score)."
+          how: "fit_transform na train, sam transform na test (scaler uczy się tylko na train)."
+          tips:
+            - "Niezbędne dla SVM, KNN, regresji logistycznej i sieci neuronowych"
+            - "RobustScaler odporny na outliers — używa mediany i IQR"
+      - cmd: "from sklearn.preprocessing import MinMaxScaler; X_norm = MinMaxScaler().fit_transform(X)"
+        desc: "Normalizacja cech do zakresu [0, 1]"
+        detail:
+          what: "Skaluje każdą cechę do przedziału [0,1] (lub feature_range)."
+          how: "(x - min) / (max - min). Zachowuje kształt rozkładu, wrażliwy na outliers."
+          tips:
+            - "feature_range=(-1, 1) — dla niektórych sieci neuronowych"
+            - "MaxAbsScaler dla danych rzadkich (sparse) — nie centruje"
+      - cmd: "from sklearn.preprocessing import OneHotEncoder; X_enc = OneHotEncoder(handle_unknown='ignore').fit_transform(X_cat)"
+        desc: "One-hot encoding zmiennych kategorycznych"
+        detail:
+          what: "Zamienia kolumny kategoryczne na binarne kolumny per kategoria."
+          how: "handle_unknown='ignore' — nieznane kategorie na teście dają same zera zamiast błędu."
+          tips:
+            - "sparse_output=False — zwróć gęstą macierz numpy zamiast sparse"
+            - "OrdinalEncoder gdy kategorie mają naturalną kolejność (niski/średni/wysoki)"
+      - cmd: "from sklearn.impute import SimpleImputer; X_filled = SimpleImputer(strategy='median').fit_transform(X)"
+        desc: "Uzupełnij brakujące wartości (NaN)"
+        detail:
+          what: "Zastępuje NaN wartością: median, mean, most_frequent lub constant."
+          how: "strategy='median' odporne na outliers. fill_value przy strategy='constant'."
+          tips:
+            - "KNNImputer — uzupełnia na podstawie najbliższych sąsiadów (dokładniejsze)"
+            - "IterativeImputer — modeluje każdą cechę jako funkcję pozostałych (MICE)"
+      - cmd: "from sklearn.preprocessing import LabelEncoder; y_enc = LabelEncoder().fit_transform(y)"
+        desc: "Zakoduj etykiety tekstowe na liczby całkowite"
+        detail:
+          what: "Mapuje etykiety klas (string) na liczby 0..n_classes-1."
+          how: "Tylko dla wektora y (target), nie dla cech X — do tego użyj OrdinalEncoder."
+          tips:
+            - "le.classes_ — zobacz mapowanie etykieta -> liczba"
+            - "le.inverse_transform(preds) — odwróć kodowanie na oryginalne etykiety"
+      - cmd: "from sklearn.preprocessing import PolynomialFeatures; X_poly = PolynomialFeatures(degree=2).fit_transform(X)"
+        desc: "Generuj cechy wielomianowe i interakcje"
+        detail:
+          what: "Tworzy cechy stopnia 2: x1, x2, x1², x1·x2, x2² — wzbogaca model liniowy."
+          how: "interaction_only=True — tylko iloczyny, bez potęg. include_bias=False — bez kolumny stałej."
+          tips:
+            - "Uważaj na eksplozję cech przy wysokim degree i wielu kolumnach"
+            - "Świetne dla LinearRegression żeby modelować nieliniowości"
+
+  - name: "Klasyfikacja"
+    icon: "🎯"
+    commands:
+      - cmd: "from sklearn.linear_model import LogisticRegression; clf = LogisticRegression(max_iter=1000).fit(X_train, y_train)"
+        desc: "Regresja logistyczna — szybki, interpretowalny baseline"
+        detail:
+          what: "Liniowy klasyfikator zwracający prawdopodobieństwa. Standardowy baseline klasyfikacji."
+          how: "max_iter=1000 by uniknąć ostrzeżenia o zbieżności. C kontroluje regularyzację (mniejsze C = silniejsza)."
+          tips:
+            - "class_weight='balanced' dla niezbalansowanych klas"
+            - "penalty='l1', solver='liblinear' — sparse model z selekcją cech"
+      - cmd: "from sklearn.ensemble import RandomForestClassifier; clf = RandomForestClassifier(n_estimators=300, n_jobs=-1).fit(X_train, y_train)"
+        desc: "Random Forest — mocny domyślny klasyfikator"
+        detail:
+          what: "Ensemble drzew decyzyjnych z baggingiem. Odporny, mało wrażliwy na hiperparametry."
+          how: "n_estimators=300 więcej drzew = stabilniej. n_jobs=-1 używa wszystkich rdzeni CPU."
+          tips:
+            - "clf.feature_importances_ — ważność cech od razu"
+            - "max_depth ogranicza przeuczenie na małych danych"
+      - cmd: "from sklearn.ensemble import GradientBoostingClassifier; clf = GradientBoostingClassifier().fit(X_train, y_train)"
+        desc: "Gradient Boosting — sekwencyjny boosting drzew"
+        detail:
+          what: "Buduje drzewa sekwencyjnie, każde poprawia błędy poprzedniego. Wysoka dokładność."
+          how: "learning_rate i n_estimators działają w parze. Wolniejszy niż HistGradientBoosting."
+          tips:
+            - "HistGradientBoostingClassifier — znacznie szybszy, wzorowany na LightGBM"
+            - "subsample<1.0 — stochastic boosting, mniejsze przeuczenie"
+      - cmd: "from sklearn.svm import SVC; clf = SVC(kernel='rbf', C=1.0, probability=True).fit(X_train, y_train)"
+        desc: "Support Vector Machine — separacja z marginesem"
+        detail:
+          what: "Znajduje hiperpłaszczyznę z maksymalnym marginesem. Kernel rbf modeluje nieliniowości."
+          how: "WYMAGA skalowania cech! C kontroluje miękkość marginesu, gamma zasięg kernela rbf."
+          tips:
+            - "probability=True by mieć predict_proba (wolniejszy trening)"
+            - "Nie skaluje na duże dane — dla >100k próbek użyj LinearSVC lub SGDClassifier"
+      - cmd: "from sklearn.neighbors import KNeighborsClassifier; clf = KNeighborsClassifier(n_neighbors=5).fit(X_train, y_train)"
+        desc: "K-Nearest Neighbors — klasyfikacja przez sąsiadów"
+        detail:
+          what: "Klasyfikuje większością głosów k najbliższych próbek. Brak treningu (lazy)."
+          how: "WYMAGA skalowania. n_neighbors nieparzyste dla 2 klas. weights='distance' waży bliższych."
+          tips:
+            - "Wolny przy predykcji na dużych danych (liczy odległości do wszystkich)"
+            - "metric='manhattan' lub 'cosine' zamiast domyślnego euklidesa"
+      - cmd: "proba = clf.predict_proba(X_test); preds = clf.predict(X_test)"
+        desc: "Predykcje twarde i prawdopodobieństwa klas"
+        detail:
+          what: "predict zwraca etykiety, predict_proba macierz prawdopodobieństw (n_samples, n_classes)."
+          how: "decision_function zwraca surowe wyniki dla SVM/liniowych (przed sigmoid/softmax)."
+          tips:
+            - "Próg 0.5 niekoniecznie optymalny — dostosuj dla niezbalansowanych klas"
+            - "clf.classes_ — kolejność kolumn w predict_proba"
+
+  - name: "Regresja"
+    icon: "📈"
+    commands:
+      - cmd: "from sklearn.linear_model import LinearRegression; reg = LinearRegression().fit(X_train, y_train)"
+        desc: "Regresja liniowa — OLS, podstawowy model regresji"
+        detail:
+          what: "Dopasowuje liniową zależność metodą najmniejszych kwadratów."
+          how: "reg.coef_ — współczynniki cech, reg.intercept_ — wyraz wolny."
+          tips:
+            - "R² przez reg.score(X_test, y_test)"
+            - "Wrażliwa na współliniowość cech — rozważ Ridge"
+      - cmd: "from sklearn.linear_model import Ridge; reg = Ridge(alpha=1.0).fit(X_train, y_train)"
+        desc: "Ridge — regresja liniowa z regularyzacją L2"
+        detail:
+          what: "Dodaje karę L2 (suma kwadratów wag) — zmniejsza przeuczenie i radzi sobie ze współliniowością."
+          how: "alpha kontroluje siłę regularyzacji. Większe alpha = mniejsze wagi."
+          tips:
+            - "RidgeCV automatycznie dobiera alpha przez cross-validation"
+            - "Skaluj cechy — regularyzacja jest wrażliwa na skalę"
+      - cmd: "from sklearn.linear_model import Lasso; reg = Lasso(alpha=0.1).fit(X_train, y_train)"
+        desc: "Lasso — regularyzacja L1 z selekcją cech"
+        detail:
+          what: "Kara L1 zeruje nieistotne współczynniki — automatyczna selekcja cech."
+          how: "alpha steruje liczbą zerowanych cech. Większe alpha = więcej zer."
+          tips:
+            - "ElasticNet łączy L1 i L2 (l1_ratio kontroluje proporcję)"
+            - "np.sum(reg.coef_ != 0) — ile cech zostało wybranych"
+      - cmd: "from sklearn.ensemble import RandomForestRegressor; reg = RandomForestRegressor(n_estimators=300, n_jobs=-1).fit(X_train, y_train)"
+        desc: "Random Forest Regressor — nieliniowa regresja zespołowa"
+        detail:
+          what: "Ensemble drzew dla regresji — uśrednia predykcje. Modeluje nieliniowości bez skalowania."
+          how: "Nie wymaga skalowania cech. Odporny na outliers w cechach."
+          tips:
+            - "Nie ekstrapoluje poza zakres danych treningowych"
+            - "feature_importances_ działa też dla regresji"
+      - cmd: "from sklearn.ensemble import HistGradientBoostingRegressor; reg = HistGradientBoostingRegressor().fit(X_train, y_train)"
+        desc: "Histogram Gradient Boosting — szybki boosting (jak LightGBM)"
+        detail:
+          what: "Boosting drzew z binowaniem cech — bardzo szybki na dużych danych, obsługuje NaN natywnie."
+          how: "Nie wymaga imputacji braków. max_iter zamiast n_estimators."
+          tips:
+            - "Często najlepszy stosunek dokładność/szybkość w sklearn"
+            - "categorical_features=[...] — natywna obsługa kategorii"
+      - cmd: "from sklearn.metrics import mean_squared_error, r2_score; rmse = mean_squared_error(y_test, preds, squared=False)"
+        desc: "Metryki regresji — RMSE i R²"
+        detail:
+          what: "RMSE w jednostkach targetu, R² (0-1) udział wyjaśnionej wariancji."
+          how: "squared=False zwraca RMSE zamiast MSE. r2_score(y_true, y_pred) dla R²."
+          tips:
+            - "mean_absolute_error — odporniejsze na outliers niż RMSE"
+            - "mean_absolute_percentage_error — błąd procentowy"
+
+  - name: "Clustering"
+    icon: "🔮"
+    commands:
+      - cmd: "from sklearn.cluster import KMeans; km = KMeans(n_clusters=3, n_init='auto').fit(X)"
+        desc: "K-Means — klasteryzacja do k grup"
+        detail:
+          what: "Dzieli dane na k klastrów minimalizując wariancję wewnątrzklastrową."
+          how: "km.labels_ — przypisanie do klastrów, km.cluster_centers_ — centroidy. Skaluj cechy!"
+          tips:
+            - "Metoda łokcia (inertia) lub silhouette do wyboru k"
+            - "n_init='auto' — wiele startów dla stabilności (unika lokalnych minimów)"
+      - cmd: "from sklearn.cluster import DBSCAN; db = DBSCAN(eps=0.5, min_samples=5).fit(X)"
+        desc: "DBSCAN — klasteryzacja gęstościowa z wykrywaniem szumu"
+        detail:
+          what: "Grupuje gęste regiony, oznacza outliers jako szum (label -1). Nie wymaga podania k."
+          how: "eps — promień sąsiedztwa, min_samples — minimalna gęstość. Skaluj cechy."
+          tips:
+            - "Świetny dla klastrów o nieregularnych kształtach"
+            - "HDBSCAN (osobny pakiet) — odporniejszy na dobór eps"
+      - cmd: "from sklearn.cluster import AgglomerativeClustering; ac = AgglomerativeClustering(n_clusters=3).fit(X)"
+        desc: "Klasteryzacja hierarchiczna aglomeracyjna"
+        detail:
+          what: "Łączy próbki bottom-up tworząc dendrogram. Różne metody linkage (ward, complete, average)."
+          how: "linkage='ward' minimalizuje wariancję. distance_threshold zamiast n_clusters dla auto-cięcia."
+          tips:
+            - "scipy.cluster.hierarchy.dendrogram do wizualizacji drzewa"
+            - "Wolniejszy niż KMeans — O(n²) pamięci"
+      - cmd: "from sklearn.mixture import GaussianMixture; gm = GaussianMixture(n_components=3).fit(X)"
+        desc: "Gaussian Mixture Model — soft clustering probabilistyczny"
+        detail:
+          what: "Modeluje dane jako mieszankę rozkładów Gaussa. Daje prawdopodobieństwa przynależności."
+          how: "gm.predict_proba(X) — soft assignments. covariance_type kontroluje kształt klastrów."
+          tips:
+            - "gm.bic(X) — kryterium do wyboru liczby komponentów"
+            - "Lepszy niż KMeans gdy klastry mają różne rozmiary/kształty"
+      - cmd: "from sklearn.metrics import silhouette_score; score = silhouette_score(X, labels)"
+        desc: "Silhouette score — jakość klasteryzacji"
+        detail:
+          what: "Mierzy jak dobrze próbki pasują do swoich klastrów (-1 do 1, wyżej lepiej)."
+          how: "Porównuje odległość wewnątrz- i międzyklastrową. Liczona bez etykiet prawdziwych."
+          tips:
+            - "Iteruj po k i wybierz maksymalny silhouette"
+            - "calinski_harabasz_score i davies_bouldin_score — alternatywne metryki"
+      - cmd: "labels = km.predict(X_new); centers = km.cluster_centers_"
+        desc: "Przypisz nowe próbki do istniejących klastrów"
+        detail:
+          what: "predict przypisuje nowe dane do najbliższego centroidu (KMeans, GMM)."
+          how: "DBSCAN i Agglomerative nie mają predict — użyj fit_predict na całości."
+          tips:
+            - "Zapisz scaler i model razem — nowe dane muszą być tak samo skalowane"
+            - "fit_predict(X) — fit + przypisanie w jednym kroku"
+
+  - name: "Redukcja wymiarów"
+    icon: "📉"
+    commands:
+      - cmd: "from sklearn.decomposition import PCA; X_pca = PCA(n_components=2).fit_transform(X)"
+        desc: "PCA — liniowa redukcja wymiarów"
+        detail:
+          what: "Rzutuje dane na osie maksymalnej wariancji. Do wizualizacji i kompresji cech."
+          how: "n_components=2 dla wykresu, lub float 0.95 = zachowaj 95% wariancji. Skaluj cechy!"
+          tips:
+            - "pca.explained_variance_ratio_ — ile wariancji wyjaśnia każda składowa"
+            - "np.cumsum(pca.explained_variance_ratio_) — wykres skumulowanej wariancji"
+      - cmd: "from sklearn.manifold import TSNE; X_2d = TSNE(n_components=2, perplexity=30).fit_transform(X)"
+        desc: "t-SNE — nieliniowa wizualizacja wysokowymiarowych danych"
+        detail:
+          what: "Zachowuje lokalną strukturę — świetny do wizualizacji klastrów w 2D."
+          how: "perplexity ~5-50. Wolny na dużych danych. Tylko do wizualizacji, nie do preprocessingu!"
+          tips:
+            - "Najpierw zredukuj PCA do ~50 wymiarów, potem t-SNE (szybciej)"
+            - "Odległości na wykresie t-SNE nie mają globalnego znaczenia"
+      - cmd: "import umap; X_umap = umap.UMAP(n_neighbors=15).fit_transform(X)"
+        desc: "UMAP — szybsza alternatywa t-SNE (osobny pakiet)"
+        detail:
+          what: "Redukcja zachowująca lokalną i częściowo globalną strukturę. Szybsza niż t-SNE."
+          how: "pip install umap-learn. n_neighbors kontroluje balans lokalne/globalne."
+          tips:
+            - "Ma transform() — można aplikować na nowe dane (t-SNE nie)"
+            - "Coraz częściej standard zamiast t-SNE w bioinformatyce i NLP"
+      - cmd: "from sklearn.decomposition import TruncatedSVD; X_svd = TruncatedSVD(n_components=100).fit_transform(X_sparse)"
+        desc: "Truncated SVD — PCA dla danych rzadkich (LSA)"
+        detail:
+          what: "Redukcja wymiarów działająca na sparse matrices (np. TF-IDF). Podstawa LSA w NLP."
+          how: "Nie centruje danych — dlatego działa na sparse. Idealne po TfidfVectorizer."
+          tips:
+            - "Standard do Latent Semantic Analysis na dokumentach tekstowych"
+            - "Łącz w Pipeline: TfidfVectorizer -> TruncatedSVD -> klasyfikator"
+      - cmd: "from sklearn.feature_selection import SelectKBest, f_classif; X_sel = SelectKBest(f_classif, k=10).fit_transform(X, y)"
+        desc: "Selekcja k najlepszych cech testem statystycznym"
+        detail:
+          what: "Wybiera k cech o najsilniejszej zależności z targetem (test ANOVA F)."
+          how: "f_classif dla klasyfikacji, f_regression dla regresji, mutual_info_* dla nieliniowych."
+          tips:
+            - "SelectFromModel — selekcja na podstawie feature_importances_ modelu"
+            - "RFE (Recursive Feature Elimination) — iteracyjnie usuwa najsłabsze cechy"
+      - cmd: "from sklearn.decomposition import NMF; W = NMF(n_components=10).fit_transform(X)"
+        desc: "NMF — nieujemna faktoryzacja macierzy"
+        detail:
+          what: "Rozkłada nieujemną macierz na czynniki — topic modeling, systemy rekomendacji."
+          how: "Wymaga X >= 0. Komponenty są addytywne i interpretowalne (np. tematy)."
+          tips:
+            - "Popularne w topic modeling na macierzy TF-IDF"
+            - "nmf.components_ — wzorce/tematy, W — przynależność próbek"
+
+  - name: "Pipeline i transformery"
+    icon: "🔗"
+    commands:
+      - cmd: "from sklearn.pipeline import Pipeline; pipe = Pipeline([('scaler', StandardScaler()), ('clf', LogisticRegression())])"
+        desc: "Pipeline — łańcuch preprocessing + model"
+        detail:
+          what: "Łączy transformery i estymator w jeden obiekt. Zapobiega data leakage przy CV."
+          how: "fit() uczy cały łańcuch, predict() przepuszcza dane przez wszystkie kroki."
+          tips:
+            - "make_pipeline(StandardScaler(), LogisticRegression()) — bez nazywania kroków"
+            - "Kluczowe dla poprawnej cross-validation (scaler uczy się tylko na train fold)"
+      - cmd: "from sklearn.compose import ColumnTransformer; ct = ColumnTransformer([('num', StandardScaler(), num_cols), ('cat', OneHotEncoder(), cat_cols)])"
+        desc: "ColumnTransformer — różny preprocessing per kolumna"
+        detail:
+          what: "Aplikuje różne transformery do różnych kolumn (numeryczne vs kategoryczne)."
+          how: "Lista (nazwa, transformer, kolumny). remainder='passthrough' zachowuje resztę kolumn."
+          tips:
+            - "Standard dla mieszanych danych tabelarycznych"
+            - "make_column_selector(dtype_include='number') — auto-wybór kolumn po typie"
+      - cmd: "pipe = make_pipeline(ColumnTransformer([...]), RandomForestClassifier())"
+        desc: "Pełny pipeline: ColumnTransformer + model"
+        detail:
+          what: "Zagnieżdżenie ColumnTransformer w Pipeline daje kompletny, produkcyjny pipeline."
+          how: "Cały preprocessing + model w jednym obiekcie do zapisania przez joblib."
+          tips:
+            - "Jeden joblib.dump zapisuje cały pipeline — żadnego ręcznego preprocessingu w produkcji"
+            - "set_config(display='diagram') — wizualizacja pipeline w Jupyter"
+      - cmd: "from sklearn.preprocessing import FunctionTransformer; log_tf = FunctionTransformer(np.log1p)"
+        desc: "FunctionTransformer — własna funkcja jako transformer"
+        detail:
+          what: "Owija dowolną funkcję w interfejs transformera (fit/transform) do użycia w Pipeline."
+          how: "np.log1p dla skośnych cech. inverse_func dla odwracalności."
+          tips:
+            - "Świetne do log-transform, clip, custom feature engineering"
+            - "validate=False jeśli funkcja obsługuje DataFrame zamiast numpy"
+      - cmd: "from sklearn.base import BaseEstimator, TransformerMixin"
+        desc: "Własny transformer — dziedzicz po BaseEstimator i TransformerMixin"
+        detail:
+          what: "Twórz custom transformery z metodami fit() i transform() kompatybilne z Pipeline."
+          how: "TransformerMixin daje fit_transform za darmo. BaseEstimator daje get/set_params."
+          tips:
+            - "Pozwala wpiąć dowolną logikę feature engineering w GridSearchCV"
+            - "Zwracaj self z fit(), przetworzone X z transform()"
+      - cmd: "from sklearn.pipeline import FeatureUnion; union = FeatureUnion([('pca', PCA(2)), ('kbest', SelectKBest(k=5))])"
+        desc: "FeatureUnion — równoległe łączenie cech z transformerów"
+        detail:
+          what: "Uruchamia kilka transformerów równolegle i skleja ich wyjścia w jedną macierz cech."
+          how: "Każdy transformer dostaje te same dane wejściowe, wyniki są konkatenowane."
+          tips:
+            - "Łącz np. cechy PCA z wyselekcjonowanymi oryginalnymi cechami"
+            - "pipe.named_steps['name'] — dostęp do konkretnego kroku po nazwie"
+
+  - name: "Model selection i tuning"
+    icon: "🎛️"
+    commands:
+      - cmd: "from sklearn.model_selection import cross_val_score; scores = cross_val_score(clf, X, y, cv=5, scoring='f1_macro')"
+        desc: "Cross-validation — rzetelna ocena modelu"
+        detail:
+          what: "Dzieli dane na cv foldów, trenuje cv razy i zwraca wyniki. scores.mean() ± std."
+          how: "cv=5 standard. scoring wybiera metrykę. Działa na Pipeline (bez data leakage)."
+          tips:
+            - "print(f'{scores.mean():.3f} +/- {scores.std():.3f}')"
+            - "cross_validate zwraca też czas i wiele metryk naraz"
+      - cmd: "from sklearn.model_selection import GridSearchCV; gs = GridSearchCV(clf, {'C': [0.1, 1, 10]}, cv=5).fit(X, y)"
+        desc: "GridSearchCV — wyczerpujące przeszukiwanie hiperparametrów"
+        detail:
+          what: "Testuje WSZYSTKIE kombinacje parametrów z cross-validation, wybiera najlepszą."
+          how: "gs.best_params_, gs.best_score_, gs.best_estimator_. n_jobs=-1 dla równoległości."
+          tips:
+            - "Param grid dla Pipeline: 'clf__C' (nazwa_kroku__parametr)"
+            - "refit=True (domyślnie) — przetrenuj najlepszy model na całych danych"
+      - cmd: "from sklearn.model_selection import RandomizedSearchCV; rs = RandomizedSearchCV(clf, param_dist, n_iter=50, cv=5).fit(X, y)"
+        desc: "RandomizedSearchCV — losowe próbkowanie przestrzeni parametrów"
+        detail:
+          what: "Próbkuje n_iter losowych kombinacji — efektywniejszy niż GridSearch przy wielu parametrach."
+          how: "param_dist może zawierać rozkłady scipy.stats (np. uniform, randint)."
+          tips:
+            - "Często znajduje dobre parametry szybciej niż pełny grid"
+            - "Dla bayesian optimization: scikit-optimize (BayesSearchCV) lub Optuna"
+      - cmd: "from sklearn.model_selection import StratifiedKFold; skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)"
+        desc: "StratifiedKFold — foldy z zachowaniem proporcji klas"
+        detail:
+          what: "Każdy fold ma taki sam rozkład klas jak całość — kluczowe dla niezbalansowanych danych."
+          how: "Przekaż jako cv= do cross_val_score lub GridSearchCV."
+          tips:
+            - "TimeSeriesSplit dla danych czasowych (nie miesza chronologii)"
+            - "GroupKFold gdy próbki są pogrupowane (np. wielu pacjentów)"
+      - cmd: "from sklearn.model_selection import learning_curve; sizes, train, val = learning_curve(clf, X, y, cv=5)"
+        desc: "Learning curve — diagnoza bias vs variance"
+        detail:
+          what: "Pokazuje jak wynik zmienia się z rozmiarem zbioru treningowego."
+          how: "Duża luka train-val = przeuczenie (variance). Oba niskie = niedouczenie (bias)."
+          tips:
+            - "validation_curve — wpływ pojedynczego hiperparametru na wynik"
+            - "Pomaga zdecydować czy zbierać więcej danych czy zmienić model"
+      - cmd: "from sklearn.model_selection import cross_validate; res = cross_validate(clf, X, y, scoring=['accuracy','f1'], return_train_score=True)"
+        desc: "cross_validate — wiele metryk i czasy w jednym przebiegu"
+        detail:
+          what: "Jak cross_val_score ale zwraca słownik z wieloma metrykami, czasem fit i score."
+          how: "scoring jako lista. return_train_score=True by porównać train vs test (overfitting)."
+          tips:
+            - "res['test_f1'], res['fit_time'] — dostęp do wyników"
+            - "Jedno wywołanie zamiast wielu cross_val_score"
+
+  - name: "Metryki i ewaluacja"
+    icon: "📊"
+    commands:
+      - cmd: "from sklearn.metrics import classification_report; print(classification_report(y_test, preds))"
+        desc: "Pełny raport klasyfikacji — precision, recall, F1 per klasa"
+        detail:
+          what: "Tabela z precision, recall, f1-score i support dla każdej klasy plus średnie."
+          how: "output_dict=True zwraca słownik zamiast tekstu (do dalszego przetwarzania)."
+          tips:
+            - "macro avg traktuje klasy równo, weighted avg waży liczebnością"
+            - "Patrz na recall dla klasy mniejszościowej przy niezbalansowanych danych"
+      - cmd: "from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay; ConfusionMatrixDisplay.from_predictions(y_test, preds)"
+        desc: "Macierz pomyłek — gdzie model się myli"
+        detail:
+          what: "Pokazuje liczbę prawidłowych i błędnych predykcji per para klas."
+          how: "from_predictions rysuje od razu. normalize='true' dla proporcji zamiast liczb."
+          tips:
+            - "Przekątna = poprawne. Off-diagonal = pomyłki między konkretnymi klasami"
+            - "from_estimator(clf, X_test, y_test) — bezpośrednio z modelu"
+      - cmd: "from sklearn.metrics import roc_auc_score; auc = roc_auc_score(y_test, clf.predict_proba(X_test)[:, 1])"
+        desc: "ROC AUC — jakość rankingu klasyfikatora binarnego"
+        detail:
+          what: "Pole pod krzywą ROC (0.5 = losowy, 1.0 = idealny). Niewrażliwe na próg decyzyjny."
+          how: "Dla binarnej: predict_proba[:, 1]. Dla multiclass: multi_class='ovr'."
+          tips:
+            - "Lepsze niż accuracy dla niezbalansowanych klas"
+            - "average_precision_score (PR-AUC) lepsze przy silnym niezbalansowaniu"
+      - cmd: "from sklearn.metrics import RocCurveDisplay, PrecisionRecallDisplay; RocCurveDisplay.from_estimator(clf, X_test, y_test)"
+        desc: "Wykresy krzywych ROC i Precision-Recall"
+        detail:
+          what: "Wizualizuje kompromis TPR/FPR (ROC) lub precision/recall przy różnych progach."
+          how: "from_estimator lub from_predictions. Można nakładać wiele modeli na jeden wykres (ax=)."
+          tips:
+            - "PR curve bardziej informatywna niż ROC przy niezbalansowanych danych"
+            - "Wybierz próg na podstawie krzywej zamiast domyślnego 0.5"
+      - cmd: "from sklearn.metrics import f1_score, precision_score, recall_score; f1 = f1_score(y_test, preds, average='macro')"
+        desc: "Pojedyncze metryki — F1, precision, recall"
+        detail:
+          what: "Liczbowe metryki do logowania i porównań. average kontroluje agregację multiclass."
+          how: "average='macro' (równo), 'weighted' (po liczebności), 'binary' (klasa pozytywna)."
+          tips:
+            - "fbeta_score(beta=2) — waży recall mocniej niż precision"
+            - "matthews_corrcoef — zbalansowana metryka nawet dla nierównych klas"
+      - cmd: "from sklearn.metrics import make_scorer; scorer = make_scorer(f1_score, average='macro')"
+        desc: "Własny scorer dla GridSearchCV i cross_val_score"
+        detail:
+          what: "Owija dowolną metrykę w obiekt scorer używany przez narzędzia model selection."
+          how: "greater_is_better=False dla metryk-błędów (loss). Przekaż jako scoring=scorer."
+          tips:
+            - "sklearn.metrics.get_scorer_names() — lista wbudowanych nazw scoringu"
+            - "Pozwala optymalizować GridSearch pod własną metrykę biznesową"
+
+  - name: "Eksport i deployment"
+    icon: "🚀"
+    commands:
+      - cmd: "import joblib; joblib.dump(pipe, 'model.joblib')"
+        desc: "Zapisz model/pipeline do pliku"
+        detail:
+          what: "Serializuje cały estymator lub pipeline. joblib lepszy niż pickle dla numpy arrays."
+          how: "Zapisuj CAŁY pipeline (z preprocessingiem) — nie tylko model."
+          tips:
+            - "compress=3 — mniejszy plik kosztem czasu zapisu"
+            - "Zapisz wersję sklearn — modele nie są gwarantowane między wersjami"
+      - cmd: "model = joblib.load('model.joblib'); preds = model.predict(X_new)"
+        desc: "Wczytaj model i przewiduj"
+        detail:
+          what: "Odtwarza zapisany pipeline gotowy do predict — bez ręcznego preprocessingu."
+          how: "Nowe dane muszą mieć te same kolumny/kolejność co dane treningowe."
+          tips:
+            - "Wczytuj tylko zaufane pliki — joblib/pickle wykonują kod przy load"
+            - "Trzymaj model i kod preprocessingu w tej samej wersji w repo"
+      - cmd: "from skl2onnx import to_onnx; onx = to_onnx(pipe, X_train[:1].astype(np.float32))"
+        desc: "Eksport do ONNX — interoperowalny deployment"
+        detail:
+          what: "Konwertuje pipeline do ONNX — uruchamiany w C++, Java, .NET, przeglądarce bez sklearn."
+          how: "pip install skl2onnx. Podaj przykładowy input dla inferencji kształtów."
+          tips:
+            - "onnxruntime — szybka inferencja CPU bez instalacji scikit-learn"
+            - "Nie wszystkie estymatory wspierane — sprawdź listę w skl2onnx"
+      - cmd: "from sklearn2pmml import sklearn2pmml, PMMLPipeline; sklearn2pmml(PMMLPipeline([...]), 'model.pmml')"
+        desc: "Eksport do PMML — standard enterprise/Java"
+        detail:
+          what: "PMML to XML-owy standard ML uruchamiany w środowiskach Java (np. Spark, JPMML)."
+          how: "pip install sklearn2pmml (wymaga Java). Owij kroki w PMMLPipeline."
+          tips:
+            - "Popularne w bankowości i ubezpieczeniach (wymogi audytowe)"
+            - "ONNX nowocześniejszy, PMML lepiej wspierany w starym stacku Java"
+      - cmd: "from fastapi import FastAPI; app = FastAPI(); model = joblib.load('model.joblib')"
+        desc: "Serwowanie modelu przez FastAPI"
+        detail:
+          what: "Wczytaj model raz na starcie, endpoint /predict przyjmuje cechy i zwraca predykcję."
+          how: "@app.post('/predict') przyjmuje Pydantic model, woła model.predict, zwraca JSON."
+          tips:
+            - "Ładuj model na starcie (globalnie), nie przy każdym requeście"
+            - "uvicorn app:app — uruchom serwer. Konteneryzuj przez Docker"
+      - cmd: "from sklearn import set_config; set_config(transform_output='pandas')"
+        desc: "Zachowaj nazwy kolumn w wyjściu transformerów"
+        detail:
+          what: "Transformery zwracają DataFrame z nazwami kolumn zamiast surowego numpy array."
+          how: "Globalne ustawienie. Ułatwia debugowanie i interpretowalność pipeline."
+          tips:
+            - "get_feature_names_out() — nazwy cech po transformacji"
+            - "transform_output='polars' — wsparcie Polars (nowsze wersje)"

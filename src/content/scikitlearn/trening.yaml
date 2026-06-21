@@ -1,0 +1,150 @@
+title: "Trening"
+
+items:
+  - name: "fit / predict — podstawowy cykl"
+    icon: "🔄"
+    desc: "Spójne API treningu dla każdego modelu — fit uczy, predict przewiduje, score ocenia"
+    code: |
+      from sklearn.ensemble import RandomForestClassifier
+      from sklearn.model_selection import train_test_split
+
+      X_train, X_test, y_train, y_test = train_test_split(
+          X, y, test_size=0.2, stratify=y, random_state=42
+      )
+
+      clf = RandomForestClassifier(n_estimators=300, n_jobs=-1)
+      clf.fit(X_train, y_train)            # trening
+      preds = clf.predict(X_test)         # predykcja
+      proba = clf.predict_proba(X_test)   # prawdopodobieństwa
+      acc = clf.score(X_test, y_test)     # accuracy
+      print(f"Accuracy: {acc:.3f}")
+
+  - name: "cross_val_score — walidacja krzyżowa"
+    icon: "🔁"
+    desc: "Rzetelna ocena modelu przez k-krotny podział — uśredniony wynik z odchyleniem"
+    code: |
+      from sklearn.model_selection import cross_val_score, StratifiedKFold
+      from sklearn.pipeline import make_pipeline
+      from sklearn.preprocessing import StandardScaler
+      from sklearn.svm import SVC
+
+      # Pipeline zapobiega data leakage przy CV
+      pipe = make_pipeline(StandardScaler(), SVC())
+
+      cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+      scores = cross_val_score(pipe, X, y, cv=cv, scoring="f1_macro", n_jobs=-1)
+
+      print(f"F1: {scores.mean():.3f} +/- {scores.std():.3f}")
+      print("Foldy:", scores)
+
+  - name: "GridSearchCV — tuning hiperparametrów"
+    icon: "🎛️"
+    desc: "Wyczerpujące przeszukiwanie siatki parametrów z cross-validation"
+    code: |
+      from sklearn.model_selection import GridSearchCV
+      from sklearn.ensemble import RandomForestClassifier
+
+      param_grid = {
+          "n_estimators": [100, 300, 500],
+          "max_depth": [None, 10, 20],
+          "max_features": ["sqrt", "log2"],
+      }
+
+      gs = GridSearchCV(
+          RandomForestClassifier(random_state=42),
+          param_grid,
+          cv=5,
+          scoring="f1_macro",
+          n_jobs=-1,
+          verbose=1,
+      )
+      gs.fit(X_train, y_train)
+
+      print("Najlepsze parametry:", gs.best_params_)
+      print("Najlepszy CV score:", gs.best_score_)
+      best_model = gs.best_estimator_   # przetrenowany na całych danych
+
+  - name: "RandomizedSearchCV — losowe przeszukiwanie"
+    icon: "🎲"
+    desc: "Efektywniejszy tuning przy wielu parametrach — losowe próbki z rozkładów"
+    code: |
+      from sklearn.model_selection import RandomizedSearchCV
+      from scipy.stats import randint, uniform
+      from sklearn.ensemble import GradientBoostingClassifier
+
+      param_dist = {
+          "n_estimators": randint(100, 600),
+          "learning_rate": uniform(0.01, 0.3),
+          "max_depth": randint(2, 8),
+          "subsample": uniform(0.6, 0.4),
+      }
+
+      rs = RandomizedSearchCV(
+          GradientBoostingClassifier(),
+          param_dist,
+          n_iter=50,        # tylko 50 losowych kombinacji
+          cv=5,
+          scoring="roc_auc",
+          n_jobs=-1,
+          random_state=42,
+      )
+      rs.fit(X_train, y_train)
+      print("Best:", rs.best_params_, rs.best_score_)
+
+  - name: "Learning curves — diagnoza bias/variance"
+    icon: "📊"
+    desc: "Wykres wyniku vs rozmiar danych — wykryj przeuczenie (variance) lub niedouczenie (bias)"
+    code: |
+      import numpy as np
+      import matplotlib.pyplot as plt
+      from sklearn.model_selection import learning_curve
+
+      sizes, train_scores, val_scores = learning_curve(
+          estimator, X, y, cv=5,
+          train_sizes=np.linspace(0.1, 1.0, 10),
+          scoring="accuracy", n_jobs=-1,
+      )
+
+      plt.plot(sizes, train_scores.mean(axis=1), label="train")
+      plt.plot(sizes, val_scores.mean(axis=1), label="validation")
+      plt.xlabel("Rozmiar zbioru treningowego")
+      plt.ylabel("Score"); plt.legend()
+      # Duża luka = variance (przeuczenie) | oba niskie = bias (niedouczenie)
+
+  - name: "Niezbalansowane klasy"
+    icon: "⚖️"
+    desc: "Strategie dla nierównych klas — class_weight, resampling, dobór metryki"
+    code: |
+      from sklearn.linear_model import LogisticRegression
+      # pip install imbalanced-learn
+      from imblearn.over_sampling import SMOTE
+      from imblearn.pipeline import Pipeline as ImbPipeline
+
+      # 1) class_weight — najprostsze
+      clf = LogisticRegression(class_weight="balanced").fit(X_train, y_train)
+
+      # 2) SMOTE — syntetyczne próbki klasy mniejszościowej (TYLKO na train!)
+      pipe = ImbPipeline([
+          ("smote", SMOTE(random_state=42)),
+          ("clf", LogisticRegression()),
+      ])
+      pipe.fit(X_train, y_train)
+
+      # 3) Oceniaj F1/recall/PR-AUC, NIE accuracy
+
+  - name: "Kalibracja prawdopodobieństw"
+    icon: "🎚️"
+    desc: "CalibratedClassifierCV — popraw wiarygodność predict_proba (Platt / isotonic)"
+    code: |
+      from sklearn.calibration import CalibratedClassifierCV, CalibrationDisplay
+      from sklearn.svm import SVC
+
+      # SVM i drzewa dają słabo skalibrowane prawdopodobieństwa
+      base = SVC()
+      calibrated = CalibratedClassifierCV(base, method="isotonic", cv=5)
+      calibrated.fit(X_train, y_train)
+
+      proba = calibrated.predict_proba(X_test)
+
+      # Wizualna ocena kalibracji (reliability diagram)
+      CalibrationDisplay.from_estimator(calibrated, X_test, y_test)
