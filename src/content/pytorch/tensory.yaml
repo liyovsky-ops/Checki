@@ -1,0 +1,186 @@
+title: "Tensory"
+
+items:
+  - name: "Tworzenie tensorów"
+    icon: "🧮"
+    desc: "Twórz tensory z list, NumPy, zakresów lub specjalnymi inicjalizatorami (zeros, ones, rand, randn)"
+    code: |
+      import torch
+      import numpy as np
+
+      # Z listy Python
+      t1 = torch.tensor([1.0, 2.0, 3.0])
+      t2 = torch.tensor([[1, 2], [3, 4]], dtype=torch.float32)
+
+      # Z NumPy (współdzielona pamięć na CPU)
+      arr = np.array([1.0, 2.0, 3.0])
+      t3 = torch.from_numpy(arr)   # zero-copy
+      t4 = torch.tensor(arr)       # kopia
+
+      # Specjalne inicjalizatory
+      zeros  = torch.zeros(3, 4)           # (3, 4) same zera
+      ones   = torch.ones(2, 3)            # same jedynki
+      eye    = torch.eye(4)                # macierz jednostkowa
+      rand   = torch.rand(5, 5)            # uniform [0, 1)
+      randn  = torch.randn(5, 5)           # standard normal N(0,1)
+      arange = torch.arange(0, 10, 2)      # [0, 2, 4, 6, 8]
+      linspace = torch.linspace(0, 1, 11)  # 11 równoodległych punktów
+
+      # Jak istniejący tensor (zachowuje kształt i device)
+      like_t = torch.zeros_like(t2)
+      full   = torch.full((3, 3), fill_value=7.0)
+
+      print(zeros.shape, zeros.dtype, zeros.device)
+
+  - name: "Operacje na tensorach"
+    icon: "➕"
+    desc: "Arytmetyka, algebra liniowa, redukcje — operacje działają wektorowo bez pętli Python"
+    code: |
+      import torch
+
+      a = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
+      b = torch.tensor([[5.0, 6.0], [7.0, 8.0]])
+
+      # Arytmetyka element-wise
+      print(a + b)          # lub torch.add(a, b)
+      print(a * b)          # element-wise multiply
+      print(a ** 2)         # kwadrat
+      print(torch.sqrt(a))  # pierwiastek
+
+      # Algebra liniowa
+      print(a @ b)                  # mnożenie macierzy (matmul)
+      print(torch.mm(a, b))         # to samo
+      print(torch.dot(a[0], b[0]))  # iloczyn skalarny wektorów
+
+      # Redukcje
+      print(a.sum())                # suma wszystkich elementów
+      print(a.mean(dim=0))          # średnia po wierszach (dim=0)
+      print(a.max())                # maksimum
+      val, idx = a.max(dim=1)       # max z indeksem
+      print(a.argmax())             # indeks maksimum
+
+      # Porównania — zwracają tensor bool
+      mask = a > 2.0
+      print(mask)             # [[False, False], [True, True]]
+      print(a[mask])          # [3., 4.] — boolean indexing
+
+  - name: "GPU i CUDA"
+    icon: "🚀"
+    desc: "Przenoś tensory i modele na GPU — sprawdź dostępność CUDA, zarządzaj pamięcią GPU"
+    code: |
+      import torch
+
+      # Sprawdź dostępność
+      print(torch.cuda.is_available())         # True/False
+      print(torch.cuda.device_count())         # liczba GPU
+      print(torch.cuda.get_device_name(0))     # "NVIDIA GeForce RTX 3090"
+      print(torch.cuda.memory_allocated(0))    # bajty użytej pamięci
+      print(torch.cuda.memory_reserved(0))     # bajty zarezerwowanej pamięci
+
+      # Przenoszenie tensorów
+      device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+      t = torch.randn(1000, 1000)
+      t_gpu = t.to(device)          # do GPU (lub zostaje na CPU)
+      t_back = t_gpu.cpu()          # z powrotem na CPU
+
+      # Tworzenie bezpośrednio na GPU
+      t_cuda = torch.zeros(3, 3, device="cuda")
+      t_cuda = torch.rand(5, 5, device=device)
+
+      # Apple Silicon (MPS)
+      if torch.backends.mps.is_available():
+          mps_device = torch.device("mps")
+          t_mps = t.to(mps_device)
+
+      # Czyść cache GPU po treningu
+      torch.cuda.empty_cache()
+
+  - name: "Autograd i gradienty"
+    icon: "🔄"
+    desc: "Automatyczne różniczkowanie — requires_grad=True włącza śledzenie, .backward() oblicza gradienty"
+    code: |
+      import torch
+
+      # Tensor z śledzeniem gradientu
+      x = torch.tensor([2.0, 3.0], requires_grad=True)
+      y = x ** 2 + 3 * x + 1  # y = x^2 + 3x + 1
+
+      # Oblicz gradienty
+      y.sum().backward()
+      print(x.grad)  # [2*2+3, 2*3+3] = [7., 9.]
+
+      # Wyłącz śledzenie gradientu (inference)
+      with torch.no_grad():
+          z = x ** 2   # nie buduje grafu
+          print(z.requires_grad)  # False
+
+      # Detach — oderwij od grafu obliczeniowego
+      detached = x.detach()     # kopia bez historii gradientów
+      detached.numpy()          # teraz możemy konwertować do NumPy
+
+      # Gradient accumulation
+      x = torch.tensor([1.0], requires_grad=True)
+      for _ in range(3):
+          loss = x ** 2
+          loss.backward()
+          print(x.grad)  # 2.0, 4.0, 6.0 — akumulują się!
+
+      x.grad.zero_()  # wyzeruj przed kolejną iteracją
+
+  - name: "Reshape i Indexing"
+    icon: "✂️"
+    desc: "Zmiana kształtu tensorów, zaawansowane indeksowanie, slice, gather — operacje podobne do NumPy"
+    code: |
+      import torch
+
+      t = torch.arange(24, dtype=torch.float32)
+
+      # Zmiana kształtu
+      t_3d = t.reshape(2, 3, 4)    # (2, 3, 4) — ten sam storage
+      t_2d = t_3d.view(6, 4)       # jak reshape, ale wymaga ciągłości
+      t_flat = t_3d.flatten()      # w 1D tensor
+
+      # Dodanie / usunięcie wymiaru
+      x = torch.randn(3, 4)        # (3, 4)
+      x_unsqueeze = x.unsqueeze(0) # (1, 3, 4)
+      x_squeeze   = x.unsqueeze(0).squeeze(0)  # (3, 4)
+
+      # Transpozycja i permutacja
+      t2 = torch.randn(2, 3)
+      print(t2.T.shape)             # (3, 2)
+      t4 = torch.randn(2, 3, 4, 5)
+      print(t4.permute(3, 0, 1, 2).shape)  # (5, 2, 3, 4)
+
+      # Indeksowanie
+      t = torch.arange(12).reshape(3, 4)
+      print(t[0])         # pierwsza kolumna
+      print(t[0, 2])      # element [0][2]
+      print(t[:, 1:3])    # wszystkie wiersze, kolumny 1 i 2
+
+      # Zaawansowane (fancy) indexing
+      idx = torch.tensor([0, 2])
+      print(t[idx])       # wiersze 0 i 2
+
+  - name: "Broadcasting"
+    icon: "📡"
+    desc: "Automatyczne rozszerzanie tensorów do wspólnego kształtu przy operacjach — jak NumPy broadcasting"
+    code: |
+      import torch
+
+      # Broadcasting: mniejszy tensor rozszerzony do rozmiaru większego
+      a = torch.ones(3, 4)        # (3, 4)
+      b = torch.tensor([1, 2, 3, 4])  # (4,) -> broadcast do (3, 4)
+      print((a + b).shape)        # (3, 4)
+
+      # Normalizacja wierszy z broadcastingiem
+      x = torch.randn(5, 10)
+      mean = x.mean(dim=1, keepdim=True)   # (5, 1) — keepdim zachowuje wymiar
+      std  = x.std(dim=1, keepdim=True)    # (5, 1)
+      x_normalized = (x - mean) / (std + 1e-8)  # broadcasting (5,1) → (5,10)
+      print(x_normalized.shape)    # (5, 10)
+
+      # Zewnętrzny iloczyn przez broadcasting
+      a = torch.arange(1, 4).float()  # [1, 2, 3]
+      b = torch.arange(1, 5).float()  # [1, 2, 3, 4]
+      outer = a.unsqueeze(1) * b.unsqueeze(0)  # (3,1) * (1,4) → (3,4)
+      print(outer)

@@ -1,0 +1,251 @@
+title: "Trening"
+
+items:
+  - name: "Dataset i DataLoader"
+    icon: "📦"
+    desc: "Własna klasa Dataset + DataLoader z batchowaniem, shufflem i wielowątkowym ładowaniem danych"
+    code: |
+      import torch
+      from torch.utils.data import Dataset, DataLoader
+      import numpy as np
+
+      class CustomDataset(Dataset):
+          def __init__(self, data, labels, transform=None):
+              self.data = torch.FloatTensor(data)
+              self.labels = torch.LongTensor(labels)
+              self.transform = transform
+
+          def __len__(self):
+              return len(self.data)
+
+          def __getitem__(self, idx):
+              sample = self.data[idx]
+              label = self.labels[idx]
+              if self.transform:
+                  sample = self.transform(sample)
+              return sample, label
+
+      # Tworzenie DataLoader
+      X = np.random.randn(1000, 784).astype(np.float32)
+      y = np.random.randint(0, 10, 1000)
+
+      dataset = CustomDataset(X, y)
+      train_size = int(0.8 * len(dataset))
+      val_size = len(dataset) - train_size
+      train_ds, val_ds = torch.utils.data.random_split(dataset, [train_size, val_size])
+
+      train_loader = DataLoader(train_ds, batch_size=32, shuffle=True,
+                                num_workers=4, pin_memory=True)
+      val_loader   = DataLoader(val_ds, batch_size=64, shuffle=False, num_workers=4)
+
+      # Iteracja
+      for batch_X, batch_y in train_loader:
+          print(batch_X.shape, batch_y.shape)  # (32, 784), (32,)
+          break
+
+  - name: "Optymalizatory"
+    icon: "⚙️"
+    desc: "SGD, Adam, AdamW — optymalizatory aktualizujące wagi na podstawie gradientów"
+    code: |
+      import torch.optim as optim
+
+      model = ... # Twój model
+
+      # SGD z momentum i weight decay
+      sgd = optim.SGD(
+          model.parameters(),
+          lr=0.01,
+          momentum=0.9,
+          weight_decay=1e-4,
+          nesterov=True
+      )
+
+      # Adam — adaptacyjny learning rate
+      adam = optim.Adam(
+          model.parameters(),
+          lr=1e-3,
+          betas=(0.9, 0.999),
+          eps=1e-8,
+          weight_decay=1e-5
+      )
+
+      # AdamW — Adam z poprawnym weight decay (zalecany dla Transformerów)
+      adamw = optim.AdamW(
+          model.parameters(),
+          lr=2e-4,
+          weight_decay=0.01
+      )
+
+      # Różne LR dla różnych warstw (fine-tuning)
+      optimizer = optim.Adam([
+          {'params': model.backbone.parameters(), 'lr': 1e-5},  # mniejszy LR dla pre-trained
+          {'params': model.head.parameters(), 'lr': 1e-3},      # większy LR dla nowej warstwy
+      ])
+
+      # Learning Rate Scheduler
+      scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
+      scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=5)
+      scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=1e-3, steps_per_epoch=len(train_loader), epochs=10)
+
+  - name: "Loss Functions"
+    icon: "📉"
+    desc: "CrossEntropyLoss, MSELoss, BCELoss — funkcje straty dla klasyfikacji, regresji i binarnych problemów"
+    code: |
+      import torch
+      import torch.nn as nn
+
+      # Klasyfikacja wieloklasowa (logity → klasy)
+      criterion = nn.CrossEntropyLoss()
+      logits = torch.randn(32, 10)        # batch 32, 10 klas
+      labels = torch.randint(0, 10, (32,))
+      loss = criterion(logits, labels)
+
+      # Klasyfikacja wieloetykietowa (sigmoid + BCE)
+      bce = nn.BCEWithLogitsLoss()
+      logits_multi = torch.randn(32, 5)
+      labels_multi = torch.randint(0, 2, (32, 5)).float()
+      loss_bce = bce(logits_multi, labels_multi)
+
+      # Regresja
+      mse = nn.MSELoss()
+      mae = nn.L1Loss()
+      preds = torch.randn(32, 1)
+      targets = torch.randn(32, 1)
+      loss_mse = mse(preds, targets)
+
+      # Huber Loss (odporna na outliery)
+      huber = nn.HuberLoss(delta=1.0)
+
+      # Wagi klas (imbalanced data)
+      weights = torch.tensor([1.0, 5.0, 3.0])  # klasa 1 waży 5x więcej
+      weighted_ce = nn.CrossEntropyLoss(weight=weights)
+
+      print(f"CE loss: {loss.item():.4f}")
+
+  - name: "Pętla trenowania"
+    icon: "🔁"
+    desc: "Kompletna pętla train/eval z walidacją, metrykami, checkpointami i early stopping"
+    code: |
+      import torch
+      import torch.nn as nn
+
+      def train_epoch(model, loader, optimizer, criterion, device):
+          model.train()
+          total_loss, correct, total = 0, 0, 0
+          for batch_X, batch_y in loader:
+              batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+              optimizer.zero_grad()
+              outputs = model(batch_X)
+              loss = criterion(outputs, batch_y)
+              loss.backward()
+              torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+              optimizer.step()
+              total_loss += loss.item() * batch_X.size(0)
+              _, predicted = outputs.max(1)
+              correct += predicted.eq(batch_y).sum().item()
+              total += batch_X.size(0)
+          return total_loss / total, correct / total
+
+      def eval_epoch(model, loader, criterion, device):
+          model.eval()
+          total_loss, correct, total = 0, 0, 0
+          with torch.no_grad():
+              for batch_X, batch_y in loader:
+                  batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+                  outputs = model(batch_X)
+                  loss = criterion(outputs, batch_y)
+                  total_loss += loss.item() * batch_X.size(0)
+                  _, predicted = outputs.max(1)
+                  correct += predicted.eq(batch_y).sum().item()
+                  total += batch_X.size(0)
+          return total_loss / total, correct / total
+
+      # Pętla główna
+      best_val_loss = float('inf')
+      patience, patience_count = 5, 0
+
+      for epoch in range(50):
+          train_loss, train_acc = train_epoch(model, train_loader, optimizer, criterion, device)
+          val_loss, val_acc = eval_epoch(model, val_loader, criterion, device)
+          scheduler.step(val_loss)
+          print(f"Epoch {epoch+1}: train_loss={train_loss:.4f}, val_acc={val_acc:.4f}")
+
+          if val_loss < best_val_loss:
+              best_val_loss = val_loss
+              patience_count = 0
+              torch.save(model.state_dict(), 'best_model.pt')
+          else:
+              patience_count += 1
+              if patience_count >= patience:
+                  print("Early stopping!")
+                  break
+
+  - name: "Checkpoint — zapis i wczytanie"
+    icon: "💾"
+    desc: "Zapisz i wczytaj stan modelu, optimizera i schedulera — wznawiaj trening od dowolnego momentu"
+    code: |
+      import torch
+
+      # Zapis pełnego stanu treningu
+      def save_checkpoint(model, optimizer, scheduler, epoch, loss, path):
+          torch.save({
+              'epoch': epoch,
+              'model_state_dict': model.state_dict(),
+              'optimizer_state_dict': optimizer.state_dict(),
+              'scheduler_state_dict': scheduler.state_dict(),
+              'loss': loss,
+          }, path)
+          print(f"Checkpoint saved: {path}")
+
+      # Wczytanie i wznawianie treningu
+      def load_checkpoint(path, model, optimizer=None, scheduler=None):
+          checkpoint = torch.load(path, map_location='cpu')
+          model.load_state_dict(checkpoint['model_state_dict'])
+          if optimizer:
+              optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+          if scheduler:
+              scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+          epoch = checkpoint['epoch']
+          loss = checkpoint['loss']
+          print(f"Loaded checkpoint from epoch {epoch}, loss={loss:.4f}")
+          return epoch, loss
+
+      # Użycie
+      save_checkpoint(model, optimizer, scheduler, epoch=10, loss=0.123, path="ckpt.pt")
+      start_epoch, last_loss = load_checkpoint("ckpt.pt", model, optimizer, scheduler)
+
+      # Tylko wagi modelu (bez optimizera — do inference)
+      torch.save(model.state_dict(), 'model_weights.pt')
+      model.load_state_dict(torch.load('model_weights.pt', map_location=device))
+
+  - name: "Mixed Precision (AMP)"
+    icon: "⚡"
+    desc: "Automatyczny mixed precision training — float16 dla obliczeń, float32 dla akumulacji; 2x szybciej, mniej VRAM"
+    code: |
+      import torch
+      from torch.cuda.amp import autocast, GradScaler
+
+      scaler = GradScaler()
+
+      def train_amp(model, loader, optimizer, criterion, device):
+          model.train()
+          for batch_X, batch_y in loader:
+              batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+              optimizer.zero_grad()
+
+              # Forward pass w float16
+              with autocast():
+                  outputs = model(batch_X)
+                  loss = criterion(outputs, batch_y)
+
+              # Skalowanie gradientów (zapobiega underflow w float16)
+              scaler.scale(loss).backward()
+              scaler.unscale_(optimizer)
+              torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+              scaler.step(optimizer)
+              scaler.update()
+
+      # PyTorch 2.x — nowy API
+      from torch.amp import autocast as autocast2
+      with autocast2("cuda"):
+          outputs = model(batch_X)

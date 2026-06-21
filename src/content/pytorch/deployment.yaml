@@ -1,0 +1,228 @@
+title: "Deployment"
+
+items:
+  - name: "torch.save / torch.load"
+    icon: "💾"
+    desc: "Zapis i wczytanie wag modelu — state_dict do produkcji, pełny obiekt do eksperymentów"
+    code: |
+      import torch
+      import torch.nn as nn
+
+      class MyModel(nn.Module):
+          def __init__(self):
+              super().__init__()
+              self.fc = nn.Linear(784, 10)
+          def forward(self, x):
+              return self.fc(x)
+
+      model = MyModel()
+
+      # Zalecane: zapis tylko state_dict (wagi)
+      torch.save(model.state_dict(), 'model.pt')
+
+      # Wczytanie state_dict
+      loaded_model = MyModel()
+      loaded_model.load_state_dict(torch.load('model.pt', map_location='cpu'))
+      loaded_model.eval()
+
+      # Zapis pełnego modelu (nie zalecane — kruche przy zmianach klasy)
+      torch.save(model, 'full_model.pt')
+      loaded_full = torch.load('full_model.pt')
+
+      # Przenoszenie między urządzeniami
+      # GPU -> CPU
+      state = torch.load('model.pt', map_location='cpu')
+      # CPU -> GPU
+      state = torch.load('model.pt', map_location='cuda:0')
+
+      model.load_state_dict(state)
+      model = model.to('cuda')
+
+  - name: "TorchScript"
+    icon: "📜"
+    desc: "Serializuj model do formatu niezależnego od Pythona — deploy na C++, mobile, bez Python runtime"
+    code: |
+      import torch
+      import torch.nn as nn
+
+      class ScriptableModel(nn.Module):
+          def __init__(self):
+              super().__init__()
+              self.fc = nn.Linear(10, 5)
+
+          def forward(self, x: torch.Tensor) -> torch.Tensor:
+              return torch.softmax(self.fc(x), dim=-1)
+
+      model = ScriptableModel()
+      model.eval()
+
+      # Metoda 1: torch.jit.script (pełne tracowanie grafu)
+      scripted = torch.jit.script(model)
+      scripted.save('scripted_model.pt')
+
+      # Metoda 2: torch.jit.trace (śledzi konkretny input)
+      example_input = torch.randn(1, 10)
+      traced = torch.jit.trace(model, example_input)
+      traced.save('traced_model.pt')
+
+      # Wczytanie bez definicji klasy
+      loaded = torch.jit.load('scripted_model.pt')
+      loaded.eval()
+
+      with torch.no_grad():
+          out = loaded(torch.randn(4, 10))
+          print(out.shape)  # (4, 5)
+
+      # Deploy na C++ — za pomocą libtorch
+      # auto module = torch::jit::load("scripted_model.pt");
+
+  - name: "ONNX Export"
+    icon: "📦"
+    desc: "Eksportuj model do ONNX — uruchamiaj przez ONNX Runtime na CPU/GPU, TensorRT, OpenVINO"
+    code: |
+      import torch
+      import torch.onnx
+      import onnx
+      import onnxruntime as ort
+      import numpy as np
+
+      model = MyModel()
+      model.eval()
+
+      # Eksport do ONNX
+      dummy_input = torch.randn(1, 784)
+      torch.onnx.export(
+          model,
+          dummy_input,
+          "model.onnx",
+          opset_version=17,
+          input_names=['input'],
+          output_names=['output'],
+          dynamic_axes={
+              'input': {0: 'batch_size'},
+              'output': {0: 'batch_size'},
+          }
+      )
+
+      # Weryfikacja poprawności eksportu
+      onnx_model = onnx.load("model.onnx")
+      onnx.checker.check_model(onnx_model)
+      print("ONNX model is valid!")
+
+      # Inference przez ONNX Runtime
+      session = ort.InferenceSession("model.onnx",
+                                      providers=["CPUExecutionProvider"])
+      input_name = session.get_inputs()[0].name
+      dummy_np = np.random.randn(4, 784).astype(np.float32)
+      output = session.run(None, {input_name: dummy_np})
+      print(f"ONNX output shape: {output[0].shape}")
+
+  - name: "torch.compile()"
+    icon: "⚡"
+    desc: "PyTorch 2.0+ kompilacja modelu — do 2x szybszy inference przez Inductor backend bez zmiany kodu"
+    code: |
+      import torch
+
+      model = MyModel().to("cuda")
+      model.eval()
+
+      # Domyślna kompilacja (dobry punkt startowy)
+      compiled_model = torch.compile(model)
+
+      # Tryby kompilacji
+      # "default" — balans szybkości kompilacji i wydajności
+      # "reduce-overhead" — dla małych batch sizes (zmniejsza overhead CUDA launch)
+      # "max-autotune" — najlepsza wydajność, najdłuższa kompilacja
+
+      fast_model = torch.compile(model, mode="reduce-overhead")
+      best_model = torch.compile(model, mode="max-autotune")
+
+      # Pierwsze wywołanie jest wolne (kompilacja)
+      x = torch.randn(1, 784, device="cuda")
+      with torch.inference_mode():
+          _ = compiled_model(x)  # kompilacja
+
+      # Kolejne wywołania szybkie
+      import time
+      start = time.perf_counter()
+      for _ in range(1000):
+          with torch.inference_mode():
+              _ = compiled_model(x)
+      print(f"Compiled: {(time.perf_counter()-start)*1000:.1f}ms/1000 iters")
+
+  - name: "Inference Mode"
+    icon: "🚀"
+    desc: "Optymalizacja inferecji — model.eval(), torch.inference_mode, batch processing, kwantyzacja"
+    code: |
+      import torch
+      from torch.quantization import quantize_dynamic
+
+      model = MyModel()
+      model.eval()
+
+      # torch.inference_mode — najszybsze wyłączenie gradientów
+      with torch.inference_mode():
+          output = model(torch.randn(1, 784))
+
+      # Dynamic quantization — zmniejsza model, przyspiesza na CPU
+      quantized_model = quantize_dynamic(
+          model,
+          {torch.nn.Linear},   # które warstwy kwantyzować
+          dtype=torch.qint8    # 8-bit integers
+      )
+      print(f"Original: {sum(p.numel() for p in model.parameters()):,} params")
+      print(f"Quantized size: ~{4 * sum(p.numel() for p in model.parameters()) / 4 / 1024:.0f} KB")
+
+      # Batch inference (szybsze niż przykład po przykładzie)
+      texts = [f"Sample text {i}" for i in range(1000)]
+      batch_size = 64
+      results = []
+      for i in range(0, len(texts), batch_size):
+          batch = texts[i:i+batch_size]
+          # process batch...
+          results.extend(batch)
+
+  - name: "torchserve — REST API"
+    icon: "🌐"
+    desc: "Wdróż model PyTorch jako REST API przez TorchServe — produkcyjny serving z batching i metrykami"
+    code: |
+      # Krok 1: Stwórz handler (my_handler.py)
+      from ts.torch_handler.base_handler import BaseHandler
+      import torch
+
+      class MyHandler(BaseHandler):
+          def initialize(self, context):
+              super().initialize(context)
+              self.model.eval()
+
+          def preprocess(self, data):
+              # Przetwórz wejście (JSON → tensor)
+              inputs = []
+              for row in data:
+                  input_data = row.get("body") or row.get("data")
+                  tensor = torch.FloatTensor(input_data)
+                  inputs.append(tensor)
+              return torch.stack(inputs)
+
+          def postprocess(self, output):
+              return output.tolist()
+
+      # Krok 2: Zarchiwizuj model
+      # torch-model-archiver \
+      #   --model-name mymodel \
+      #   --version 1.0 \
+      #   --model-file model.py \
+      #   --serialized-file model.pt \
+      #   --handler my_handler.py \
+      #   --export-path model_store/
+
+      # Krok 3: Uruchom serwer
+      # torchserve --start --model-store model_store --models mymodel=mymodel.mar
+
+      # Krok 4: Wywołaj API
+      import requests
+      response = requests.post(
+          "http://localhost:8080/predictions/mymodel",
+          json={"data": [1.0] * 784}
+      )
+      print(response.json())

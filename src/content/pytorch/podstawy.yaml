@@ -1,0 +1,104 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać PyTorch?
+  firstComponent: Pierwsze kroki z PyTorch
+  firstComponentLang: Python
+
+intro:
+  title: Czym jest PyTorch?
+  desc: >
+    PyTorch to otwartoźródłowy framework do głębokiego uczenia rozwijany przez Meta AI Research.
+    Oparty na dynamicznym grafie obliczeniowym (define-by-run), który pozwala pisać sieciowe modele
+    jak zwykły kod Pythona z pętlami i warunkami. Stał się standardem w badaniach AI dzięki
+    elastyczności, debugowalności i silnej integracji z ekosystemem (Hugging Face, Lightning, torchvision).
+
+concepts:
+  - title: Tensor
+    desc: >
+      Podstawowa struktura danych PyTorch — wielowymiarowa tablica podobna do NumPy ndarray,
+      ale z obsługą GPU i automatycznym różniczkowaniem. Tensory przechowują dane i obliczają gradienty.
+    icon: "🧮"
+  - title: Autograd
+    desc: >
+      Automatyczne różniczkowanie — PyTorch buduje graf obliczeniowy podczas forward pass
+      i automatycznie oblicza gradienty podczas backward pass. Serce optymalizacji sieci neuronowych.
+    icon: "🔄"
+  - title: nn.Module
+    desc: >
+      Klasa bazowa dla wszystkich warstw i modeli w PyTorch. Definiujesz strukturę w __init__()
+      i logikę obliczeniową w forward(). Automatycznie zarządza parametrami i gradientami.
+    icon: "🧱"
+  - title: Optymalizator
+    desc: >
+      SGD, Adam, AdamW — obiekty aktualizujące wagi modelu na podstawie gradientów.
+      optimizer.step() aktualizuje parametry, optimizer.zero_grad() zeruje akumulowane gradienty.
+    icon: "⚙️"
+  - title: DataLoader
+    desc: >
+      Wrapper nad Dataset który dostarcza dane w batchach. Obsługuje shuffle, padding,
+      wielowątkowe ładowanie (num_workers), pin_memory dla GPU i samplowanie.
+    icon: "📦"
+  - title: CUDA
+    desc: >
+      Przenoszenie tensorów i modeli na GPU przez .to('cuda') lub .cuda().
+      GPU może przyspieszyć trening 10-100x dla dużych modeli i batchy.
+    icon: "🚀"
+  - title: Loss Function
+    desc: >
+      Funkcja straty mierzy jak bardzo predykcje różnią się od prawdziwych etykiet.
+      PyTorch ma gotowe: CrossEntropyLoss, MSELoss, BCELoss, NLLLoss i wiele innych.
+    icon: "📉"
+  - title: Gradient Tape"
+    desc: >
+      PyTorch automatycznie śledzi operacje na tensorach z requires_grad=True.
+      loss.backward() wypełnia .grad każdego parametru. Wyłącz przez torch.no_grad() przy inferecji.
+    icon: "📝"
+
+whenToUse:
+  - Badania naukowe i eksperymenty z nowymi architekturami sieci neuronowych
+  - Fine-tuning i trening modeli deep learning (klasyfikacja, detekcja, segmentacja)
+  - Budowanie własnych architektur (CNN, RNN, Transformer, GNN)
+  - Praca z Hugging Face Transformers (PyTorch jest domyślnym backendem)
+  - Computer vision (torchvision), NLP, audio (torchaudio), grafika 3D (pytorch3d)
+  - Reinforcement learning i algorytmy gradientowe
+  - Prototypowanie algorytmów ML z automatycznym różniczkowaniem
+  - Produkcyjne deploymenty przez TorchScript, ONNX lub torch.compile
+
+firstComponent: |
+  import torch
+  import torch.nn as nn
+  import torch.optim as optim
+
+  # Sprawdź dostępność GPU
+  device = "cuda" if torch.cuda.is_available() else "cpu"
+  print(f"Using device: {device}")
+
+  # Prosta sieć neuronowa
+  class SimpleNet(nn.Module):
+      def __init__(self, input_size, hidden_size, output_size):
+          super().__init__()
+          self.fc1 = nn.Linear(input_size, hidden_size)
+          self.relu = nn.ReLU()
+          self.fc2 = nn.Linear(hidden_size, output_size)
+
+      def forward(self, x):
+          return self.fc2(self.relu(self.fc1(x)))
+
+  # Inicjalizacja
+  model = SimpleNet(784, 256, 10).to(device)
+  optimizer = optim.Adam(model.parameters(), lr=1e-3)
+  criterion = nn.CrossEntropyLoss()
+
+  # Przykładowe dane (batch 32, wejście 784 = MNIST flattened)
+  X = torch.randn(32, 784).to(device)
+  y = torch.randint(0, 10, (32,)).to(device)
+
+  # Forward + backward + update
+  optimizer.zero_grad()
+  outputs = model(X)
+  loss = criterion(outputs, y)
+  loss.backward()
+  optimizer.step()
+
+  print(f"Loss: {loss.item():.4f}")
+  print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")

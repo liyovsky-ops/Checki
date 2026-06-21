@@ -1,0 +1,235 @@
+title: "Ekosystem PyTorch"
+
+items:
+  - name: "torchvision"
+    icon: "🖼️"
+    desc: "Standardowa biblioteka Computer Vision — datasety (MNIST, CIFAR, ImageNet), transformacje i pre-trained modele"
+    code: |
+      import torchvision
+      import torchvision.transforms as transforms
+      from torchvision.models import resnet50, ResNet50_Weights
+      from torchvision.datasets import CIFAR10, ImageFolder
+      from torch.utils.data import DataLoader
+
+      # Transformacje dla augmentacji
+      train_transform = transforms.Compose([
+          transforms.RandomHorizontalFlip(p=0.5),
+          transforms.RandomCrop(32, padding=4),
+          transforms.ColorJitter(brightness=0.2, contrast=0.2),
+          transforms.ToTensor(),
+          transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                               std=[0.229, 0.224, 0.225])
+      ])
+
+      # Standardowy dataset CIFAR-10
+      train_ds = CIFAR10(root='./data', train=True, download=True,
+                         transform=train_transform)
+      train_loader = DataLoader(train_ds, batch_size=128, shuffle=True, num_workers=4)
+
+      # Pre-trained ResNet50 z nowymi wagami
+      model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
+      model.fc = __import__('torch.nn', fromlist=['Linear']).Linear(2048, 10)  # fine-tune
+
+      # Własny dataset z katalogu (ImageFolder — klasy = podkatalogi)
+      dataset = ImageFolder('./data/train', transform=train_transform)
+
+  - name: "torchaudio"
+    icon: "🎵"
+    desc: "Przetwarzanie audio — wczytaj pliki audio, spectrogramy, MFCC, pre-trained modele ASR"
+    code: |
+      import torchaudio
+      import torchaudio.transforms as T
+      import torch
+
+      # Wczytaj plik audio
+      waveform, sample_rate = torchaudio.load("audio.wav")
+      print(f"Shape: {waveform.shape}")  # (channels, num_frames)
+      print(f"Sample rate: {sample_rate}")
+
+      # Resampling
+      resampler = T.Resample(orig_freq=sample_rate, new_freq=16000)
+      waveform_16k = resampler(waveform)
+
+      # Mel Spectrogram
+      mel_spectrogram = T.MelSpectrogram(
+          sample_rate=16000,
+          n_fft=1024,
+          win_length=None,
+          hop_length=512,
+          n_mels=128
+      )
+      mel = mel_spectrogram(waveform_16k)
+      print(f"Mel shape: {mel.shape}")  # (1, 128, time)
+
+      # MFCC (Mel-frequency cepstral coefficients)
+      mfcc_transform = T.MFCC(sample_rate=16000, n_mfcc=40)
+      mfcc = mfcc_transform(waveform_16k)
+
+      # Pre-trained wav2vec2 (ASR)
+      bundle = torchaudio.pipelines.WAV2VEC2_ASR_BASE_960H
+      asr_model = bundle.get_model()
+
+  - name: "PyTorch Lightning"
+    icon: "⚡"
+    desc: "Wysokopoziomowy wrapper nad PyTorch — eliminuje boilerplate, obsługuje multi-GPU, distributed training"
+    code: |
+      import torch
+      import torch.nn as nn
+      import pytorch_lightning as pl
+      from torch.utils.data import DataLoader, TensorDataset
+
+      class LitClassifier(pl.LightningModule):
+          def __init__(self, hidden_dim=256, lr=1e-3):
+              super().__init__()
+              self.save_hyperparameters()
+              self.model = nn.Sequential(
+                  nn.Linear(784, hidden_dim),
+                  nn.ReLU(),
+                  nn.Linear(hidden_dim, 10)
+              )
+              self.criterion = nn.CrossEntropyLoss()
+
+          def forward(self, x):
+              return self.model(x)
+
+          def training_step(self, batch, batch_idx):
+              x, y = batch
+              logits = self(x)
+              loss = self.criterion(logits, y)
+              acc = (logits.argmax(1) == y).float().mean()
+              self.log_dict({'train_loss': loss, 'train_acc': acc}, prog_bar=True)
+              return loss
+
+          def validation_step(self, batch, batch_idx):
+              x, y = batch
+              logits = self(x)
+              loss = self.criterion(logits, y)
+              acc = (logits.argmax(1) == y).float().mean()
+              self.log_dict({'val_loss': loss, 'val_acc': acc})
+
+          def configure_optimizers(self):
+              return torch.optim.AdamW(self.parameters(), lr=self.hparams.lr)
+
+      # Trening — automatyczne multi-GPU, precision, logging
+      trainer = pl.Trainer(max_epochs=10, accelerator="auto", precision="16-mixed")
+      trainer.fit(LitClassifier(), train_loader, val_loader)
+
+  - name: "einops"
+    icon: "🔢"
+    desc: "Czytelne operacje na tensorach — rearrange, reduce, repeat z Einstein notation zamiast view/permute"
+    code: |
+      import torch
+      from einops import rearrange, reduce, repeat
+      from einops.layers.torch import Rearrange, Reduce
+
+      x = torch.randn(8, 3, 32, 32)   # (batch, channels, H, W)
+
+      # Flatten spatial dims — czytelniejszy niż x.view(8, 3, -1)
+      flat = rearrange(x, 'b c h w -> b c (h w)')
+      print(flat.shape)  # (8, 3, 1024)
+
+      # Zmień kolejność wymiarów
+      transposed = rearrange(x, 'b c h w -> b h w c')
+      print(transposed.shape)  # (8, 32, 32, 3)
+
+      # Split na patche (Vision Transformer)
+      patches = rearrange(x, 'b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=4, p2=4)
+      print(patches.shape)  # (8, 64, 48) — 64 patche 4x4
+
+      # Redukcja z opisem
+      spatial_mean = reduce(x, 'b c h w -> b c', 'mean')
+      print(spatial_mean.shape)  # (8, 3) — global average pooling
+
+      # Repeat
+      expanded = repeat(spatial_mean, 'b c -> b c h w', h=32, w=32)
+      print(expanded.shape)  # (8, 3, 32, 32)
+
+      # W nn.Sequential — jako warstwa
+      model = nn.Sequential(
+          Rearrange('b c h w -> b (c h w)'),  # flatten
+          nn.Linear(3*32*32, 10)
+      )
+
+  - name: "torchserve"
+    icon: "🌐"
+    desc: "Produkcyjny serving modeli PyTorch — REST API, batching, wiele modeli, monitoring przez Prometheus"
+    code: |
+      # Instalacja
+      # pip install torchserve torch-model-archiver
+
+      # 1. Stwórz handler (my_handler.py)
+      from ts.torch_handler.base_handler import BaseHandler
+      import torch, json
+
+      class ClassifyHandler(BaseHandler):
+          def preprocess(self, data):
+              inputs = [torch.FloatTensor(json.loads(row.get("body"))) for row in data]
+              return torch.stack(inputs)
+
+          def postprocess(self, output):
+              probabilities = torch.softmax(output, dim=-1)
+              return probabilities.tolist()
+
+      # 2. Archiwizuj model
+      # torch-model-archiver \
+      #   --model-name classifier \
+      #   --version 1.0 \
+      #   --model-file model.py \
+      #   --serialized-file model_weights.pt \
+      #   --handler my_handler.py \
+      #   --export-path ./model_store
+
+      # 3. Uruchom TorchServe
+      # torchserve \
+      #   --start \
+      #   --model-store ./model_store \
+      #   --models classifier=classifier.mar \
+      #   --ts-config config.properties
+
+      # 4. Wywołaj API
+      import requests
+      resp = requests.post(
+          "http://localhost:8080/predictions/classifier",
+          data=json.dumps([1.0] * 784),
+          headers={"Content-Type": "application/json"}
+      )
+      print(resp.json())  # [0.1, 0.05, ...]
+
+  - name: "torch.fx — Graph Transforms"
+    icon: "🔄"
+    desc: "Programowalna transformacja modeli — analizuj i modyfikuj graf obliczeniowy do pruning, quantization"
+    code: |
+      import torch
+      import torch.nn as nn
+      import torch.fx as fx
+
+      class MyModel(nn.Module):
+          def __init__(self):
+              super().__init__()
+              self.fc1 = nn.Linear(10, 20)
+              self.relu = nn.ReLU()
+              self.fc2 = nn.Linear(20, 5)
+
+          def forward(self, x):
+              return self.fc2(self.relu(self.fc1(x)))
+
+      model = MyModel()
+
+      # Symboliczne śledzenie grafu
+      traced = fx.symbolic_trace(model)
+      print(traced.graph)
+
+      # Analizuj operacje
+      for node in traced.graph.nodes:
+          print(f"op={node.op}, name={node.name}, target={node.target}")
+
+      # Podmień aktywacje ReLU → GELU
+      for node in traced.graph.nodes:
+          if node.op == 'call_module':
+              module = traced.get_submodule(node.target)
+              if isinstance(module, nn.ReLU):
+                  setattr(traced, node.target, nn.GELU())
+
+      traced.recompile()
+      x = torch.randn(4, 10)
+      print(traced(x).shape)  # (4, 5) — ta sama architektura, inne aktywacje

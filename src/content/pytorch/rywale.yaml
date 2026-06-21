@@ -1,0 +1,68 @@
+title: "PyTorch vs inne frameworki DL"
+
+items:
+  - name: "TensorFlow / Keras"
+    icon: "🧠"
+    color: "#FF6F00"
+    tagline: "Google framework z Keras API — silny w produkcji i mobile, ale mniej elastyczny niż PyTorch"
+    pros:
+      - "TensorFlow Serving i TFLite — dojrzałe narzędzia produkcyjne"
+      - "Keras API bardziej zwięzły dla prostych modeli"
+      - "Silna integracja z ekosystemem Google (TPU, Vertex AI, Cloud)"
+      - "TensorBoard — wizualizacja treningu"
+      - "TF Lite i Edge TPU — deployment na urządzeniach mobilnych"
+    cons:
+      - "Mniej popularny w badaniach — PyTorch dominuje na arXiv"
+      - "API historycznie niespójne (TF1 vs TF2 vs Keras)"
+      - "Statyczny graf obliczeniowy trudniejszy do debugowania"
+      - "Mniejszy ekosystem badawczy (Hugging Face preferuje PyTorch)"
+    vs: "PyTorch dominuje w badaniach akademickich i jest backendem Hugging Face. TensorFlow lepszy dla deploymentu na mobile (TFLite) i w ekosystemie Google Cloud. Dla nowych projektów wybierz PyTorch."
+
+  - name: "JAX / Flax"
+    icon: "⚡"
+    color: "#9C27B0"
+    tagline: "NumPy + automatyczne różniczkowanie + JIT od Google — ultra-wydajny, ale stromiejsza krzywa"
+    pros:
+      - "Funkcyjne programowanie — czyste funkcje bez state"
+      - "jit(), vmap(), pmap() — transformacje programów (wektoryzacja, parallelizm)"
+      - "Doskonały na TPU — Google używa JAX do trenowania Gemini"
+      - "Szybszy niż PyTorch dla wielu architektur badawczych"
+      - "grad() jako funkcja wyższego rzędu — elastyczne różniczkowanie"
+    cons:
+      - "Stromiejsza krzywa uczenia — inne podejście niż OOP PyTorch"
+      - "Mniejszy ekosystem narzędzi i mniej tutoriali"
+      - "Immutable arrays — trzeba myśleć funkcyjnie"
+      - "Flax/Optax/Orbax — wiele osobnych bibliotek do nauczenia"
+    vs: "JAX dla badaczy szukających maksymalnej wydajności na TPU i eleganckich transformacji programów. PyTorch dla większości zastosowań — bogaty ekosystem, Hugging Face, więcej zasobów edukacyjnych."
+
+  - name: "Scikit-learn"
+    icon: "🤖"
+    color: "#F89939"
+    tagline: "Klasyczne ML na CPU — Random Forest, SVM, klastery; nie deep learning"
+    pros:
+      - "Najłatwiejsze API dla klasycznego ML — fit/predict/score"
+      - "Ogromny wybór algorytmów (nie-deep learning)"
+      - "Pipeline API — łatwe preprocessing + model"
+      - "Szybki na małych danych bez GPU"
+      - "Stabilne, dojrzałe, doskonała dokumentacja"
+    cons:
+      - "Brak sieci neuronowych (MLPClassifier to bardzo ograniczone)"
+      - "Nie skaluje na GPU ani duże datasety"
+      - "Brak automatycznego różniczkowania"
+      - "Nieodpowiedni dla obrazów, tekstu, audio w surowej formie"
+    vs: "Scikit-learn i PyTorch to komplementarne narzędzia — sklearn dla tabular data i klasycznych algorytmów, PyTorch dla deep learning na surowych danych (obrazy, tekst, audio). Często używane razem."
+
+  - name: "MXNet"
+    icon: "🌐"
+    color: "#E36A2A"
+    tagline: "Apache MXNet — kiedyś rywal PyTorch, dziś praktycznie martwy"
+    pros:
+      - "Elastyczne GPU training, imperatywne i deklaratywne API"
+      - "Dobra skalowalność multi-GPU i multi-node"
+      - "Gluon API (podobny do PyTorch) był innowacyjny"
+    cons:
+      - "Praktycznie martwy projekt — Amazon przeniósł się na PyTorch"
+      - "Miniaturowa społeczność, brak aktywnego developmentu"
+      - "Żaden wiodący paper badawczy nie używa MXNet"
+      - "Hugging Face i większość ekosystemu ignoruje MXNet"
+    vs: "MXNet należy do historii. Jeśli używasz starszego kodu MXNet — migruj na PyTorch. Nie zaczynaj nowych projektów na MXNet."

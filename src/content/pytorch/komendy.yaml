@@ -1,0 +1,582 @@
+title: "Komendy PyTorch"
+
+groups:
+  - name: "Środowisko i CUDA"
+    icon: "ℹ️"
+    commands:
+      - cmd: "python -c \"import torch; print(torch.__version__)\""
+        desc: "Sprawdź wersję PyTorch"
+        detail:
+          what: "Wyświetla zainstalowaną wersję PyTorch."
+          how: "Porównaj z najnowszą wersją na pytorch.org — regularnie aktualizuj."
+          tips:
+            - "torch.__version__ zawiera też suffix CUDA, np. '2.1.0+cu121'"
+            - "pip show torch — pełne informacje o pakiecie"
+      - cmd: "python -c \"import torch; print(torch.cuda.is_available())\""
+        desc: "Sprawdź czy CUDA jest dostępna"
+        detail:
+          what: "Zwraca True jeśli PyTorch wykrywa GPU z obsługą CUDA."
+          how: "Wymaga kompatybilnej karty NVIDIA, sterownika CUDA i wersji PyTorch z CUDA."
+          tips:
+            - "torch.cuda.device_count() — liczba dostępnych GPU"
+            - "torch.cuda.get_device_name(0) — nazwa GPU"
+      - cmd: "python -c \"import torch; print(torch.backends.mps.is_available())\""
+        desc: "Sprawdź czy Apple Silicon MPS jest dostępny"
+        detail:
+          what: "Sprawdza Metal Performance Shaders dla Mac M1/M2/M3."
+          how: "MPS przyspiesza PyTorch na Apple Silicon bez NVIDIA GPU."
+          tips:
+            - "device = 'mps' if torch.backends.mps.is_available() else 'cpu'"
+            - "Nie wszystkie operacje PyTorch obsługują MPS — sprawdź dokumentację"
+      - cmd: "nvidia-smi"
+        desc: "Informacje o GPU NVIDIA — pamięć, temp, użycie"
+        detail:
+          what: "Wyświetla status wszystkich GPU NVIDIA — driver, CUDA version, pamięć, procesy."
+          how: "Uruchom podczas treningu żeby monitorować użycie VRAM."
+          tips:
+            - "watch -n 1 nvidia-smi — odświeżaj co sekundę"
+            - "nvidia-smi --query-gpu=memory.used,memory.total --format=csv — tylko pamięć"
+      - cmd: "torch.cuda.memory_allocated() / 1024**3"
+        desc: "Sprawdź ile GB GPU pamięci jest aktualnie używane"
+        detail:
+          what: "memory_allocated zwraca bajty aktualnie zajęte przez tensory PyTorch."
+          how: "Dzielenie przez 1024**3 konwertuje do gigabajtów."
+          tips:
+            - "torch.cuda.max_memory_allocated() — peak od startu sesji"
+            - "torch.cuda.empty_cache() — zwolnij cache (nie usuwa aktywnych tensorów)"
+      - cmd: "device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')"
+        desc: "Wybierz urządzenie — GPU jeśli dostępne, inaczej CPU"
+        detail:
+          what: "Standardowy wzorzec wyboru urządzenia — przenośny kod między środowiskami."
+          how: "Następnie przekazuj device do model.to(device) i tensor.to(device)."
+          tips:
+            - "device = 'cuda:1' — konkretna karta GPU (przy multi-GPU)"
+            - "torch.set_default_device('cuda') — PyTorch 2.0+ — ustaw domyślne urządzenie globalnie"
+      - cmd: "torch.cuda.set_device(1); torch.cuda.current_device()"
+        desc: "Ustaw aktywne GPU i sprawdź bieżące urządzenie"
+        detail:
+          what: "set_device(1) ustawia GPU 1 jako domyślne. current_device zwraca indeks aktywnego GPU."
+          how: "Używane przy ręcznym zarządzaniu multi-GPU zamiast DataParallel."
+          tips:
+            - "CUDA_VISIBLE_DEVICES=0,2 python train.py — widoczne tylko GPU 0 i 2"
+            - "torch.cuda.synchronize() — poczekaj na zakończenie operacji GPU (synchronizacja)"
+
+  - name: "Instalacja"
+    icon: "📦"
+    commands:
+      - cmd: "pip install torch torchvision torchaudio"
+        desc: "Zainstaluj PyTorch (CPU)"
+        detail:
+          what: "Instaluje PyTorch, torchvision i torchaudio w wersji CPU."
+          how: "Dla wersji GPU odwiedź pytorch.org/get-started — wybierz CUDA version."
+          tips:
+            - "Zawsze sprawdź pytorch.org dla komendy z odpowiednią wersją CUDA"
+            - "pip install torch --index-url https://download.pytorch.org/whl/cu121 — CUDA 12.1"
+      - cmd: "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121"
+        desc: "Zainstaluj PyTorch z CUDA 12.1"
+        detail:
+          what: "Instaluje PyTorch z obsługą GPU przez CUDA 12.1."
+          how: "Sprawdź wersję CUDA przez nvcc --version lub nvidia-smi."
+          tips:
+            - "cu118 dla CUDA 11.8, cu121 dla CUDA 12.1, cu124 dla CUDA 12.4"
+            - "conda install pytorch torchvision -c pytorch — przez conda (często łatwiejsze)"
+      - cmd: "pip install pytorch-lightning einops torchserve torch-model-archiver"
+        desc: "Zainstaluj popularne rozszerzenia PyTorch"
+        detail:
+          what: "Lightning — high-level wrapper; einops — tensor ops; torchserve — serving."
+          how: "Instaluj według potrzeb projektu — nie wszystko naraz."
+          tips:
+            - "pip install transformers — Hugging Face (używa PyTorch jako backend)"
+            - "pip install timm — PyTorch Image Models (setki pre-trained modeli CV)"
+
+  - name: "Tensor ops"
+    icon: "🔢"
+    commands:
+      - cmd: "x = torch.tensor([[1.0, 2.0], [3.0, 4.0]])"
+        desc: "Utwórz tensor z danych Pythona"
+        detail:
+          what: "torch.tensor kopiuje dane do nowego tensora. Automatycznie wykrywa typ danych."
+          how: "dtype=torch.float32 — jawne określenie dtype. device='cuda' — bezpośrednio na GPU."
+          tips:
+            - "torch.from_numpy(arr) — tensor współdzielący pamięć z numpy array"
+            - "torch.as_tensor(data) — zero-copy gdy możliwe"
+      - cmd: "torch.zeros(3, 4) / torch.ones(3, 4) / torch.rand(3, 4) / torch.randn(3, 4)"
+        desc: "Twórz tensory z zer, jedynek, losowe uniform lub normalny"
+        detail:
+          what: "Podstawowe fabryki tensorów. zeros/ones wypełniają stałymi. rand uniform [0,1), randn N(0,1)."
+          how: "Pierwsze argumenty to shape. dtype i device można dołączyć."
+          tips:
+            - "torch.eye(4) — macierz jednostkowa 4x4"
+            - "torch.full((3, 4), 7.0) — wypełnij wartością 7.0"
+      - cmd: "torch.arange(0, 10, 2) / torch.linspace(0, 1, 50)"
+        desc: "Sekwencje arytmetyczne — krok lub równe odstępy"
+        detail:
+          what: "arange(start, stop, step) — jak range() Pythona. linspace(start, end, n) — n punktów."
+          how: "linspace gwarantuje dokładnie n punktów i zawiera endpoint — dobry dla wykresów."
+          tips:
+            - "torch.logspace(0, 3, 4) — przestrzeń logarytmiczna [1, 10, 100, 1000]"
+            - "arange z float może mieć błędy zaokrąglenia — preferuj linspace"
+      - cmd: "torch.cat([a, b], dim=0) / torch.stack([a, b], dim=0)"
+        desc: "Łącz tensory — cat wzdłuż osi, stack dodaje nową oś"
+        detail:
+          what: "cat łączy tensory o tej samej liczbie wymiarów wzdłuż istniejącej osi. stack tworzy nową oś."
+          how: "cat([3x4, 3x4], dim=0) -> 6x4. stack([3x4, 3x4], dim=0) -> 2x3x4."
+          tips:
+            - "torch.vstack/hstack — wygodne aliasy dla cat po dim=0/1"
+            - "torch.chunk(x, 3, dim=0) — podziel tensor na 3 części"
+      - cmd: "x.reshape(2, -1) / x.view(2, -1) / x.permute(1, 0, 2)"
+        desc: "Zmieniaj kształt i kolejność osi tensora"
+        detail:
+          what: "reshape bezpieczny (kopiuje jeśli trzeba). view szybszy ale wymaga contiguous. permute zamienia osie."
+          how: "-1 w reshape/view auto-oblicza rozmiar. permute(1, 0, 2) zamienia oś 0 i 1."
+          tips:
+            - "x.contiguous() — upewnij się że tensor jest ciągły w pamięci przed view"
+            - "x.transpose(0, 1) — zamień dwie osie (specjalny przypadek permute)"
+      - cmd: "x.squeeze(0) / x.unsqueeze(0)"
+        desc: "Usuń lub dodaj wymiar rozmiaru 1"
+        detail:
+          what: "squeeze usuwa wymiary o rozmiarze 1. unsqueeze dodaje nowy wymiar rozmiaru 1."
+          how: "squeeze() bez argumentu usuwa WSZYSTKIE wymiary o rozmiarze 1."
+          tips:
+            - "x[None] — to samo co x.unsqueeze(0) — dodaj batch dimension"
+            - "x.flatten() — spłaszcz do 1D tensora"
+      - cmd: |
+          a = torch.tensor([[1, 2], [3, 4]])
+          b = torch.tensor([[5, 6]])
+          result = a + b
+        desc: "Broadcasting — operacje na tensorach różnych kształtów"
+        detail:
+          what: "PyTorch automatycznie rozszerza mniejsze tensory żeby pasowały do większych."
+          how: "Zasady: wyrównaj od prawej, wymiary 1 są rozszerzane, wymiary brakujące = 1."
+          tips:
+            - "torch.broadcast_shapes(a.shape, b.shape) — sprawdź wynikowy kształt"
+            - "Częsty błąd: a.shape (3,) i b.shape (3,1) dają (3,3) nie (3,)"
+
+  - name: "Autograd"
+    icon: "⬅️"
+    commands:
+      - cmd: "x = torch.tensor([2.0], requires_grad=True)"
+        desc: "Utwórz tensor ze śledzeniem gradientów"
+        detail:
+          what: "requires_grad=True oznacza tensor jako część grafu obliczeniowego — gradienty będą policzone."
+          how: "Parametry modelu (nn.Parameter) mają requires_grad=True automatycznie."
+          tips:
+            - "x.requires_grad_(True) — metoda in-place do zmiany flagi na istniejącym tensorze"
+            - "Tylko float tensory mogą mieć requires_grad=True"
+      - cmd: "loss.backward(); print(x.grad)"
+        desc: "Policz gradienty przez backpropagation"
+        detail:
+          what: "backward() oblicza dL/dx dla wszystkich tensorów z requires_grad=True w grafie."
+          how: "Gradienty akumulują się w .grad — dlatego zero_grad() przed każdym krokiem."
+          tips:
+            - "loss.backward(retain_graph=True) — zachowaj graf (dla wielu backward())"
+            - "torch.autograd.grad(loss, x) — gradienty bez zapisywania do .grad"
+      - cmd: "with torch.no_grad(): y = model(x)"
+        desc: "Wyłącz śledzenie gradientów dla bloku kodu"
+        detail:
+          what: "no_grad() zapobiega budowaniu grafu obliczeniowego — szybsze, mniej pamięci."
+          how: "Używaj podczas ewaluacji i inferecji. torch.inference_mode() jest jeszcze szybszy."
+          tips:
+            - "@torch.no_grad() jako dekorator całej funkcji inferecji"
+            - "torch.inference_mode() — preferowany dla czystej inferecji"
+      - cmd: "y = x.detach()"
+        desc: "Odłącz tensor od grafu obliczeniowego"
+        detail:
+          what: "detach() zwraca nowy tensor bez historii gradientów, współdzielący pamięć z oryginałem."
+          how: "Używaj gdy potrzebujesz numpy array lub gdy nie chcesz backpropagować przez ten tensor."
+          tips:
+            - "x.detach().numpy() — konwertuj tensor na numpy (wymaga CPU)"
+            - "Nie rób item() w pętli treningowej — kosztowne synchronizacje GPU-CPU"
+      - cmd: |
+          with torch.enable_grad():
+              loss = compute_loss(x)
+        desc: "Włącz gradienty wewnątrz bloku no_grad"
+        detail:
+          what: "enable_grad() nadpisuje no_grad() — przydatne gdy outer scope wyłącza gradienty."
+          how: "Rzadko potrzebne — głównie w bibliotekach które nie wiedzą o kontekście."
+          tips:
+            - "torch.is_grad_enabled() — sprawdź czy gradienty są aktywne"
+            - "Zachowaj zasadę: no_grad do ewaluacji, enable_grad do trenowania"
+
+  - name: "nn.Module i warstwy"
+    icon: "🤖"
+    commands:
+      - cmd: "print(sum(p.numel() for p in model.parameters()))"
+        desc: "Policz parametry modelu"
+        detail:
+          what: "Sumuje liczbę elementów we wszystkich tensorach parametrów modelu."
+          how: "Przydatne do porównania rozmiarów modeli i szacowania użycia pamięci."
+          tips:
+            - "sum(p.numel() for p in model.parameters() if p.requires_grad) — tylko trenowalnych"
+            - "1M parametrów float32 = 4MB RAM"
+      - cmd: "model.train() / model.eval()"
+        desc: "Przełącz tryb trening / ewaluacja"
+        detail:
+          what: "train() aktywuje Dropout i BatchNorm w trybie treningowym. eval() je wyłącza."
+          how: "Zawsze wywołuj model.eval() przed inferecją — inaczej wyniki będą losowe (Dropout)."
+          tips:
+            - "Zapominanie model.eval() to częsty błąd powodujący niestabilne predykcje"
+            - "Tryb wpływa tylko na Dropout, BatchNorm, LayerNorm — nie na wagi"
+      - cmd: |
+          class MyNet(nn.Module):
+              def __init__(self):
+                  super().__init__()
+                  self.fc1 = nn.Linear(784, 256)
+                  self.fc2 = nn.Linear(256, 10)
+              def forward(self, x):
+                  return self.fc2(torch.relu(self.fc1(x)))
+        desc: "Definicja własnej sieci jako nn.Module"
+        detail:
+          what: "Dziedziczenie po nn.Module daje automatyczne śledzenie parametrów, .to(device), state_dict()."
+          how: "__init__ definiuje warstwy. forward() definiuje przepływ danych."
+          tips:
+            - "super().__init__() — ZAWSZE wywołuj w __init__"
+            - "nn.Sequential — alternatywa dla prostych sieci bez rozgałęzień"
+      - cmd: "for name, param in model.named_parameters(): print(name, param.shape)"
+        desc: "Iteruj przez nazwane parametry modelu"
+        detail:
+          what: "named_parameters() zwraca (nazwa, tensor) dla każdego parametru w modelu."
+          how: "Używane do zamrażania warstw, różnych LR per warstwa (layer-wise LR decay)."
+          tips:
+            - "model.parameters() — tylko tensory (bez nazw)"
+            - "model.named_modules() — wszystkie moduły (warstwy), nie tylko parametry"
+      - cmd: "model = model.to(device) / model.cuda() / model.cpu()"
+        desc: "Przenieś model na GPU lub CPU"
+        detail:
+          what: ".to(device) przenosi wszystkie parametry i bufory na wskazane urządzenie."
+          how: ".cuda() = .to('cuda'). .cpu() = .to('cpu'). Zwraca self — można chainować."
+          tips:
+            - "model.to(device) jest idiomatyczny — device może być string lub torch.device"
+            - "model.half() — konwertuj do float16 (mniej VRAM, szybsze na GPU)"
+      - cmd: "print(model)"
+        desc: "Wydrukuj architekturę modelu"
+        detail:
+          what: "Wyświetla hierarchiczną strukturę modelu ze wszystkimi warstwami."
+          how: "Pokazuje nazwy warstw, ich typy i parametry (np. Linear(784, 256))."
+          tips:
+            - "torchinfo.summary(model, input_size=(1, 784)) — szczegółowe info jak Keras summary()"
+            - "pip install torchinfo — narzędzie do podglądu kształtów warstw"
+
+  - name: "Optymalizatory i LR"
+    icon: "⚙️"
+    commands:
+      - cmd: "optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.01)"
+        desc: "AdamW — Adam z poprawionym weight decay (preferowany dla Transformerów)"
+        detail:
+          what: "AdamW naprawia błąd w regularyzacji L2 oryginalnego Adama — decoupled weight decay."
+          how: "Domyślny optymalizator dla fine-tuningu LLM. lr=1e-4 do 5e-5 typowe dla fine-tuningu."
+          tips:
+            - "betas=(0.9, 0.999), eps=1e-8 — domyślne wartości, rzadko trzeba zmieniać"
+            - "weight_decay=0.01 — regularyzacja L2 dla wszystkich parametrów"
+      - cmd: "optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, nesterov=True)"
+        desc: "SGD z momentum Nesterova — dobry dla CNN"
+        detail:
+          what: "SGD z momentum i Nesterov acceleration — często lepszy niż Adam dla computer vision."
+          how: "Wymaga strojenia LR — użyj learning rate schedulera."
+          tips:
+            - "weight_decay=1e-4 — regularyzacja"
+            - "Przy multi-GPU użyj większego LR (scaling rule: LR *= num_gpus)"
+      - cmd: "scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)"
+        desc: "Cosine Annealing scheduler LR"
+        detail:
+          what: "Zmniejsza LR według krzywej cosinus — soft restart lub zmniejszenie do minimum."
+          how: "T_max — liczba kroków/epok do minimum. eta_min — minimalne LR (domyślnie 0)."
+          tips:
+            - "CosineAnnealingWarmRestarts — periodic restarts (SGDR)"
+            - "scheduler.step() po każdej epoce (lub po każdym batchu dla OneCycleLR)"
+      - cmd: "scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=1e-3, steps_per_epoch=len(loader), epochs=10)"
+        desc: "OneCycleLR — warmup + cosine decay w jednym cyklu"
+        detail:
+          what: "Najskuteczniejszy scheduler dla szybkiego treningu — warmup do max_lr, potem decay."
+          how: "Wymaga wywołania scheduler.step() po KAŻDYM batchu, nie epoce."
+          tips:
+            - "pct_start=0.3 — 30% kroków na warmup"
+            - "Używany przez fastai i HF Trainer jako domyślny"
+      - cmd: "scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3, factor=0.5)"
+        desc: "Zmniejsz LR gdy metryka przestaje się poprawiać"
+        detail:
+          what: "Monitoruje metrykę i zmniejsza LR gdy nie ma poprawy przez patience epok."
+          how: "scheduler.step(val_loss) — przekazuj metrykę do kroku schedulera."
+          tips:
+            - "mode='max' dla accuracy (domyślnie 'min' dla loss)"
+            - "threshold=1e-4 — minimalna poprawa żeby uznać za progres"
+      - cmd: "torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)"
+        desc: "Przytnij gradienty — zapobiega gradient explosion"
+        detail:
+          what: "Przycina normę gradientów do max_norm. Kluczowe dla RNN i Transformerów."
+          how: "Wywołuj po loss.backward(), przed optimizer.step()."
+          tips:
+            - "max_norm=1.0 to dobra wartość startowa dla LLM i Transformerów"
+            - "clip_grad_value_(params, clip_value=0.5) — przycina wartości (nie normę)"
+
+  - name: "Loss functions"
+    icon: "📉"
+    commands:
+      - cmd: "criterion = nn.CrossEntropyLoss(); loss = criterion(logits, targets)"
+        desc: "Cross Entropy Loss — klasyfikacja wieloklasowa"
+        detail:
+          what: "Łączy LogSoftmax i NLLLoss. Przyjmuje surowe logity (nie po softmax) i indeksy klas."
+          how: "logits: (batch, num_classes). targets: (batch,) — indeksy klas jako Long tensor."
+          tips:
+            - "weight=class_weights — ważone klasy dla niezbalansowanych datasetów"
+            - "ignore_index=-100 — ignoruj przykłady oznaczone jako -100 (używane w HF Trainer)"
+      - cmd: "criterion = nn.MSELoss(); loss = criterion(predictions, targets)"
+        desc: "Mean Squared Error Loss — regresja"
+        detail:
+          what: "MSE mierzy średni kwadrat różnicy — standardowy loss dla regresji."
+          how: "reduction='mean' (domyślnie), 'sum', 'none'. predictions i targets muszą mieć ten sam kształt."
+          tips:
+            - "nn.L1Loss() — MAE, odporniejszy na outliers"
+            - "nn.HuberLoss() — kompromis między MSE i MAE"
+      - cmd: "criterion = nn.BCEWithLogitsLoss(); loss = criterion(logits, targets.float())"
+        desc: "Binary Cross Entropy z logitami — klasyfikacja binarna lub multi-label"
+        detail:
+          what: "BCEWithLogitsLoss = Sigmoid + BCELoss — numerycznie stabilniejsze niż osobno."
+          how: "targets.float() — konwertuj na float (BCELoss nie przyjmuje Long)."
+          tips:
+            - "pos_weight=torch.tensor([3.0]) — waga dla klasy pozytywnej (niezbalansowane dane)"
+            - "Dla multi-label targets shape: (batch, num_labels) z wartościami 0 lub 1"
+      - cmd: |
+          class FocalLoss(nn.Module):
+              def __init__(self, gamma=2.0):
+                  super().__init__()
+                  self.gamma = gamma
+              def forward(self, logits, targets):
+                  ce = F.cross_entropy(logits, targets, reduction='none')
+                  pt = torch.exp(-ce)
+                  return ((1 - pt) ** self.gamma * ce).mean()
+        desc: "Custom Focal Loss — dla mocno niezbalansowanych klas"
+        detail:
+          what: "Focal Loss zmniejsza wagę łatwych przykładów — skupia się na trudnych."
+          how: "gamma=2.0 — standardowa wartość. Wyższe gamma — bardziej skupione na trudnych."
+          tips:
+            - "Oryginalnie dla object detection (RetinaNet) — działa dla każdej klasyfikacji"
+            - "F.cross_entropy zamiast nn.CrossEntropyLoss — wygodniejsze w custom loss"
+
+  - name: "DataLoader i dataset"
+    icon: "📊"
+    commands:
+      - cmd: "loader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=4)"
+        desc: "Utwórz DataLoader z wielowątkowym ładowaniem"
+        detail:
+          what: "DataLoader dostarcza batchów danych — shuffle miesza kolejność co epokę."
+          how: "num_workers=4 używa 4 procesów do ładowania danych równolegle z GPU."
+          tips:
+            - "pin_memory=True przyspiesza transfer CPU→GPU (zalecane gdy trenujesz na GPU)"
+            - "num_workers=0 — jednowątkowy (konieczny na Windows z CUDA)"
+      - cmd: |
+          class MyDataset(torch.utils.data.Dataset):
+              def __init__(self, data, labels):
+                  self.data = data
+                  self.labels = labels
+              def __len__(self):
+                  return len(self.data)
+              def __getitem__(self, idx):
+                  return self.data[idx], self.labels[idx]
+        desc: "Własna klasa Dataset — implementacja interfejsu"
+        detail:
+          what: "Custom Dataset wymaga __len__ i __getitem__. DataLoader używa getitem do budowania batchy."
+          how: "__getitem__ może ładować pliki, stosować augmentacje, tokenizować — cokolwiek."
+          tips:
+            - "Cache'uj dane jeśli transformacje są drogie — transforms na dysk"
+            - "Dziedzicz po Dataset nawet dla prostych datasetsów — kompatybilność z DataLoader"
+      - cmd: "train_ds, val_ds = torch.utils.data.random_split(dataset, [0.8, 0.2])"
+        desc: "Podziel dataset na train/validation (80/20)"
+        detail:
+          what: "random_split losowo dzieli dataset na podzbiory o podanych proporcjach."
+          how: "PyTorch 2.0+ obsługuje proporcje float. Wcześniej podaj liczby całkowite."
+          tips:
+            - "generator=torch.Generator().manual_seed(42) — reprodukowalny podział"
+            - "Stratified split wymaga własnej implementacji lub sklearn.model_selection"
+      - cmd: "for batch_X, batch_y in loader: batch_X, batch_y = batch_X.to(device), batch_y.to(device)"
+        desc: "Iteruj przez DataLoader i przenoś na GPU"
+        detail:
+          what: "Standardowa pętla przez batchów — przeniesienie na GPU musi być jawne."
+          how: "Każde wywołanie next(iter(loader)) daje nowy batch po przetasowaniu."
+          tips:
+            - "non_blocking=True w .to(device) — asynchroniczny transfer"
+            - "tqdm(loader, desc='Training') — pasek postępu"
+      - cmd: |
+          def collate_fn(batch):
+              texts, labels = zip(*batch)
+              padded = nn.utils.rnn.pad_sequence(texts, batch_first=True)
+              return padded, torch.tensor(labels)
+          loader = DataLoader(dataset, collate_fn=collate_fn)
+        desc: "Własny collate_fn — padding sekwencji o różnej długości"
+        detail:
+          what: "collate_fn składa listę próbek w batch. Domyślny stacks tensory tej samej wielkości."
+          how: "pad_sequence obsługuje różne długości — padding do najdłuższego w batchu."
+          tips:
+            - "Niezbędne dla NLP gdzie zdania mają różną długość"
+            - "torch.nn.utils.rnn.pack_padded_sequence — efektywniejsze dla LSTM"
+
+  - name: "Train loop snippets"
+    icon: "🔁"
+    commands:
+      - cmd: "optimizer.zero_grad(); loss.backward(); optimizer.step()"
+        desc: "Krok optymalizacji — zeruj gradienty, backward, update"
+        detail:
+          what: "Trzy linie podstawowej pętli treningowej PyTorch — zawsze w tej kolejności."
+          how: "zero_grad() usuwa poprzednie gradienty. backward() oblicza nowe. step() aktualizuje wagi."
+          tips:
+            - "set_to_none=True w zero_grad() — szybsze i oszczędza pamięć (PyTorch 1.7+)"
+            - "Gradient accumulation: wywołuj step() co N batchy dla symulacji większego batch"
+      - cmd: |
+          from torch.cuda.amp import autocast, GradScaler
+          scaler = GradScaler()
+          with autocast():
+              output = model(input)
+              loss = criterion(output, target)
+          scaler.scale(loss).backward()
+          scaler.step(optimizer)
+          scaler.update()
+        desc: "Mixed Precision Training (AMP) — szybsze, mniej VRAM"
+        detail:
+          what: "AMP automatycznie używa float16 gdzie bezpieczne i float32 gdzie potrzebne."
+          how: "GradScaler zapobiega underflow gradientów w float16 przez skalowanie loss."
+          tips:
+            - "Typowo 1.5-2x szybciej z prawie identyczną dokładnością"
+            - "torch.cuda.amp.autocast(dtype=torch.bfloat16) — bfloat16 na Ampere+"
+      - cmd: "scheduler.step()"
+        desc: "Krok schedulera LR po każdej epoce"
+        detail:
+          what: "Aktualizuje learning rate według harmonogramu (cosine, linear decay, plateau)."
+          how: "ReduceLROnPlateau: scheduler.step(val_loss) — przyjmuje metrykę."
+          tips:
+            - "Wywołuj po optimizer.step(), nie przed"
+            - "scheduler.get_last_lr() — sprawdź aktualny learning rate"
+      - cmd: "with torch.no_grad(): outputs = model(X)"
+        desc: "Inference bez śledzenia gradientów"
+        detail:
+          what: "Wyłącza autograd dla bloku kodu — szybsze i mniej pamięci podczas ewaluacji."
+          how: "Alternatywa: @torch.no_grad() jako dekorator, lub torch.inference_mode() (szybszy)."
+          tips:
+            - "torch.inference_mode() szybszy niż no_grad — używaj do inferecji"
+            - "Pamiętaj model.eval() + no_grad razem dla poprawnej ewaluacji"
+      - cmd: |
+          for i, (X, y) in enumerate(loader):
+              loss = compute_loss(X, y)
+              (loss / accumulation_steps).backward()
+              if (i + 1) % accumulation_steps == 0:
+                  optimizer.step()
+                  optimizer.zero_grad()
+        desc: "Gradient accumulation — symuluj większy batch size"
+        detail:
+          what: "Akumuluj gradienty przez N batchy zanim zrobisz krok optymalizatora."
+          how: "Efektywny batch size = batch_size * accumulation_steps. Dzielenie loss normalizuje gradient."
+          tips:
+            - "Użyteczne gdy nie mieści się duży batch na GPU"
+            - "Nie zapomnij podzielić loss przez accumulation_steps przed backward()"
+
+  - name: "Checkpoint i deploy"
+    icon: "💾"
+    commands:
+      - cmd: "torch.save(model.state_dict(), 'model.pt')"
+        desc: "Zapisz wagi modelu"
+        detail:
+          what: "Zapisuje słownik state_dict (nazwa parametru -> tensor) do pliku."
+          how: "Zalecany sposób zapisu — niezależny od definicji klasy modelu."
+          tips:
+            - "model.state_dict() to OrderedDict wszystkich parametrów i buforów"
+            - "Użyj .safetensors zamiast .pt dla bezpieczniejszego zapisu"
+      - cmd: "model.load_state_dict(torch.load('model.pt', map_location='cpu'))"
+        desc: "Wczytaj wagi modelu"
+        detail:
+          what: "Wczytuje parametry z pliku do istniejącej instancji modelu."
+          how: "map_location='cpu' bezpiecznie wczytuje model trenowany na GPU na CPU."
+          tips:
+            - "strict=False — ignoruj brakujące/dodatkowe klucze (przydatne przy fine-tuningu)"
+            - "Zawsze model.eval() po wczytaniu do inferecji"
+      - cmd: |
+          checkpoint = {
+              'epoch': epoch,
+              'model_state': model.state_dict(),
+              'optimizer_state': optimizer.state_dict(),
+              'loss': best_loss
+          }
+          torch.save(checkpoint, 'checkpoint.pt')
+        desc: "Pełny checkpoint z opcją wznowienia treningu"
+        detail:
+          what: "Zapisuje model, optimizer i metadane — pozwala wznowić trening od miejsca przerwania."
+          how: "Wczytaj: ckpt = torch.load('checkpoint.pt'); model.load_state_dict(ckpt['model_state'])."
+          tips:
+            - "Zapisuj co N epok lub gdy val_loss najniższy — early stopping"
+            - "optimizer.load_state_dict(ckpt['optimizer_state']) — też wznów stan optimizera"
+      - cmd: "scripted = torch.jit.script(model); scripted.save('model_scripted.pt')"
+        desc: "TorchScript — serializuj model do deploymentu bez Pythona"
+        detail:
+          what: "TorchScript kompiluje model do formy która działa bez interpretera Pythona."
+          how: "Zapisany model wczytaj przez torch.jit.load() — działa w C++/mobile."
+          tips:
+            - "torch.jit.trace(model, example_input) — prostszy ale nie obsługuje branchy"
+            - "@torch.jit.script jako dekorator funkcji — dla specyficznych funkcji"
+      - cmd: "torch.onnx.export(model, dummy_input, 'model.onnx', opset_version=17)"
+        desc: "Eksportuj model do ONNX — interoperability"
+        detail:
+          what: "ONNX (Open Neural Network Exchange) — format obsługiwany przez TensorRT, OpenVINO, ONNX Runtime."
+          how: "dummy_input musi mieć kształt prawdziwego inputu. opset_version=17 — najnowszy stabilny."
+          tips:
+            - "dynamic_axes={'input': {0: 'batch_size'}} — zmienny batch size"
+            - "pip install onnxruntime — szybka inferecja CPU bez PyTorch"
+      - cmd: "model = torch.compile(model, mode='reduce-overhead')"
+        desc: "torch.compile — kompilacja JIT dla szybszego inference"
+        detail:
+          what: "torch.compile (PyTorch 2.0+) kompiluje model przez TorchDynamo — 30-200% szybciej."
+          how: "Pierwsze wywołanie wolne (kompilacja). Tryb reduce-overhead dla małych batch sizes."
+          tips:
+            - "mode='max-autotune' — dłuższa kompilacja, maksymalna prędkość"
+            - "fullgraph=True — kompiluj cały model (błąd jeśli są niekompatybilne operacje)"
+
+  - name: "Debugowanie i profiling"
+    icon: "🔍"
+    commands:
+      - cmd: "print(x.shape, x.dtype, x.device, x.requires_grad)"
+        desc: "Sprawdź właściwości tensora"
+        detail:
+          what: "Wydrukuje kształt, typ danych, urządzenie i czy tensor śledzi gradienty."
+          how: "Podstawowa diagnostyka przy debugowaniu błędów kształtu lub urządzenia."
+          tips:
+            - "x.min(), x.max(), x.mean() — sprawdź wartości (wykryj NaN/Inf)"
+            - "torch.isnan(x).any() — sprawdź czy jest NaN"
+      - cmd: "with torch.autograd.detect_anomaly(): loss.backward()"
+        desc: "Wykryj anomalie w gradientach (NaN, Inf)"
+        detail:
+          what: "detect_anomaly() wykrywa NaN/Inf podczas backward pass i wskazuje źródło."
+          how: "Spowalnia trening — używaj tylko do debugowania, nie w produkcji."
+          tips:
+            - "Jeśli backward() produkuje NaN — sprawdź czy learning rate nie jest za duży"
+            - "Gradient clipping często rozwiązuje problem explosion gradients"
+      - cmd: "prof = torch.profiler.profile(activities=[...], record_shapes=True)"
+        desc: "Profiluj operacje PyTorch — gdzie spędza czas"
+        detail:
+          what: "Mierzy czas CPU i GPU per operację — identyfikuj bottlenecks."
+          how: "Uruchom kilka kroków treningu pod profilerem i exportuj do TensorBoard."
+          tips:
+            - "prof.key_averages().table(sort_by='cuda_time_total') — top operacje po czasie GPU"
+            - "torch.profiler.schedule(wait=1, warmup=1, active=3) — standardowy harmonogram"
+      - cmd: "torch.cuda.memory_summary()"
+        desc: "Podsumowanie użycia pamięci GPU"
+        detail:
+          what: "Wyświetla szczegółowe informacje o alokacji pamięci CUDA — bieżące, pik, reserved."
+          how: "Przydatne przy debugowaniu OOM (out of memory) błędów na GPU."
+          tips:
+            - "torch.cuda.memory_allocated() — bajty aktualnie używane przez tensory"
+            - "torch.cuda.empty_cache() — zwolnij cache (nie zwolni aktywnych tensorów)"
+      - cmd: "torch.manual_seed(42); torch.cuda.manual_seed_all(42)"
+        desc: "Ustaw seed dla reprodukowalności"
+        detail:
+          what: "Ustawia seed generatora liczb losowych PyTorch (CPU i GPU)."
+          how: "Dla pełnej reprodukowalności ustaw też numpy i random seed."
+          tips:
+            - "torch.backends.cudnn.deterministic = True — deterministyczne operacje CUDA"
+            - "torch.backends.cudnn.benchmark = False — wyłącz autotuning (szybkość vs reproduk.)"
+      - cmd: |
+          import torchinfo
+          torchinfo.summary(model, input_size=(1, 3, 224, 224))
+        desc: "Szczegółowe podsumowanie architektury jak Keras summary()"
+        detail:
+          what: "torchinfo wyświetla każdą warstwę z kształtami wejścia/wyjścia, liczbą parametrów."
+          how: "input_size to kształt przykładowego inputu (z batch dimension)."
+          tips:
+            - "pip install torchinfo — nie jest wbudowane w PyTorch"
+            - "col_names=['input_size', 'output_size', 'num_params'] — kolumny tabeli"

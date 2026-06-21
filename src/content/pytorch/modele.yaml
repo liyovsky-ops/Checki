@@ -1,0 +1,249 @@
+title: "Modele"
+
+items:
+  - name: "nn.Module — klasa bazowa"
+    icon: "🧱"
+    desc: "Klasa bazowa wszystkich modeli i warstw — definiuj parametry w __init__, logikę w forward()"
+    code: |
+      import torch
+      import torch.nn as nn
+
+      class MLP(nn.Module):
+          def __init__(self, input_dim, hidden_dim, output_dim, dropout=0.3):
+              super().__init__()
+              self.layers = nn.Sequential(
+                  nn.Linear(input_dim, hidden_dim),
+                  nn.BatchNorm1d(hidden_dim),
+                  nn.ReLU(),
+                  nn.Dropout(dropout),
+                  nn.Linear(hidden_dim, hidden_dim // 2),
+                  nn.ReLU(),
+                  nn.Linear(hidden_dim // 2, output_dim)
+              )
+
+          def forward(self, x):
+              return self.layers(x)
+
+      model = MLP(784, 512, 10)
+      print(model)
+
+      # Liczba parametrów
+      total = sum(p.numel() for p in model.parameters())
+      trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+      print(f"Total: {total:,} | Trainable: {trainable:,}")
+
+      # Forward pass
+      x = torch.randn(32, 784)  # batch 32
+      out = model(x)
+      print(out.shape)  # (32, 10)
+
+  - name: "nn.Sequential"
+    icon: "📋"
+    desc: "Zbuduj model jako sekwencję warstw bez pisania klasy — szybki prototyping prostych architektur"
+    code: |
+      import torch.nn as nn
+
+      # Prosta sieć bez własnej klasy
+      model = nn.Sequential(
+          nn.Linear(784, 256),
+          nn.ReLU(),
+          nn.Dropout(0.2),
+          nn.Linear(256, 128),
+          nn.ReLU(),
+          nn.Linear(128, 10)
+      )
+
+      # Sekwential z nazwami warstw (OrderedDict)
+      from collections import OrderedDict
+      model_named = nn.Sequential(OrderedDict([
+          ('flatten', nn.Flatten()),
+          ('fc1', nn.Linear(784, 256)),
+          ('relu1', nn.ReLU()),
+          ('fc2', nn.Linear(256, 10)),
+      ]))
+
+      # Dostęp do warstw po nazwie
+      print(model_named.fc1)
+      print(model_named.fc1.weight.shape)  # (256, 784)
+
+  - name: "nn.Conv2d — CNN"
+    icon: "🖼️"
+    desc: "Konwolucyjna sieć neuronowa do przetwarzania obrazów — wykrywa lokalne cechy przez filtry"
+    code: |
+      import torch
+      import torch.nn as nn
+      import torch.nn.functional as F
+
+      class SimpleCNN(nn.Module):
+          def __init__(self, num_classes=10):
+              super().__init__()
+              # Feature extraction
+              self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+              self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+              self.pool = nn.MaxPool2d(2, 2)
+              self.bn1 = nn.BatchNorm2d(32)
+              self.bn2 = nn.BatchNorm2d(64)
+
+              # Classifier
+              self.dropout = nn.Dropout(0.5)
+              self.fc1 = nn.Linear(64 * 7 * 7, 512)  # po 2x pool 28->7
+              self.fc2 = nn.Linear(512, num_classes)
+
+          def forward(self, x):
+              x = self.pool(F.relu(self.bn1(self.conv1(x))))  # 28->14
+              x = self.pool(F.relu(self.bn2(self.conv2(x))))  # 14->7
+              x = x.flatten(1)                                # (B, 64*7*7)
+              x = F.relu(self.fc1(self.dropout(x)))
+              return self.fc2(x)
+
+      model = SimpleCNN()
+      x = torch.randn(8, 1, 28, 28)  # batch 8, grayscale 28x28
+      print(model(x).shape)  # (8, 10)
+
+  - name: "nn.LSTM — RNN"
+    icon: "🔀"
+    desc: "Sieć rekurencyjna do sekwencji — tekst, szeregi czasowe, mowa; obsługuje dwukierunkowe LSTM"
+    code: |
+      import torch
+      import torch.nn as nn
+
+      class TextClassifier(nn.Module):
+          def __init__(self, vocab_size, embed_dim, hidden_dim, num_classes, num_layers=2):
+              super().__init__()
+              self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=0)
+              self.lstm = nn.LSTM(
+                  embed_dim, hidden_dim,
+                  num_layers=num_layers,
+                  batch_first=True,
+                  bidirectional=True,
+                  dropout=0.3
+              )
+              self.dropout = nn.Dropout(0.5)
+              self.fc = nn.Linear(hidden_dim * 2, num_classes)  # *2 bo bidirectional
+
+          def forward(self, x):
+              embedded = self.embedding(x)        # (B, seq_len, embed_dim)
+              output, (hidden, cell) = self.lstm(embedded)
+              # Weź ostatni hidden state z obu kierunków
+              last_hidden = torch.cat([hidden[-2], hidden[-1]], dim=1)
+              return self.fc(self.dropout(last_hidden))
+
+      model = TextClassifier(vocab_size=10000, embed_dim=128, hidden_dim=256, num_classes=5)
+      x = torch.randint(0, 10000, (32, 100))  # batch 32, sekwencje długości 100
+      print(model(x).shape)  # (32, 5)
+
+  - name: "nn.Transformer"
+    icon: "⚡"
+    desc: "Transformer encoder-decoder z self-attention — do seq2seq, tłumaczenia, summarization"
+    code: |
+      import torch
+      import torch.nn as nn
+      import math
+
+      class PositionalEncoding(nn.Module):
+          def __init__(self, d_model, max_len=5000):
+              super().__init__()
+              pe = torch.zeros(max_len, d_model)
+              position = torch.arange(0, max_len).unsqueeze(1).float()
+              div_term = torch.exp(torch.arange(0, d_model, 2).float() *
+                                   (-math.log(10000.0) / d_model))
+              pe[:, 0::2] = torch.sin(position * div_term)
+              pe[:, 1::2] = torch.cos(position * div_term)
+              self.register_buffer('pe', pe.unsqueeze(0))
+
+          def forward(self, x):
+              return x + self.pe[:, :x.size(1)]
+
+      class SimpleTransformer(nn.Module):
+          def __init__(self, vocab_size, d_model=256, nhead=8, num_layers=3, num_classes=10):
+              super().__init__()
+              self.embedding = nn.Embedding(vocab_size, d_model)
+              self.pos_enc = PositionalEncoding(d_model)
+              encoder_layer = nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward=512,
+                                                         batch_first=True)
+              self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+              self.fc = nn.Linear(d_model, num_classes)
+
+          def forward(self, x):
+              x = self.pos_enc(self.embedding(x))
+              x = self.transformer(x)
+              return self.fc(x.mean(dim=1))  # mean pooling
+
+      model = SimpleTransformer(vocab_size=10000)
+      x = torch.randint(0, 10000, (8, 50))
+      print(model(x).shape)  # (8, 10)
+
+  - name: "Custom forward()"
+    icon: "🔧"
+    desc: "Zaawansowane wzorce w forward() — residual connections, attention, conditional computation"
+    code: |
+      import torch
+      import torch.nn as nn
+      import torch.nn.functional as F
+
+      class ResidualBlock(nn.Module):
+          """Blok residualny jak w ResNet"""
+          def __init__(self, channels):
+              super().__init__()
+              self.conv1 = nn.Conv2d(channels, channels, 3, padding=1)
+              self.bn1 = nn.BatchNorm2d(channels)
+              self.conv2 = nn.Conv2d(channels, channels, 3, padding=1)
+              self.bn2 = nn.BatchNorm2d(channels)
+
+          def forward(self, x):
+              residual = x   # skip connection
+              out = F.relu(self.bn1(self.conv1(x)))
+              out = self.bn2(self.conv2(out))
+              return F.relu(out + residual)  # dodaj skip connection
+
+      class MultiHeadSelfAttention(nn.Module):
+          """Własna self-attention"""
+          def __init__(self, d_model, num_heads):
+              super().__init__()
+              self.attention = nn.MultiheadAttention(d_model, num_heads, batch_first=True)
+              self.norm = nn.LayerNorm(d_model)
+              self.dropout = nn.Dropout(0.1)
+
+          def forward(self, x, mask=None):
+              attn_out, attn_weights = self.attention(x, x, x, key_padding_mask=mask)
+              return self.norm(x + self.dropout(attn_out)), attn_weights
+
+      # Test
+      block = ResidualBlock(64)
+      x = torch.randn(2, 64, 32, 32)
+      print(block(x).shape)  # (2, 64, 32, 32) - taki sam kształt
+
+      attn = MultiHeadSelfAttention(256, 8)
+      seq = torch.randn(4, 20, 256)  # (batch, seq_len, d_model)
+      out, weights = attn(seq)
+      print(out.shape, weights.shape)
+
+  - name: "Warstwy aktywacji i normalizacja"
+    icon: "📊"
+    desc: "ReLU, GELU, SiLU, BatchNorm, LayerNorm, GroupNorm — kluczowe komponenty architektur deep learning"
+    code: |
+      import torch
+      import torch.nn as nn
+
+      x = torch.randn(8, 64, 28, 28)  # batch, channels, H, W
+
+      # Aktywacje
+      relu = nn.ReLU()(x)       # max(0, x)
+      gelu = nn.GELU()(x)       # Gaussian error linear unit (Transformers)
+      silu = nn.SiLU()(x)       # x * sigmoid(x) — LLaMA, EfficientNet
+      leaky = nn.LeakyReLU(0.1)(x)  # małe ujemne wartości zamiast zera
+
+      # Normalizacja
+      bn = nn.BatchNorm2d(64)(x)     # po kanałach (CNN)
+      ln_x = x.view(8, 64, -1)
+      ln = nn.LayerNorm([64, 784])(ln_x)  # po cechach (Transformery)
+      gn = nn.GroupNorm(8, 64)(x)    # grupowa normalizacja (małe batch)
+
+      # Dropout
+      drop2d = nn.Dropout2d(0.2)(x)  # dropuje całe kanały (CNN)
+      drop = nn.Dropout(0.3)
+      drop.train()   # aktywny podczas treningu
+      drop.eval()    # dezaktywowany podczas inferecji
+
+      print("ReLU:", relu.shape)
+      print("BatchNorm:", bn.shape)
