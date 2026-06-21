@@ -1,0 +1,478 @@
+title: "Komendy NumPy"
+
+groups:
+  - name: "Tworzenie tablic"
+    icon: "🧱"
+    commands:
+      - cmd: "a = np.array([[1, 2], [3, 4]], dtype=np.float64)"
+        desc: "Utwórz tablicę z listy z jawnym dtype"
+        detail:
+          what: "np.array konwertuje listy/krotki na ndarray. dtype kontroluje typ elementów."
+          how: "Zagnieżdżone listy dają tablice wielowymiarowe. Bez dtype NumPy wnioskuje typ."
+          tips:
+            - "np.asarray(x) — nie kopiuje jeśli x już jest ndarray (oszczędność)"
+            - "a.astype(np.float32) — konwersja typu istniejącej tablicy"
+      - cmd: "z = np.zeros((3, 4)); o = np.ones((2, 3)); f = np.full((2, 2), 7)"
+        desc: "Tablice wypełnione zerami, jedynkami lub stałą"
+        detail:
+          what: "Fabryki tablic o zadanym kształcie. zeros/ones domyślnie float64."
+          how: "Pierwszy argument to shape (krotka). dtype= dla innego typu."
+          tips:
+            - "np.zeros_like(a) — zera w kształcie i dtype istniejącej tablicy a"
+            - "np.empty((3,3)) — niezainicjalizowana (szybsza, śmieci w pamięci)"
+      - cmd: "r = np.arange(0, 10, 2); l = np.linspace(0, 1, 11)"
+        desc: "Sekwencje — krok (arange) lub równe odstępy (linspace)"
+        detail:
+          what: "arange jak range() Pythona. linspace daje dokładnie n punktów z endpointem."
+          how: "arange(start, stop, step). linspace(start, stop, num) zawiera oba końce."
+          tips:
+            - "Dla float preferuj linspace — arange ma błędy zaokrąglenia"
+            - "np.logspace(0, 3, 4) — [1, 10, 100, 1000] w skali log"
+      - cmd: "e = np.eye(4); d = np.diag([1, 2, 3])"
+        desc: "Macierz jednostkowa i macierz diagonalna"
+        detail:
+          what: "eye(n) tworzy macierz jednostkową n×n. diag z wektora tworzy macierz przekątną."
+          how: "diag(macierz) wyciąga przekątną; diag(wektor) buduje macierz diagonalną."
+          tips:
+            - "np.identity(n) — alias dla eye(n)"
+            - "np.tri(n) — dolna macierz trójkątna jedynek"
+      - cmd: "g = np.random.default_rng(42); x = g.standard_normal((3, 3))"
+        desc: "Losowe tablice nowoczesnym generatorem"
+        detail:
+          what: "default_rng to zalecany od NumPy 1.17 Generator (zastępuje np.random.*)."
+          how: "Podaj seed dla reprodukowalności. Metody: standard_normal, uniform, integers."
+          tips:
+            - "g.integers(0, 10, size=(2,3)) — losowe inty z zakresu"
+            - "Stary styl np.random.seed/randn — działa, ale Generator jest lepszy"
+      - cmd: "m = np.meshgrid(np.arange(3), np.arange(4))"
+        desc: "Siatka współrzędnych z wektorów osi"
+        detail:
+          what: "meshgrid tworzy macierze współrzędnych — do funkcji 2D, wykresów, ewaluacji na siatce."
+          how: "Zwraca listę tablic. indexing='ij' dla konwencji macierzowej zamiast kartezjańskiej."
+          tips:
+            - "np.mgrid[0:3, 0:4] — zwięzła alternatywa przez slicing"
+            - "sparse=True — oszczędza pamięć przy dużych siatkach"
+
+  - name: "Operacje na kształcie"
+    icon: "📐"
+    commands:
+      - cmd: "b = a.reshape(2, -1)"
+        desc: "Zmień kształt tablicy (-1 = auto-wymiar)"
+        detail:
+          what: "reshape reinterpretuje te same dane w nowym kształcie (zwykle bez kopiowania)."
+          how: "-1 oznacza 'oblicz ten wymiar automatycznie'. Liczba elementów musi się zgadzać."
+          tips:
+            - "reshape zwraca widok jeśli możliwe — modyfikacja wpływa na oryginał"
+            - "a.ravel() / a.flatten() — spłaszcz do 1D (ravel=widok, flatten=kopia)"
+      - cmd: "t = a.T; p = a.transpose(2, 0, 1)"
+        desc: "Transpozycja i zmiana kolejności osi"
+        detail:
+          what: ".T odwraca osie (transpozycja 2D). transpose() przestawia osie w dowolnej kolejności."
+          how: "transpose(2,0,1) przesuwa oś 2 na początek. Zwraca widok (zmienia tylko strides)."
+          tips:
+            - "np.swapaxes(a, 0, 1) — zamień dwie konkretne osie"
+            - "np.moveaxis(a, 0, -1) — przenieś oś z pozycji 0 na ostatnią"
+      - cmd: "e = a[:, np.newaxis]; s = a.squeeze()"
+        desc: "Dodaj (newaxis) lub usuń (squeeze) wymiar rozmiaru 1"
+        detail:
+          what: "newaxis/None dodaje oś o rozmiarze 1. squeeze usuwa wszystkie wymiary rozmiaru 1."
+          how: "a[:, None] dodaje oś na pozycji 1. np.expand_dims(a, axis) — czytelniejszy odpowiednik."
+          tips:
+            - "Newaxis kluczowy dla broadcastingu (np. kolumna vs wiersz)"
+            - "a.squeeze(axis=0) — usuń konkretną oś (błąd jeśli rozmiar != 1)"
+      - cmd: "c = np.concatenate([a, b], axis=0); v = np.vstack([a, b])"
+        desc: "Łączenie tablic wzdłuż osi"
+        detail:
+          what: "concatenate łączy wzdłuż istniejącej osi. vstack/hstack to wygodne aliasy."
+          how: "axis=0 łączy wiersze, axis=1 kolumny. Tablice muszą pasować w pozostałych wymiarach."
+          tips:
+            - "np.stack([a, b], axis=0) — tworzy NOWĄ oś (w przeciwieństwie do concatenate)"
+            - "np.column_stack — sklej 1D tablice jako kolumny macierzy"
+      - cmd: "parts = np.split(a, 3, axis=0)"
+        desc: "Podział tablicy na części"
+        detail:
+          what: "split dzieli tablicę na równe części wzdłuż osi. Zwraca listę pod-tablic."
+          how: "Drugi argument: liczba części lub lista indeksów podziału."
+          tips:
+            - "np.array_split — dopuszcza nierówne części (split wymaga równych)"
+            - "np.hsplit / np.vsplit — podział poziomy/pionowy"
+      - cmd: "tiled = np.tile(a, (2, 3)); rep = np.repeat(a, 3)"
+        desc: "Powielanie tablicy (tile) i elementów (repeat)"
+        detail:
+          what: "tile powtarza całą tablicę jak kafelki. repeat powtarza każdy element osobno."
+          how: "tile(a, (2,3)) — 2x w pionie, 3x w poziomie. repeat(a, 3) — każdy element 3 razy."
+          tips:
+            - "np.repeat(a, [1,2,3]) — różna liczba powtórzeń per element"
+            - "Do broadcastingu zwykle nie trzeba tile — NumPy robi to wirtualnie"
+
+  - name: "Indeksowanie i slicing"
+    icon: "🎯"
+    commands:
+      - cmd: "x = a[1, 2]; row = a[0, :]; col = a[:, 1]"
+        desc: "Podstawowe indeksowanie i slicing"
+        detail:
+          what: "a[i, j] — element. a[i, :] — wiersz. a[:, j] — kolumna. Slicing zwraca widok."
+          how: "Przecinek oddziela osie. : oznacza całą oś. Indeksy od 0, ujemne od końca."
+          tips:
+            - "Slicing to WIDOK — modyfikacja zmienia oryginał! Użyj .copy() jeśli trzeba"
+            - "a[1:3, ::2] — wiersze 1-2, co druga kolumna"
+      - cmd: "mask = a > 5; selected = a[mask]"
+        desc: "Boolean masking — wybór po warunku"
+        detail:
+          what: "Tablica boolowska wybiera elementy spełniające warunek. Zwraca 1D kopię."
+          how: "a[a > 5] = 0 — przypisanie warunkowe. Łącz warunki przez & | ~ (z nawiasami!)."
+          tips:
+            - "a[(a > 2) & (a < 8)] — uwaga na nawiasy i & zamiast and"
+            - "np.where(a > 5, a, 0) — element warunkowy bez modyfikacji oryginału"
+      - cmd: "picked = a[[0, 2, 4]]; grid = a[[0, 1], [2, 3]]"
+        desc: "Fancy indexing — wybór przez tablice indeksów"
+        detail:
+          what: "Indeksowanie tablicą indeksów zwraca KOPIĘ. Można wybierać w dowolnej kolejności."
+          how: "a[[0,2,4]] — wiersze 0,2,4. a[[0,1],[2,3]] — elementy (0,2) i (1,3)."
+          tips:
+            - "Fancy indexing zawsze kopiuje (inaczej niż slicing)"
+            - "np.take(a, indices, axis=0) — alternatywa, czasem szybsza"
+      - cmd: "idx = np.where(a > 5)"
+        desc: "Znajdź indeksy spełniające warunek"
+        detail:
+          what: "np.where(condition) zwraca krotkę tablic indeksów elementów True."
+          how: "np.where(cond, x, y) — wybór element-wise (jak ternary). Dwie różne funkcjonalności!"
+          tips:
+            - "np.argwhere(a > 5) — indeksy jako kolumny (n_found, ndim)"
+            - "np.nonzero(a) — indeksy elementów niezerowych"
+      - cmd: "a[1:3] = 0; np.put(a, [0, 2], [99, 88])"
+        desc: "Przypisanie do wycinka i przez indeksy"
+        detail:
+          what: "Slicing po lewej stronie = modyfikuje in-place. put ustawia wartości po indeksach (flat)."
+          how: "a[mask] = wartość działa na całym maskowanym obszarze. put pracuje na spłaszczonej tablicy."
+          tips:
+            - "np.place(a, mask, vals) — przypisz wartości tam gdzie maska True"
+            - "Przypisanie do widoku zmienia tablicę źródłową"
+      - cmd: "diag = np.diagonal(a); tri = np.triu(a)"
+        desc: "Wyciąganie przekątnej i części trójkątnej"
+        detail:
+          what: "diagonal wyciąga przekątną. triu/tril zwracają górny/dolny trójkąt (reszta zerowana)."
+          how: "np.diag działa w obie strony. k= przesuwa względem głównej przekątnej."
+          tips:
+            - "np.fill_diagonal(a, 0) — wypełnij przekątną in-place"
+            - "np.triu(a, k=1) — ścisły górny trójkąt (bez przekątnej)"
+
+  - name: "Operacje matematyczne"
+    icon: "➗"
+    commands:
+      - cmd: "c = a + b; d = a * 2; e = np.sqrt(a)"
+        desc: "Operacje arytmetyczne element-wise"
+        detail:
+          what: "Operatory +-*/ działają na całych tablicach element po elemencie (wektoryzacja)."
+          how: "ufunc jak np.sqrt, np.exp, np.log działają na każdym elemencie naraz, w C."
+          tips:
+            - "a += b — operacje in-place (bez nowej tablicy, oszczędność pamięci)"
+            - "np.power(a, 2), np.abs(a), np.sign(a) — typowe ufunc"
+      - cmd: "s = np.sin(a); ex = np.exp(a); lg = np.log(a)"
+        desc: "Funkcje matematyczne (ufunc)"
+        detail:
+          what: "Universal functions stosują funkcję do każdego elementu z obsługą broadcastingu."
+          how: "np.sin/cos/tan, exp/log/log10, sqrt, floor/ceil/round — wszystkie wektorowe."
+          tips:
+            - "np.log1p(x) i np.expm1(x) — stabilne dla x bliskich 0"
+            - "out= parametr — zapisz wynik do istniejącej tablicy (bez alokacji)"
+      - cmd: "clipped = np.clip(a, 0, 1)"
+        desc: "Przytnij wartości do zakresu"
+        detail:
+          what: "clip ogranicza wartości — poniżej min ustawia min, powyżej max ustawia max."
+          how: "np.clip(a, min, max). None dla jednostronnego ograniczenia."
+          tips:
+            - "Częste w normalizacji i zapobieganiu przepełnieniom"
+            - "np.maximum(a, 0) — ReLU; np.minimum(a, b) — element-wise min"
+      - cmd: "r = np.round(a, 2); fl = np.floor(a); ce = np.ceil(a)"
+        desc: "Zaokrąglanie wartości"
+        detail:
+          what: "round zaokrągla do n miejsc, floor w dół, ceil w górę, trunc obcina do całości."
+          how: "np.round używa bankowego zaokrąglania (do parzystej) dla .5."
+          tips:
+            - "np.rint(a) — do najbliższej liczby całkowitej (float wynik)"
+            - "Konwersja a.astype(int) obcina, nie zaokrągla!"
+      - cmd: "cum = np.cumsum(a); cp = np.cumprod(a)"
+        desc: "Sumy i iloczyny skumulowane"
+        detail:
+          what: "cumsum zwraca narastającą sumę, cumprod narastający iloczyn wzdłuż osi."
+          how: "axis= wybiera oś. Bez axis — działa na spłaszczonej tablicy."
+          tips:
+            - "np.diff(a) — różnice między kolejnymi elementami (odwrotność cumsum)"
+            - "np.gradient(a) — numeryczna pochodna"
+      - cmd: "d = np.dot(a, b); m = a @ b; o = np.outer(u, v)"
+        desc: "Iloczyny — skalarny, macierzowy, zewnętrzny"
+        detail:
+          what: "@ to mnożenie macierzy. dot dla 1D = iloczyn skalarny. outer = iloczyn zewnętrzny."
+          how: "a @ b dla 2D = mnożenie macierzowe. Kształty muszą być zgodne (n,k)@(k,m)."
+          tips:
+            - "Preferuj @ nad np.dot dla czytelności (PEP 465)"
+            - "np.einsum('ij,jk->ik', a, b) — uniwersalny zapis Einstein notation"
+
+  - name: "Linear algebra"
+    icon: "🔻"
+    commands:
+      - cmd: "inv = np.linalg.inv(A)"
+        desc: "Odwrotność macierzy"
+        detail:
+          what: "Oblicza macierz odwrotną A⁻¹ (tylko dla kwadratowych, nieosobliwych)."
+          how: "Do rozwiązywania układów preferuj solve — szybsze i stabilniejsze niż inv."
+          tips:
+            - "np.linalg.pinv(A) — pseudoodwrotność (dla niekwadratowych/osobliwych)"
+            - "Nie odwracaj by rozwiązać Ax=b — użyj solve!"
+      - cmd: "x = np.linalg.solve(A, b)"
+        desc: "Rozwiąż układ równań liniowych Ax = b"
+        detail:
+          what: "Zwraca x spełniające Ax = b. Numerycznie stabilniejsze niż inv(A) @ b."
+          how: "A musi być kwadratowa i nieosobliwa. b to wektor lub macierz prawych stron."
+          tips:
+            - "np.linalg.lstsq(A, b) — najmniejsze kwadraty dla układów nadokreślonych"
+            - "Dla wielu b naraz — przekaż b jako macierz kolumn"
+      - cmd: "vals, vecs = np.linalg.eig(A)"
+        desc: "Wartości i wektory własne"
+        detail:
+          what: "eig zwraca wartości własne (vals) i wektory własne (kolumny vecs)."
+          how: "Dla macierzy symetrycznych użyj eigh — szybsze i zwraca rzeczywiste wyniki."
+          tips:
+            - "np.linalg.eigh(A) — dla symetrycznych/hermitowskich (PCA, kowariancja)"
+            - "np.linalg.eigvals(A) — same wartości własne (bez wektorów)"
+      - cmd: "U, S, Vt = np.linalg.svd(A)"
+        desc: "Rozkład według wartości osobliwych (SVD)"
+        detail:
+          what: "Rozkłada A = U·diag(S)·Vt. Podstawa PCA, kompresji, pseudoodwrotności."
+          how: "full_matrices=False dla zredukowanego (oszczędność dla niekwadratowych)."
+          tips:
+            - "S to wartości osobliwe posortowane malejąco"
+            - "Fundament redukcji wymiarów i systemów rekomendacji"
+      - cmd: "n = np.linalg.norm(v); det = np.linalg.det(A)"
+        desc: "Norma wektora i wyznacznik macierzy"
+        detail:
+          what: "norm liczy długość (L2 domyślnie). det zwraca wyznacznik macierzy kwadratowej."
+          how: "norm(v, ord=1) dla L1, ord=np.inf dla maksimum. axis= dla norm per wiersz/kolumna."
+          tips:
+            - "np.linalg.matrix_rank(A) — rząd macierzy"
+            - "np.trace(A) — ślad (suma przekątnej)"
+      - cmd: "q, r = np.linalg.qr(A); L = np.linalg.cholesky(A)"
+        desc: "Rozkłady QR i Choleskiego"
+        detail:
+          what: "QR rozkłada A=QR (ortogonalna × trójkątna). Cholesky A=LLᵀ dla dodatnio określonych."
+          how: "QR do najmniejszych kwadratów. Cholesky szybszy dla macierzy kowariancji."
+          tips:
+            - "Cholesky wymaga macierzy symetrycznej dodatnio określonej"
+            - "QR stabilniejszy numerycznie niż równania normalne"
+      - cmd: "T = np.tensordot(A, B, axes=([2], [0])); K = np.kron(A, B)"
+        desc: "Iloczyn tensorowy (tensordot) i Kroneckera (kron)"
+        detail:
+          what: "tensordot uogólnia mnożenie macierzy na dowolne osie tensorów. kron to iloczyn Kroneckera."
+          how: "axes wskazuje pary osi do skontraktowania. einsum daje jeszcze większą kontrolę."
+          tips:
+            - "np.tensordot(A, B, axes=1) — kontrakcja po ostatniej/pierwszej osi"
+            - "Dla batch operacji na wielu macierzach użyj np.matmul (@) z broadcastingiem"
+
+  - name: "Statystyki"
+    icon: "📊"
+    commands:
+      - cmd: "m = a.mean(axis=0); s = a.std(axis=1)"
+        desc: "Średnia i odchylenie standardowe per oś"
+        detail:
+          what: "mean i std liczą statystyki. axis=0 po kolumnach, axis=1 po wierszach."
+          how: "Bez axis — na całej tablicy. keepdims=True zachowuje wymiary (do broadcastingu)."
+          tips:
+            - "a.var() — wariancja. ddof=1 dla wariancji próbkowej (dzielenie przez n-1)"
+            - "keepdims=True ułatwia normalizację: (a - a.mean(0, keepdims=True))"
+      - cmd: "mn = a.min(axis=0); mx = a.max(); pk = np.ptp(a)"
+        desc: "Minimum, maksimum i rozstęp"
+        detail:
+          what: "min/max zwracają skrajne wartości. ptp (peak-to-peak) = max - min."
+          how: "axis= dla per-oś. Bez axis — wartość globalna."
+          tips:
+            - "np.argmin/argmax — INDEKS minimum/maksimum (nie wartość)"
+            - "np.maximum(a, b) vs a.max() — element-wise vs redukcja!"
+      - cmd: "med = np.median(a); q = np.percentile(a, [25, 50, 75])"
+        desc: "Mediana i percentyle"
+        detail:
+          what: "median to wartość środkowa. percentile zwraca wartości na danych percentylach."
+          how: "Lista percentyli zwraca tablicę. np.quantile używa ułamków [0,1] zamiast [0,100]."
+          tips:
+            - "np.percentile(a, 75) - np.percentile(a, 25) — rozstęp międzykwartylowy (IQR)"
+            - "Mediana odporna na outliers (inaczej niż średnia)"
+      - cmd: "s = a.sum(axis=0); p = a.prod()"
+        desc: "Sumy i iloczyny z redukcją po osi"
+        detail:
+          what: "sum/prod redukują tablicę. axis kontroluje kierunek agregacji."
+          how: "axis=0 sumuje kolumny (redukuje wiersze), axis=1 odwrotnie."
+          tips:
+            - "np.nansum/nanmean — ignorują NaN (zwykłe dają NaN przy NaN)"
+            - "a.sum() bez axis — pojedyncza liczba (skalar)"
+      - cmd: "u, counts = np.unique(a, return_counts=True)"
+        desc: "Unikalne wartości i ich liczności"
+        detail:
+          what: "unique zwraca posortowane unikalne wartości. return_counts dodaje liczności."
+          how: "return_index — indeksy pierwszych wystąpień. return_inverse — odbudowa oryginału."
+          tips:
+            - "np.bincount(a) — liczność wartości całkowitych (histogram intów)"
+            - "Świetne do liczenia rozkładu klas w danych ML"
+      - cmd: "c = np.corrcoef(x, y); cov = np.cov(data)"
+        desc: "Korelacja i kowariancja"
+        detail:
+          what: "corrcoef zwraca macierz korelacji Pearsona, cov macierz kowariancji."
+          how: "Wiersze = zmienne, kolumny = obserwacje (rowvar=True domyślnie)."
+          tips:
+            - "rowvar=False gdy wiersze to obserwacje a kolumny zmienne"
+            - "np.histogram(a, bins=20) — rozkład częstości"
+
+  - name: "Broadcasting"
+    icon: "📡"
+    commands:
+      - cmd: "result = matrix + vector"
+        desc: "Broadcasting tablic o różnych kształtach"
+        detail:
+          what: "NumPy automatycznie rozszerza mniejszą tablicę do większej bez kopiowania danych."
+          how: "Zasady: wyrównaj kształty od PRAWEJ. Wymiar 1 lub brakujący jest rozciągany."
+          tips:
+            - "(3,4) + (4,) -> (3,4): wektor dodany do każdego wiersza"
+            - "np.broadcast_shapes((3,1),(1,4)) — sprawdź wynikowy kształt: (3,4)"
+      - cmd: "col = a[:, None]; outer = col + row[None, :]"
+        desc: "Tworzenie siatki przez broadcasting kolumny i wiersza"
+        detail:
+          what: "Kolumna (n,1) + wiersz (1,m) daje macierz (n,m) — bez pętli ani meshgrid."
+          how: "a[:, None] tworzy kolumnę, row[None, :] wiersz. Broadcasting wypełnia siatkę."
+          tips:
+            - "Wydajniejsze niż meshgrid dla prostych operacji"
+            - "Klasyczny wzorzec macierzy odległości: (a[:,None] - b[None,:])**2"
+      - cmd: "normalized = (a - a.mean(0)) / a.std(0)"
+        desc: "Standaryzacja kolumn przez broadcasting"
+        detail:
+          what: "Odjęcie wektora średnich i podzielenie przez odchylenia — z-score per kolumna."
+          how: "mean(0) i std(0) dają wektory (n_features,), broadcastowane na każdy wiersz."
+          tips:
+            - "keepdims=True jeśli potrzebujesz zachować wymiar do dalszych operacji"
+            - "To dokładnie to, co robi StandardScaler ze sklearn"
+      - cmd: "dist = np.sqrt(((A[:, None] - B[None, :]) ** 2).sum(-1))"
+        desc: "Macierz odległości euklidesowych przez broadcasting"
+        detail:
+          what: "Liczy odległości między wszystkimi parami punktów z A i B bez pętli."
+          how: "A[:,None] kształt (n,1,d), B[None,:] (1,m,d) -> różnica (n,m,d), suma po ostatniej osi."
+          tips:
+            - "Uważa na pamięć: tworzy tablicę (n,m,d) — dla dużych n,m użyj scipy.cdist"
+            - "Fundament KNN i klasteryzacji liczony wektorowo"
+      - cmd: "out = np.where(cond, a, b)"
+        desc: "Wybór element-wise z broadcastingiem"
+        detail:
+          what: "np.where wybiera z a gdzie cond True, z b gdzie False — wszystko broadcastowane."
+          how: "Trzy argumenty broadcastują się razem. Skalary też działają."
+          tips:
+            - "np.select([c1, c2], [v1, v2], default=0) — wiele warunków"
+            - "Wektorowy odpowiednik if-else dla całych tablic"
+      - cmd: "scaled = a * weights[:, None]"
+        desc: "Skalowanie wierszy/kolumn wektorem wag"
+        detail:
+          what: "Mnożenie tablicy przez wektor z dodaną osią skaluje wzdłuż wybranej osi."
+          how: "weights[:, None] (n,1) skaluje wiersze, weights[None, :] (1,m) kolumny."
+          tips:
+            - "Bez [:, None] broadcasting może pójść po złej osi lub rzucić błąd"
+            - "Częste w ważeniu próbek i normalizacji"
+
+  - name: "I/O i typy"
+    icon: "💾"
+    commands:
+      - cmd: "np.save('arr.npy', a); b = np.load('arr.npy')"
+        desc: "Binarny zapis i odczyt pojedynczej tablicy"
+        detail:
+          what: "Format .npy zachowuje kształt, dtype i dane — najszybszy i najwierniejszy."
+          how: "save dodaje rozszerzenie .npy automatycznie. load odtwarza dokładnie tablicę."
+          tips:
+            - "Znacznie szybsze i mniejsze niż CSV dla danych liczbowych"
+            - "allow_pickle=False (domyślnie) — bezpieczeństwo przy load"
+      - cmd: "np.savez('data.npz', x=a, y=b); d = np.load('data.npz')"
+        desc: "Zapis wielu tablic w jednym pliku"
+        detail:
+          what: "savez pakuje wiele nazwanych tablic do archiwum .npz. Dostęp przez d['x']."
+          how: "savez_compressed dla kompresji (wolniejszy zapis, mniejszy plik)."
+          tips:
+            - "d.files — lista nazw zapisanych tablic"
+            - "Idealne do zapisania całego datasetu (X_train, y_train, ...)"
+      - cmd: "a = np.loadtxt('data.csv', delimiter=','); np.savetxt('out.csv', a, delimiter=',')"
+        desc: "Tekstowy odczyt i zapis (CSV)"
+        detail:
+          what: "loadtxt/savetxt obsługują pliki tekstowe. Czytelne, ale wolniejsze niż .npy."
+          how: "delimiter dla separatora, skiprows dla nagłówka, fmt dla formatu zapisu."
+          tips:
+            - "np.genfromtxt — obsługuje brakujące wartości i mieszane typy"
+            - "Dla złożonych CSV użyj pandas.read_csv (szybsze i elastyczniejsze)"
+      - cmd: "a = a.astype(np.float32); print(a.dtype, a.itemsize)"
+        desc: "Konwersja typu danych i sprawdzanie dtype"
+        detail:
+          what: "astype tworzy kopię z nowym typem. itemsize to bajty na element."
+          how: "float32 zamiast float64 — połowa pamięci (ważne dla ML/GPU)."
+          tips:
+            - "a.nbytes — całkowity rozmiar tablicy w bajtach"
+            - "np.can_cast(src, dst) — sprawdź bezpieczeństwo konwersji"
+      - cmd: "arr = np.frombuffer(buf, dtype=np.float32); b = a.tobytes()"
+        desc: "Konwersja z/do surowych bajtów"
+        detail:
+          what: "frombuffer interpretuje bufor bajtów jako tablicę. tobytes serializuje do bajtów."
+          how: "Zero-copy dla frombuffer (współdzieli pamięć z buforem)."
+          tips:
+            - "Przydatne przy komunikacji sieciowej, plikach binarnych, interop z C"
+            - "np.frombuffer jest read-only — skopiuj jeśli potrzebujesz modyfikować"
+      - cmd: "mm = np.memmap('big.dat', dtype='float32', mode='r', shape=(10000, 10000))"
+        desc: "Memory-mapped array dla danych większych niż RAM"
+        detail:
+          what: "memmap mapuje plik na dysku jako tablicę — czyta fragmenty na żądanie."
+          how: "mode='r' tylko odczyt, 'r+' odczyt/zapis, 'w+' nowy plik. Slicing ładuje tylko potrzebne."
+          tips:
+            - "Pozwala pracować z tablicami większymi niż dostępna pamięć"
+            - "Dla bardzo dużych danych rozważ HDF5 (h5py) lub zarr"
+
+  - name: "Losowość (np.random)"
+    icon: "🎲"
+    commands:
+      - cmd: "rng = np.random.default_rng(42)"
+        desc: "Utwórz nowoczesny generator z seedem"
+        detail:
+          what: "default_rng to zalecany od NumPy 1.17 Generator (PCG64) — szybszy i lepszy statystycznie."
+          how: "Seed dla reprodukowalności. Wszystkie metody losowe wywołuj na rng, nie globalnie."
+          tips:
+            - "Preferuj rng nad starym np.random.seed (legacy)"
+            - "rng = np.random.default_rng() bez seeda — losowy stan startowy"
+      - cmd: "x = rng.random((3, 4)); n = rng.standard_normal((3, 4))"
+        desc: "Losowe próbki uniform i normalne"
+        detail:
+          what: "random daje uniform [0,1). standard_normal daje N(0,1). normal(mu, sigma) dla dowolnego."
+          how: "Argument size to kształt. uniform(low, high, size) dla innego zakresu."
+          tips:
+            - "rng.normal(loc=5, scale=2, size=100) — N(5, 2²)"
+            - "rng.uniform(-1, 1, (3,3)) — uniform na [-1,1)"
+      - cmd: "ints = rng.integers(0, 10, size=(2, 3))"
+        desc: "Losowe liczby całkowite z zakresu"
+        detail:
+          what: "integers zwraca losowe inty z [low, high). endpoint=True by włączyć high."
+          how: "Zastępuje stare randint. size kontroluje kształt wyniku."
+          tips:
+            - "endpoint=True — przedział domknięty [low, high]"
+            - "rng.integers(10, size=5) — z [0,10) gdy podasz tylko high"
+      - cmd: "sample = rng.choice(a, size=5, replace=False)"
+        desc: "Losowy wybór elementów z tablicy"
+        detail:
+          what: "choice losuje elementy. replace=False bez zwracania, p= dla wag prawdopodobieństw."
+          how: "size kontroluje liczbę próbek. Dla replace=False size <= len(a)."
+          tips:
+            - "p=[0.1, 0.9] — niejednorodne prawdopodobieństwa wyboru"
+            - "Świetne do bootstrap sampling i tworzenia mini-batchy"
+      - cmd: "rng.shuffle(a); perm = rng.permutation(10)"
+        desc: "Tasowanie tablicy i permutacje"
+        detail:
+          what: "shuffle miesza in-place wzdłuż pierwszej osi. permutation zwraca nową przetasowaną tablicę."
+          how: "permutation(n) daje przetasowane 0..n-1. permutation(a) kopiuje i tasuje."
+          tips:
+            - "shuffle modyfikuje oryginał, permutation zwraca kopię"
+            - "Tasowanie indeksów do spójnego mieszania X i y razem"
+      - cmd: "p = rng.poisson(5, 1000); b = rng.binomial(10, 0.5, 1000)"
+        desc: "Próbki z rozkładów statystycznych"
+        detail:
+          what: "Generator ma dziesiątki rozkładów: poisson, binomial, exponential, beta, gamma..."
+          how: "Każdy ma swoje parametry + size. Do symulacji Monte Carlo i modelowania."
+          tips:
+            - "rng.exponential(scale=2, size=100), rng.beta(2, 5, 100)"
+            - "rng.multivariate_normal(mean, cov, size) — wielowymiarowy Gauss"
