@@ -526,6 +526,26 @@ groups:
           tips:
             - "mode='max-autotune' — dłuższa kompilacja, maksymalna prędkość"
             - "fullgraph=True — kompiluj cały model (błąd jeśli są niekompatybilne operacje)"
+      - cmd: |
+          import torch.distributed as dist
+          from torch.nn.parallel import DistributedDataParallel as DDP
+          dist.init_process_group(backend="nccl")
+          model = DDP(model.to(rank), device_ids=[rank])
+        desc: "DistributedDataParallel (DDP) — trening na wielu GPU/węzłach"
+        detail:
+          what: "DDP replikuje model na każdym GPU i synchronizuje gradienty przez all-reduce — standard multi-GPU."
+          how: "Uruchom przez torchrun --nproc_per_node=N train.py. Backend 'nccl' dla GPU NVIDIA."
+          tips:
+            - "Każdy proces obsługuje jedno GPU — użyj DistributedSampler w DataLoaderze"
+            - "DDP wyraźnie szybszy niż przestarzały DataParallel (jeden proces na GPU)"
+      - cmd: "ep = torch.export.export(model, (example_input,)); torch.export.save(ep, 'model.pt2')"
+        desc: "torch.export — kompletny eksport grafu (PyTorch 2.1+)"
+        detail:
+          what: "torch.export tworzy pełny, statyczny graf modelu (ExportedProgram) do deploymentu bez Pythona."
+          how: "Następca TorchScript — wynik (.pt2) trafia do AOTInductor, ExecuTorch, edge runtime."
+          tips:
+            - "dynamic_shapes={...} — zezwól na zmienny batch/sekwencję"
+            - "Bardziej rygorystyczny niż jit.trace — wymaga grafu bez przerw (graph break)"
 
   - name: "Debugowanie i profiling"
     icon: "🔍"
