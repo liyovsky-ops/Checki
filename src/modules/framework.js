@@ -66,7 +66,7 @@ export function renderTiles(category, containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
   const accent = CATEGORY_ACCENT[category] || '#7c6af7';
-  (FRAMEWORKS[category] || []).forEach(function(fw) {
+  (FRAMEWORKS[category] || []).filter(fw => !fw.hideTile).forEach(function(fw) {
     const tile = document.createElement('div');
     tile.className = 'fw-tile';
     tile.style.background   = hexToRgba(accent, 0.05);
