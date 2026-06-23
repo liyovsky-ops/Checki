@@ -1,0 +1,115 @@
+title: Celery Beat — harmonogram zadań
+
+items:
+  - name: Podstawowa konfiguracja Beat
+    desc: >
+      Celery Beat to scheduler — uruchamia taski periodycznie (jak cron).
+      Konfiguracja w beat_schedule definiuje harmonogram. Beat działa jako
+      osobny proces obok workera.
+    code: |
+      # celeryconfig.py lub celery.py
+      from celery.schedules import crontab
+
+      app.conf.beat_schedule = {
+          'cleanup-every-hour': {
+              'task': 'myapp.tasks.cleanup_old_data',
+              'schedule': 3600.0,  # co godzinę (sekundy)
+          },
+          'daily-report': {
+              'task': 'myapp.tasks.generate_report',
+              'schedule': crontab(hour=8, minute=0),  # codziennie o 8:00
+              'args': ('daily',),
+          },
+          'weekly-backup': {
+              'task': 'myapp.tasks.backup_database',
+              'schedule': crontab(hour=3, minute=0, day_of_week='sunday'),
+              'kwargs': {'full_backup': True},
+          },
+      }
+
+      # Uruchomienie Beat
+      # celery -A myapp beat --loglevel=info
+
+  - name: crontab — wyrażenia cron
+    desc: >
+      crontab() daje pełną elastyczność wyrażeń cron. Minuta, godzina,
+      dzień tygodnia, dzień miesiąca, miesiąc. Wildcardy, listy, zakresy.
+    code: |
+      from celery.schedules import crontab
+
+      # Co 15 minut
+      crontab(minute='*/15')
+
+      # Poniedziałek-Piątek o 9:30
+      crontab(hour=9, minute=30, day_of_week='mon-fri')
+
+      # Pierwszy dzień każdego miesiąca o północy
+      crontab(hour=0, minute=0, day_of_month=1)
+
+      # Co godzinę w godzinach pracy (8-18)
+      crontab(minute=0, hour='8-18')
+
+      # Dwa razy dziennie — o 6:00 i 18:00
+      crontab(hour='6,18', minute=0)
+
+  - name: solar — harmonogram wg wschodu/zachodu słońca
+    desc: >
+      solar() harmonogram oparty na pozycji słońca — przydatny do IoT,
+      automatyki domowej, systemów zależnych od pory dnia.
+    code: |
+      from celery.schedules import solar
+
+      app.conf.beat_schedule = {
+          'lights-on-at-sunset': {
+              'task': 'home.tasks.turn_on_lights',
+              'schedule': solar('sunset', -15, 52.23, 21.01),  # Warszawa, 15 min przed zachodem
+          },
+      }
+
+  - name: Django-celery-beat — harmonogram w bazie danych
+    desc: >
+      django-celery-beat przechowuje harmonogram w DB zamiast w kodzie.
+      Pozwala edytować, dodawać i usuwać taski periodyczne przez Django Admin
+      bez restartu Beat.
+    code: |
+      # pip install django-celery-beat
+
+      # settings.py
+      INSTALLED_APPS = [
+          ...
+          'django_celery_beat',
+      ]
+
+      # python manage.py migrate  # tworzy tabele PeriodicTask, IntervalSchedule itd.
+
+      # Programowe tworzenie harmonogramu
+      from django_celery_beat.models import PeriodicTask, IntervalSchedule
+      import json
+
+      schedule, _ = IntervalSchedule.objects.get_or_create(
+          every=10, period=IntervalSchedule.MINUTES,
+      )
+
+      PeriodicTask.objects.create(
+          interval=schedule,
+          name='Check stock prices',
+          task='stocks.tasks.check_prices',
+          args=json.dumps(['AAPL', 'GOOGL']),
+      )
+
+      # Uruchomienie Beat z DB scheduler
+      # celery -A myapp beat -S django_celery_beat.schedulers:DatabaseScheduler
+
+  - name: Timezone i DST
+    desc: >
+      Celery Beat domyślnie używa UTC. Ustaw timezone w konfiguracji
+      żeby harmonogramy były w Twojej strefie czasowej. enable_utc=False
+      wyłącza UTC i używa lokalnej strefy.
+    code: |
+      # celeryconfig.py
+      app.conf.timezone = 'Europe/Warsaw'
+      app.conf.enable_utc = True  # harmonogramy w UTC, konwersja automatyczna
+
+      # Lub w Django settings.py
+      CELERY_TIMEZONE = 'Europe/Warsaw'
+      CELERY_ENABLE_UTC = True

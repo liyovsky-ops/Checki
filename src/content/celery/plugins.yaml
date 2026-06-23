@@ -1,0 +1,27 @@
+title: Ekosystem Celery
+
+items:
+  - name: django-celery-beat
+    desc: Harmonogram tasków w bazie danych Django — edytuj przez Admin panel bez restartu Beat. PeriodicTask, CrontabSchedule, IntervalSchedule jako modele Django.
+    icon: "⏰"
+  - name: django-celery-results
+    desc: Przechowuj wyniki tasków w bazie Django zamiast w Redis. TaskResult model z pełną historią, statusami i tracebackami. Queryable przez Django ORM.
+    icon: "📊"
+  - name: Flower
+    desc: Real-time webowy dashboard Celery. Monitoruj workerów, kolejki, taski, wykresy wydajności. Jedna komenda uruchamiająca — celery flower.
+    icon: "🌸"
+  - name: celery-redbeat
+    desc: Scheduler Beat oparty na Redis zamiast pliku. Pozwala na wiele instancji Beat (HA) i dynamiczne dodawanie tasków periodycznych z kodu.
+    icon: "💓"
+  - name: celery-singleton
+    desc: Zapobiega duplikowaniu tasków — ten sam task z tymi samymi argumentami nie zostanie wysłany ponownie jeśli już jest w kolejce lub w trakcie.
+    icon: "🔒"
+  - name: Flask-Celery (celery z Flask)
+    desc: Integracja Celery z Flask — Application Factory pattern, shared config, app context wewnątrz tasków. Nie potrzebujesz osobnej biblioteki — wystarczy wzorzec init.
+    icon: "🌶️"
+  - name: Sentry (CeleryIntegration)
+    desc: Automatyczny error tracking dla tasków Celery. Tracebacki, breadcrumbs, performance monitoring. sentry_sdk.init() z CeleryIntegration() i gotowe.
+    icon: "🔍"
+  - name: Prometheus + celery-exporter
+    desc: Metryki Celery w formacie Prometheus — task count, duration, queue depth, worker status. Wizualizacja w Grafana, alerty na opóźnienia w kolejkach.
+    icon: "📈"

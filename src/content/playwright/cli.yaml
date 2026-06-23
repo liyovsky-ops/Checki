@@ -1,0 +1,181 @@
+title: Komendy Playwright
+
+groups:
+  - name: Instalacja
+    icon: "📦"
+    commands:
+      - cmd: pip install pytest-playwright
+        desc: Instalacja Playwright dla Python z pytest
+        detail:
+          what: Instaluje playwright i pytest plugin z fixture'ami page, context, browser.
+          how: Wymaga Pythona 3.8+. Po instalacji musisz jeszcze pobrać przeglądarki.
+          tips:
+            - 'pip install playwright — bez pytest, do scraping i automatyzacji'
+            - 'pip install pytest-playwright allure-pytest — z raportami Allure'
+      - cmd: playwright install
+        desc: Pobierz przeglądarki (Chromium, Firefox, WebKit)
+        detail:
+          what: Pobiera binaria przeglądarek zarządzane przez Playwright. Około 500MB.
+          how: Instaluje Chromium, Firefox i WebKit w dedykowanym katalogu Playwright.
+          tips:
+            - 'playwright install chromium — tylko Chromium (szybszy download)'
+            - 'playwright install --with-deps — z systemowymi zależnościami (Ubuntu/Debian)'
+      - cmd: playwright install-deps
+        desc: Zainstaluj systemowe zależności dla przeglądarek
+        detail:
+          what: Instaluje pakiety systemowe potrzebne do uruchomienia przeglądarek (libatk, libcups, itp.).
+          how: Wymaga sudo. Przydatne na świeżym Ubuntu/Debian i w kontenerach Docker.
+          tips:
+            - 'playwright install --with-deps — install + install-deps w jednym'
+            - 'W Docker: FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy — gotowy image'
+
+  - name: Uruchamianie testów
+    icon: "🚀"
+    commands:
+      - cmd: pytest tests/ --headed
+        desc: Uruchom testy z widoczną przeglądarką
+        detail:
+          what: Otwiera prawdziwą przeglądarkę — widzisz co test robi. Domyślnie Playwright działa headless.
+          how: '--headed otwiera okno przeglądarki. Przydatne do debugowania i demo.'
+          flags:
+            - flag: --headed
+              desc: Pokaż okno przeglądarki
+            - flag: '--slowmo 500'
+              desc: Spowolnij każdą akcję o 500ms
+            - flag: '--browser firefox'
+              desc: Uruchom na Firefox zamiast Chromium
+          tips:
+            - 'pytest tests/ --headed --slowmo 1000 — wolny tryb do obserwacji'
+      - cmd: pytest tests/ --browser chromium --browser firefox
+        desc: Uruchom testy na wielu przeglądarkach
+        detail:
+          what: Każdy test jest uruchamiany na Chromium I Firefox. Podwaja liczbę testów.
+          how: Dodaj --browser webkit dla pełnego cross-browser (Safari engine).
+          tips:
+            - 'pytest --browser webkit — testuj Safari engine (Mac/iOS compatibility)'
+            - 'W CI: uruchom na wszystkich trzech przeglądarkach'
+      - cmd: pytest tests/ -n 4
+        desc: Uruchom testy równolegle na 4 procesach
+        detail:
+          what: pytest-xdist rozkłada testy na 4 procesy. Każdy test ma izolowany BrowserContext.
+          how: Wymaga pip install pytest-xdist.
+          tips:
+            - 'pytest -n auto — tyle procesów ile rdzeni CPU'
+            - 'Upewnij się że testy są niezależne (nie shared state)'
+      - cmd: pytest tests/test_login.py::test_valid_login -v
+        desc: Uruchom jeden konkretny test
+        detail:
+          what: Wykonuje tylko wskazany test z podanego pliku. -v pokazuje szczegółowy output.
+          how: ':: oddziela plik od nazwy testu.'
+          tips:
+            - 'pytest -k "login and not admin" — filtruj testy po nazwie'
+            - 'pytest --lf — uruchom tylko testy które failowały ostatnio'
+      - cmd: pytest tests/ --tracing retain-on-failure
+        desc: Nagrywaj trace tylko dla failujących testów
+        detail:
+          what: Automatycznie nagrywa trace (screenshot, DOM, network) dla testów które failują.
+          how: Trace zapisywany w test-results/. Otwierasz przez playwright show-trace.
+          flags:
+            - flag: '--tracing on'
+              desc: Nagrywaj trace dla wszystkich testów
+            - flag: '--tracing retain-on-failure'
+              desc: Zachowaj trace tylko dla testów które fail
+            - flag: '--tracing off'
+              desc: Wyłącz tracing
+          tips:
+            - 'playwright show-trace test-results/test-name/trace.zip — otwórz w przeglądarce'
+
+  - name: Codegen i nagrywanie
+    icon: "📹"
+    commands:
+      - cmd: playwright codegen https://example.com
+        desc: Otwórz przeglądarkę i nagraj test
+        detail:
+          what: Otwiera przeglądarkę i okno z kodem. Każda akcja (klik, input) jest nagrywana jako kod testowy.
+          how: Klikaj, wpisuj tekst, nawiguj — Playwright generuje gotowy Python/TS kod.
+          flags:
+            - flag: '--target python-pytest'
+              desc: Generuj kod pytest (domyślnie)
+            - flag: '--target python-async'
+              desc: Generuj async Python
+            - flag: '--target javascript'
+              desc: Generuj JavaScript
+          tips:
+            - 'playwright codegen --target python-pytest https://myapp.local — generuj pytest testy'
+            - 'Nagrany kod to dobry punkt startowy — potem refaktoryzuj do Page Objects'
+      - cmd: playwright codegen --save-storage=auth.json https://example.com
+        desc: Nagraj sesję i zapisz stan logowania
+        detail:
+          what: Po nagraniu zapisuje cookies i localStorage do pliku JSON.
+          how: Zaloguj się ręcznie w przeglądarce, zamknij — stan jest zapisany do reużycia.
+          tips:
+            - 'playwright codegen --load-storage=auth.json — kontynuuj z zapisanym stanem'
+      - cmd: playwright codegen --device="iPhone 13"
+        desc: Nagraj test na emulowanym urządzeniu mobilnym
+        detail:
+          what: Otwiera przeglądarkę z viewport i user-agent iPhone 13.
+          how: Playwright ma predefiniowane device descriptors dla popularnych urządzeń.
+          tips:
+            - 'playwright codegen --device="Pixel 5" — Android'
+            - 'playwright codegen --device="iPad Pro" — tablet'
+
+  - name: Debugowanie
+    icon: "🐛"
+    commands:
+      - cmd: PWDEBUG=1 pytest tests/test_login.py
+        desc: Uruchom test w trybie debug z Playwright Inspector
+        detail:
+          what: Otwiera Playwright Inspector — GUI debugger z step-through, locator picker i evaluate.
+          how: Każda akcja w teście jest pauzowana. Klikaj Step Over żeby przejść do następnej.
+          tips:
+            - 'W Inspector możesz Evaluate — wpisz locator i sprawdź czy matchuje'
+            - 'Locator Picker — kliknij element w przeglądarce żeby zobaczyć sugerowany locator'
+      - cmd: playwright show-trace trace.zip
+        desc: Otwórz trace w przeglądarce (Trace Viewer)
+        detail:
+          what: Otwiera interaktywny Trace Viewer z timeline akcji, screenshotami i DOM snapshots.
+          how: Plik trace.zip generowany przez --tracing on lub context.tracing.stop().
+          tips:
+            - 'Trace Viewer to najlepsze narzędzie do debugowania CI failures'
+            - 'Klikaj akcje na timeline żeby zobaczyć DOM w tym momencie'
+      - cmd: pytest tests/ --screenshot on
+        desc: Rób screenshot po każdym teście
+        detail:
+          what: Automatycznie robi screenshot strony po każdym teście (pass i fail).
+          how: Screenshoty zapisywane w test-results/.
+          flags:
+            - flag: '--screenshot on'
+              desc: Screenshot po każdym teście
+            - flag: '--screenshot only-on-failure'
+              desc: Screenshot tylko przy fail
+          tips:
+            - 'pytest --video on — nagrywaj wideo każdego testu'
+            - 'pytest --video retain-on-failure — wideo tylko failujących'
+      - cmd: page.pause()
+        desc: Zatrzymaj test i otwórz Inspector (w kodzie)
+        detail:
+          what: Wstaw page.pause() w kodzie testu żeby zatrzymać wykonanie i otworzyć Inspector.
+          how: Odpowiednik breakpointa. Możesz inspect DOM, sprawdzać locatory, evaluate JS.
+          tips:
+            - 'Usuń page.pause() przed commitem — tylko do debugowania!'
+            - 'Alternatywa: PWDEBUG=1 pauzuje automatycznie na każdej akcji'
+
+  - name: CI/CD
+    icon: "🔁"
+    commands:
+      - cmd: "npx playwright install --with-deps"
+        desc: Instalacja w CI (GitHub Actions, GitLab CI)
+        detail:
+          what: Instaluje przeglądarki z systemowymi zależnościami w środowisku CI.
+          how: W CI nie ma GUI — testy domyślnie headless. Dodaj --tracing retain-on-failure.
+          tips:
+            - 'GitHub Actions: mcr.microsoft.com/playwright/python:latest jako base image'
+            - 'Zachowuj artifacts (screenshots, traces) z failujących testów'
+      - cmd: pytest tests/ --tracing retain-on-failure --screenshot only-on-failure
+        desc: Optymalna konfiguracja dla CI
+        detail:
+          what: Headless testy z trace i screenshotem tylko dla failures. Minimalne artefakty, max debuggability.
+          how: Artefakty w test-results/ — dodaj jako CI artifacts.
+          tips:
+            - 'Dodaj test-results/ do .gitignore'
+            - 'W GitHub Actions: actions/upload-artifact dla test-results/'

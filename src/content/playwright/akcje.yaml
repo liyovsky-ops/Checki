@@ -1,0 +1,145 @@
+title: Akcje i Asercje
+
+items:
+  - name: Klikanie, wpisywanie, nawigacja
+    desc: >
+      Podstawowe akcje użytkownika — click, fill, type, goto, press.
+      Playwright automatycznie czeka aż element będzie gotowy (visible, enabled, stable).
+    code: |
+      from playwright.sync_api import Page
+
+      def test_basic_actions(page: Page):
+          # Nawigacja
+          page.goto('https://example.com')
+          page.go_back()
+          page.go_forward()
+          page.reload()
+
+          # Klikanie
+          page.get_by_role('button', name='Submit').click()
+          page.get_by_role('link', name='Więcej').click()
+          page.get_by_text('Opcja A').dblclick()       # podwójne kliknięcie
+          page.get_by_role('button').click(force=True)  # pomiń auto-wait
+
+          # Wpisywanie tekstu
+          page.get_by_label('Email').fill('jan@firma.pl')   # zastąp zawartość
+          page.get_by_label('Szukaj').type('playwright')    # symuluj klawiaturę
+          page.get_by_label('Email').clear()                # wyczyść pole
+
+          # Klawisze specjalne
+          page.keyboard.press('Enter')
+          page.keyboard.press('Control+a')
+          page.get_by_label('Szukaj').press('Enter')
+
+  - name: Formularze — select, checkbox, radio, upload
+    desc: >
+      Playwright obsługuje wszystkie elementy formularzy — select, checkbox,
+      radio button, file upload, date input. Bez hacków.
+    code: |
+      from playwright.sync_api import Page
+
+      def test_forms(page: Page):
+          # Select / dropdown
+          page.get_by_label('Kraj').select_option('PL')
+          page.get_by_label('Kraj').select_option(label='Polska')
+          page.get_by_label('Kategorie').select_option(['tech', 'ai'])  # multi-select
+
+          # Checkbox
+          page.get_by_label('Akceptuję regulamin').check()
+          page.get_by_label('Newsletter').uncheck()
+          page.get_by_label('Akceptuję regulamin').is_checked()  # True/False
+
+          # Radio button
+          page.get_by_label('Dostawa kurierem').check()
+
+          # File upload
+          page.get_by_label('Załącz plik').set_input_files('raport.pdf')
+          page.get_by_label('Zdjęcia').set_input_files(['foto1.jpg', 'foto2.jpg'])
+
+          # Drag and drop
+          page.locator('#source').drag_to(page.locator('#target'))
+
+  - name: expect() — asercje Playwright
+    desc: >
+      expect() to asercja Playwright z auto-retry. Nie sprawdza raz i failuje —
+      czeka (domyślnie 5s) aż warunek będzie spełniony. Eliminuje race conditions.
+    code: |
+      from playwright.sync_api import Page, expect
+
+      def test_assertions(page: Page):
+          page.goto('https://example.com')
+
+          # Tekst i widoczność
+          expect(page.get_by_role('heading')).to_have_text('Dashboard')
+          expect(page.get_by_text('Załadowano')).to_be_visible()
+          expect(page.get_by_text('Spinner')).to_be_hidden()
+          expect(page.get_by_text('Spinner')).not_to_be_visible()
+
+          # Atrybuty i klasy
+          expect(page.get_by_role('button')).to_be_enabled()
+          expect(page.get_by_role('button')).to_be_disabled()
+          expect(page.locator('.alert')).to_have_class(/success/)
+          expect(page.locator('input')).to_have_value('jan@firma.pl')
+
+          # Strona
+          expect(page).to_have_url('https://example.com/dashboard')
+          expect(page).to_have_title('Dashboard — MyApp')
+
+          # Liczba elementów
+          expect(page.get_by_role('listitem')).to_have_count(5)
+
+          # Zawartość tekstu (partial)
+          expect(page.locator('.status')).to_contain_text('aktywny')
+
+  - name: Oczekiwanie na zdarzenia
+    desc: >
+      expect_navigation, expect_popup, expect_download — czekaj na konkretne
+      zdarzenia przeglądarki. with page.expect_*() as context manager.
+    code: |
+      from playwright.sync_api import Page
+
+      def test_waiting(page: Page):
+          # Czekaj na nawigację po kliknięciu
+          with page.expect_navigation():
+              page.get_by_role('link', name='Profil').click()
+
+          # Czekaj na nowe okno/popup
+          with page.expect_popup() as popup_info:
+              page.get_by_text('Otwórz w nowym oknie').click()
+          popup = popup_info.value
+          popup.get_by_role('button', name='OK').click()
+
+          # Czekaj na pobranie pliku
+          with page.expect_download() as download_info:
+              page.get_by_text('Pobierz raport').click()
+          download = download_info.value
+          download.save_as('/tmp/raport.pdf')
+
+          # Czekaj na response API
+          with page.expect_response('**/api/users') as response_info:
+              page.get_by_role('button', name='Załaduj').click()
+          response = response_info.value
+          assert response.status == 200
+
+  - name: Screenshoty i visual testing
+    desc: >
+      Playwright robi screenshoty stron i elementów. Porównywanie screenshotów
+      (visual regression) wbudowane — wykrywa wizualne zmiany w UI.
+    code: |
+      from playwright.sync_api import Page, expect
+
+      def test_screenshots(page: Page):
+          page.goto('https://example.com')
+
+          # Screenshot całej strony
+          page.screenshot(path='screenshots/homepage.png')
+
+          # Screenshot pełnej strony (z scrollem)
+          page.screenshot(path='screenshots/full.png', full_page=True)
+
+          # Screenshot konkretnego elementu
+          page.locator('.hero-section').screenshot(path='screenshots/hero.png')
+
+          # Visual comparison (porównanie z baseline)
+          expect(page).to_have_screenshot('homepage.png')
+          expect(page.locator('.chart')).to_have_screenshot('chart.png')

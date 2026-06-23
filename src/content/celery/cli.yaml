@@ -1,0 +1,182 @@
+title: Komendy Celery
+
+groups:
+  - name: Worker
+    icon: "⚙️"
+    commands:
+      - cmd: celery -A myapp worker --loglevel=info
+        desc: Uruchom workera Celery
+        detail:
+          what: Startuje proces workera nasłuchującego na brokerze i wykonującego taski z kolejki.
+          how: '-A myapp wskazuje moduł z instancją Celery. Worker automatycznie odkrywa taski.'
+          flags:
+            - flag: '-A myapp'
+              desc: Moduł z instancją Celery app
+            - flag: '--loglevel=info'
+              desc: Poziom logowania (debug/info/warning/error)
+            - flag: '--concurrency=4'
+              desc: Liczba procesów/wątków workera
+            - flag: '-Q email,images'
+              desc: Kolejki do obsługi (domyślnie celery)
+          tips:
+            - 'celery -A myapp worker -P gevent --concurrency=100 — gevent pool dla I/O-bound tasków'
+            - 'celery -A myapp worker -P solo — jednoprocesowy (debug)'
+      - cmd: celery -A myapp worker --autoscale=10,3
+        desc: Worker z autoskalowaniem (3-10 procesów)
+        detail:
+          what: Automatycznie zwiększa concurrency przy obciążeniu i zmniejsza gdy kolejka pusta.
+          how: '--autoscale=max,min — max procesów pod obciążeniem, min gdy idle.'
+          tips:
+            - 'Oszczędza RAM — nie trzyma 10 procesów gdy nie ma tasków'
+            - 'Monitoruj przez Flower żeby znaleźć optymalne wartości'
+      - cmd: celery -A myapp worker --hostname=worker1@%h
+        desc: Worker z custom hostname
+        detail:
+          what: Nadaje unikalną nazwę workerowi — przydatne przy wielu workerach na jednej maszynie.
+          how: '%h = hostname, %n = node name. Pomaga rozróżnić workerów w Flower i logach.'
+          tips:
+            - 'celery -A myapp worker -Q images --hostname=img-worker@%h — dedykowany worker per kolejka'
+
+  - name: Beat (Scheduler)
+    icon: "⏰"
+    commands:
+      - cmd: celery -A myapp beat --loglevel=info
+        desc: Uruchom scheduler Beat
+        detail:
+          what: Startuje proces Beat wysyłający periodyczne taski do kolejki wg harmonogramu z konfiguracji.
+          how: Beat działa jako osobny proces obok workera. Jeden Beat na cały klaster.
+          tips:
+            - 'NIE uruchamiaj wielu instancji Beat — duplikowałyby taski'
+            - 'celery -A myapp worker --beat — worker z wbudowanym Beat (dev only)'
+      - cmd: celery -A myapp beat -S django_celery_beat.schedulers:DatabaseScheduler
+        desc: Beat z harmonogramem w bazie Django
+        detail:
+          what: Zamiast czytać harmonogram z kodu, czyta z tabel Django. Edytuj przez Admin panel.
+          how: Wymaga pip install django-celery-beat i migracji.
+          tips:
+            - 'Dynamicznie dodawaj/usuwaj taski przez Django Admin bez restartu Beat'
+
+  - name: Inspekcja i monitoring
+    icon: "🔍"
+    commands:
+      - cmd: celery -A myapp inspect active
+        desc: Pokaż taski aktualnie wykonywane przez workerów
+        detail:
+          what: Wysyła broadcast do workerów i zbiera listę tasków w trakcie wykonywania.
+          how: Pokazuje task name, ID, args, kwargs, czas startu dla każdego workera.
+          tips:
+            - 'celery -A myapp inspect active -d worker1@host — tylko konkretny worker'
+      - cmd: celery -A myapp inspect reserved
+        desc: Pokaż taski zarezerwowane (w kolejce workera)
+        detail:
+          what: Taski pobrane z brokera ale jeszcze nie startowane — prefetched.
+          how: Worker pobiera kilka tasków naraz (prefetch) żeby nie czekać na brokera.
+          tips:
+            - 'worker_prefetch_multiplier=1 — pobieraj jeden task na raz (fair scheduling)'
+      - cmd: celery -A myapp inspect registered
+        desc: Lista zarejestrowanych typów tasków
+        detail:
+          what: Wyświetla wszystkie taski które worker rozpoznaje (zaimportowane @task/@shared_task).
+          how: Jeśli brakuje taska — sprawdź autodiscover_tasks() i importy.
+          tips:
+            - 'Przydatne do debugowania "Received unregistered task" error'
+      - cmd: celery -A myapp inspect stats
+        desc: Statystyki workerów (pamięć, PID, pool)
+        detail:
+          what: Szczegółowe statystyki każdego workera — PID, pool size, total tasks, rusage.
+          how: Dane techniczne przydatne do capacity planning i debugowania.
+          tips:
+            - 'Sprawdź total tasks i uptime żeby ocenić throughput workera'
+      - cmd: celery -A myapp inspect ping
+        desc: Sprawdź czy workerzy odpowiadają
+        detail:
+          what: Ping-pong — sprawdza czy workerzy są żywi i reagują na komendy.
+          how: Szybki health check. Brak odpowiedzi = worker padł lub jest rozłączony z brokerem.
+          tips:
+            - 'Użyj w health checkach Kubernetes/Docker'
+
+  - name: Kontrola workerów
+    icon: "🎮"
+    commands:
+      - cmd: celery -A myapp control shutdown
+        desc: Zamknij wszystkich workerów gracefully
+        detail:
+          what: Wysyła SIGTERM do workerów — kończą aktualny task i się zamykają.
+          how: Bezpieczne wyłączenie bez przerywania tasków w trakcie.
+          tips:
+            - 'celery -A myapp control shutdown -d worker1@host — wyłącz konkretnego workera'
+      - cmd: celery -A myapp control revoke <task-id>
+        desc: Anuluj task po ID
+        detail:
+          what: Zabrania workerom wykonanie taska z danym ID. Jeśli jest w trakcie — domyślnie czeka na zakończenie.
+          how: '--terminate zabija task natychmiast (SIGTERM).'
+          tips:
+            - 'celery -A myapp control revoke <id> --terminate — natychmiastowe zabicie'
+            - 'Revoked taski nie są usuwane z kolejki — worker je ignoruje przy odczycie'
+      - cmd: celery -A myapp purge
+        desc: Wyczyść wszystkie taski z kolejki
+        detail:
+          what: Usuwa wszystkie oczekujące taski z brokera. Nie dotyka tasków w trakcie.
+          how: Destrukcyjna operacja — wszystkie zakolejkowane taski przepadają.
+          tips:
+            - 'Używaj ostrożnie! Nie ma undo'
+            - 'celery -A myapp purge -Q images — wyczyść tylko konkretną kolejkę'
+
+  - name: Narzędzia i debug
+    icon: "🐛"
+    commands:
+      - cmd: celery -A myapp shell
+        desc: Interaktywny Python shell z kontekstem Celery
+        detail:
+          what: Uruchamia IPython/Python shell z załadowaną instancją Celery — możesz wywoływać taski, sprawdzać wyniki.
+          how: Przydatny do debugowania, testowania tasków i sprawdzania backendu.
+          tips:
+            - 'from myapp.tasks import process; result = process.delay(data) — test task z shell'
+      - cmd: celery -A myapp call myapp.tasks.add --args='[2, 2]'
+        desc: Wywołaj task z CLI (bez kodu Python)
+        detail:
+          what: Wysyła task do kolejki bezpośrednio z terminala — przydatne do testowania i one-off.
+          how: '--args dla pozycyjnych, --kwargs dla named argumentów.'
+          tips:
+            - "celery -A myapp call myapp.tasks.send_email --kwargs='{\"to\": \"test@x.com\"}'"
+      - cmd: celery -A myapp result <task-id>
+        desc: Pobierz wynik taska po ID
+        detail:
+          what: Odpytuje result backend o wynik konkretnego taska.
+          how: Wymaga skonfigurowanego result_backend. Zwraca wynik lub traceback.
+          tips:
+            - 'Przydatne do debugowania tasków które failują w tle'
+      - cmd: celery -A myapp report
+        desc: Pokaż pełny raport konfiguracji Celery
+        detail:
+          what: Wyświetla aktualną konfigurację Celery — broker, backend, routing, timeouts, serializer.
+          how: Przydatne do debugowania problemów z konfiguracją.
+          tips:
+            - 'Sprawdź broker_url, result_backend, task_routes'
+      - cmd: celery -A myapp flower --port=5555
+        desc: Uruchom Flower dashboard
+        detail:
+          what: Startuje webowy dashboard monitoringu na http://localhost:5555.
+          how: 'pip install flower. Real-time widok workerów, tasków, kolejek.'
+          tips:
+            - 'celery -A myapp flower --basic_auth=admin:pass — z autentykacją'
+            - 'celery -A myapp flower --broker_api=redis://localhost:6379/0 — monitoruj brokera'
+
+  - name: Instalacja
+    icon: "📦"
+    commands:
+      - cmd: pip install celery[redis]
+        desc: Instalacja Celery z Redis jako brokerem
+        detail:
+          what: Instaluje Celery z zależnościami dla Redis (redis-py, kombu).
+          how: 'Extras: [redis], [rabbitmq], [sqs], [all] — zależności per broker.'
+          tips:
+            - 'pip install celery[redis] flower — z dashboardem w jednym'
+            - 'pip install celery[rabbitmq] — RabbitMQ zamiast Redis'
+      - cmd: pip install django-celery-beat django-celery-results
+        desc: Instalacja integracji Celery z Django
+        detail:
+          what: Beat z harmonogramem w DB + wyniki tasków w DB Django.
+          how: Dodaj do INSTALLED_APPS i uruchom migrate.
+          tips:
+            - 'python manage.py migrate — po instalacji, przed użyciem'

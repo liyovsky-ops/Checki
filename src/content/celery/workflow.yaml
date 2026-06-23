@@ -1,0 +1,120 @@
+title: Canvas — workflow z tasków
+
+items:
+  - name: chain — sekwencyjne taski (pipe)
+    desc: >
+      chain łączy taski w sekwencję — wynik pierwszego trafia jako pierwszy argument
+      drugiego. Odpowiednik pipe/pipeline. Idealny do wieloetapowego przetwarzania.
+    code: |
+      from celery import chain
+      from myapp.tasks import download_file, process_file, upload_result
+
+      # Każdy task przekazuje wynik do następnego
+      pipeline = chain(
+          download_file.s('https://example.com/data.csv'),
+          process_file.s(),     # otrzyma wynik download_file
+          upload_result.s(),    # otrzyma wynik process_file
+      )
+      result = pipeline.apply_async()
+
+      # Skrócony zapis z operatorem |
+      pipeline = (
+          download_file.s('https://example.com/data.csv')
+          | process_file.s()
+          | upload_result.s()
+      )
+      result = pipeline()
+
+  - name: group — równoległe wykonanie
+    desc: >
+      group uruchamia wiele tasków równolegle. Zwraca GroupResult — możesz
+      czekać na wszystkie wyniki naraz. Idealne do fan-out przetwarzania.
+    code: |
+      from celery import group
+      from myapp.tasks import process_image
+
+      # Przetwórz 5 obrazków równolegle
+      job = group([
+          process_image.s(f'/img/{i}.jpg')
+          for i in range(5)
+      ])
+      result = job.apply_async()
+
+      # Czekaj na wszystkie wyniki
+      results = result.get()  # lista 5 wyników
+      print(results)
+
+      # Sprawdź czy wszystkie gotowe
+      print(result.ready())      # True/False
+      print(result.successful()) # True jeśli wszystkie OK
+
+  - name: chord — group + callback
+    desc: >
+      chord = group tasków + jeden callback po zakończeniu wszystkich.
+      Callback dostaje listę wyników z grupy. Idealny do map-reduce.
+    code: |
+      from celery import chord
+      from myapp.tasks import fetch_price, aggregate_prices
+
+      # Pobierz ceny z 3 źródeł równolegle, potem agreguj
+      result = chord(
+          [fetch_price.s('binance'),
+           fetch_price.s('kraken'),
+           fetch_price.s('coinbase')],
+          aggregate_prices.s()  # dostaje [cena1, cena2, cena3]
+      ).apply_async()
+
+      # aggregate_prices otrzyma listę wyników
+      @shared_task
+      def aggregate_prices(prices):
+          return {
+              'avg': sum(prices) / len(prices),
+              'min': min(prices),
+              'max': max(prices),
+          }
+
+  - name: chunks — podział dużych danych
+    desc: >
+      chunks dzieli listę argumentów na paczki i rozkłada na workerów.
+      Idealny do przetwarzania dużych zbiorów danych bez ręcznego podziału.
+    code: |
+      from myapp.tasks import process_record
+
+      # Przetwórz 10000 rekordów w paczkach po 100
+      result = process_record.chunks(
+          [(record_id,) for record_id in range(10000)],
+          100  # rozmiar paczki
+      ).apply_async()
+
+  - name: starmap — map bez tworzenia podzadań
+    desc: >
+      starmap aplikuje task na liście argumentów — lżejszy niż group
+      bo nie tworzy osobnych wiadomości dla każdego wywołania.
+    code: |
+      from myapp.tasks import add
+
+      # Wykonaj add dla każdej pary argumentów
+      result = add.starmap([(2, 2), (4, 4), (8, 8)])
+      # Rezultat: [4, 8, 16]
+
+  - name: Immutable signatures — s() vs si()
+    desc: >
+      .s() tworzy sygnaturę, która przyjmuje wynik poprzedniego taska.
+      .si() (immutable) ignoruje wynik poprzedniego — task dostaje tylko
+      swoje jawne argumenty. Przydatne w chord gdy callback nie potrzebuje wyników.
+    code: |
+      from celery import chain
+      from myapp.tasks import setup, process, cleanup
+
+      # .s() — process dostanie wynik setup
+      chain(setup.s(), process.s(), cleanup.s())
+
+      # .si() — cleanup ignoruje wynik process
+      chain(setup.s(), process.s(), cleanup.si())
+
+      # Praktyczny przykład: header tasków
+      from celery import chord
+      chord(
+          [task_a.s(), task_b.s(), task_c.s()],
+          notify_admin.si('Wszystkie taski zakończone')  # nie potrzebuje wyników
+      )

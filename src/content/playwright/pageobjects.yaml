@@ -1,0 +1,124 @@
+title: Page Object Model
+
+items:
+  - name: Page Object — wzorzec organizacji testów
+    desc: >
+      Page Object Model (POM) to wzorzec enkapsulujący interakcje z konkretną
+      stroną/komponentem w klasę. Selektory i akcje w jednym miejscu — test
+      jest czytelny, zmiany w HTML wymagają edycji jednej klasy.
+    code: |
+      # pages/login_page.py
+      from playwright.sync_api import Page, expect
+
+      class LoginPage:
+          def __init__(self, page: Page):
+              self.page = page
+              self.email_input = page.get_by_label('Email')
+              self.password_input = page.get_by_label('Hasło')
+              self.submit_button = page.get_by_role('button', name='Zaloguj')
+              self.error_message = page.get_by_role('alert')
+
+          def goto(self):
+              self.page.goto('/login')
+              return self
+
+          def login(self, email: str, password: str):
+              self.email_input.fill(email)
+              self.password_input.fill(password)
+              self.submit_button.click()
+
+          def expect_error(self, text: str):
+              expect(self.error_message).to_contain_text(text)
+
+          def expect_logged_in(self):
+              expect(self.page).to_have_url('/dashboard')
+
+  - name: Użycie Page Object w testach
+    desc: >
+      Test jest czytelny jak scenariusz — nie widać selektorów CSS ani
+      szczegółów implementacji. Zmiana HTML wymaga edycji klasy, nie testów.
+    code: |
+      # tests/test_login.py
+      from pages.login_page import LoginPage
+
+      def test_successful_login(page):
+          login_page = LoginPage(page).goto()
+          login_page.login('jan@firma.pl', 'secret123')
+          login_page.expect_logged_in()
+
+      def test_invalid_password(page):
+          login_page = LoginPage(page).goto()
+          login_page.login('jan@firma.pl', 'wrong')
+          login_page.expect_error('Nieprawidłowe hasło')
+
+      def test_empty_form(page):
+          login_page = LoginPage(page).goto()
+          login_page.submit_button.click()
+          login_page.expect_error('Email jest wymagany')
+
+  - name: Fixtures w pytest-playwright
+    desc: >
+      pytest-playwright dostarcza fixture'y: page, context, browser.
+      Możesz tworzyć własne fixtures do setup/teardown — zalogowany użytkownik,
+      seedowanie bazy, konfiguracja base URL.
+    code: |
+      # conftest.py
+      import pytest
+      from playwright.sync_api import Page
+
+      @pytest.fixture
+      def authenticated_page(page: Page):
+          """Fixture zwracający zalogowaną stronę"""
+          page.goto('/login')
+          page.get_by_label('Email').fill('admin@firma.pl')
+          page.get_by_label('Hasło').fill('admin123')
+          page.get_by_role('button', name='Zaloguj').click()
+          page.wait_for_url('/dashboard')
+          yield page
+
+      @pytest.fixture
+      def mobile_page(browser):
+          """Fixture z widokiem mobilnym"""
+          context = browser.new_context(
+              viewport={'width': 375, 'height': 812},
+              user_agent='Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)',
+          )
+          page = context.new_page()
+          yield page
+          context.close()
+
+      # Użycie w testach
+      def test_dashboard(authenticated_page):
+          authenticated_page.get_by_role('heading', name='Dashboard')
+
+      def test_mobile_menu(mobile_page):
+          mobile_page.goto('/app')
+          mobile_page.get_by_role('button', name='Menu').click()
+
+  - name: Konfiguracja pytest-playwright
+    desc: >
+      Base URL, przeglądarki, timeout — konfiguracja przez pytest.ini,
+      pyproject.toml lub argumenty CLI. Unikaj hardkodowania URL-i w testach.
+    code: |
+      # pyproject.toml
+      [tool.pytest.ini_options]
+      base_url = "http://localhost:3000"
+
+      # conftest.py — override base URL
+      @pytest.fixture(scope='session')
+      def browser_context_args(browser_context_args):
+          return {
+              **browser_context_args,
+              'base_url': 'http://localhost:3000',
+              'viewport': {'width': 1280, 'height': 720},
+              'locale': 'pl-PL',
+              'timezone_id': 'Europe/Warsaw',
+          }
+
+      # CLI — przeglądarki i opcje
+      # pytest --browser chromium          (domyślnie)
+      # pytest --browser firefox
+      # pytest --browser webkit
+      # pytest --browser chromium --browser firefox  (oba naraz)
+      # pytest --headed                    (widoczna przeglądarka)
+      # pytest --slowmo 500                (spowolnienie akcji o 500ms)

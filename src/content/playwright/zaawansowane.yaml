@@ -1,0 +1,164 @@
+title: Zaawansowane techniki Playwright
+
+items:
+  - name: Network interception — mockowanie API
+    desc: >
+      page.route() przechwytuje requesty HTTP i pozwala mockować odpowiedzi API.
+      Testuj frontend bez backendu, symuluj błędy serwera, opóźnienia.
+    code: |
+      from playwright.sync_api import Page, Route
+      import json
+
+      def test_mock_api(page: Page):
+          # Mockuj odpowiedź API
+          page.route('**/api/users', lambda route: route.fulfill(
+              status=200,
+              content_type='application/json',
+              body=json.dumps([
+                  {'id': 1, 'name': 'Jan Kowalski'},
+                  {'id': 2, 'name': 'Anna Nowak'},
+              ]),
+          ))
+
+          page.goto('/users')
+          from playwright.sync_api import expect
+          expect(page.get_by_text('Jan Kowalski')).to_be_visible()
+
+      def test_api_error(page: Page):
+          # Symuluj błąd 500
+          page.route('**/api/data', lambda route: route.fulfill(
+              status=500,
+              body='Internal Server Error',
+          ))
+          page.goto('/dashboard')
+          from playwright.sync_api import expect
+          expect(page.get_by_text('Błąd serwera')).to_be_visible()
+
+      def test_slow_network(page: Page):
+          # Symuluj wolną sieć
+          def delay_response(route: Route):
+              import time
+              time.sleep(3)
+              route.continue_()
+
+          page.route('**/api/**', delay_response)
+          page.goto('/app')
+          from playwright.sync_api import expect
+          expect(page.get_by_text('Ładowanie...')).to_be_visible()
+
+  - name: Authentication state — reuse logowania
+    desc: >
+      Zapisz stan logowania (cookies, localStorage) do pliku i reużyj
+      między testami. Loguj się raz, potem każdy test startuje jako zalogowany.
+    code: |
+      # conftest.py — zapisz stan auth raz
+      import pytest
+
+      @pytest.fixture(scope='session')
+      def auth_state(browser):
+          context = browser.new_context()
+          page = context.new_page()
+          page.goto('/login')
+          page.get_by_label('Email').fill('admin@firma.pl')
+          page.get_by_label('Hasło').fill('admin123')
+          page.get_by_role('button', name='Zaloguj').click()
+          page.wait_for_url('/dashboard')
+
+          # Zapisz stan do pliku
+          context.storage_state(path='auth_state.json')
+          context.close()
+          return 'auth_state.json'
+
+      @pytest.fixture
+      def auth_page(browser, auth_state):
+          """Każdy test startuje zalogowany"""
+          context = browser.new_context(storage_state=auth_state)
+          page = context.new_page()
+          yield page
+          context.close()
+
+      # test_dashboard.py
+      def test_profile(auth_page):
+          auth_page.goto('/profile')
+          from playwright.sync_api import expect
+          expect(auth_page.get_by_text('admin@firma.pl')).to_be_visible()
+
+  - name: Parallel testing
+    desc: >
+      pytest-playwright izoluje testy w osobnych BrowserContext — parallelize
+      jest bezpieczny. pytest-xdist rozkłada testy na wiele procesów.
+    code: |
+      # Instalacja
+      # pip install pytest-xdist
+
+      # Uruchomienie równoległe
+      # pytest -n 4                  # 4 procesy
+      # pytest -n auto               # tyle procesów ile rdzeni CPU
+      # pytest -n 4 --headed          # 4 przeglądarki naraz (widoczne)
+
+      # Każdy test i tak ma izolowany BrowserContext
+      # więc nie ma shared state między testami
+
+  - name: API testing z Playwright
+    desc: >
+      Playwright ma wbudowane API do testowania HTTP — request context
+      bez uruchamiania przeglądarki. Szybsze od pełnych E2E testów.
+    code: |
+      from playwright.sync_api import APIRequestContext
+      import pytest
+
+      @pytest.fixture(scope='session')
+      def api_context(playwright):
+          context = playwright.request.new_context(
+              base_url='http://localhost:8000',
+              extra_http_headers={'Authorization': 'Bearer test-token'},
+          )
+          yield context
+          context.dispose()
+
+      def test_create_user(api_context: APIRequestContext):
+          response = api_context.post('/api/users', data={
+              'name': 'Jan',
+              'email': 'jan@firma.pl',
+          })
+          assert response.status == 201
+          data = response.json()
+          assert data['name'] == 'Jan'
+
+      def test_get_users(api_context: APIRequestContext):
+          response = api_context.get('/api/users')
+          assert response.ok
+          users = response.json()
+          assert len(users) > 0
+
+  - name: Trace Viewer — debugowanie testów
+    desc: >
+      Trace nagrywa każdą akcję, screenshot, DOM snapshot i network request.
+      Otwierasz w przeglądarce i debugujesz krok po kroku jak time-travel debugger.
+    code: |
+      # Nagrywanie trace
+      # pytest --tracing on                  # nagrywa wszystkie testy
+      # pytest --tracing retain-on-failure   # nagrywa tylko failujące
+
+      # Otwieranie trace
+      # playwright show-trace trace.zip
+
+      # Programowe nagrywanie
+      def test_with_trace(browser):
+          context = browser.new_context()
+          context.tracing.start(screenshots=True, snapshots=True, sources=True)
+
+          page = context.new_page()
+          page.goto('/app')
+          page.get_by_role('button', name='Action').click()
+
+          context.tracing.stop(path='trace.zip')
+          context.close()
+
+      # W przeglądarce trace viewer pokazuje:
+      # - Timeline z akcjami
+      # - Screenshot każdego kroku
+      # - DOM snapshot (inspect element)
+      # - Network log
+      # - Console log
+      # - Source code (jeśli sources=True)

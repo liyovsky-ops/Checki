@@ -1,0 +1,105 @@
+title: Selektory i Locatory
+
+items:
+  - name: Locatory — rekomendowany sposób
+    desc: >
+      Locatory to preferowany sposób znajdowania elementów w Playwright.
+      Używają roli ARIA, tekstu, labeli — czytelne i odporne na zmiany struktury HTML.
+      Lazy — nie odpytują DOM aż do wykonania akcji.
+    code: |
+      from playwright.sync_api import Page
+
+      def test_locators(page: Page):
+          page.goto('https://example.com/login')
+
+          # Po roli ARIA (najlepszy sposób!)
+          page.get_by_role('button', name='Zaloguj')
+          page.get_by_role('heading', name='Panel użytkownika')
+          page.get_by_role('link', name='Rejestracja')
+          page.get_by_role('textbox', name='Email')
+
+          # Po labelu formularza
+          page.get_by_label('Email')
+          page.get_by_label('Hasło')
+
+          # Po placeholderze
+          page.get_by_placeholder('Wpisz email...')
+
+          # Po tekście (widocznym)
+          page.get_by_text('Zapomniałeś hasła?')
+          page.get_by_text('Zapomniałeś', exact=False)  # partial match
+
+          # Po alt text (obrazki)
+          page.get_by_alt_text('Logo firmy')
+
+          # Po title attribute
+          page.get_by_title('Ustawienia konta')
+
+          # Po test-id (data-testid attribute)
+          page.get_by_test_id('submit-button')
+
+  - name: CSS i XPath selektory
+    desc: >
+      Gdy locatory nie wystarczają — CSS i XPath jako fallback.
+      page.locator('css=...') lub page.locator('xpath=...'). Mniej czytelne,
+      bardziej kruche, ale czasem jedyna opcja.
+    code: |
+      from playwright.sync_api import Page
+
+      def test_css_xpath(page: Page):
+          # CSS selektory
+          page.locator('.btn-primary')
+          page.locator('#login-form')
+          page.locator('[data-testid="user-card"]')
+          page.locator('div.card > h3')
+
+          # XPath
+          page.locator('xpath=//button[contains(text(), "Submit")]')
+
+          # Łączenie locatorów (chaining)
+          card = page.locator('.user-card')
+          card.get_by_role('button', name='Edytuj')
+
+  - name: Filtrowanie i łączenie locatorów
+    desc: >
+      Locatory można filtrować po tekście, potomkach i łączyć w łańcuchy.
+      .filter() zawęża wyniki, .locator() szuka wewnątrz, .first/.last/.nth()
+      wybierają konkretny element.
+    code: |
+      from playwright.sync_api import Page
+
+      def test_filtering(page: Page):
+          # Filtruj po tekście
+          page.get_by_role('listitem').filter(has_text='Python')
+
+          # Filtruj — ma wewnątrz element z rolą
+          page.get_by_role('listitem').filter(
+              has=page.get_by_role('button', name='Usuń')
+          )
+
+          # Łańcuch — szukaj wewnątrz
+          page.locator('.product-list').get_by_role('button', name='Kup')
+
+          # Nth — konkretny element z listy
+          page.get_by_role('listitem').first
+          page.get_by_role('listitem').last
+          page.get_by_role('listitem').nth(2)  # trzeci element (0-indexed)
+
+          # Count — ile elementów pasuje
+          count = page.get_by_role('listitem').count()
+
+  - name: Frame i iframe locatory
+    desc: >
+      Playwright automatycznie przeszukuje iframy. frame_locator() pozwala
+      celować w elementy wewnątrz konkretnego iframe.
+    code: |
+      from playwright.sync_api import Page
+
+      def test_iframe(page: Page):
+          # Znajdź iframe i element wewnątrz
+          frame = page.frame_locator('#payment-iframe')
+          frame.get_by_label('Numer karty').fill('4242424242424242')
+          frame.get_by_role('button', name='Zapłać').click()
+
+          # Zagnieżdżone iframy
+          page.frame_locator('#outer').frame_locator('#inner').get_by_text('OK')

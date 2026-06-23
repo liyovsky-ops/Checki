@@ -1,0 +1,93 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Celery?
+  firstComponent: Pierwszy task Celery
+  firstComponentLang: python
+
+intro:
+  title: Czym jest Celery?
+  desc: >
+    Celery to rozproszona kolejka zadań (task queue) dla Pythona. Pozwala przenosić
+    ciężkie, długotrwałe operacje z głównego procesu aplikacji do workerów działających
+    w tle. Wysyłanie maili, przetwarzanie plików, wywołania zewnętrznych API, generowanie
+    raportów — wszystko co nie powinno blokować response HTTP. Celery komunikuje się
+    przez brokera wiadomości (Redis, RabbitMQ) i może skalować się na wiele maszyn.
+
+concepts:
+  - title: Task (Zadanie)
+    desc: >
+      Funkcja Pythona ozdobiona dekoratorem @app.task lub @shared_task.
+      Zamiast wywoływać ją synchronicznie, wysyłasz ją do kolejki przez .delay()
+      lub .apply_async(). Worker odbiera zadanie z kolejki i je wykonuje w tle.
+    icon: "📋"
+  - title: Broker (Redis / RabbitMQ)
+    desc: >
+      Pośrednik wiadomości — kolejka FIFO przez którą producent (twoja aplikacja)
+      wysyła zadania, a konsument (worker Celery) je odbiera. Redis jest najprostszy
+      do postawienia, RabbitMQ daje więcej gwarancji dostarczenia i zaawansowany routing.
+    icon: "📨"
+  - title: Worker
+    desc: >
+      Proces Celery nasłuchujący na brokerze i wykonujący taski. Uruchamiasz
+      go komendą `celery -A app worker`. Możesz mieć wielu workerów na wielu maszynach —
+      Celery automatycznie rozkłada obciążenie. Każdy worker może obsługiwać wiele tasków
+      jednocześnie (procesy lub wątki).
+    icon: "⚙️"
+  - title: Result Backend
+    desc: >
+      Opcjonalny komponent przechowujący wyniki tasków — Redis, baza danych,
+      Memcached. Bez backendu task jest fire-and-forget. Z backendem możesz sprawdzić
+      status (.state), pobrać wynik (.get()) lub obsłużyć błąd (.traceback).
+    icon: "💾"
+  - title: Beat (Scheduler)
+    desc: >
+      Celery Beat to wbudowany scheduler — odpowiednik crontaba. Definiujesz
+      harmonogram w konfiguracji lub bazie danych, a Beat automatycznie wysyła
+      taski do kolejki w określonych odstępach czasu lub o konkretnych porach.
+    icon: "⏰"
+  - title: Canvas (Workflow)
+    desc: >
+      Zestaw prymitywów do budowania złożonych workflow z tasków: chain (sekwencja),
+      group (równoległe), chord (group + callback), chunks (podział danych).
+      Pozwala budować pipeline'y przetwarzania danych bez imperatywnego kodu.
+    icon: "🎨"
+
+whenToUse:
+  - Wysyłanie maili, SMS, push notyfikacji — nie blokuj response HTTP
+  - Przetwarzanie plików (resize obrazów, PDF, import CSV) w tle
+  - Wywołania zewnętrznych API z retry i backoff
+  - Okresowe zadania (cron) — czyszczenie danych, generowanie raportów
+  - Pipeline'y ML — trening modeli, batch inference
+  - Wszystko co trwa >200ms i użytkownik nie musi czekać na wynik
+
+firstComponent: |
+  # Instalacja
+  pip install celery[redis]
+
+  # tasks.py — definicja tasków
+  from celery import Celery
+
+  app = Celery('myapp', broker='redis://localhost:6379/0',
+               backend='redis://localhost:6379/1')
+
+  @app.task
+  def add(x, y):
+      return x + y
+
+  @app.task(bind=True, max_retries=3)
+  def send_email(self, to, subject, body):
+      try:
+          # symulacja wysyłki maila
+          print(f'Wysyłam mail do {to}: {subject}')
+          return {'status': 'sent', 'to': to}
+      except Exception as exc:
+          self.retry(exc=exc, countdown=60)
+
+  # Użycie — wywołanie asynchroniczne
+  result = add.delay(4, 6)
+  print(result.id)        # UUID zadania
+  print(result.get())     # 10 (czeka na wynik)
+  print(result.status)    # SUCCESS
+
+  # Uruchomienie workera
+  # celery -A tasks worker --loglevel=info

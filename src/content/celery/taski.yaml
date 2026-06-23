@@ -1,0 +1,139 @@
+title: Definiowanie i wywoływanie tasków
+
+items:
+  - name: Podstawowy task z dekoratorem
+    desc: >
+      @app.task dekoruje funkcję jako task Celery. .delay() wysyła task do kolejki,
+      .apply_async() daje kontrolę nad parametrami (countdown, eta, queue).
+      bind=True daje dostęp do self — retry, request info, task ID.
+    code: |
+      from celery import Celery
+
+      app = Celery('myapp', broker='redis://localhost:6379/0')
+
+      # Prosty task
+      @app.task
+      def process_image(image_path):
+          # resize, watermark, compress...
+          return f'Processed: {image_path}'
+
+      # Task z bind=True — dostęp do self
+      @app.task(bind=True)
+      def import_csv(self, file_path):
+          self.update_state(state='PROGRESS', meta={'current': 50, 'total': 100})
+          # przetwarzanie...
+          return {'imported': 1000}
+
+      # Wywołanie
+      result = process_image.delay('/img/photo.jpg')  # fire-and-forget
+      result = process_image.apply_async(
+          args=['/img/photo.jpg'],
+          countdown=30,            # opóźnienie 30 sekund
+          queue='images',          # dedykowana kolejka
+          expires=3600,            # task wygasa po godzinie
+      )
+
+  - name: shared_task — task bez instancji app
+    desc: >
+      @shared_task to task niezwiązany z konkretną instancją Celery app.
+      Idealny w projektach Django/Flask gdzie app tworzona jest w innym module.
+      Task rejestruje się automatycznie przy autodiscovery.
+    code: |
+      from celery import shared_task
+
+      @shared_task
+      def send_notification(user_id, message):
+          # nie potrzebujesz importować app
+          user = get_user(user_id)
+          push_to_user(user, message)
+          return {'sent': True}
+
+      # W Django: umieść w <app>/tasks.py
+      # Celery automatycznie znajdzie przez autodiscover_tasks()
+
+  - name: Retry — automatyczne ponawianie przy błędzie
+    desc: >
+      self.retry() ponawia task po błędzie. max_retries, countdown (stały) lub
+      exponential backoff. autoretry_for automatyzuje retry dla konkretnych wyjątków.
+    code: |
+      import requests
+      from celery import shared_task
+
+      # Ręczny retry z exponential backoff
+      @shared_task(bind=True, max_retries=5)
+      def call_external_api(self, url, payload):
+          try:
+              response = requests.post(url, json=payload, timeout=10)
+              response.raise_for_status()
+              return response.json()
+          except requests.RequestException as exc:
+              self.retry(exc=exc, countdown=2 ** self.request.retries)
+
+      # Automatyczny retry — mniej kodu
+      @shared_task(
+          autoretry_for=(requests.RequestException,),
+          retry_kwargs={'max_retries': 5},
+          retry_backoff=True,       # exponential backoff
+          retry_backoff_max=600,    # max 10 min między retries
+          retry_jitter=True,        # losowy jitter
+      )
+      def fetch_data(url):
+          response = requests.get(url, timeout=10)
+          response.raise_for_status()
+          return response.json()
+
+  - name: Task routing — różne kolejki dla różnych tasków
+    desc: >
+      Routing pozwala kierować taski do dedykowanych workerów. Ciężkie obliczenia
+      na jednym workerze, maile na innym, priorytety przez osobne kolejki.
+    code: |
+      # celeryconfig.py
+      task_routes = {
+          'myapp.tasks.send_email': {'queue': 'email'},
+          'myapp.tasks.process_image': {'queue': 'images'},
+          'myapp.tasks.train_model': {'queue': 'ml'},
+      }
+
+      # Uruchomienie workerów per kolejka
+      # celery -A myapp worker -Q email --concurrency=2
+      # celery -A myapp worker -Q images --concurrency=4
+      # celery -A myapp worker -Q ml --concurrency=1
+
+      # Dynamiczne routowanie przy wywołaniu
+      from myapp.tasks import process_image
+      process_image.apply_async(args=['/img/big.jpg'], queue='images')
+
+  - name: Śledzenie statusu i wyniku
+    desc: >
+      AsyncResult przechowuje status i wynik taska. Wymaga result backend (Redis,
+      baza danych). Statusy: PENDING → STARTED → SUCCESS/FAILURE/REVOKED.
+      Custom state pozwala raportować progress.
+    code: |
+      from celery.result import AsyncResult
+      from myapp.tasks import process_image
+
+      # Wysłanie taska
+      result = process_image.delay('/img/photo.jpg')
+
+      # Sprawdzenie statusu
+      print(result.id)       # '4c5e83a2-...'
+      print(result.state)    # 'PENDING' / 'STARTED' / 'SUCCESS'
+      print(result.ready())  # True/False
+
+      # Pobranie wyniku (blokujące)
+      value = result.get(timeout=30)  # czeka max 30s
+
+      # Pobranie wyniku z innego procesu (po ID)
+      result = AsyncResult('4c5e83a2-...', app=celery_app)
+      if result.successful():
+          print(result.result)
+      elif result.failed():
+          print(result.traceback)
+
+      # Custom progress w tasku
+      @shared_task(bind=True)
+      def long_task(self, total):
+          for i in range(total):
+              self.update_state(state='PROGRESS',
+                  meta={'current': i + 1, 'total': total})
+          return {'status': 'done'}

@@ -1,0 +1,66 @@
+title: Playwright vs alternatywy E2E testing
+
+items:
+  - name: Cypress
+    icon: "🌲"
+    color: "#69d3a7"
+    tagline: Developer-friendly E2E — piękny UI, time-travel debugger
+    pros:
+      - Piękny Test Runner z time-travel debugger
+      - Automatic waiting i retry wbudowane
+      - Ogromna społeczność i ekosystem pluginów
+      - Snapshot testing i video recording
+    cons:
+      - Tylko Chromium — brak Firefox i WebKit (od v13 eksperymentalnie)
+      - Nie obsługuje wielu kart/okien (architektura single-tab)
+      - Wolniejszy niż Playwright — runs in-browser, nie kontroluje z zewnątrz
+      - Brak wsparcia dla Pythona — tylko JavaScript/TypeScript
+    vs: Cypress najlepszy DX i community w świecie JS. Playwright wygrywa cross-browser, multi-tab, Python support i szybkością.
+
+  - name: Selenium
+    icon: "🔬"
+    color: "#43b02a"
+    tagline: Weteran automatyzacji — działa z wszystkim, ale wolno
+    pros:
+      - Najstarsza i najszersza kompatybilność przeglądarek
+      - Oficjalne wsparcie Python, Java, C#, Ruby, JavaScript
+      - Selenium Grid — distributed testing na wielu maszynach
+      - Ogromna ilość materiałów edukacyjnych i rozwiązań
+    cons:
+      - Brak auto-waiting — musisz pisać explicit/implicit waits ręcznie
+      - Flaky testy — race conditions z powodu braku auto-wait
+      - Znacznie wolniejszy niż Playwright
+      - Architektura WebDriver — dodatkowa warstwa latency
+    vs: Selenium gdy potrzebujesz legacy browser support lub Selenium Grid istnieje w firmie. Playwright dla nowych projektów — szybszy, niezawodniejszy, lepsze API.
+
+  - name: Puppeteer
+    icon: "🤖"
+    color: "#40b5a4"
+    tagline: Chromium DevTools Protocol — precyzyjna kontrola Chrome
+    pros:
+      - Oficjalny tool od Google do automatyzacji Chrome
+      - Pełny dostęp do Chrome DevTools Protocol
+      - Idealne do web scraping i PDF generation
+      - Lżejszy niż pełny framework testowy
+    cons:
+      - Tylko Chromium — brak Firefox, WebKit
+      - Brak wbudowanych asercji i test runnera
+      - Brak auto-waiting (Playwright to fork Puppeteera który to naprawia)
+      - Tylko JavaScript/TypeScript
+    vs: Puppeteer do automatyzacji Chrome i scraping. Playwright to dosłownie następca Puppeteera z cross-browser, auto-wait i Python support.
+
+  - name: TestCafe
+    icon: "🧪"
+    color: "#36b6e5"
+    tagline: E2E bez WebDriver — proxy-based, łatwy setup
+    pros:
+      - Zero konfiguracji — nie wymaga WebDrivera ani instalacji przeglądarek
+      - Wbudowana obsługa wielu przeglądarek
+      - Smart assertion queries z automatic waiting
+      - Concurrent test execution out of the box
+    cons:
+      - Wolniejszy niż Playwright (proxy-based architektura)
+      - Mniejsza społeczność i ekosystem
+      - Ograniczona kontrola nad przeglądarką vs CDP
+      - Brak Pythona — JavaScript/TypeScript only
+    vs: TestCafe łatwy start bez setup. Playwright szybszy, precyzyjniejszy i wspiera Python — lepszy wybór dla nowych projektów.

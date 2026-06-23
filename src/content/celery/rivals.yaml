@@ -1,0 +1,66 @@
+title: Celery vs alternatywy task queue
+
+items:
+  - name: RQ (Redis Queue)
+    icon: "🔴"
+    color: "#DC382D"
+    tagline: Prosty task queue oparty na Redis — minimalizm nad wszystko
+    pros:
+      - Ekstremalnie prosty API — 3 linie kodu do pierwszego taska
+      - Tylko Redis jako broker — zero konfiguracji RabbitMQ
+      - Wbudowany dashboard (rq-dashboard)
+      - Idealny do prostych use case'ów bez workflow
+    cons:
+      - Brak canvas (chain, group, chord) — ręcznie koordynujesz taski
+      - Brak wbudowanego schedulera (potrzebujesz rq-scheduler)
+      - Tylko Redis — brak wsparcia dla RabbitMQ, SQS
+      - Wolniejszy niż Celery przy dużej skali
+    vs: RQ gdy potrzebujesz prostego fire-and-forget bez workflow. Celery gdy budujesz poważny pipeline z retry, routing, scheduling i skalowaniem.
+
+  - name: Dramatiq
+    icon: "🎭"
+    color: "#5C6BC0"
+    tagline: Nowoczesny task queue — prosty jak RQ, mocny jak Celery
+    pros:
+      - Czysty, nowoczesny API — middleware zamiast signals
+      - Wbudowane retry z backoff bez konfiguracji
+      - Actors i pipelines (odpowiednik chain/group)
+      - Lepsze domyślne ustawienia niż Celery (acks_late, prefetch 1)
+    cons:
+      - Mniejsza społeczność — mniej tutoriali i rozwiązań na SO
+      - Brak wbudowanego Beat — potrzebujesz APScheduler
+      - Mniej integracji z Django/Flask niż Celery
+      - Brak result backend w standardowej konfiguracji
+    vs: Dramatiq lepszy API i domyślne ustawienia. Celery wygrywa ekosystemem, integracjami i skalą community.
+
+  - name: Huey
+    icon: "🐿️"
+    color: "#8D6E63"
+    tagline: Lekki task queue — mniejszy niż Celery, więcej niż RQ
+    pros:
+      - Lekki — mniej zależności, szybki start
+      - Wbudowany scheduler (periodic tasks)
+      - Wsparcie dla SQLite jako backendu (bez Redis na dev!)
+      - Prosty API z dekoratorami
+    cons:
+      - Brak zaawansowanego routingu i canvas
+      - Jednoprocesowy worker — ograniczona skalowalność
+      - Mała społeczność
+      - Nie nadaje się do dużych, rozproszonych systemów
+    vs: Huey do małych projektów i prototypów gdzie Celery to overkill. Celery gdy potrzebujesz skali, routing i rozbudowanego monitoringu.
+
+  - name: AWS SQS + Lambda
+    icon: "☁️"
+    color: "#FF9900"
+    tagline: Serverless task processing — zero zarządzania infrastrukturą
+    pros:
+      - Zero zarządzania workerami i brokerem
+      - Automatyczne skalowanie do zera i do tysięcy
+      - Płacisz tylko za wykonane taski
+      - Dead letter queues i retry wbudowane w SQS
+    cons:
+      - Vendor lock-in — AWS only
+      - Cold start Lambda (opóźnienie przy rzadkich taskach)
+      - Limit 15 min na wykonanie Lambdy
+      - Trudniejszy local development i testowanie
+    vs: SQS+Lambda gdy jesteś na AWS i nie chcesz zarządzać infrastrukturą. Celery gdy potrzebujesz pełnej kontroli, długich tasków lub multi-cloud.

@@ -1,0 +1,133 @@
+title: Monitoring i debugowanie Celery
+
+items:
+  - name: Flower — webowy dashboard
+    desc: >
+      Flower to real-time webowy monitor Celery. Pokazuje aktywne workerów,
+      kolejki, taski w trakcie, historię, wykresy wydajności. Jednolinijkowa
+      instalacja, dostęp przez przeglądarkę.
+    code: |
+      # Instalacja i uruchomienie
+      pip install flower
+      celery -A myapp flower --port=5555
+
+      # Dostęp: http://localhost:5555
+
+      # Z autentykacją
+      celery -A myapp flower \
+          --basic_auth=admin:secret \
+          --port=5555
+
+      # Flower pokazuje:
+      # - Aktywni workerzy i ich obciążenie
+      # - Taski w trakcie (STARTED), oczekujące (PENDING), zakończone
+      # - Historia tasków z wynikami i tracebackami
+      # - Wykresy: tasks/min, success rate, avg execution time
+      # - Kolejki: głębokość, consumer count
+
+  - name: celery inspect — status workerów z CLI
+    desc: >
+      celery inspect wysyła komendy do workerów i zbiera odpowiedzi.
+      Sprawdź co worker robi teraz, ile tasków ma w kolejce, jakie taski
+      obsługuje, statystyki.
+    code: |
+      # Aktywne taski na wszystkich workerach
+      celery -A myapp inspect active
+
+      # Zarezerwowane (w kolejce workera, jeszcze nie startowane)
+      celery -A myapp inspect reserved
+
+      # Statystyki workera
+      celery -A myapp inspect stats
+
+      # Zarejestrowane taski
+      celery -A myapp inspect registered
+
+      # Ping workerów
+      celery -A myapp inspect ping
+
+      # Status konkretnego workera
+      celery -A myapp inspect active -d worker1@hostname
+
+  - name: celery control — sterowanie workerami
+    desc: >
+      celery control wysyła komendy sterujące do workerów — shutdown,
+      zmiana concurrency, dodanie/usunięcie kolejki na żywo.
+    code: |
+      # Shutdown wszystkich workerów
+      celery -A myapp control shutdown
+
+      # Zmień concurrency na żywo
+      celery -A myapp control pool_grow 2     # +2 procesy
+      celery -A myapp control pool_shrink 1   # -1 proces
+
+      # Dodaj kolejkę do workera bez restartu
+      celery -A myapp control add_consumer images
+
+      # Usuń kolejkę z workera
+      celery -A myapp control cancel_consumer images
+
+      # Anuluj task po ID
+      celery -A myapp control revoke <task-id>
+
+      # Anuluj i zabij task (SIGTERM)
+      celery -A myapp control revoke <task-id> --terminate
+
+  - name: Logowanie i Sentry
+    desc: >
+      Celery używa standardowego logging Pythona. Konfiguruj poziomy logów,
+      wysyłaj błędy do Sentry, dodaj structured logging dla tasków.
+    code: |
+      import logging
+      from celery import shared_task
+      from celery.signals import after_setup_logger
+
+      logger = logging.getLogger(__name__)
+
+      @shared_task(bind=True)
+      def risky_task(self, data):
+          logger.info('Starting task %s with data: %s', self.request.id, data)
+          try:
+              result = process(data)
+              logger.info('Task %s completed: %s', self.request.id, result)
+              return result
+          except Exception:
+              logger.exception('Task %s failed', self.request.id)
+              raise
+
+      # Sentry integration
+      # pip install sentry-sdk
+      import sentry_sdk
+      from sentry_sdk.integrations.celery import CeleryIntegration
+
+      sentry_sdk.init(
+          dsn='https://xxx@sentry.io/123',
+          integrations=[CeleryIntegration()],
+          traces_sample_rate=0.1,
+      )
+
+  - name: Task events i sygnały
+    desc: >
+      Celery emituje sygnały (signals) na każdym etapie życia taska.
+      task_prerun, task_postrun, task_failure, task_success — hookuj własną
+      logikę bez modyfikacji tasków.
+    code: |
+      from celery.signals import task_prerun, task_postrun, task_failure
+      import time
+
+      task_start_times = {}
+
+      @task_prerun.connect
+      def on_task_start(sender=None, task_id=None, **kwargs):
+          task_start_times[task_id] = time.time()
+
+      @task_postrun.connect
+      def on_task_end(sender=None, task_id=None, **kwargs):
+          start = task_start_times.pop(task_id, None)
+          if start:
+              duration = time.time() - start
+              print(f'Task {sender.name} took {duration:.2f}s')
+
+      @task_failure.connect
+      def on_task_failure(sender=None, task_id=None, exception=None, **kwargs):
+          print(f'Task {sender.name} failed: {exception}')

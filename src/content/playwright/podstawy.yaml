@@ -1,0 +1,88 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Playwright?
+  firstComponent: Pierwszy test Playwright
+  firstComponentLang: python
+
+intro:
+  title: Czym jest Playwright?
+  desc: >
+    Playwright to framework do E2E (end-to-end) testowania aplikacji webowych od Microsoftu.
+    Obsługuje Chromium, Firefox i WebKit z jednego API. Automatyczne czekanie na elementy,
+    izolacja kontekstów przeglądarki, nagrywanie testów z GUI, trace viewer do debugowania.
+    Dostępny dla TypeScript/JavaScript, Python, C# i Java. W Pythonie integruje się z pytest
+    przez plugin pytest-playwright.
+
+concepts:
+  - title: Browser → Context → Page
+    desc: >
+      Hierarchia obiektów Playwright. Browser to instancja przeglądarki (Chromium/Firefox/WebKit).
+      BrowserContext to izolowana sesja (cookies, storage — jak incognito). Page to pojedyncza
+      karta. Jeden browser może mieć wiele contextów, każdy context wiele pages.
+    icon: "🌐"
+  - title: Auto-waiting
+    desc: >
+      Playwright automatycznie czeka na elementy zanim wykona akcję. Klikasz button —
+      Playwright czeka aż będzie widoczny, klikalny i stabilny. Nie musisz pisać
+      sleep() ani explicit waits jak w Selenium. To eliminuje flaky testy.
+    icon: "⏳"
+  - title: Selektory i Locatory
+    desc: >
+      Locator to rekomendowany sposób znajdowania elementów. page.get_by_role(),
+      page.get_by_text(), page.get_by_label() — czytelne, odporne na zmiany HTML.
+      Locatory są lazy — nie odpytują DOM aż do akcji. Re-evaluate przy każdym użyciu.
+    icon: "🎯"
+  - title: Trace Viewer
+    desc: >
+      Wbudowane narzędzie do debugowania testów. Nagrywa każdą akcję, screenshot,
+      network request i DOM snapshot. Otwierasz trace.zip w przeglądarce i widzisz
+      krok po kroku co test robił — lepsze niż video, bo interaktywne.
+    icon: "🔍"
+  - title: Codegen — nagrywanie testów
+    desc: >
+      playwright codegen otwiera przeglądarkę i nagrywa Twoje akcje jako kod testowy.
+      Klikasz, wpisujesz tekst, nawigujesz — Playwright generuje gotowy test w Pythonie
+      lub TypeScript. Idealne do szybkiego prototypowania testów.
+    icon: "📹"
+  - title: Test Isolation
+    desc: >
+      Każdy test dostaje świeży BrowserContext — izolowane cookies, localStorage,
+      sessionStorage. Testy nie wpływają na siebie nawzajem. Nie musisz czyścić
+      stanu między testami. Parallelize bez problemów.
+    icon: "🔒"
+
+whenToUse:
+  - E2E testy aplikacji webowych — pełne scenariusze użytkownika
+  - Cross-browser testing — jeden test na Chromium, Firefox i WebKit
+  - Testowanie SPA (React, Vue, Angular) z dynamicznym contentem
+  - Visual regression testing — porównywanie screenshotów
+  - API testing + UI testing w jednym frameworku
+  - Automatyzacja web scraping z pełną obsługą JavaScript
+
+firstComponent: |
+  # Instalacja (Python)
+  pip install pytest-playwright
+  playwright install  # pobiera przeglądarki
+
+  # test_example.py — pierwszy test
+  import re
+  from playwright.sync_api import Page, expect
+
+  def test_homepage_title(page: Page):
+      page.goto('https://playwright.dev/')
+      expect(page).to_have_title(re.compile('Playwright'))
+
+  def test_get_started_link(page: Page):
+      page.goto('https://playwright.dev/')
+      page.get_by_role('link', name='Get started').click()
+      expect(page.get_by_role('heading', name='Installation')).to_be_visible()
+
+  def test_search(page: Page):
+      page.goto('https://playwright.dev/')
+      page.get_by_role('button', name='Search').click()
+      page.get_by_placeholder('Search docs').fill('locator')
+      expect(page.get_by_role('dialog')).to_contain_text('Locators')
+
+  # Uruchomienie
+  # pytest test_example.py --headed  (z widoczną przeglądarką)
+  # pytest test_example.py           (headless — domyślnie)

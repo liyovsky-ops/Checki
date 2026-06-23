@@ -170,6 +170,7 @@ export const FRAMEWORKS = {
     { id: 'flask',         name: 'Flask',         icon: '🌶️', color: '#E8402C', lang: 'Python',     desc: 'Mikro-framework webowy' },
     { id: 'django',        name: 'Django',        icon: '🎸',  color: '#092E20', lang: 'Python',     desc: 'Batteries-included framework webowy' },
     { id: 'pandas',        name: 'Pandas',        icon: '🐼',  color: '#150458', lang: 'Python',     desc: 'Potężna biblioteka do analizy danych' },
+    { id: 'celery',       name: 'Celery',        icon: '🥬',  color: '#a9cc54', lang: 'Python',     desc: 'Rozproszona kolejka zadań' },
   ],
   database: [
     { id: 'postgresql', name: 'PostgreSQL', icon: '🐘', color: '#336791', lang: 'SQL',       desc: 'Zaawansowana baza relacyjna' },

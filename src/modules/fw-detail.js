@@ -30,6 +30,8 @@ import { FW_HUGGINGFACE_DATA }   from '../data/fw_huggingface.js';
 import { FW_PYTORCH_DATA }       from '../data/fw_pytorch.js';
 import { FW_SCIKITLEARN_DATA }   from '../data/fw_scikitlearn.js';
 import { FW_NUMPY_DATA }         from '../data/fw_numpy.js';
+import { FW_CELERY_DATA }        from '../data/fw_celery.js';
+import { FW_PLAYWRIGHT_DATA }    from '../data/fw_playwright.js';
 
 let activeTab = 'podstawy';
 let activeFw  = 'react';
@@ -48,6 +50,8 @@ const FW_DATA_MAP = {
   pandas: FW_PANDAS_DATA, huggingface: FW_HUGGINGFACE_DATA,
   pytorch: FW_PYTORCH_DATA,
   scikitlearn: FW_SCIKITLEARN_DATA, numpy: FW_NUMPY_DATA,
+  celery: FW_CELERY_DATA,
+  playwright: FW_PLAYWRIGHT_DATA,
 };
 
 export function openFramework(fw) {
