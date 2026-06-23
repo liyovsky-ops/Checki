@@ -1,7 +1,7 @@
 title: Komendy Celery
 
 groups:
-  - name: Worker
+  - name: Worker — uruchamianie
     icon: "⚙️"
     commands:
       - cmd: celery -A myapp worker --loglevel=info
@@ -36,6 +36,59 @@ groups:
           how: '%h = hostname, %n = node name. Pomaga rozróżnić workerów w Flower i logach.'
           tips:
             - 'celery -A myapp worker -Q images --hostname=img-worker@%h — dedykowany worker per kolejka'
+      - cmd: celery -A myapp worker -P gevent --concurrency=100
+        desc: Worker z gevent pool (async I/O)
+        detail:
+          what: Gevent pool pozwala obsłużyć setki równoczesnych tasków I/O-bound bez tworzenia setek procesów.
+          how: 'pip install gevent. Idealny dla tasków robiących HTTP requesty, czekających na bazy, itp.'
+          tips:
+            - 'Nie używaj dla CPU-bound tasków — gevent nie ominię GIL'
+            - '-P eventlet — alternatywa dla gevent, podobne zastosowanie'
+      - cmd: celery -A myapp worker -P threads --concurrency=8
+        desc: Worker z pulą wątków zamiast procesów
+        detail:
+          what: Wątki zamiast procesów — mniej pamięci, ale GIL ogranicza CPU-bound taski.
+          how: Dobry dla tasków I/O-bound gdzie gevent jest overkill.
+          tips:
+            - 'Lżejszy niż procesy — jeden proces, wiele wątków'
+      - cmd: celery -A myapp worker -Q email,notifications --concurrency=2
+        desc: Dedykowany worker dla kolejki email
+        detail:
+          what: Worker obsługuje tylko kolejki email i notifications z 2 procesami.
+          how: Rozdzielenie kolejek pozwala izolować ciężkie taski od lekkich.
+          tips:
+            - 'Uruchom osobny worker -Q heavy --concurrency=1 dla tasków ML'
+            - 'Domyślna kolejka to "celery" — jeśli nie podasz -Q, obsługuje ją'
+      - cmd: celery -A myapp worker --without-heartbeat --without-mingle
+        desc: Worker zoptymalizowany (bez heartbeat i mingle)
+        detail:
+          what: Wyłącza heartbeat (sygnały życia) i mingle (synchronizacja stanu przy starcie).
+          how: Zmniejsza ruch na brokerze. Przydatne przy wielu workerach.
+          tips:
+            - '--without-gossip — wyłącz też gossip protocol (jeszcze mniej ruchu)'
+      - cmd: celery multi start w1 w2 -A myapp -l info
+        desc: Uruchom wiele workerów jedną komendą
+        detail:
+          what: celery multi zarządza wieloma procesami workerów naraz — start, restart, stop.
+          how: 'w1, w2 to nazwy workerów. Każdy dostaje osobny PID file.'
+          tips:
+            - 'celery multi restart w1 w2 -A myapp — restart bez downtime'
+            - 'celery multi stop w1 w2 — zatrzymaj workerów'
+            - 'celery multi stopwait w1 w2 — graceful stop (czeka na aktywne taski)'
+      - cmd: celery multi stop w1 w2
+        desc: Zatrzymaj workerów uruchomionych przez multi
+        detail:
+          what: Wysyła SIGTERM do workerów zarządzanych przez celery multi.
+          how: Korzysta z PID files zapisanych przy starcie.
+          tips:
+            - 'celery multi stopwait w1 w2 — czeka aż workerzy zakończą aktywne taski'
+      - cmd: celery -A myapp worker --max-tasks-per-child=100
+        desc: Worker restartuje procesy po 100 taskach
+        detail:
+          what: Każdy child process jest zabijany i tworzony na nowo po wykonaniu 100 tasków.
+          how: Zapobiega memory leaks — przydatne gdy taski mają wycieki pamięci.
+          tips:
+            - '--max-memory-per-child=200000 — restart po przekroczeniu 200MB RAM'
 
   - name: Beat (Scheduler)
     icon: "⏰"
@@ -55,8 +108,29 @@ groups:
           how: Wymaga pip install django-celery-beat i migracji.
           tips:
             - 'Dynamicznie dodawaj/usuwaj taski przez Django Admin bez restartu Beat'
+      - cmd: celery -A myapp worker --beat --scheduler django_celery_beat.schedulers:DatabaseScheduler
+        desc: Worker + Beat w jednym procesie (dev)
+        detail:
+          what: Łączy workera i Beat w jeden proces — wygodne do developmentu.
+          how: Na produkcji ZAWSZE uruchamiaj Beat osobno — unikniesz duplikatów.
+          tips:
+            - 'Tylko do dev! Na produkcji osobny proces Beat'
+      - cmd: celery -A myapp beat --pidfile=/var/run/celerybeat.pid
+        desc: Beat z PID file (produkcja)
+        detail:
+          what: Zapisuje PID procesu Beat do pliku — potrzebne do zarządzania przez systemd/supervisord.
+          how: '--schedule=/var/lib/celery/beat-schedule — ścieżka do pliku harmonogramu.'
+          tips:
+            - 'Użyj z systemd unit file na produkcji'
+      - cmd: celery -A myapp beat --max-interval=60
+        desc: Beat sprawdza harmonogram co 60 sekund
+        detail:
+          what: Ustawia maksymalny interwał sprawdzania harmonogramu przez Beat.
+          how: Domyślnie 300s (5 min). Zmniejsz jeśli dodajesz taski dynamicznie i chcesz szybszą reakcję.
+          tips:
+            - 'Mniejszy interwał = więcej zapytań do bazy (przy DatabaseScheduler)'
 
-  - name: Inspekcja i monitoring
+  - name: Inspekcja workerów
     icon: "🔍"
     commands:
       - cmd: celery -A myapp inspect active
@@ -94,6 +168,62 @@ groups:
           how: Szybki health check. Brak odpowiedzi = worker padł lub jest rozłączony z brokerem.
           tips:
             - 'Użyj w health checkach Kubernetes/Docker'
+      - cmd: celery -A myapp inspect scheduled
+        desc: Pokaż taski zaplanowane (ETA / countdown)
+        detail:
+          what: Taski z ustawionym countdown lub eta — czekają na swoją kolej u workera.
+          how: Pokazuje czas kiedy task będzie gotowy do wykonania.
+          tips:
+            - 'Nie myl z Beat schedule — to taski wysłane z apply_async(countdown=...)'
+      - cmd: celery -A myapp inspect revoked
+        desc: Pokaż anulowane taski (revoked)
+        detail:
+          what: Lista task ID które zostały revoked — worker je zignoruje.
+          how: Revoked taski trzymane w pamięci workera (znikają po restarcie).
+          tips:
+            - '--persistent-revokes — zapisz revoked taski do pliku (przetrwają restart)'
+      - cmd: celery -A myapp inspect conf
+        desc: Pokaż konfigurację workera
+        detail:
+          what: Wyświetla aktualną konfigurację Celery załadowaną przez workera.
+          how: Przydatne do sprawdzenia czy worker czyta poprawny config.
+          tips:
+            - 'Sprawdź broker_url, result_backend, task_routes'
+      - cmd: celery -A myapp inspect query_task <task-id>
+        desc: Zapytaj workerów o status konkretnego taska
+        detail:
+          what: Sprawdza czy dany task jest aktywny, zarezerwowany lub zaplanowany na workerach.
+          how: Szuka taska po ID na wszystkich podłączonych workerach.
+          tips:
+            - 'Szybszy niż result backend bo pyta workerów bezpośrednio'
+      - cmd: celery -A myapp inspect active_queues
+        desc: Pokaż kolejki obsługiwane przez workerów
+        detail:
+          what: Lista kolejek z których każdy worker aktualnie konsumuje taski.
+          how: Przydatne do weryfikacji routingu — czy worker słucha na właściwej kolejce.
+          tips:
+            - 'Sprawdź po celery control add_consumer czy kolejka została dodana'
+      - cmd: celery -A myapp inspect clock
+        desc: Pokaż zegar logiczny workerów
+        detail:
+          what: Wyświetla wartość zegara logicznego (Lamport clock) każdego workera.
+          how: Zegar rośnie z każdym zdarzeniem — przydatny do debugowania kolejności zdarzeń.
+          tips:
+            - 'Przydatne przy debugowaniu problemów z synchronizacją tasków'
+      - cmd: celery -A myapp inspect memsample
+        desc: Próbka zużycia pamięci workera
+        detail:
+          what: Pobiera snapshot zużycia pamięci RSS i VMS przez worker processes.
+          how: Przydatne do wykrywania memory leaks — porównaj próbki w czasie.
+          tips:
+            - 'celery -A myapp inspect memdump — pełny dump pamięci (więcej szczegółów)'
+      - cmd: celery -A myapp inspect objgraph
+        desc: Object graph — debugowanie memory leaks
+        detail:
+          what: Generuje raport obiektów Pythona w pamięci workera — typów, ilości, wzrostu.
+          how: Wymaga pip install objgraph. Pokazuje które obiekty nie są garbage collected.
+          tips:
+            - 'Uruchom kilka razy i porównaj — obiekty które rosną = potencjalny leak'
 
   - name: Kontrola workerów
     icon: "🎮"
@@ -113,6 +243,13 @@ groups:
           tips:
             - 'celery -A myapp control revoke <id> --terminate — natychmiastowe zabicie'
             - 'Revoked taski nie są usuwane z kolejki — worker je ignoruje przy odczycie'
+      - cmd: celery -A myapp control revoke <task-id> --terminate --signal=SIGKILL
+        desc: Zabij task natychmiast (SIGKILL)
+        detail:
+          what: Wymusza natychmiastowe zabicie taska — bez szansy na cleanup.
+          how: Używaj jako ostatnia deska ratunku gdy --terminate (SIGTERM) nie pomaga.
+          tips:
+            - 'SIGKILL nie pozwala na cleanup — task nie wykona finally/except'
       - cmd: celery -A myapp purge
         desc: Wyczyść wszystkie taski z kolejki
         detail:
@@ -121,6 +258,120 @@ groups:
           tips:
             - 'Używaj ostrożnie! Nie ma undo'
             - 'celery -A myapp purge -Q images — wyczyść tylko konkretną kolejkę'
+      - cmd: celery -A myapp control pool_grow 2
+        desc: Dodaj 2 procesy do pool workera na żywo
+        detail:
+          what: Zwiększa concurrency workera o 2 procesy bez restartu.
+          how: Działa z prefork pool. Nie działa z gevent/eventlet.
+          tips:
+            - 'celery -A myapp control pool_shrink 2 — zmniejsz o 2 procesy'
+      - cmd: celery -A myapp control pool_shrink 1
+        desc: Zmniejsz pool workera o 1 proces
+        detail:
+          what: Zabiera jeden proces z pool workera — zmniejsza concurrency.
+          how: Przydatne gdy worker zużywa za dużo pamięci i chcesz go odciążyć.
+          tips:
+            - 'Nie zmniejszysz poniżej 1 procesu'
+      - cmd: celery -A myapp control add_consumer images
+        desc: Dodaj kolejkę do workera bez restartu
+        detail:
+          what: Worker zaczyna konsumować taski z kolejki "images" — bez restartu.
+          how: Dynamiczne dodawanie kolejek do istniejącego workera.
+          tips:
+            - 'celery -A myapp control add_consumer images -d worker1@host — konkretny worker'
+      - cmd: celery -A myapp control cancel_consumer images
+        desc: Usuń kolejkę z workera bez restartu
+        detail:
+          what: Worker przestaje konsumować taski z kolejki "images".
+          how: Taski w kolejce czekają na innego workera lub zostają.
+          tips:
+            - 'Sprawdź inspect active_queues żeby zobaczyć aktualne kolejki'
+      - cmd: celery -A myapp control rate_limit myapp.tasks.send_email 10/m
+        desc: Ogranicz rate taska do 10/minutę
+        detail:
+          what: Ustawia rate limit na tasku — max 10 wykonań na minutę.
+          how: 'Format: N/s (sekunda), N/m (minuta), N/h (godzina).'
+          tips:
+            - 'celery -A myapp control rate_limit myapp.tasks.api_call 100/h — 100 na godzinę'
+            - '0 = brak limitu'
+      - cmd: celery -A myapp control time_limit myapp.tasks.process 300 60
+        desc: Ustaw timeout na tasku (hard=300s, soft=60s)
+        detail:
+          what: Hard time limit zabija task po 300s. Soft time limit rzuca SoftTimeLimitExceeded po 60s.
+          how: Soft limit pozwala na cleanup (except SoftTimeLimitExceeded). Hard zabija natychmiast.
+          tips:
+            - 'Soft limit daje szansę na zapis stanu i graceful exit'
+      - cmd: celery -A myapp control election
+        desc: Wymuś ponowne wybory lidera workerów
+        detail:
+          what: Wymusza ponowne wybory lidera wśród workerów — lider raportuje statystyki.
+          how: Przydatne po restarcie głównego workera.
+          tips:
+            - 'Zazwyczaj nie musisz tego robić ręcznie'
+
+  - name: Wywoływanie tasków z CLI
+    icon: "📤"
+    commands:
+      - cmd: celery -A myapp call myapp.tasks.add --args='[2, 2]'
+        desc: Wywołaj task z terminala (args pozycyjne)
+        detail:
+          what: Wysyła task do kolejki bezpośrednio z terminala — przydatne do testowania i one-off.
+          how: '--args dla pozycyjnych, --kwargs dla named argumentów.'
+          tips:
+            - 'Zwraca task ID — użyj celery result <id> żeby sprawdzić wynik'
+      - cmd: "celery -A myapp call myapp.tasks.send_email --kwargs='{\"to\": \"jan@firma.pl\"}'"
+        desc: Wywołaj task z named argumentami
+        detail:
+          what: Przekazuje keyword arguments jako JSON string.
+          how: JSON musi być poprawny — użyj podwójnych cudzysłowów wewnątrz.
+          tips:
+            - 'Łącz args i kwargs: --args="[1]" --kwargs="{\"force\": true}"'
+      - cmd: celery -A myapp call myapp.tasks.process --countdown=30
+        desc: Wywołaj task z opóźnieniem 30 sekund
+        detail:
+          what: Task czeka 30 sekund zanim zostanie wykonany.
+          how: Odpowiednik apply_async(countdown=30) w kodzie.
+          tips:
+            - '--eta="2026-06-25T10:00:00" — wykonaj o konkretnej godzinie'
+      - cmd: celery -A myapp call myapp.tasks.process --queue=heavy
+        desc: Wyślij task do konkretnej kolejki
+        detail:
+          what: Task trafia do kolejki "heavy" zamiast domyślnej "celery".
+          how: Odpowiednik apply_async(queue="heavy") w kodzie.
+          tips:
+            - 'Upewnij się że jakiś worker słucha na kolejce heavy: -Q heavy'
+      - cmd: celery -A myapp call myapp.tasks.process --expires=3600
+        desc: Task wygasa po godzinie (jeśli nie wykonany)
+        detail:
+          what: Jeśli task nie zostanie pobrany z kolejki w ciągu 3600 sekund, jest ignorowany.
+          how: Zapobiega przetwarzaniu nieaktualnych tasków po dłuższym downtime.
+          tips:
+            - 'Przydatne dla tasków których wynik traci sens po czasie (np. cache warm-up)'
+
+  - name: Wyniki i status
+    icon: "📊"
+    commands:
+      - cmd: celery -A myapp result <task-id>
+        desc: Pobierz wynik taska po ID
+        detail:
+          what: Odpytuje result backend o wynik konkretnego taska.
+          how: Wymaga skonfigurowanego result_backend. Zwraca wynik lub traceback.
+          tips:
+            - 'Przydatne do debugowania tasków które failują w tle'
+      - cmd: celery -A myapp result <task-id> --traceback
+        desc: Pokaż traceback failującego taska
+        detail:
+          what: Wyświetla pełny Python traceback jeśli task zakończył się wyjątkiem.
+          how: Wymaga result_backend. Traceback jest serializowany i przechowywany.
+          tips:
+            - 'Alternatywa: AsyncResult(id).traceback w kodzie'
+      - cmd: celery -A myapp status
+        desc: Pokaż status wszystkich workerów (lista nodów)
+        detail:
+          what: Szybki przegląd — lista podłączonych workerów i ich status (online/offline).
+          how: Prostsze niż inspect ping — jedna linijka per worker.
+          tips:
+            - 'Przydatne do skryptów health check'
 
   - name: Narzędzia i debug
     icon: "🐛"
@@ -132,20 +383,6 @@ groups:
           how: Przydatny do debugowania, testowania tasków i sprawdzania backendu.
           tips:
             - 'from myapp.tasks import process; result = process.delay(data) — test task z shell'
-      - cmd: celery -A myapp call myapp.tasks.add --args='[2, 2]'
-        desc: Wywołaj task z CLI (bez kodu Python)
-        detail:
-          what: Wysyła task do kolejki bezpośrednio z terminala — przydatne do testowania i one-off.
-          how: '--args dla pozycyjnych, --kwargs dla named argumentów.'
-          tips:
-            - "celery -A myapp call myapp.tasks.send_email --kwargs='{\"to\": \"test@x.com\"}'"
-      - cmd: celery -A myapp result <task-id>
-        desc: Pobierz wynik taska po ID
-        detail:
-          what: Odpytuje result backend o wynik konkretnego taska.
-          how: Wymaga skonfigurowanego result_backend. Zwraca wynik lub traceback.
-          tips:
-            - 'Przydatne do debugowania tasków które failują w tle'
       - cmd: celery -A myapp report
         desc: Pokaż pełny raport konfiguracji Celery
         detail:
@@ -153,6 +390,68 @@ groups:
           how: Przydatne do debugowania problemów z konfiguracją.
           tips:
             - 'Sprawdź broker_url, result_backend, task_routes'
+      - cmd: celery -A myapp upgrade settings myapp/celeryconfig.py
+        desc: Migruj config do nowego formatu (lowercase)
+        detail:
+          what: Konwertuje stary format konfiguracji (CELERY_BROKER_URL) na nowy (broker_url).
+          how: Celery 4+ używa lowercase settings. Ten tool automatycznie migruje.
+          tips:
+            - 'Zrób backup configa przed migracją'
+      - cmd: celery -A myapp graph bootsteps
+        desc: Wygeneruj graf kroków startowych workera (DOT format)
+        detail:
+          what: Generuje graf w formacie DOT pokazujący kolejność inicjalizacji workera.
+          how: 'celery -A myapp graph bootsteps | dot -Tpng -o bootsteps.png'
+          tips:
+            - 'Przydatne do debugowania problemów ze startem workera'
+      - cmd: celery -A myapp graph workers
+        desc: Wygeneruj graf topologii workerów (DOT format)
+        detail:
+          what: Generuje graf połączeń między workerami i brokerem.
+          how: 'celery -A myapp graph workers | dot -Tpng -o workers.png'
+          tips:
+            - 'Wymaga graphviz: apt install graphviz'
+      - cmd: celery -A myapp events
+        desc: Monitoruj zdarzenia Celery w real-time (curses)
+        detail:
+          what: Terminal UI pokazujący live feed zdarzeń — taski startują, kończą się, failują.
+          how: Wymaga --enable-events na workerach (celery worker -E).
+          tips:
+            - 'celery -A myapp events --camera=myapp.Camera — custom event camera'
+            - 'celery -A myapp events -d — dump zdarzeń do stdout (bez curses UI)'
+      - cmd: celery -A myapp logtool
+        desc: Filtruj i analizuj logi Celery
+        detail:
+          what: Narzędzie do parsowania i filtrowania logów Celery z pliku lub stdin.
+          how: 'celery logtool stats < celery.log — statystyki z logów'
+          tips:
+            - 'celery logtool traces < celery.log — wyciągnij tracebacki z logów'
+      - cmd: celery -A myapp amqp queue.declare myqueue
+        desc: Zadeklaruj kolejkę na brokerze ręcznie
+        detail:
+          what: Tworzy kolejkę bezpośrednio na brokerze AMQP (RabbitMQ).
+          how: Przydatne do diagnostyki — sprawdzisz czy kolejka istnieje i ile ma wiadomości.
+          tips:
+            - 'celery -A myapp amqp queue.purge myqueue — wyczyść kolejkę'
+            - 'celery -A myapp amqp queue.delete myqueue — usuń kolejkę'
+      - cmd: celery -A myapp amqp queue.purge myqueue
+        desc: Wyczyść konkretną kolejkę AMQP
+        detail:
+          what: Usuwa wszystkie wiadomości z konkretnej kolejki na brokerze.
+          how: Bardziej precyzyjne niż celery purge — celuje w jedną kolejkę.
+          tips:
+            - 'Nieodwracalne — sprawdź inspect reserved zanim purge'
+      - cmd: celery -A myapp list bindings
+        desc: Pokaż bindingi kolejek na brokerze
+        detail:
+          what: Wyświetla mapowanie exchange → routing_key → queue na brokerze AMQP.
+          how: Przydatne do debugowania routingu tasków.
+          tips:
+            - 'Jeśli task nie trafia do kolejki — sprawdź bindings i routing_key'
+
+  - name: Flower (dashboard)
+    icon: "🌸"
+    commands:
       - cmd: celery -A myapp flower --port=5555
         desc: Uruchom Flower dashboard
         detail:
@@ -161,8 +460,36 @@ groups:
           tips:
             - 'celery -A myapp flower --basic_auth=admin:pass — z autentykacją'
             - 'celery -A myapp flower --broker_api=redis://localhost:6379/0 — monitoruj brokera'
+      - cmd: "celery -A myapp flower --basic_auth=admin:secret --port=5555"
+        desc: Flower z autentykacją HTTP Basic
+        detail:
+          what: Dodaje login/hasło do dostępu do dashboardu Flower.
+          how: 'admin:secret — login:hasło. Wymagaj na produkcji!'
+          tips:
+            - 'Lepiej: odpal Flower za reverse proxy (Nginx) z HTTPS'
+      - cmd: celery -A myapp flower --persistent=True --db=flower.db
+        desc: Flower z persistent storage (historia tasków)
+        detail:
+          what: Zapisuje historię tasków do bazy SQLite — dane przetrwają restart Flower.
+          how: Bez --persistent historia tasków jest w pamięci i ginie po restarcie.
+          tips:
+            - 'flower.db rośnie — ustaw --max_tasks=10000 żeby limitować'
+      - cmd: "celery -A myapp flower --broker=redis://localhost:6379/0 --address=0.0.0.0"
+        desc: Flower dostępny z sieci lokalnej
+        detail:
+          what: Nasłuchuje na wszystkich interfejsach — dostępny z innych maszyn w sieci.
+          how: '--address=0.0.0.0 zamiast domyślnego 127.0.0.1.'
+          tips:
+            - 'Na produkcji ZAWSZE z autentykacją i za HTTPS reverse proxy'
+      - cmd: celery -A myapp flower --url_prefix=flower
+        desc: Flower pod prefixem URL (za reverse proxy)
+        detail:
+          what: Dashboard dostępny pod /flower/ zamiast / — przydatne za Nginx.
+          how: 'Nginx: location /flower/ { proxy_pass http://localhost:5555; }'
+          tips:
+            - 'Wymaga --url_prefix żeby linki wewnętrzne działały poprawnie'
 
-  - name: Instalacja
+  - name: Instalacja i konfiguracja
     icon: "📦"
     commands:
       - cmd: pip install celery[redis]
@@ -173,6 +500,20 @@ groups:
           tips:
             - 'pip install celery[redis] flower — z dashboardem w jednym'
             - 'pip install celery[rabbitmq] — RabbitMQ zamiast Redis'
+      - cmd: pip install celery[rabbitmq]
+        desc: Instalacja Celery z RabbitMQ
+        detail:
+          what: Instaluje Celery z zależnościami dla RabbitMQ (librabbitmq, amqp).
+          how: RabbitMQ daje więcej gwarancji dostarczenia niż Redis.
+          tips:
+            - 'RabbitMQ wymaga osobnej instalacji: apt install rabbitmq-server'
+      - cmd: pip install celery[sqs]
+        desc: Instalacja Celery z AWS SQS jako brokerem
+        detail:
+          what: Używa Amazon SQS jako brokera — managed, serverless kolejka.
+          how: Wymaga AWS credentials. broker_url = sqs:// w konfiguracji.
+          tips:
+            - 'SQS nie wspiera wszystkich ficzerów Celery (np. chord ma ograniczenia)'
       - cmd: pip install django-celery-beat django-celery-results
         desc: Instalacja integracji Celery z Django
         detail:
@@ -180,3 +521,31 @@ groups:
           how: Dodaj do INSTALLED_APPS i uruchom migrate.
           tips:
             - 'python manage.py migrate — po instalacji, przed użyciem'
+      - cmd: pip install flower
+        desc: Instalacja Flower dashboard
+        detail:
+          what: Webowy monitoring Celery — workerzy, taski, kolejki, wykresy.
+          how: Po instalacji uruchom celery flower.
+          tips:
+            - 'pip install flower==2.0.0 — konkretna wersja (stabilna)'
+      - cmd: pip install celery[gevent]
+        desc: Instalacja z gevent pool
+        detail:
+          what: Instaluje zależności gevent do async I/O pool.
+          how: 'Uruchom: celery worker -P gevent --concurrency=100'
+          tips:
+            - 'pip install celery[eventlet] — alternatywa dla gevent'
+      - cmd: pip install celery-redbeat
+        desc: Instalacja RedBeat — HA scheduler na Redis
+        detail:
+          what: Scheduler oparty na Redis zamiast pliku — pozwala na wiele instancji Beat (high availability).
+          how: 'celery beat -S redbeat.RedBeatScheduler'
+          tips:
+            - 'Rozwiązuje problem SPOF (Single Point of Failure) standardowego Beat'
+      - cmd: pip install sentry-sdk
+        desc: Instalacja Sentry z integracją Celery
+        detail:
+          what: Automatyczny error tracking dla tasków Celery — tracebacki, breadcrumbs, performance.
+          how: 'sentry_sdk.init(integrations=[CeleryIntegration()])'
+          tips:
+            - 'Sentry łapie wyjątki z tasków automatycznie — zero dodatkowego kodu'
