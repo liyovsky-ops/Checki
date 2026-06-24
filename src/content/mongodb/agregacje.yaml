@@ -1,0 +1,90 @@
+title: Aggregation Pipeline
+
+items:
+  - name: Pipeline basics — $match, $group, $sort
+    desc: >
+      Aggregation pipeline to seria etapów przetwarzania danych. Każdy etap
+      transformuje dokumenty i przekazuje wynik do następnego. Odpowiednik
+      SQL GROUP BY + HAVING + ORDER BY.
+    code: |
+      # Przykład: średni wiek użytkowników per miasto
+      pipeline = [
+          {'$match': {'age': {'$gte': 18}}},        # WHERE age >= 18
+          {'$group': {
+              '_id': '$address.city',                 # GROUP BY city
+              'avg_age': {'$avg': '$age'},            # AVG(age)
+              'count': {'$sum': 1},                   # COUNT(*)
+              'names': {'$push': '$name'}             # ARRAY_AGG(name)
+          }},
+          {'$sort': {'count': -1}},                   # ORDER BY count DESC
+          {'$limit': 10}                              # LIMIT 10
+      ]
+
+      results = db.users.aggregate(pipeline)
+      for doc in results:
+          print(f"{doc['_id']}: {doc['avg_age']:.1f} avg, {doc['count']} users")
+
+  - name: $lookup — odpowiednik JOIN
+    desc: >
+      Łączy dokumenty z innej kolekcji — jak LEFT JOIN w SQL. Zwraca tablicę
+      dopasowanych dokumentów. Używaj z umiarem — MongoDB nie jest relacyjna,
+      częste joiny sugerują zły model danych.
+    code: |
+      # Zamówienia z danymi użytkownika
+      pipeline = [
+          {'$lookup': {
+              'from': 'users',                # JOIN users
+              'localField': 'user_id',        # ON orders.user_id
+              'foreignField': '_id',          # = users._id
+              'as': 'user_info'               # AS user_info (tablica)
+          }},
+          {'$unwind': '$user_info'},          # zamień tablicę na obiekt
+          {'$project': {
+              'total': 1,
+              'user_name': '$user_info.name',
+              'user_email': '$user_info.email'
+          }}
+      ]
+
+  - name: $project i $addFields
+    desc: >
+      $project wybiera/ukrywa pola (jak SELECT w SQL). $addFields dodaje
+      nowe pola do dokumentu bez usuwania istniejących. Mogą zawierać
+      wyrażenia — obliczenia, formatowanie, warunkowa logika.
+    code: |
+      pipeline = [
+          {'$addFields': {
+              'full_name': {'$concat': ['$first_name', ' ', '$last_name']},
+              'is_adult': {'$gte': ['$age', 18]},
+              'discount': {'$cond': {
+                  'if': {'$gte': ['$orders_count', 10]},
+                  'then': 0.15,
+                  'else': 0.05
+              }}
+          }},
+          {'$project': {
+              'full_name': 1,
+              'email': 1,
+              'is_adult': 1,
+              'discount': 1,
+              '_id': 0
+          }}
+      ]
+
+  - name: $unwind — rozwijanie tablic
+    desc: >
+      Zamienia tablicę w dokumentie na osobne dokumenty — jeden per element tablicy.
+      Kluczowy etap przed $group na elementach tablicy.
+    code: |
+      # Dokument: {user: "Jan", tags: ["python", "docker", "aws"]}
+      # Po $unwind: 3 dokumenty — {user: "Jan", tags: "python"}, etc.
+
+      pipeline = [
+          {'$unwind': '$tags'},
+          {'$group': {
+              '_id': '$tags',
+              'count': {'$sum': 1}
+          }},
+          {'$sort': {'count': -1}}
+      ]
+      # Wynik: najpopularniejsze tagi

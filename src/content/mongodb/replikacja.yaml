@@ -1,0 +1,93 @@
+title: Replikacja i Sharding
+
+items:
+  - name: Replica Set — wysoka dostępność
+    desc: >
+      Replica Set = primary + secondaries + opcjonalny arbiter. Primary obsługuje
+      zapisy. Secondaries replikują asynchronicznie. Jeśli primary padnie,
+      election wybiera nowy primary (automatyczny failover, ~10-30 sekund).
+    code: |
+      # Inicjalizacja Replica Set (mongosh)
+      rs.initiate({
+        _id: "myrs",
+        members: [
+          { _id: 0, host: "mongo1:27017" },
+          { _id: 1, host: "mongo2:27017" },
+          { _id: 2, host: "mongo3:27017" }
+        ]
+      })
+
+      # Status replica set
+      rs.status()
+
+      # Python — połączenie z replica set
+      from pymongo import MongoClient
+      client = MongoClient('mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=myrs')
+
+      # Read preference — czytaj z secondary (zmniejsz load na primary)
+      from pymongo import ReadPreference
+      db = client.get_database('myapp', read_preference=ReadPreference.SECONDARY_PREFERRED)
+
+  - name: Write Concern — gwarancje zapisu
+    desc: >
+      Write concern kontroluje ile serwerów musi potwierdzić zapis zanim klient
+      dostanie odpowiedź. w:1 = tylko primary, w:majority = większość, w:0 = fire-and-forget.
+    code: |
+      # w:1 — domyślne, primary potwierdza (szybkie, mniej bezpieczne)
+      db.users.insert_one({'name': 'Jan'})  # w:1 domyślnie
+
+      # w:majority — większość replica set potwierdza (bezpieczne)
+      from pymongo import WriteConcern
+      safe_collection = db.get_collection('payments', write_concern=WriteConcern(w='majority'))
+      safe_collection.insert_one({'amount': 100, 'currency': 'PLN'})
+
+      # w:0 — fire-and-forget (najszybsze, zero gwarancji)
+      # Używaj TYLKO dla logów/analytics gdzie utrata jest akceptowalna
+
+      # j:true — journal write (zapis na dysk, nie tylko RAM)
+      db.get_collection('orders', write_concern=WriteConcern(w='majority', j=True))
+
+  - name: Sharding — horizontalne skalowanie
+    desc: >
+      Sharding dzieli kolekcję na wiele serwerów. Shard key determinuje rozkład
+      danych. mongos router kieruje zapytania. Config server przechowuje metadata.
+      Skaluje się do petabajtów.
+    code: |
+      # Architektura sharded cluster:
+      # Client → mongos (router) → shard1, shard2, shard3
+      #                          → config servers (metadata)
+
+      # Włączenie shardingu (mongosh na mongos)
+      sh.enableSharding("myapp")
+
+      # Shard key — hash (równomierny rozkład)
+      sh.shardCollection("myapp.users", { "user_id": "hashed" })
+
+      # Shard key — range (dla range queries)
+      sh.shardCollection("myapp.logs", { "timestamp": 1 })
+
+      # Status shardingu
+      sh.status()
+
+      # UWAGA: Shard key NIE MOŻNA zmienić po stworzeniu!
+      # Zły shard key = hot shard = jeden shard dostaje cały ruch
+
+  - name: Wybór Shard Key
+    desc: >
+      Najważniejsza decyzja w shardowanym MongoDB. Zły shard key to katastrofa —
+      hot shards, scatter-gather queries, niemożliwość rebalance.
+    code: |
+      # DOBRY shard key:
+      # - Wysoka kardynalność (dużo unikalnych wartości)
+      # - Równomierny rozkład (brak hot spots)
+      # - Pasuje do wzorców zapytań (queries trafiają na 1 shard)
+
+      # Przykłady:
+      # ✅ { user_id: "hashed" } — równomierny rozkład
+      # ✅ { tenant_id: 1, created_at: 1 } — multi-tenant + range
+      # ❌ { country: 1 } — 90% danych na jednym shard (US/EU)
+      # ❌ { created_at: 1 } — hot shard = najnowszy shard
+      # ❌ { _id: 1 } — ObjectId jest monotoniczny → hot shard
+
+      # Compound shard key — najlepsza praktyka
+      sh.shardCollection("myapp.orders", { "customer_id": 1, "order_date": 1 })

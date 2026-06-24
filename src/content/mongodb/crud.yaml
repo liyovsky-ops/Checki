@@ -1,0 +1,137 @@
+title: Operacje CRUD
+
+items:
+  - name: Insert — wstawianie dokumentów
+    desc: >
+      insert_one() dla jednego dokumentu, insert_many() dla wielu. MongoDB automatycznie
+      generuje _id (ObjectId) jeśli nie podasz. Dokumenty mogą mieć dowolną strukturę
+      — nie musisz definiować schematu.
+    code: |
+      from pymongo import MongoClient
+      db = MongoClient()['myapp']
+
+      # Jeden dokument
+      result = db.users.insert_one({
+          'name': 'Anna Nowak',
+          'email': 'anna@firma.pl',
+          'tags': ['admin', 'dev'],
+          'profile': {'bio': 'Python developer', 'github': 'annanov'}
+      })
+      print(result.inserted_id)  # ObjectId('...')
+
+      # Wiele dokumentów
+      users = [
+          {'name': 'Jan', 'age': 25},
+          {'name': 'Ola', 'age': 30},
+          {'name': 'Piotr', 'age': 28}
+      ]
+      result = db.users.insert_many(users)
+      print(result.inserted_ids)  # [ObjectId(...), ObjectId(...), ObjectId(...)]
+
+  - name: Find — wyszukiwanie dokumentów
+    desc: >
+      find_one() zwraca pierwszy pasujący dokument. find() zwraca kursor (iterator).
+      Filtry używają operatorów MongoDB ($gt, $lt, $in, $regex, $exists).
+      Projection kontroluje które pola zwrócić.
+    code: |
+      # Proste wyszukiwanie
+      user = db.users.find_one({'email': 'anna@firma.pl'})
+
+      # Operatory porównania
+      adults = db.users.find({'age': {'$gte': 18, '$lt': 65}})
+
+      # Operator $in — wartość z listy
+      devs = db.users.find({'tags': {'$in': ['dev', 'engineer']}})
+
+      # Regex — wyszukiwanie wzorca
+      gmail = db.users.find({'email': {'$regex': '@gmail\\.com$'}})
+
+      # Zagnieżdżone pola (dot notation)
+      warsaw = db.users.find({'address.city': 'Warszawa'})
+
+      # Projection — wybierz pola do zwrotu
+      names = db.users.find({}, {'name': 1, 'email': 1, '_id': 0})
+
+      # Sortowanie, limit, skip (paginacja)
+      page = db.users.find().sort('name', 1).skip(20).limit(10)
+
+      # Count
+      total = db.users.count_documents({'age': {'$gte': 18}})
+
+  - name: Update — aktualizacja dokumentów
+    desc: >
+      update_one() aktualizuje pierwszy pasujący. update_many() wszystkie pasujące.
+      Operatory: $set (ustaw pole), $unset (usuń pole), $inc (inkrementuj),
+      $push/$pull (dodaj/usuń z tablicy), $addToSet (dodaj unikalnie).
+    code: |
+      # $set — ustaw/zmień pola
+      db.users.update_one(
+          {'email': 'anna@firma.pl'},
+          {'$set': {'age': 31, 'role': 'senior'}}
+      )
+
+      # $inc — inkrementuj numerycznie
+      db.users.update_one({'_id': user_id}, {'$inc': {'login_count': 1}})
+
+      # $push — dodaj do tablicy
+      db.users.update_one({'_id': user_id}, {'$push': {'skills': 'Docker'}})
+
+      # $addToSet — dodaj tylko jeśli nie istnieje
+      db.users.update_one({'_id': user_id}, {'$addToSet': {'tags': 'verified'}})
+
+      # $pull — usuń z tablicy
+      db.users.update_one({'_id': user_id}, {'$pull': {'tags': 'intern'}})
+
+      # $unset — usuń pole
+      db.users.update_one({'_id': user_id}, {'$unset': {'temporary_field': ''}})
+
+      # update_many — aktualizuj wszystkich
+      db.users.update_many(
+          {'role': {'$exists': False}},
+          {'$set': {'role': 'user'}}
+      )
+
+      # upsert — wstaw jeśli nie istnieje, aktualizuj jeśli istnieje
+      db.users.update_one(
+          {'email': 'new@firma.pl'},
+          {'$set': {'name': 'New User'}},
+          upsert=True
+      )
+
+  - name: Delete — usuwanie dokumentów
+    desc: >
+      delete_one() usuwa pierwszy pasujący. delete_many() wszystkie pasujące.
+      Nie da się cofnąć — używaj soft delete ($set deleted_at) dla ważnych danych.
+    code: |
+      # Usuń jeden
+      db.users.delete_one({'email': 'spam@test.com'})
+
+      # Usuń wielu
+      result = db.users.delete_many({'role': 'temp'})
+      print(f'Deleted {result.deleted_count} documents')
+
+      # Soft delete (bezpieczniejsze)
+      from datetime import datetime
+      db.users.update_one(
+          {'_id': user_id},
+          {'$set': {'deleted_at': datetime.utcnow()}}
+      )
+      # Potem w find: {'deleted_at': {'$exists': False}}
+
+  - name: Bulk Operations — operacje wsadowe
+    desc: >
+      bulk_write() wykonuje wiele operacji w jednym round-trip do serwera.
+      Drastycznie szybsze niż N osobnych wywołań. ordered=False pozwala
+      na równoległe wykonanie.
+    code: |
+      from pymongo import InsertOne, UpdateOne, DeleteOne
+
+      operations = [
+          InsertOne({'name': 'User1', 'age': 20}),
+          InsertOne({'name': 'User2', 'age': 25}),
+          UpdateOne({'name': 'User1'}, {'$set': {'verified': True}}),
+          DeleteOne({'name': 'spam_user'}),
+      ]
+
+      result = db.users.bulk_write(operations, ordered=False)
+      print(f'Inserted: {result.inserted_count}, Modified: {result.modified_count}')

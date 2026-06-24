@@ -1,0 +1,119 @@
+title: Deployment modeli TensorFlow
+
+items:
+  - name: SavedModel — eksport do produkcji
+    desc: >
+      SavedModel to standardowy format eksportu. Zawiera graf obliczeń, wagi,
+      sygnatury (input/output shapes). Wczytywany przez TF Serving, TF Lite, TF.js.
+    code: |
+      # Eksport
+      model.save('saved_model/my_model')
+
+      # Struktura:
+      # saved_model/my_model/
+      #   saved_model.pb          — graf obliczeń
+      #   variables/
+      #     variables.data-00000  — wagi
+      #     variables.index
+      #   assets/                 — dodatkowe pliki (słownik, config)
+
+      # Wczytanie
+      loaded = tf.keras.models.load_model('saved_model/my_model')
+      predictions = loaded.predict(x_test)
+
+      # Eksport z sygnaturą (dla TF Serving)
+      @tf.function(input_signature=[tf.TensorSpec(shape=[None, 224, 224, 3], dtype=tf.float32)])
+      def serve(images):
+          return model(images)
+
+      tf.saved_model.save(model, 'serving_model', signatures={'serving_default': serve})
+
+  - name: TF Serving — produkcyjny serwer inference
+    desc: >
+      Docker container serwujący modele przez REST i gRPC. Auto-batching,
+      model versioning, A/B testing modeli. Zero kodu Pythona w produkcji.
+    code: |
+      # Struktura katalogów dla TF Serving
+      # models/
+      #   my_model/
+      #     1/                    ← wersja 1
+      #       saved_model.pb
+      #       variables/
+      #     2/                    ← wersja 2 (auto-loaded)
+
+      # Uruchomienie TF Serving
+      docker run -p 8501:8501 \
+          -v $(pwd)/models:/models \
+          -e MODEL_NAME=my_model \
+          tensorflow/serving
+
+      # REST API — prediction
+      import requests
+      import json
+
+      data = json.dumps({"instances": x_test[:5].tolist()})
+      response = requests.post(
+          'http://localhost:8501/v1/models/my_model:predict',
+          data=data,
+          headers={"content-type": "application/json"}
+      )
+      predictions = response.json()['predictions']
+
+  - name: TensorFlow Lite — modele na edge/mobile
+    desc: >
+      Konwersja modelu do lekkiego formatu .tflite. Quantization zmniejsza
+      model 4× (float32 → int8) z minimalną utratą accuracy. Działa na
+      Android, iOS, Raspberry Pi, microcontrollers.
+    code: |
+      # Konwersja do TFLite
+      converter = tf.lite.TFLiteConverter.from_saved_model('saved_model/my_model')
+      tflite_model = converter.convert()
+
+      with open('model.tflite', 'wb') as f:
+          f.write(tflite_model)
+
+      # Quantization — 4× mniejszy model
+      converter.optimizations = [tf.lite.Optimize.DEFAULT]
+      quantized = converter.convert()
+      # Float32 model: 20MB → Int8 quantized: 5MB
+
+      # Inference z TFLite
+      interpreter = tf.lite.Interpreter(model_path='model.tflite')
+      interpreter.allocate_tensors()
+
+      input_details = interpreter.get_input_details()
+      output_details = interpreter.get_output_details()
+
+      interpreter.set_tensor(input_details[0]['index'], input_data)
+      interpreter.invoke()
+      output = interpreter.get_tensor(output_details[0]['index'])
+
+  - name: TensorFlow.js — modele w przeglądarce
+    desc: >
+      Uruchom model ML bezpośrednio w przeglądarce — zero serwera, zero latency.
+      Konwersja z Python SavedModel lub Keras do formatu JS. WebGL/WebGPU backend.
+    code: |
+      # Konwersja do TF.js (w terminalu)
+      # pip install tensorflowjs
+      # tensorflowjs_converter --input_format=keras saved_model/my_model tfjs_model/
+
+      # W JavaScript:
+      # const model = await tf.loadLayersModel('tfjs_model/model.json');
+      # const prediction = model.predict(tf.tensor2d([[1, 2, 3, 4]]));
+
+  - name: Eksport do ONNX
+    desc: >
+      ONNX (Open Neural Network Exchange) — uniwersalny format modeli.
+      Eksportuj z TF, importuj do PyTorch, uruchom na ONNX Runtime (Microsoft).
+      Przydatny gdy deployment stack nie jest TF-native.
+    code: |
+      # pip install tf2onnx
+      # python -m tf2onnx.convert \
+      #     --saved-model saved_model/my_model \
+      #     --output model.onnx \
+      #     --opset 13
+
+      # ONNX Runtime (inference — szybszy niż TF na CPU)
+      import onnxruntime as ort
+      session = ort.InferenceSession('model.onnx')
+      result = session.run(None, {'input': x_test.astype('float32')})

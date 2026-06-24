@@ -1,0 +1,66 @@
+title: MongoDB vs alternatywy bazodanowe
+
+items:
+  - name: PostgreSQL
+    icon: "🐘"
+    color: "#336791"
+    tagline: Relacyjna baza — ACID, JOINy, dojrzały ekosystem
+    pros:
+      - Pełne ACID transakcje z izolacją
+      - Zaawansowane JOINy, CTEs, window functions
+      - JSONB — przechowuj dokumenty w relacyjnej bazie
+      - 35+ lat dojrzałości, ogromny ekosystem
+    cons:
+      - Schemat sztywny — ALTER TABLE na dużych tabelach jest bolesny
+      - Horizontalne skalowanie trudniejsze (Citus, Vitess)
+      - ORM overhead dla prostych operacji
+      - Mniej elastyczny model danych niż dokumentowy
+    vs: PostgreSQL gdy dane są relacyjne, potrzebujesz JOINów i transakcji ACID. MongoDB gdy dane mają zmienną strukturę, embedding zamiast JOINów, i potrzebujesz łatwego shardingu.
+
+  - name: DynamoDB
+    icon: "⚡"
+    color: "#4053D6"
+    tagline: Serverless key-value — zero ops, auto-scaling, pay-per-request
+    pros:
+      - Zero zarządzania infrastrukturą — AWS managed
+      - Auto-scaling — od 1 request/s do milionów
+      - Single-digit millisecond latency gwarantowane
+      - Pay-per-request pricing (idealne do zmiennego ruchu)
+    cons:
+      - Vendor lock-in (AWS only)
+      - Ograniczone query patterns (scan = wolny i drogi)
+      - Max item size 400KB (vs 16MB w MongoDB)
+      - Brak aggregation pipeline — przetwarzanie po stronie klienta
+    vs: DynamoDB gdy jesteś na AWS i chcesz zero ops. MongoDB gdy potrzebujesz elastycznych queries, agregacji, i multi-cloud.
+
+  - name: Cassandra / ScyllaDB
+    icon: "📊"
+    color: "#1287B1"
+    tagline: Wide-column store — write-heavy, petabajty, multi-DC
+    pros:
+      - Nieograniczone horizontalne skalowanie (linear)
+      - Optymalizowana pod zapisy (LSM-tree)
+      - Multi-datacenter replication natywna
+      - Zero single point of failure (peer-to-peer)
+    cons:
+      - Brak JOINów i agregacji
+      - Denormalizacja wymagana (query-first design)
+      - Trudna do operowania (JVM tuning, compaction)
+      - Eventual consistency domyślnie
+    vs: Cassandra dla write-heavy workloads (IoT, time-series, logs) na masową skalę. MongoDB gdy potrzebujesz elastycznych queries i agregacji.
+
+  - name: Redis
+    icon: "⚡"
+    color: "#DC382D"
+    tagline: In-memory — sub-millisecond, cache i key-value
+    pros:
+      - Sub-millisecond latency (RAM)
+      - Bogate struktury danych (sorted sets, streams)
+      - Pub/Sub wbudowany
+      - Lua scripting dla atomowych operacji
+    cons:
+      - Dane w RAM — kosztowne dla dużych datasetów
+      - Brak złożonych queries (nie zastąpi bazy danych)
+      - Persistence jest kompromisem (RDB/AOF)
+      - Single-threaded (do Redis 7)
+    vs: Redis to cache i session store, nie primary database. MongoDB jako primary database, Redis jako cache layer przed nim.

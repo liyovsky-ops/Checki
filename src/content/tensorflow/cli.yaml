@@ -1,0 +1,410 @@
+title: Komendy TensorFlow
+
+groups:
+  - name: Instalacja
+    icon: "📦"
+    commands:
+      - cmd: pip install tensorflow
+        desc: Instalacja TensorFlow (CPU + GPU auto-detect)
+        detail:
+          what: Instaluje TensorFlow z automatyczną detekcją GPU (CUDA). Wersja 2.x zawiera Keras.
+          how: Wymaga Python 3.9-3.12. GPU wymaga NVIDIA CUDA Toolkit i cuDNN.
+          tips:
+            - 'pip install tensorflow==2.16.1 — konkretna wersja'
+            - 'pip install tensorflow-cpu — wymuś CPU-only (mniejszy pakiet)'
+      - cmd: pip install tensorflow[and-cuda]
+        desc: TensorFlow z CUDA (GPU) w jednym pakiecie
+        detail:
+          what: Instaluje TF + NVIDIA CUDA + cuDNN w jednym. Nie musisz ręcznie instalować CUDA.
+          how: Dostępne od TF 2.15. Automatycznie pobiera kompatybilne wersje CUDA/cuDNN.
+          tips:
+            - 'Wymaga NVIDIA GPU z compute capability >= 3.5'
+            - 'nvidia-smi — sprawdź czy GPU jest widoczne'
+      - cmd: pip install tensorflow-macos tensorflow-metal
+        desc: TensorFlow na Apple Silicon (M1/M2/M3)
+        detail:
+          what: Używa Metal API Apple do GPU acceleration na chipach M-series.
+          how: tensorflow-macos = CPU, tensorflow-metal = GPU plugin. Oba potrzebne.
+          tips:
+            - 'Tylko macOS z Apple Silicon (nie Intel Mac)'
+      - cmd: pip install tensorboard
+        desc: Instalacja TensorBoard (wizualizacja treningu)
+        detail:
+          what: Narzędzie do wizualizacji loss curves, metryk, grafów modeli, profilingu.
+          how: Zwykle instalowany automatycznie z TensorFlow.
+          tips:
+            - 'tensorboard --logdir=./logs — uruchom i otwórz localhost:6006'
+      - cmd: pip install tensorflow-hub
+        desc: Instalacja TensorFlow Hub (pretrenowane modele)
+        detail:
+          what: Dostęp do tysięcy pretrenowanych modeli i warstw.
+          how: hub.KerasLayer("url") ładuje model bezpośrednio do pipeline'u.
+          tips:
+            - 'tfhub.dev — przeglądaj modele online'
+      - cmd: pip install keras-tuner
+        desc: Instalacja Keras Tuner (hyperparameter search)
+        detail:
+          what: Automatyczny tuning hyperparametrów — learning rate, layers, dropout.
+          how: Random search, Bayesian optimization, Hyperband.
+          tips:
+            - 'import keras_tuner as kt'
+      - cmd: pip install tf2onnx
+        desc: Konwerter TF → ONNX
+        detail:
+          what: Eksportuj model TF do formatu ONNX (kompatybilny z PyTorch, ONNX Runtime).
+          how: 'python -m tf2onnx.convert --saved-model path --output model.onnx'
+          tips:
+            - 'ONNX Runtime jest często szybszy od TF na CPU inference'
+      - cmd: pip install tensorflowjs
+        desc: Konwerter TF → TF.js (JavaScript)
+        detail:
+          what: Eksportuj model do formatu JavaScript — uruchom w przeglądarce.
+          how: 'tensorflowjs_converter --input_format=keras model.keras tfjs_output/'
+          tips:
+            - 'Model działa bez serwera — inference w przeglądarce klienta'
+
+  - name: Weryfikacja i diagnostyka
+    icon: "🔍"
+    commands:
+      - cmd: python3 -c "import tensorflow as tf; print(tf.__version__)"
+        desc: Sprawdź zainstalowaną wersję TF
+        detail:
+          what: Wyświetla wersję TensorFlow. Upewnij się że masz 2.x.
+          how: Szybki test czy import działa.
+          tips:
+            - 'tf.version.VERSION — alternatywny sposób'
+      - cmd: python3 -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
+        desc: Sprawdź czy TF widzi GPU
+        detail:
+          what: Listuje dostępne GPU. Pusta lista = brak GPU lub CUDA nie skonfigurowane.
+          how: Wymaga NVIDIA GPU + CUDA + cuDNN.
+          tips:
+            - 'Pusta lista? Sprawdź nvidia-smi i kompatybilność wersji CUDA/cuDNN'
+      - cmd: nvidia-smi
+        desc: Pokaż GPU status, VRAM, procesy
+        detail:
+          what: NVIDIA System Management Interface — GPU utilization, temperatura, VRAM usage.
+          how: Przydatne do monitorowania czy trening używa GPU i ile VRAM zajmuje.
+          tips:
+            - 'watch -n 1 nvidia-smi — live monitoring co sekundę'
+      - cmd: python3 -c "import tensorflow as tf; print(tf.test.is_built_with_cuda())"
+        desc: Sprawdź czy TF jest zbudowany z CUDA
+        detail:
+          what: Zwraca True/False — czy ta instalacja TF ma support CUDA.
+          how: 'False = pip install tensorflow-cpu, True = pełna wersja z GPU.'
+          tips:
+            - 'tf.test.is_gpu_available() — deprecated, użyj list_physical_devices'
+      - cmd: python3 -c "import tensorflow as tf; tf.debugging.set_log_device_placement(True); tf.constant(1.0)"
+        desc: Pokaż na jakim device lądują operacje
+        detail:
+          what: Loguje czy operacja wykonała się na CPU czy GPU.
+          how: Przydatne do debugowania — upewnij się że trening idzie na GPU.
+          tips:
+            - 'Wyłącz po debugowaniu — spamuje logi'
+
+  - name: TensorBoard
+    icon: "📊"
+    commands:
+      - cmd: tensorboard --logdir=./logs
+        desc: Uruchom TensorBoard (localhost:6006)
+        detail:
+          what: Startuje serwer wizualizacji treningu. Otwierasz w przeglądarce.
+          how: '--logdir wskazuje katalog z logami (z TensorBoard callback).'
+          flags:
+            - flag: '--logdir=./logs'
+              desc: Katalog z logami treningu
+            - flag: '--port 6007'
+              desc: Zmień port (domyślnie 6006)
+            - flag: '--bind_all'
+              desc: Dostęp z sieci lokalnej
+          tips:
+            - 'tensorboard --logdir=./logs --port 6007 — inny port'
+      - cmd: tensorboard --logdir=./logs --reload_interval 5
+        desc: TensorBoard z odświeżaniem co 5 sekund
+        detail:
+          what: Automatycznie odświeża dane co 5 sekund zamiast domyślnych 30.
+          how: Przydatne do śledzenia treningu w real-time.
+          tips:
+            - 'Domyślnie 30 sekund — za wolno do debugowania'
+      - cmd: tensorboard dev upload --logdir=./logs
+        desc: Upload logów do TensorBoard.dev (cloud)
+        detail:
+          what: Udostępnij wyniki treningu online — link do udostępnienia.
+          how: Wymaga konta Google. Dane publiczne.
+          tips:
+            - 'Przydatne do dzielenia się wynikami z zespołem'
+      - cmd: "tf.keras.callbacks.TensorBoard(log_dir='./logs', histogram_freq=1)"
+        desc: Callback TensorBoard w kodzie
+        detail:
+          what: Dodaje logowanie do TensorBoard jako callback w model.fit().
+          how: histogram_freq=1 loguje histogramy wag co epokę.
+          tips:
+            - 'profile_batch="500,520" — profiling GPU (batch 500-520)'
+
+  - name: Budowanie modeli
+    icon: "🏗️"
+    commands:
+      - cmd: model.summary()
+        desc: Wyświetl architekturę modelu i parametry
+        detail:
+          what: Tabelka z warstwami, output shapes, liczbą parametrów (trainable/non-trainable).
+          how: Uruchom po zbudowaniu modelu (po compile lub po pierwszym call).
+          tips:
+            - 'tf.keras.utils.plot_model(model, to_file="model.png") — graf jako obrazek'
+      - cmd: tf.keras.utils.plot_model(model, to_file='model.png', show_shapes=True)
+        desc: Wygeneruj diagram modelu jako PNG
+        detail:
+          what: Wizualizacja grafu modelu z kształtami tensorów. Wymaga graphviz + pydot.
+          how: 'pip install pydot graphviz'
+          tips:
+            - 'show_layer_names=True — nazwy warstw na diagramie'
+      - cmd: model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+        desc: Kompilacja modelu (optimizer + loss + metrics)
+        detail:
+          what: Konfiguruje jak model się uczy. Wymagane przed fit().
+          how: optimizer = jak aktualizować wagi, loss = co minimalizować, metrics = co raportować.
+          tips:
+            - 'Adam = domyślny optimizer. SGD z momentum = alternatywa'
+      - cmd: model.fit(x_train, y_train, epochs=10, validation_split=0.2, callbacks=callbacks)
+        desc: Trenuj model
+        detail:
+          what: Główna pętla treningowa. Iteruje przez dane epochs razy.
+          how: validation_split=0.2 używa 20% danych do walidacji.
+          flags:
+            - flag: epochs=10
+              desc: Ile przejść przez cały dataset
+            - flag: batch_size=32
+              desc: Ile próbek na raz (domyślnie 32)
+            - flag: validation_split=0.2
+              desc: Procent danych do walidacji
+            - flag: callbacks=[...]
+              desc: Lista callbacków (EarlyStopping, TensorBoard, etc.)
+          tips:
+            - 'verbose=0 — cichy trening, verbose=2 — jedna linia per epoka'
+      - cmd: model.evaluate(x_test, y_test)
+        desc: Ewaluacja modelu na danych testowych
+        detail:
+          what: Oblicza loss i metryki na danych testowych (których model nie widział).
+          how: Zwraca listę [loss, metric1, metric2, ...].
+          tips:
+            - 'NIE używaj do tuningu — test set to ostateczna weryfikacja'
+      - cmd: model.predict(x_new)
+        desc: Predykcja na nowych danych
+        detail:
+          what: Forward pass bez gradientów. Zwraca output modelu (np. prawdopodobieństwa klas).
+          how: Input musi mieć ten sam shape co dane treningowe (z batch dimension).
+          tips:
+            - 'np.argmax(model.predict(x), axis=1) — indeks klasy z najwyższym prawdopodobieństwem'
+
+  - name: Zapisywanie i ładowanie
+    icon: "💾"
+    commands:
+      - cmd: model.save('my_model.keras')
+        desc: Zapisz model (architektura + wagi + optimizer)
+        detail:
+          what: Zapisuje pełny model w formacie Keras (.keras) lub HDF5 (.h5).
+          how: Wczytaj przez tf.keras.models.load_model('my_model.keras').
+          tips:
+            - '.keras — nowy format (zalecany). .h5 — legacy format'
+      - cmd: model.save('saved_model/my_model')
+        desc: Zapisz jako SavedModel (format produkcyjny)
+        detail:
+          what: Format katalogowy z grafem i wagami. Kompatybilny z TF Serving, TF Lite, TF.js.
+          how: Katalog zawiera saved_model.pb + variables/ + assets/.
+          tips:
+            - 'Standard dla deployment — nie .keras/.h5'
+      - cmd: model.save_weights('weights.h5')
+        desc: Zapisz tylko wagi (bez architektury)
+        detail:
+          what: Zapisuje wagi modelu bez definicji modelu. Mniejszy plik.
+          how: Musisz odtworzyć architekturę przed load_weights().
+          tips:
+            - 'Przydatne przy transfer learning — wczytaj wagi do innego modelu'
+      - cmd: loaded = tf.keras.models.load_model('my_model.keras')
+        desc: Wczytaj zapisany model
+        detail:
+          what: Wczytuje pełny model (architektura + wagi + optimizer state).
+          how: Gotowy do predict() lub dalszego fit().
+          tips:
+            - 'custom_objects={} — jeśli model ma custom layers/losses'
+      - cmd: model.load_weights('weights.h5')
+        desc: Wczytaj wagi do istniejącego modelu
+        detail:
+          what: Wczytuje tylko wagi — model musi mieć identyczną architekturę.
+          how: Typowe w transfer learning i checkpoint restore.
+          tips:
+            - 'Architektura musi się zgadzać co do warstw i shapes'
+
+  - name: Transfer Learning
+    icon: "🔄"
+    commands:
+      - cmd: base = tf.keras.applications.ResNet50(weights='imagenet', include_top=False)
+        desc: Załaduj pretrenowany ResNet50 (bez głowicy)
+        detail:
+          what: ResNet50 wytrenowany na ImageNet (1000 klas, 14M obrazów). include_top=False usuwa klasyfikator.
+          how: Dodaj własne Dense warstwy na końcu dla swoich klas.
+          tips:
+            - 'EfficientNetV2B0 — nowszy, lżejszy, lepszy. MobileNetV3 — dla mobile.'
+      - cmd: base.trainable = False
+        desc: Zamroź wagi pretrenowanego modelu
+        detail:
+          what: Wagi bazowego modelu nie będą aktualizowane podczas treningu. Trenujesz tylko swoją głowicę.
+          how: Odmroź po kilku epokach (fine-tuning) — base.trainable = True z niskim LR.
+          tips:
+            - 'Fine-tuning: odmroź ostatnie 20 warstw, LR=1e-5 (10× niższy niż base)'
+      - cmd: tf.keras.applications.EfficientNetV2B0(weights='imagenet', include_top=False)
+        desc: EfficientNetV2 — nowoczesny backbone
+        detail:
+          what: Najlepsza ratio accuracy/speed. B0 (mały) do L (duży). ImageNet pretrained.
+          how: Wejście 224×224×3 dla B0, 480×480×3 dla L.
+          tips:
+            - 'B0 do prototypu, B2-B3 do produkcji, L do maximum accuracy'
+
+  - name: tf.data Pipeline
+    icon: "🔄"
+    commands:
+      - cmd: tf.data.Dataset.from_tensor_slices((x, y))
+        desc: Utwórz dataset z tablic NumPy
+        detail:
+          what: Tworzy Dataset z par (features, labels). Lazy — dane przetwarzane on-the-fly.
+          how: Typowy start pipeline'u. Dalej .shuffle().batch().prefetch().
+          tips:
+            - 'Dla dużych danych użyj TFRecordDataset zamiast from_tensor_slices'
+      - cmd: dataset.shuffle(10000).batch(32).prefetch(tf.data.AUTOTUNE)
+        desc: Standardowy pipeline — shuffle, batch, prefetch
+        detail:
+          what: Shuffle (losowa kolejność), batch (grupy po 32), prefetch (przygotuj następny batch w tle).
+          how: AUTOTUNE automatycznie dobiera ile prefetchować.
+          tips:
+            - 'Kolejność ma znaczenie: shuffle PRZED batch'
+      - cmd: dataset.map(preprocess_fn, num_parallel_calls=tf.data.AUTOTUNE)
+        desc: Równoległa transformacja danych
+        detail:
+          what: Aplikuje funkcję do każdego elementu. num_parallel_calls = ile wątków.
+          how: AUTOTUNE dobiera liczbę wątków automatycznie.
+          tips:
+            - 'Transformacje powinny być tf.function-compatible (tf.ops, nie numpy)'
+      - cmd: dataset.cache()
+        desc: Cache dataset w RAM po pierwszej epoce
+        detail:
+          what: Po pierwszym przejściu dane trzymane w RAM. Kolejne epoki bez I/O.
+          how: Umieść PRZED shuffle i batch, PO transformacjach.
+          tips:
+            - 'dataset.cache("/tmp/cache") — cache na dysku (dla dużych danych)'
+      - cmd: tf.keras.utils.image_dataset_from_directory('data/train/', image_size=(224,224), batch_size=32)
+        desc: Załaduj obrazy z katalogu (1 podkatalog = 1 klasa)
+        detail:
+          what: Automatycznie tworzy Dataset z katalogu. Struktura train/cats/, train/dogs/.
+          how: Zwraca (image, label) batche. Labels z nazw podkatalogów.
+          tips:
+            - 'validation_split=0.2, subset="training" — podział train/val'
+
+  - name: Konwersja i eksport
+    icon: "📤"
+    commands:
+      - cmd: "tensorflowjs_converter --input_format=keras model.keras tfjs_output/"
+        desc: Konwertuj model do TensorFlow.js
+        detail:
+          what: Eksportuje model do formatu JavaScript — działa w przeglądarce.
+          how: Generuje model.json + weight shards (.bin pliki).
+          tips:
+            - 'pip install tensorflowjs'
+      - cmd: "python -m tf2onnx.convert --saved-model saved_model/ --output model.onnx"
+        desc: Konwertuj SavedModel do ONNX
+        detail:
+          what: ONNX format — kompatybilny z PyTorch, ONNX Runtime, inne frameworki.
+          how: 'pip install tf2onnx. ONNX Runtime często szybszy na CPU.'
+          tips:
+            - '--opset 13 — wersja operatorów ONNX (13+ zalecane)'
+      - cmd: converter = tf.lite.TFLiteConverter.from_saved_model('saved_model/')
+        desc: Konwertuj do TF Lite (mobile/edge)
+        detail:
+          what: Tworzy .tflite plik — mały, szybki, działa bez Pythona.
+          how: Converter + optimizations (quantization) = 4× mniejszy model.
+          tips:
+            - 'converter.optimizations = [tf.lite.Optimize.DEFAULT] — int8 quantization'
+
+  - name: TF Serving (produkcja)
+    icon: "🚀"
+    commands:
+      - cmd: "docker run -p 8501:8501 -v $(pwd)/models:/models -e MODEL_NAME=my_model tensorflow/serving"
+        desc: Uruchom TF Serving w Docker
+        detail:
+          what: Serwer inference — REST (8501) i gRPC (8500). Auto-batching, model versioning.
+          how: Struktura katalogów models/my_model/1/ (wersja 1), models/my_model/2/ (wersja 2).
+          tips:
+            - 'Nowa wersja = nowy podkatalog z numerem — TF Serving auto-loaduje'
+      - cmd: "curl -d '{\"instances\": [[1.0, 2.0, 3.0]]}' http://localhost:8501/v1/models/my_model:predict"
+        desc: Wyślij request predykcji do TF Serving (REST)
+        detail:
+          what: REST API — POST z JSON instances. Odpowiedź z predictions.
+          how: Content-Type application/json. Instances to lista tensorów.
+          tips:
+            - ':predict — predykcja. :classify — klasyfikacja. :regress — regresja.'
+      - cmd: "curl http://localhost:8501/v1/models/my_model"
+        desc: Sprawdź status modelu w TF Serving
+        detail:
+          what: Zwraca metadata modelu — wersje, status, sygnatury.
+          how: Przydatne do health check i weryfikacji deploymentu.
+          tips:
+            - '/v1/models/my_model/versions/2 — status konkretnej wersji'
+      - cmd: "docker run -p 8501:8501 -v $(pwd)/models:/models -e MODEL_NAME=my_model --gpus all tensorflow/serving:latest-gpu"
+        desc: TF Serving z GPU
+        detail:
+          what: Inference na GPU — szybsze dla dużych modeli (batch inference).
+          how: Wymaga nvidia-container-toolkit i NVIDIA GPU.
+          tips:
+            - 'CPU wystarczy dla małych modeli (<100MB). GPU dla ResNet/BERT+.'
+
+  - name: Debugowanie i profilowanie
+    icon: "🐛"
+    commands:
+      - cmd: tf.debugging.enable_check_numerics()
+        desc: Wykryj NaN/Inf w tensorach (debug training)
+        detail:
+          what: Rzuca wyjątek gdy jakakolwiek operacja produkuje NaN lub Infinity.
+          how: Przydatne do debugowania gradient explosion / vanishing gradients.
+          tips:
+            - 'Wyłącz w produkcji — spowalnia trening'
+      - cmd: tf.config.run_functions_eagerly(True)
+        desc: Wymuś eager execution (wyłącz tf.function graph mode)
+        detail:
+          what: Wszystkie operacje wykonywane natychmiast — print(), breakpoint() działają.
+          how: Przydatne do debugowania. Wolniejsze niż graph mode.
+          tips:
+            - 'Po debugowaniu przywróć: tf.config.run_functions_eagerly(False)'
+      - cmd: tf.profiler.experimental.start('logdir')
+        desc: Profiluj operacje GPU/CPU (wydajność)
+        detail:
+          what: Nagrywa timeline operacji — które kernele na GPU, ile czasu, bottlenecki I/O.
+          how: Otwierasz w TensorBoard (Profiler tab).
+          tips:
+            - 'tf.profiler.experimental.stop() — zatrzymaj profilowanie'
+      - cmd: model.get_layer('dense_1').get_weights()
+        desc: Podejrzyj wagi konkretnej warstwy
+        detail:
+          what: Zwraca listę [kernel, bias] — macierz wag i wektor bias.
+          how: Przydatne do debugowania i analizy co model nauczył się.
+          tips:
+            - 'model.layers — lista wszystkich warstw z nazwami'
+      - cmd: tf.config.experimental.set_memory_growth(gpu, True)
+        desc: GPU memory growth — alokuj VRAM on-demand
+        detail:
+          what: Domyślnie TF alokuje CAŁY VRAM na GPU. Z memory_growth alokuje tyle ile potrzeba.
+          how: Wywołaj PRZED stworzeniem modelu. Pozwala uruchomić wiele procesów na jednym GPU.
+          tips:
+            - 'Bez tego drugi proces TF na tym samym GPU dostanie OOM'
+      - cmd: "tf.config.set_visible_devices(gpus[0], 'GPU')"
+        desc: Ogranicz TF do jednego GPU
+        detail:
+          what: Gdy masz wiele GPU — wymuś użycie konkretnego. Przydatne do izolacji eksperymentów.
+          how: 'gpus = tf.config.list_physical_devices("GPU"); użyj gpus[0] lub gpus[1]'
+          tips:
+            - 'CUDA_VISIBLE_DEVICES=0 — alternatywa przez env var'
+      - cmd: tf.keras.backend.clear_session()
+        desc: Wyczyść sesję Keras (zwolnij pamięć)
+        detail:
+          what: Usuwa wszystkie modele i warstwy z pamięci. Reset globalnego stanu Keras.
+          how: Wywołaj między eksperymentami żeby uniknąć memory leaks.
+          tips:
+            - 'Przydatne w notebook-ach po wielu eksperymentach'

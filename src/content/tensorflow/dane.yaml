@@ -1,0 +1,105 @@
+title: Dane i Pipeline (tf.data)
+
+items:
+  - name: tf.data.Dataset — pipeline danych
+    desc: >
+      tf.data to API do budowania wydajnych pipeline'ów. Lazy evaluation — dane
+      przetwarzane on-the-fly podczas treningu. Prefetch + parallel map eliminuje
+      wąskie gardło I/O. GPU nigdy nie czeka na dane.
+    code: |
+      import tensorflow as tf
+
+      # Z tablic NumPy
+      dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
+      dataset = dataset.shuffle(10000).batch(32).prefetch(tf.data.AUTOTUNE)
+
+      # Z katalogu obrazów
+      dataset = tf.keras.utils.image_dataset_from_directory(
+          'data/train/',
+          image_size=(224, 224),
+          batch_size=32,
+          label_mode='categorical'
+      )
+
+      # Pipeline z transformacjami
+      def preprocess(image, label):
+          image = tf.image.resize(image, [224, 224])
+          image = image / 255.0
+          return image, label
+
+      dataset = (
+          tf.data.Dataset.from_tensor_slices((paths, labels))
+          .map(load_image, num_parallel_calls=tf.data.AUTOTUNE)
+          .map(preprocess, num_parallel_calls=tf.data.AUTOTUNE)
+          .cache()           # cache w RAM po pierwszej epoce
+          .shuffle(1000)
+          .batch(32)
+          .prefetch(tf.data.AUTOTUNE)  # prefetch następny batch
+      )
+
+  - name: TFRecord — binarny format danych
+    desc: >
+      TFRecord to binarny format Google do przechowywania danych treningowych.
+      Szybszy odczyt niż CSV/JSON, idealny do dużych datasetów. Dane serializowane
+      przez Protocol Buffers. Standard w pipeline'ach Google Cloud.
+    code: |
+      # Zapis do TFRecord
+      writer = tf.io.TFRecordWriter('train.tfrecord')
+
+      for image, label in data:
+          feature = {
+              'image': tf.train.Feature(bytes_list=tf.train.BytesList(value=[image.numpy().tobytes()])),
+              'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label])),
+          }
+          example = tf.train.Example(features=tf.train.Features(feature=feature))
+          writer.write(example.SerializeToString())
+      writer.close()
+
+      # Odczyt z TFRecord
+      def parse_fn(serialized):
+          features = tf.io.parse_single_example(serialized, {
+              'image': tf.io.FixedLenFeature([], tf.string),
+              'label': tf.io.FixedLenFeature([], tf.int64),
+          })
+          image = tf.io.decode_raw(features['image'], tf.float32)
+          image = tf.reshape(image, [28, 28])
+          return image, features['label']
+
+      dataset = tf.data.TFRecordDataset('train.tfrecord').map(parse_fn).batch(32)
+
+  - name: Image augmentation w pipeline
+    desc: >
+      Augmentacja w tf.data — transformacje na GPU, zero bottleneck.
+      Losowe obroty, flips, color jitter, crop — model widzi inne warianty
+      w każdej epoce. Działa tylko podczas treningu.
+    code: |
+      def augment(image, label):
+          image = tf.image.random_flip_left_right(image)
+          image = tf.image.random_brightness(image, max_delta=0.2)
+          image = tf.image.random_contrast(image, lower=0.8, upper=1.2)
+          image = tf.image.random_crop(image, size=[200, 200, 3])
+          image = tf.image.resize(image, [224, 224])
+          return image, label
+
+      train_ds = train_ds.map(augment, num_parallel_calls=tf.data.AUTOTUNE)
+
+  - name: Praca z tekstem — Tokenizacja
+    desc: >
+      tf.keras.layers.TextVectorization zamienia tekst na sekwencje integerów.
+      Automatycznie buduje słownik, obsługuje padding i truncation.
+      Alternatywa: Hugging Face Tokenizers (BPE, WordPiece).
+    code: |
+      vectorizer = tf.keras.layers.TextVectorization(
+          max_tokens=10000,
+          output_mode='int',
+          output_sequence_length=200
+      )
+      vectorizer.adapt(train_texts)  # buduj słownik z danych
+
+      model = tf.keras.Sequential([
+          vectorizer,
+          tf.keras.layers.Embedding(10000, 128),
+          tf.keras.layers.GlobalAveragePooling1D(),
+          tf.keras.layers.Dense(64, activation='relu'),
+          tf.keras.layers.Dense(1, activation='sigmoid')  # sentiment
+      ])

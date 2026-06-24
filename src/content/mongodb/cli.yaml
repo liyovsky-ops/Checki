@@ -1,0 +1,382 @@
+title: Komendy MongoDB
+
+groups:
+  - name: Instalacja i połączenie
+    icon: "📦"
+    commands:
+      - cmd: pip install pymongo
+        desc: Instalacja oficjalnego Python driver
+        detail:
+          what: PyMongo — synchroniczny driver MongoDB dla Pythona.
+          how: Obsługuje CRUD, agregacje, indeksy, replica sets, sharding.
+          tips:
+            - 'pip install pymongo[srv] — z DNS SRV support (dla Atlas)'
+            - 'pip install motor — async driver (FastAPI/asyncio)'
+      - cmd: pip install motor
+        desc: Instalacja async MongoDB driver (dla FastAPI)
+        detail:
+          what: Motor — asynchroniczny driver oparty na PyMongo. Non-blocking I/O.
+          how: 'Kompatybilne API z PyMongo. import motor.motor_asyncio'
+          tips:
+            - 'Obowiązkowy dla FastAPI/Starlette — nie blokuj event loop'
+      - cmd: pip install mongoengine
+        desc: Instalacja MongoEngine (ODM)
+        detail:
+          what: Object Document Mapper — jak ORM ale dla MongoDB. Schema, validation, embedding.
+          how: Definiujesz klasy Document z polami — jak modele Django/SQLAlchemy.
+          tips:
+            - 'Alternatywa: Beanie (async ODM, oparty na Pydantic + Motor)'
+      - cmd: pip install beanie
+        desc: Instalacja Beanie (async ODM z Pydantic)
+        detail:
+          what: Async ODM oparty na Pydantic i Motor. Type-safe, auto-validation.
+          how: Modele to klasy Pydantic — IDE autocomplete, walidacja wbudowana.
+          tips:
+            - 'Najlepszy ODM dla FastAPI + MongoDB stack'
+      - cmd: mongosh "mongodb://localhost:27017"
+        desc: Połącz z MongoDB przez shell
+        detail:
+          what: MongoDB Shell — JavaScript REPL do interakcji z bazą.
+          how: 'mongosh "mongodb+srv://user:pass@cluster.mongodb.net/mydb" — dla Atlas'
+          tips:
+            - 'mongosh — bez URL łączy z localhost:27017'
+      - cmd: mongosh "mongodb+srv://user:pass@cluster.mongodb.net/mydb"
+        desc: Połącz z MongoDB Atlas (cloud)
+        detail:
+          what: SRV connection string dla Atlas — auto-discovery repliki setów.
+          how: Skopiuj connection string z Atlas dashboard.
+          tips:
+            - 'Dodaj ?retryWrites=true&w=majority do URL'
+
+  - name: mongosh — operacje na bazie
+    icon: "💻"
+    commands:
+      - cmd: show dbs
+        desc: Lista baz danych
+        detail:
+          what: Wyświetla wszystkie bazy danych z rozmiarem.
+          how: Puste bazy nie są pokazywane.
+          tips:
+            - 'show databases — pełna nazwa komendy'
+      - cmd: use myapp
+        desc: Przełącz na bazę danych (stwórz jeśli nie istnieje)
+        detail:
+          what: Ustawia aktywną bazę. Baza tworzona automatycznie przy pierwszym insert.
+          how: Nie musisz tworzyć bazy ręcznie.
+          tips:
+            - 'db — pokaż aktualną bazę'
+      - cmd: show collections
+        desc: Lista kolekcji w aktywnej bazie
+        detail:
+          what: Wyświetla wszystkie kolekcje w aktualnej bazie danych.
+          how: Kolekcje tworzone automatycznie przy pierwszym insert.
+          tips:
+            - 'db.getCollectionNames() — programowy odpowiednik'
+      - cmd: db.users.insertOne({name:"Jan", age:28})
+        desc: Wstaw dokument do kolekcji
+        detail:
+          what: Wstawia jeden dokument. Auto-generuje _id (ObjectId).
+          how: 'db.users.insertMany([{...}, {...}]) — wiele naraz'
+          tips:
+            - 'Kolekcja "users" tworzona automatycznie'
+      - cmd: db.users.find({age:{$gte:25}}).pretty()
+        desc: Znajdź dokumenty z filtrem
+        detail:
+          what: Zwraca kursor z pasującymi dokumentami. .pretty() formatuje JSON.
+          how: '$gte = greater or equal, $lt = less than, $in = in array'
+          tips:
+            - 'db.users.find().limit(5) — pierwsze 5'
+            - 'db.users.find({}, {name:1, _id:0}) — projection'
+      - cmd: db.users.find().sort({age:-1}).limit(10)
+        desc: Sortuj i limituj wyniki
+        detail:
+          what: sort({pole:1}) ascending, sort({pole:-1}) descending. limit(N) — max N wyników.
+          how: Chainable — .find().sort().limit().skip()
+          tips:
+            - '.skip(20).limit(10) — paginacja (strona 3 po 10)'
+      - cmd: db.users.updateOne({name:"Jan"},{$set:{age:29}})
+        desc: Aktualizuj dokument
+        detail:
+          what: Aktualizuje pierwszy pasujący dokument. $set zmienia/dodaje pola.
+          how: 'updateMany() — aktualizuj wszystkie pasujące'
+          tips:
+            - '$inc:{count:1} — inkrementuj, $push:{tags:"new"} — dodaj do tablicy'
+      - cmd: db.users.deleteOne({name:"spam"})
+        desc: Usuń dokument
+        detail:
+          what: Usuwa pierwszy pasujący dokument. Nie da się cofnąć.
+          how: 'deleteMany({}) — usuń WSZYSTKIE dokumenty z kolekcji'
+          tips:
+            - 'deleteMany({}) z pustym filtrem = TRUNCATE'
+      - cmd: db.users.countDocuments({active:true})
+        desc: Policz dokumenty z filtrem
+        detail:
+          what: Liczy dokumenty pasujące do filtra. Dokładny count (nie szacunkowy).
+          how: 'estimatedDocumentCount() — szybszy szacunek bez filtra'
+          tips:
+            - 'db.users.distinct("city") — unikalne wartości pola'
+      - cmd: db.users.aggregate([{$group:{_id:"$city",count:{$sum:1}}}])
+        desc: Agregacja — grupuj i licz
+        detail:
+          what: Pipeline agregacji — $match → $group → $sort → $project.
+          how: Odpowiednik SQL GROUP BY + COUNT.
+          tips:
+            - 'Agregacja to najsilniejsza feature MongoDB'
+
+  - name: Indeksy (mongosh)
+    icon: "⚡"
+    commands:
+      - cmd: db.users.createIndex({email:1})
+        desc: Stwórz indeks ascending
+        detail:
+          what: Indeks na polu email — przyspiesza find({email:...}).
+          how: '1 = ascending, -1 = descending'
+          tips:
+            - 'db.users.createIndex({email:1},{unique:true}) — unikalny'
+      - cmd: db.users.createIndex({email:1},{unique:true})
+        desc: Stwórz indeks unikalny
+        detail:
+          what: Wymusza unikalność pola. Duplikat = error.
+          how: Odpowiednik UNIQUE constraint w SQL.
+          tips:
+            - 'Nie działa na dokumentach gdzie pole nie istnieje (null = one unique null)'
+      - cmd: db.orders.createIndex({user_id:1,created_at:-1})
+        desc: Compound index (wielopolowy)
+        detail:
+          what: Indeks na parze pól. Obsługuje queries filtrujące po obu polach.
+          how: Kolejność pól ma znaczenie — ESR Rule (Equality, Sort, Range).
+          tips:
+            - 'Indeks {a:1,b:1} obsługuje query na {a:1}, ale NIE na {b:1} samodzielnie'
+      - cmd: db.sessions.createIndex({createdAt:1},{expireAfterSeconds:3600})
+        desc: TTL index — auto-delete po czasie
+        detail:
+          what: Dokumenty automatycznie usuwane po 3600 sekundach od createdAt.
+          how: Idealny dla sesji, tokenów, cache'u.
+          tips:
+            - 'MongoDB sprawdza co 60 sekund — kasowanie nie jest instant'
+      - cmd: db.articles.createIndex({title:"text",body:"text"})
+        desc: Text index — full-text search
+        detail:
+          what: Enables $text queries na polach tekstowych. Stemming, stop words.
+          how: Maksymalnie jeden text index per kolekcja.
+          tips:
+            - 'db.articles.find({$text:{$search:"python tutorial"}})'
+      - cmd: db.places.createIndex({location:"2dsphere"})
+        desc: Geospatial index — zapytania lokalizacyjne
+        detail:
+          what: Indeks dla danych GeoJSON. $near, $geoWithin, $geoIntersects.
+          how: location musi być GeoJSON format {type:"Point", coordinates:[lng,lat]}.
+          tips:
+            - '$near z $maxDistance (w metrach) — znajdź w promieniu'
+      - cmd: db.users.getIndexes()
+        desc: Lista indeksów kolekcji
+        detail:
+          what: Wyświetla wszystkie indeksy z definicjami.
+          how: Każda kolekcja ma domyślny indeks na _id.
+          tips:
+            - 'db.users.dropIndex("email_1") — usuń indeks'
+      - cmd: db.users.find({email:"jan@firma.pl"}).explain("executionStats")
+        desc: Explain — analiza planu zapytania
+        detail:
+          what: Pokazuje jak MongoDB wykonuje zapytanie — IXSCAN (indeks) vs COLLSCAN (pełny skan).
+          how: executionStats daje czasy i liczbę skanowanych dokumentów.
+          tips:
+            - 'COLLSCAN na dużej kolekcji = musisz dodać indeks'
+
+  - name: Administracja
+    icon: "🔧"
+    commands:
+      - cmd: db.stats()
+        desc: Statystyki bazy danych
+        detail:
+          what: Rozmiar bazy, liczba kolekcji, obiektów, indeksów, storage.
+          how: 'db.users.stats() — statystyki konkretnej kolekcji'
+          tips:
+            - 'dataSize vs storageSize — logiczny vs fizyczny rozmiar'
+      - cmd: db.users.stats()
+        desc: Statystyki kolekcji
+        detail:
+          what: Liczba dokumentów, rozmiar, indeksy, storage engine details.
+          how: Przydatne do monitorowania wzrostu kolekcji.
+          tips:
+            - 'totalIndexSize — ile RAM zajmują indeksy'
+      - cmd: db.currentOp()
+        desc: Pokaż aktywne operacje
+        detail:
+          what: Lista aktualnie wykonywanych operacji — długie queries, locki.
+          how: Przydatne do debugowania wolnych zapytań i deadlocków.
+          tips:
+            - 'db.killOp(opid) — zabij wolną operację'
+      - cmd: db.createCollection("logs",{capped:true,size:1048576,max:1000})
+        desc: Stwórz capped collection (circular buffer)
+        detail:
+          what: Kolekcja o stałym rozmiarze — najstarsze dokumenty automatycznie usuwane.
+          how: Idealne dla logów, event bufferów. Zachowuje insertion order.
+          tips:
+            - 'size w bajtach, max = max dokumentów'
+      - cmd: "db.createCollection('users',{validator:{$jsonSchema:{bsonType:'object',required:['email','name']}}})"
+        desc: Schema validation na kolekcji
+        detail:
+          what: Wymusza strukturę dokumentów — wymagane pola, typy, walidacja.
+          how: Dokumenty niespełniające schematu = error przy insert/update.
+          tips:
+            - 'validationAction:"warn" — loguj zamiast blokować'
+      - cmd: mongodump --uri="mongodb://localhost:27017" --db=myapp --out=./backup
+        desc: Backup bazy danych
+        detail:
+          what: Eksportuje bazę do plików BSON. Pełny backup z indeksami.
+          how: 'mongorestore --dir=./backup/myapp — przywracanie'
+          tips:
+            - 'mongodump --gzip — kompresja backupu'
+      - cmd: mongorestore --uri="mongodb://localhost:27017" --db=myapp ./backup/myapp
+        desc: Przywróć bazę z backupu
+        detail:
+          what: Importuje dane z mongodump backupu.
+          how: '--drop — najpierw usuń istniejące dane przed restore'
+          tips:
+            - 'mongorestore --nsInclude="myapp.users" — tylko jedna kolekcja'
+      - cmd: mongoexport --db=myapp --collection=users --out=users.json
+        desc: Eksportuj kolekcję do JSON
+        detail:
+          what: Eksportuje dokumenty jako JSON (czytelny) lub CSV.
+          how: '--type=csv --fields=name,email — eksport CSV'
+          tips:
+            - 'mongoimport — import z JSON/CSV'
+      - cmd: mongoimport --db=myapp --collection=users --file=users.json
+        desc: Importuj dane z JSON
+        detail:
+          what: Importuje dokumenty z pliku JSON/CSV do kolekcji.
+          how: '--jsonArray — jeśli plik to JSON array. --mode=upsert — aktualizuj istniejące.'
+          tips:
+            - '--headerline — pierwsza linia CSV to nagłówki'
+
+  - name: Atlas CLI
+    icon: "☁️"
+    commands:
+      - cmd: atlas auth login
+        desc: Zaloguj do MongoDB Atlas
+        detail:
+          what: Autoryzacja Atlas CLI przez przeglądarkę.
+          how: Otwiera przeglądarkę do logowania.
+          tips:
+            - 'brew install mongodb-atlas-cli — instalacja na macOS'
+      - cmd: atlas clusters list
+        desc: Lista klastrów Atlas
+        detail:
+          what: Wyświetla wszystkie klastry w projekcie z statusem.
+          how: 'atlas clusters describe myCluster — szczegóły klastra'
+          tips:
+            - 'atlas clusters create — stwórz nowy klaster'
+      - cmd: atlas clusters create myCluster --tier M0 --provider AWS --region EU_WEST_1
+        desc: Stwórz darmowy klaster Atlas (M0)
+        detail:
+          what: M0 = darmowy tier (512MB). Idealne do dev/nauki.
+          how: M10+ = płatne. M0 ma ograniczenia (brak sharding, backup limited).
+          tips:
+            - '--tier M10 — najmniejszy płatny (dedykowany serwer)'
+      - cmd: atlas metrics processes list
+        desc: Metryki wydajności klastra
+        detail:
+          what: CPU, memory, connections, opcounters — monitoring klastra.
+          how: Alternatywa do Atlas dashboard w terminalu.
+          tips:
+            - 'atlas logs download — pobierz logi klastra'
+
+  - name: Docker
+    icon: "🐳"
+    commands:
+      - cmd: docker run -d -p 27017:27017 --name mongodb mongo:7
+        desc: Uruchom MongoDB 7 w Docker
+        detail:
+          what: Startuje MongoDB server na porcie 27017. Dane w kontenerze (znikną po usunięciu).
+          how: 'mongosh mongodb://localhost:27017 — połącz'
+          tips:
+            - '-v mongo_data:/data/db — persist data poza kontenerem'
+      - cmd: "docker run -d -p 27017:27017 -v mongo_data:/data/db -e MONGO_INITDB_ROOT_USERNAME=admin -e MONGO_INITDB_ROOT_PASSWORD=secret mongo:7"
+        desc: MongoDB z auth i persistent storage
+        detail:
+          what: MongoDB z autentykacją i danymi na Docker volume.
+          how: 'Połącz: mongosh "mongodb://admin:secret@localhost:27017"'
+          tips:
+            - 'ZAWSZE używaj auth na produkcji — bez auth każdy ma dostęp'
+      - cmd: "docker compose up -d"
+        desc: MongoDB z Mongo Express (GUI) w Docker Compose
+        detail:
+          what: Pełny stack lokalny — MongoDB + Mongo Express web GUI.
+          how: 'docker-compose.yml z mongo + mongo-express services'
+          tips:
+            - 'Mongo Express na http://localhost:8081'
+
+  - name: Replica Set i Sharding
+    icon: "🔄"
+    commands:
+      - cmd: rs.status()
+        desc: Status replica set
+        detail:
+          what: Wyświetla stan wszystkich members — primary, secondary, arbiter, health, lag.
+          how: Uruchom na dowolnym członku replica set.
+          tips:
+            - 'rs.conf() — konfiguracja replica set'
+      - cmd: rs.initiate()
+        desc: Inicjalizuj replica set
+        detail:
+          what: Uruchamia replica set na bieżącym node. Inne nodes dodaje się przez rs.add().
+          how: Wymaga --replSet w konfiguracji mongod.
+          tips:
+            - 'rs.add("mongo2:27017") — dodaj secondary'
+      - cmd: sh.status()
+        desc: Status shardingu
+        detail:
+          what: Wyświetla sharded collections, shard distribution, balancer status.
+          how: Uruchom na mongos router.
+          tips:
+            - 'sh.isBalancerRunning() — czy balancer działa'
+      - cmd: db.users.watch()
+        desc: Change Stream — nasłuchuj na zmiany w real-time
+        detail:
+          what: Zwraca kursor z eventami INSERT/UPDATE/DELETE. Idealny do CDC, notyfikacji.
+          how: Wymaga Replica Set. Pipeline opcjonalny do filtrowania.
+          tips:
+            - 'with db.users.watch() as stream: for change in stream: ...'
+      - cmd: db.users.find().hint({email_1:1})
+        desc: Wymuś użycie konkretnego indeksu
+        detail:
+          what: hint() zmusza MongoDB do użycia wskazanego indeksu zamiast auto-wyboru.
+          how: Przydatne gdy query planner wybiera zły indeks.
+          tips:
+            - 'Używaj z explain() żeby porównać plany'
+      - cmd: db.runCommand({serverStatus:1})
+        desc: Pełny status serwera
+        detail:
+          what: Connections, opcounters, memory, replication lag, storage engine stats.
+          how: Najbardziej szczegółowy diagnostyczny command.
+          tips:
+            - 'db.runCommand({top:1}) — operacje per kolekcja'
+      - cmd: db.users.renameCollection("customers")
+        desc: Zmień nazwę kolekcji
+        detail:
+          what: Atomowa zmiana nazwy. Nie kopiuje danych.
+          how: Nie działa cross-database.
+          tips:
+            - 'db.adminCommand({renameCollection:"myapp.users", to:"myapp.customers"})'
+      - cmd: db.users.drop()
+        desc: Usuń kolekcję (z danymi i indeksami)
+        detail:
+          what: Kasuje kolekcję, wszystkie dokumenty i indeksy. Nie do cofnięcia.
+          how: Odpowiednik DROP TABLE w SQL.
+          tips:
+            - 'db.dropDatabase() — usuń CAŁĄ bazę'
+      - cmd: db.users.createIndex({email:1},{background:true})
+        desc: Buduj indeks w tle (nie blokuj operacji)
+        detail:
+          what: Background index build nie blokuje reads/writes. Domyślne w MongoDB 4.2+.
+          how: Przydatne na produkcji — nie zatrzymuje serwisu.
+          tips:
+            - 'MongoDB 4.2+ buduje w tle automatycznie'
+      - cmd: db.users.validate()
+        desc: Sprawdź integralność kolekcji
+        detail:
+          what: Weryfikuje strukturę kolekcji, indeksów, i danych BSON.
+          how: Przydatne po awarii lub podejrzeniu korupcji danych.
+          tips:
+            - 'Może trwać długo na dużych kolekcjach'

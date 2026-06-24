@@ -1,0 +1,96 @@
+title: Indeksy MongoDB
+
+items:
+  - name: Tworzenie indeksów
+    desc: >
+      Indeksy przyspieszają wyszukiwanie — bez indeksu MongoDB skanuje KAŻDY dokument
+      (collection scan). Z indeksem skacze bezpośrednio do pasujących dokumentów.
+      Koszt: wolniejsze zapisy i więcej RAM.
+    code: |
+      # Indeks na jednym polu
+      db.users.create_index('email')
+
+      # Indeks unikalny
+      db.users.create_index('email', unique=True)
+
+      # Compound index (wielopolowy)
+      db.orders.create_index([('user_id', 1), ('created_at', -1)])
+      # 1 = ascending, -1 = descending
+
+      # Partial index (tylko dokumenty spełniające warunek)
+      db.users.create_index('email', partialFilterExpression={'active': True})
+
+      # TTL index (auto-delete po czasie)
+      db.sessions.create_index('created_at', expireAfterSeconds=3600)
+      # Dokumenty usuwane automatycznie po 1h
+
+      # Text index (full-text search)
+      db.articles.create_index({'title': 'text', 'body': 'text'})
+      results = db.articles.find({'$text': {'$search': 'python tutorial'}})
+
+  - name: Typy indeksów
+    desc: >
+      MongoDB oferuje kilka typów indeksów dla różnych wzorców zapytań.
+      Single field, compound, multikey (tablice), text, geospatial, hashed.
+    code: |
+      # Multikey index — indeksuje elementy tablicy
+      db.products.create_index('tags')
+      # Szybkie wyszukiwanie: {'tags': 'electronics'}
+
+      # Geospatial index (2dsphere) — lokalizacje
+      db.places.create_index({'location': '2dsphere'})
+      db.places.find({
+          'location': {
+              '$near': {
+                  '$geometry': {'type': 'Point', 'coordinates': [21.01, 52.23]},
+                  '$maxDistance': 5000  # 5km
+              }
+          }
+      })
+
+      # Hashed index — dla shard key (równomierny rozkład)
+      db.users.create_index({'user_id': 'hashed'})
+
+  - name: Analiza wydajności zapytań
+    desc: >
+      explain() pokazuje jak MongoDB wykonuje zapytanie — czy używa indeksu,
+      ile dokumentów skanuje, ile czasu zajmuje. Odpowiednik EXPLAIN ANALYZE w SQL.
+    code: |
+      # Explain zapytania
+      result = db.users.find({'email': 'jan@firma.pl'}).explain()
+
+      # Kluczowe pola w wyniku:
+      # winningPlan.stage: "IXSCAN" = indeks (dobrze), "COLLSCAN" = full scan (źle!)
+      # totalDocsExamined: ile dokumentów przejrzano
+      # totalKeysExamined: ile wpisów indeksu sprawdzono
+      # executionTimeMillis: czas w ms
+
+      # executionStats — szczegółowe statystyki
+      result = db.users.find({'age': {'$gt': 25}}).explain('executionStats')
+
+      # Lista indeksów kolekcji
+      for index in db.users.list_indexes():
+          print(index)
+
+      # Usuń indeks
+      db.users.drop_index('email_1')
+
+  - name: Index strategy — best practices
+    desc: >
+      ESR Rule: Equality → Sort → Range. Compound index powinien mieć pola
+      w tej kolejności. Covered query = zapytanie obsłużone w 100% z indeksu
+      (zero odczytów dokumentów).
+    code: |
+      # ESR Rule — Equality, Sort, Range
+      # Zapytanie: find({status: 'active', age: {$gte: 25}}).sort({name: 1})
+      # Indeks: {status: 1, name: 1, age: 1}
+      #          E(quality)  S(ort)    R(ange)
+
+      # Covered query — wynik z samego indeksu
+      db.users.create_index([('email', 1), ('name', 1)])
+      # To zapytanie NIE czyta dokumentów (projection = pola z indeksu)
+      db.users.find({'email': 'jan@firma.pl'}, {'name': 1, '_id': 0})
+
+      # Nie za dużo indeksów!
+      # Każdy indeks spowalnia INSERT/UPDATE i zajmuje RAM
+      # Reguła: max 5-7 indeksów per kolekcja

@@ -1,0 +1,118 @@
+title: Budowanie modeli w Keras
+
+items:
+  - name: Sequential API — liniowy stos warstw
+    desc: >
+      Najprostszy sposób budowania modelu. Warstwy dodawane jedna po drugiej.
+      Idealny gdy dane przepływają liniowo: input → warstwa1 → warstwa2 → output.
+    code: |
+      import tensorflow as tf
+
+      model = tf.keras.Sequential([
+          tf.keras.layers.Dense(256, activation='relu', input_shape=(784,)),
+          tf.keras.layers.BatchNormalization(),
+          tf.keras.layers.Dropout(0.3),
+          tf.keras.layers.Dense(128, activation='relu'),
+          tf.keras.layers.Dropout(0.2),
+          tf.keras.layers.Dense(10, activation='softmax')
+      ])
+
+      model.summary()  # wyświetl architekturę i liczbę parametrów
+
+  - name: Functional API — dowolny graf warstw
+    desc: >
+      Pozwala na multi-input, multi-output, skip connections, shared layers.
+      Budujesz graf jawnie łącząc warstwy. Używany w ResNet, Inception, U-Net.
+    code: |
+      from tf.keras import layers, Model
+
+      # Input
+      inputs = layers.Input(shape=(224, 224, 3))
+
+      # Backbone
+      x = layers.Conv2D(32, 3, activation='relu')(inputs)
+      x = layers.MaxPooling2D()(x)
+      x = layers.Conv2D(64, 3, activation='relu')(x)
+      x = layers.GlobalAveragePooling2D()(x)
+
+      # Two outputs: classification + regression
+      class_output = layers.Dense(10, activation='softmax', name='class')(x)
+      score_output = layers.Dense(1, name='score')(x)
+
+      model = Model(inputs=inputs, outputs=[class_output, score_output])
+
+  - name: Transfer Learning — użyj pretrenowanego modelu
+    desc: >
+      Zamiast trenować od zera, weź model wytrenowany na ImageNet (ResNet, EfficientNet)
+      i dostosuj do swoich danych. Zamrażasz bazowe warstwy, trenujesz tylko głowicę.
+      10× szybciej, 10× mniej danych potrzebnych.
+    code: |
+      import tensorflow as tf
+
+      # Załaduj pretrenowany model (bez głowicy klasyfikacyjnej)
+      base_model = tf.keras.applications.EfficientNetV2B0(
+          weights='imagenet',
+          include_top=False,
+          input_shape=(224, 224, 3)
+      )
+      base_model.trainable = False  # zamroź wagi
+
+      # Dodaj własną głowicę
+      model = tf.keras.Sequential([
+          base_model,
+          tf.keras.layers.GlobalAveragePooling2D(),
+          tf.keras.layers.Dense(256, activation='relu'),
+          tf.keras.layers.Dropout(0.3),
+          tf.keras.layers.Dense(5, activation='softmax')  # 5 klas
+      ])
+
+      model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
+      # Fine-tuning: odmroź ostatnie warstwy po kilku epokach
+      base_model.trainable = True
+      for layer in base_model.layers[:-20]:
+          layer.trainable = False
+
+  - name: Warstwy konwolucyjne (CNN)
+    desc: >
+      Conv2D, MaxPooling2D, BatchNormalization — fundament computer vision.
+      Filtry uczą się wykrywać krawędzie, tekstury, kształty. Pooling redukuje
+      wymiary. BatchNorm stabilizuje trening.
+    code: |
+      model = tf.keras.Sequential([
+          tf.keras.layers.Conv2D(32, (3,3), activation='relu', input_shape=(28,28,1)),
+          tf.keras.layers.BatchNormalization(),
+          tf.keras.layers.MaxPooling2D((2,2)),
+
+          tf.keras.layers.Conv2D(64, (3,3), activation='relu'),
+          tf.keras.layers.BatchNormalization(),
+          tf.keras.layers.MaxPooling2D((2,2)),
+
+          tf.keras.layers.Conv2D(64, (3,3), activation='relu'),
+          tf.keras.layers.Flatten(),
+          tf.keras.layers.Dense(64, activation='relu'),
+          tf.keras.layers.Dense(10, activation='softmax')
+      ])
+
+  - name: Custom Model (Subclassing)
+    desc: >
+      Pełna kontrola — definiujesz __init__ (warstwy) i call (forward pass).
+      Używaj gdy Functional API nie wystarczy (dynamiczne grafy, custom logika).
+    code: |
+      import tensorflow as tf
+
+      class MyModel(tf.keras.Model):
+          def __init__(self):
+              super().__init__()
+              self.dense1 = tf.keras.layers.Dense(128, activation='relu')
+              self.dropout = tf.keras.layers.Dropout(0.3)
+              self.dense2 = tf.keras.layers.Dense(10)
+
+          def call(self, x, training=False):
+              x = self.dense1(x)
+              if training:
+                  x = self.dropout(x)
+              return self.dense2(x)
+
+      model = MyModel()
+      model.compile(optimizer='adam', loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True))

@@ -1,0 +1,110 @@
+title: Trening i optymalizacja
+
+items:
+  - name: Kompilacja modelu — optimizer, loss, metrics
+    desc: >
+      model.compile() konfiguruje jak model się uczy. Optimizer (jak aktualizować wagi),
+      loss function (co minimalizować), metrics (co raportować). Wybór tych trzech
+      determinuje czy trening konwerguje.
+    code: |
+      model.compile(
+          optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+          loss='sparse_categorical_crossentropy',  # dla int labels
+          metrics=['accuracy', tf.keras.metrics.Precision(), tf.keras.metrics.Recall()]
+      )
+
+      # Popularne loss functions:
+      # binary_crossentropy — klasyfikacja binarna (0/1)
+      # sparse_categorical_crossentropy — multi-class z int labels
+      # categorical_crossentropy — multi-class z one-hot labels
+      # mse — regresja (Mean Squared Error)
+
+      # Popularne optimizery:
+      # Adam — domyślny wybór, adaptive learning rate
+      # SGD — prostszy, czasem lepiej generalizuje z momentum
+      # AdamW — Adam z weight decay (regularyzacja)
+
+  - name: Callbacks — kontrola treningu
+    desc: >
+      Callbacks reagują na zdarzenia podczas treningu. EarlyStopping zatrzymuje
+      gdy model przestaje się poprawiać. ModelCheckpoint zapisuje najlepszy model.
+      ReduceLROnPlateau zmniejsza learning rate gdy loss stagnuje.
+    code: |
+      callbacks = [
+          tf.keras.callbacks.EarlyStopping(
+              monitor='val_loss',
+              patience=5,           # czekaj 5 epok bez poprawy
+              restore_best_weights=True
+          ),
+          tf.keras.callbacks.ModelCheckpoint(
+              'best_model.keras',
+              monitor='val_accuracy',
+              save_best_only=True
+          ),
+          tf.keras.callbacks.ReduceLROnPlateau(
+              monitor='val_loss',
+              factor=0.5,           # zmniejsz LR o połowę
+              patience=3
+          ),
+          tf.keras.callbacks.TensorBoard(log_dir='./logs'),
+      ]
+
+      model.fit(x_train, y_train, epochs=50, validation_split=0.2, callbacks=callbacks)
+
+  - name: Data Augmentation — więcej danych bez więcej danych
+    desc: >
+      Augmentacja generuje warianty istniejących danych — obroty, przesunięcia,
+      odwrócenia, zmiany jasności. Model widzi "nowe" przykłady, lepiej generalizuje.
+      W tf.keras augmentacja to warstwy w modelu.
+    code: |
+      augmentation = tf.keras.Sequential([
+          tf.keras.layers.RandomFlip('horizontal'),
+          tf.keras.layers.RandomRotation(0.1),
+          tf.keras.layers.RandomZoom(0.1),
+          tf.keras.layers.RandomContrast(0.1),
+      ])
+
+      # Jako część modelu (działa tylko w training)
+      model = tf.keras.Sequential([
+          augmentation,
+          tf.keras.layers.Rescaling(1./255),
+          base_model,
+          tf.keras.layers.GlobalAveragePooling2D(),
+          tf.keras.layers.Dense(10, activation='softmax')
+      ])
+
+  - name: Custom Training Loop
+    desc: >
+      Gdy model.fit() nie wystarczy — custom training loop z tf.GradientTape.
+      Pełna kontrola nad forward pass, loss computation, gradient update.
+      Potrzebny przy GAN-ach, reinforcement learning, multi-task learning.
+    code: |
+      optimizer = tf.keras.optimizers.Adam()
+      loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+
+      @tf.function  # kompiluj do grafu — 2-3× szybciej
+      def train_step(x, y):
+          with tf.GradientTape() as tape:
+              predictions = model(x, training=True)
+              loss = loss_fn(y, predictions)
+          gradients = tape.gradient(loss, model.trainable_variables)
+          optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+          return loss
+
+      for epoch in range(10):
+          for x_batch, y_batch in train_dataset:
+              loss = train_step(x_batch, y_batch)
+          print(f'Epoch {epoch}, Loss: {loss:.4f}')
+
+  - name: Mixed Precision Training
+    desc: >
+      Używa float16 zamiast float32 gdzie to bezpieczne — 2× szybszy trening
+      na GPU z Tensor Cores (RTX 30xx/40xx, A100, V100). Zero zmian w modelu.
+    code: |
+      tf.keras.mixed_precision.set_global_policy('mixed_float16')
+      # Teraz wszystkie warstwy domyślnie używają float16 do obliczeń
+      # i float32 do akumulacji (numerycznie stabilne)
+
+      # UWAGA: ostatnia warstwa Dense musi mieć dtype='float32'
+      # żeby loss computation była stabilna
+      outputs = tf.keras.layers.Dense(10, dtype='float32')(x)

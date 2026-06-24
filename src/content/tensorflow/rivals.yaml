@@ -1,0 +1,66 @@
+title: TensorFlow vs alternatywy ML
+
+items:
+  - name: PyTorch
+    icon: "🔥"
+    color: "#ee4c2c"
+    tagline: Dynamiczny, Pythoniczny, ulubieniec badaczy i startupów
+    pros:
+      - Dynamiczny graf (eager by default) — debugowanie jak zwykły Python
+      - Pythonic API — czyta się jak Python, nie jak framework
+      - Dominuje w badaniach (80%+ papierów na NeurIPS/ICML)
+      - TorchScript i torch.compile do optymalizacji
+    cons:
+      - Gorsze tooling do deployment (TorchServe młodszy niż TF Serving)
+      - Brak natywnego wsparcia TPU (wymaga torch_xla)
+      - Mobile deployment słabszy niż TF Lite
+      - Mniej gotowych modeli produkcyjnych
+    vs: PyTorch lepszy do research i szybkiego prototypowania. TensorFlow lepszy do produkcyjnego deployment (TF Serving, TF Lite, TPU). Trend rynkowy — PyTorch dominuje w nowych projektach, TF trzyma się w produkcji.
+
+  - name: JAX
+    icon: "⚡"
+    color: "#5C6BC0"
+    tagline: Autograd + XLA — functional ML od Google
+    pros:
+      - Funkcyjny styl — czyste funkcje, łatwe do kompozycji
+      - jit() kompilacja do XLA — ultra szybki na GPU/TPU
+      - vmap() — automatyczna wektoryzacja (batch bez pętli)
+      - Pełna kontrola nad obliczeniami (niższy poziom niż Keras)
+    cons:
+      - Stroma krzywa uczenia — wymaga myślenia funkcyjnego
+      - Mały ekosystem vs TF/PyTorch
+      - Brak high-level API jak Keras (Flax/Haiku to community libs)
+      - Debugging trudniejszy z jit() (traced execution)
+    vs: JAX dla zaawansowanych badaczy którzy chcą maksymalnej wydajności i kontroli. TensorFlow/Keras dla 90% przypadków ML. JAX rośnie w Google ale nie zastąpi TF w produkcji.
+
+  - name: scikit-learn
+    icon: "📊"
+    color: "#f89939"
+    tagline: Klasyczne ML — proste, szybkie, bez GPU
+    pros:
+      - Najprostsze API w ML — fit(), predict(), score()
+      - Ogromna kolekcja algorytmów klasycznych (RF, SVM, KNN, clustering)
+      - Doskonała dokumentacja z przykładami
+      - Działa na CPU — nie potrzebujesz GPU
+    cons:
+      - Brak deep learning (sieci neuronowe)
+      - Nie skaluje się na duże dane (in-memory only)
+      - Brak GPU acceleration
+      - Nie obsługuje sekwencyjnych/obrazowych danych
+    vs: scikit-learn dla klasycznego ML (tabular data, feature engineering). TensorFlow gdy potrzebujesz deep learning (obrazy, tekst, sekwencje, generative AI).
+
+  - name: Hugging Face Transformers
+    icon: "🤗"
+    color: "#ffd21e"
+    tagline: Gotowe modele NLP/CV/Audio — zero treningu od zera
+    pros:
+      - 200k+ pretrenowanych modeli (BERT, GPT, LLaMA, Whisper, DALL-E)
+      - pipeline() — 3 linie kodu do sentiment, NER, summarization
+      - Backend-agnostic — PyTorch, TensorFlow, JAX
+      - Hub z modelami, datasetami, spaces
+    cons:
+      - Nie framework ML — to biblioteka modeli (potrzebujesz TF/PyTorch pod spodem)
+      - Ciężkie modele — LLaMA 70B wymaga wielu GPU
+      - Abstrakcja ukrywa detale — trudniej customizować
+      - Zależność od community modeli (jakość bywa różna)
+    vs: HF Transformers do NLP/LLM — nie trenuj BERT od zera, użyj gotowego. TensorFlow gdy trenujesz custom modele (CV, time-series, tabular) lub potrzebujesz TF Serving/TF Lite.

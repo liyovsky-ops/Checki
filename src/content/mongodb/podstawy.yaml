@@ -1,0 +1,101 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać MongoDB?
+  firstComponent: Pierwszy dokument MongoDB
+  firstComponentLang: python
+
+intro:
+  title: Czym jest MongoDB?
+  desc: >
+    MongoDB to dokumentowa baza NoSQL. Zamiast tabel i wierszy masz kolekcje
+    i dokumenty (JSON/BSON). Schemat jest elastyczny — każdy dokument może mieć
+    inne pola. Idealny do danych o zmiennej strukturze, szybkiego prototypowania
+    i horizontalnego skalowania. Wbudowana replikacja (replica sets) i sharding.
+
+concepts:
+  - title: Dokument (BSON)
+    desc: >
+      Dokument = JSON-like obiekt przechowywany jako BSON (Binary JSON). Ma _id
+      (unique, auto-generowany ObjectId), zagnieżdżone obiekty, tablice.
+      Jeden dokument może mieć max 16MB. Odpowiednik "wiersza" w SQL.
+    icon: "📄"
+  - title: Kolekcja
+    desc: >
+      Kolekcja = zbiór dokumentów. Odpowiednik "tabeli" w SQL. Nie wymaga schematu —
+      dokumenty w tej samej kolekcji mogą mieć różne pola. Schema validation opcjonalny
+      (JSON Schema). Kolekcje nie wymagają tworzenia — powstają automatycznie.
+    icon: "📁"
+  - title: Replica Set
+    desc: >
+      Grupa serwerów MongoDB z automatycznym failover. Primary obsługuje zapisy,
+      secondaries replikują dane. Jeśli primary padnie, secondary automatycznie
+      zostaje nowym primary (election). Minimum 3 nodes (primary + 2 secondaries).
+    icon: "🔄"
+  - title: Sharding
+    desc: >
+      Horizontalne partycjonowanie danych na wiele serwerów (shards). Shard key
+      determinuje na który shard trafia dokument. Mongos router kieruje zapytania
+      do właściwego sharda. Skaluje się do petabajtów danych.
+    icon: "📊"
+  - title: Aggregation Pipeline
+    desc: >
+      Seria transformacji danych — $match → $group → $sort → $project.
+      Odpowiednik GROUP BY + JOIN + subqueries w SQL. Przetwarzanie po stronie
+      serwera — nie pobierasz wszystkich danych do klienta.
+    icon: "🔧"
+  - title: ObjectId
+    desc: >
+      12-bajtowy uniknalny identyfikator. Zawiera timestamp (kiedy stworzony),
+      random value, counter. Sortowalne chronologicznie. Auto-generowany jeśli
+      nie podasz _id. Nie UUID — mniejszy, szybszy, z wbudowanym timestampem.
+    icon: "🔑"
+
+whenToUse:
+  - Dane o zmiennej strukturze — CMS, produkty z różnymi atrybutami
+  - Szybkie prototypowanie — zero migracji, dodajesz pola on-the-fly
+  - Dokumenty zagnieżdżone — zamówienia z produktami, posty z komentarzami
+  - Real-time analytics — agregacje po stronie serwera
+  - IoT / logi / eventy — wysoki write throughput, time-series collections
+  - Gdy potrzebujesz horizontalnego skalowania od dnia pierwszego
+
+firstComponent: |
+  # Instalacja
+  pip install pymongo
+
+  # Połączenie
+  from pymongo import MongoClient
+
+  client = MongoClient('mongodb://localhost:27017/')
+  db = client['myapp']
+  collection = db['users']
+
+  # Wstaw dokument
+  user = {
+      'name': 'Jan Kowalski',
+      'email': 'jan@firma.pl',
+      'age': 28,
+      'skills': ['Python', 'FastAPI', 'MongoDB'],
+      'address': {
+          'city': 'Warszawa',
+          'country': 'PL'
+      }
+  }
+  result = collection.insert_one(user)
+  print(f'Inserted: {result.inserted_id}')
+
+  # Znajdź
+  found = collection.find_one({'email': 'jan@firma.pl'})
+  print(found['name'])  # Jan Kowalski
+
+  # Znajdź wielu
+  for user in collection.find({'age': {'$gte': 25}}):
+      print(user['name'])
+
+  # Update
+  collection.update_one(
+      {'email': 'jan@firma.pl'},
+      {'$set': {'age': 29}, '$push': {'skills': 'Docker'}}
+  )
+
+  # Delete
+  collection.delete_one({'email': 'jan@firma.pl'})

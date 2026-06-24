@@ -1,0 +1,94 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać TensorFlow?
+  firstComponent: Pierwszy model TensorFlow
+  firstComponentLang: python
+
+intro:
+  title: Czym jest TensorFlow?
+  desc: >
+    TensorFlow to open-source framework ML od Google. Pozwala budować, trenować
+    i wdrażać modele machine learning — od prostych regresji po złożone sieci neuronowe.
+    TensorFlow 2.x zintegrował Keras jako domyślne high-level API, co drastycznie
+    uprościło budowanie modeli. Działa na CPU, GPU (NVIDIA CUDA) i TPU (Google Cloud).
+    Skaluje się od laptopa po klaster z tysiącami GPU.
+
+concepts:
+  - title: Tensory
+    desc: >
+      Tensor to wielowymiarowa tablica danych — fundament TensorFlow. Skalar = tensor 0D,
+      wektor = 1D, macierz = 2D, obraz = 3D (wysokość × szerokość × kanały).
+      tf.Tensor jest immutable — operacje tworzą nowe tensory, nie modyfikują istniejących.
+    icon: "📐"
+  - title: Keras API (tf.keras)
+    desc: >
+      High-level API do budowania modeli. Sequential (liniowy stos warstw), Functional
+      (dowolny graf warstw), Subclassing (pełna kontrola). 90% modeli buduje się
+      przez Sequential lub Functional API. Subclassing gdy potrzebujesz custom forward pass.
+    icon: "🏗️"
+  - title: Eager Execution
+    desc: >
+      TF 2.x domyślnie wykonuje operacje natychmiast (jak PyTorch). Debugowanie przez
+      print(), breakpointy, step-through. W TF 1.x trzeba było budować graf i uruchamiać
+      w sesji — to już przeszłość.
+    icon: "⚡"
+  - title: tf.data Pipeline
+    desc: >
+      API do budowania pipeline'ów danych. Ładowanie, transformacja, augmentacja,
+      batching, prefetching — wszystko lazy i zoptymalizowane. Obsługuje pliki
+      (CSV, TFRecord, obrazy), bazy danych, streaming. Prefetch + parallel map
+      eliminuje wąskie gardło I/O.
+    icon: "🔄"
+  - title: SavedModel & TF Serving
+    desc: >
+      SavedModel to format eksportu modelu z wagami, grafem i sygnaturami.
+      TF Serving to produkcyjny serwer inference — REST/gRPC API, batching,
+      model versioning, A/B testing modeli. Standard dla deployment ML w Google.
+    icon: "📦"
+  - title: TensorBoard
+    desc: >
+      Wizualizacja treningu — loss curves, metryki, histogramy wag, graf modelu,
+      profiling wydajności, embedding projector. Uruchamiasz tensorboard --logdir=logs
+      i otwierasz w przeglądarce. Niezbędne do debugowania treningu.
+    icon: "📊"
+
+whenToUse:
+  - Produkcyjne wdrożenia ML — TF Serving, TF Lite (mobile), TF.js (browser)
+  - Trenowanie na TPU (Google Cloud) — TF ma natywne wsparcie
+  - Computer Vision — Keras + tf.data + augmentacja + transfer learning
+  - NLP z Transformerami — przez Hugging Face Transformers (backend TF)
+  - Duże pipeline'y danych — tf.data + TFRecord do efektywnego I/O
+  - Edge deployment — TensorFlow Lite na Android/iOS/Raspberry Pi
+
+firstComponent: |
+  # Instalacja
+  pip install tensorflow
+
+  # Pierwszy model — klasyfikacja cyfr (MNIST)
+  import tensorflow as tf
+
+  # Załaduj dane
+  (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
+  x_train, x_test = x_train / 255.0, x_test / 255.0  # normalizacja
+
+  # Zbuduj model
+  model = tf.keras.Sequential([
+      tf.keras.layers.Flatten(input_shape=(28, 28)),
+      tf.keras.layers.Dense(128, activation='relu'),
+      tf.keras.layers.Dropout(0.2),
+      tf.keras.layers.Dense(10, activation='softmax')
+  ])
+
+  # Kompilacja
+  model.compile(
+      optimizer='adam',
+      loss='sparse_categorical_crossentropy',
+      metrics=['accuracy']
+  )
+
+  # Trening
+  model.fit(x_train, y_train, epochs=5, validation_split=0.1)
+
+  # Ewaluacja
+  model.evaluate(x_test, y_test)
+  # ~98% accuracy na cyfrach pisanych ręcznie
