@@ -1,0 +1,120 @@
+title: Mocking i Spying
+
+items:
+  - name: vi.fn() — mock functions
+    desc: >
+      vi.fn() tworzy mock funkcję która śledzi wywołania (calls, args, results).
+      Odpowiednik jest.fn(). Opcjonalnie przyjmuje implementację.
+    code: |
+      import { vi, expect, it } from 'vitest';
+
+      it('mock function', () => {
+        const fn = vi.fn();
+        fn('hello');
+        fn('world');
+
+        expect(fn).toHaveBeenCalledTimes(2);
+        expect(fn).toHaveBeenCalledWith('hello');
+        expect(fn).toHaveBeenLastCalledWith('world');
+
+        // Mock z implementacją
+        const add = vi.fn((a: number, b: number) => a + b);
+        expect(add(1, 2)).toBe(3);
+        expect(add).toHaveReturnedWith(3);
+      });
+
+  - name: vi.mock() — module mocking
+    desc: >
+      vi.mock('module') automatycznie mockuje wszystkie exporty modułu.
+      Factory function pozwala na custom implementację. Hoisted na górę pliku.
+    code: |
+      import { vi, expect, it } from 'vitest';
+      import { fetchUser } from './api';
+
+      // Mock cały moduł
+      vi.mock('./api', () => ({
+        fetchUser: vi.fn().mockResolvedValue({ id: 1, name: 'Jan' }),
+      }));
+
+      it('mocked module', async () => {
+        const user = await fetchUser(1);
+        expect(user.name).toBe('Jan');
+        expect(fetchUser).toHaveBeenCalledWith(1);
+      });
+
+  - name: vi.spyOn() — spy na istniejącej metodzie
+    desc: >
+      Obserwuje wywołania bez zmiany implementacji (domyślnie).
+      mockImplementation() lub mockReturnValue() pozwala zmienić zachowanie.
+    code: |
+      import { vi, expect, it } from 'vitest';
+
+      const calculator = {
+        add: (a: number, b: number) => a + b,
+      };
+
+      it('spy', () => {
+        const spy = vi.spyOn(calculator, 'add');
+
+        calculator.add(1, 2); // oryginalna implementacja
+        expect(spy).toHaveBeenCalledWith(1, 2);
+        expect(spy).toHaveReturnedWith(3);
+
+        // Override implementacji
+        spy.mockReturnValue(42);
+        expect(calculator.add(1, 2)).toBe(42);
+
+        spy.mockRestore(); // przywróć oryginał
+      });
+
+  - name: vi.stubGlobal() — mock globalnych
+    desc: >
+      Mockuje globalne zmienne (fetch, Date, localStorage).
+      Automatycznie restorowane po teście.
+    code: |
+      import { vi, expect, it } from 'vitest';
+
+      it('stub fetch', async () => {
+        const mockFetch = vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ data: 'test' }),
+        });
+        vi.stubGlobal('fetch', mockFetch);
+
+        const res = await fetch('/api/data');
+        expect(res.ok).toBe(true);
+      });
+
+      it('stub Date', () => {
+        vi.setSystemTime(new Date('2024-01-15'));
+        expect(new Date().getFullYear()).toBe(2024);
+        vi.useRealTimers();
+      });
+
+  - name: Timer mocking
+    desc: >
+      vi.useFakeTimers() mockuje setTimeout, setInterval, Date.
+      vi.advanceTimersByTime(ms) przesuwa czas o podaną liczbę ms.
+    code: |
+      import { vi, expect, it, beforeEach, afterEach } from 'vitest';
+
+      beforeEach(() => vi.useFakeTimers());
+      afterEach(() => vi.useRealTimers());
+
+      it('fake timers', () => {
+        const callback = vi.fn();
+        setTimeout(callback, 1000);
+
+        expect(callback).not.toHaveBeenCalled();
+        vi.advanceTimersByTime(1000);
+        expect(callback).toHaveBeenCalledOnce();
+      });
+
+      it('run all timers', () => {
+        const fn = vi.fn();
+        setTimeout(fn, 5000);
+        setTimeout(fn, 10000);
+
+        vi.runAllTimers();
+        expect(fn).toHaveBeenCalledTimes(2);
+      });

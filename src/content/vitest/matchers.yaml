@@ -1,0 +1,115 @@
+title: Matchers i Asercje
+
+items:
+  - name: Podstawowe matchers
+    desc: >
+      expect(value) zwraca obiekt z matcherami. toBe() porównuje ===,
+      toEqual() porównuje deep equality (obiekty/tablice). toStrictEqual()
+      jak toEqual ale sprawdza też typy (undefined properties, class instances).
+    code: |
+      import { expect, it } from 'vitest';
+
+      it('basic matchers', () => {
+        // Equality
+        expect(1 + 1).toBe(2);          // === strict
+        expect({ a: 1 }).toEqual({ a: 1 }); // deep equal
+        expect([1, 2]).toStrictEqual([1, 2]);
+
+        // Truthiness
+        expect(true).toBeTruthy();
+        expect(0).toBeFalsy();
+        expect(null).toBeNull();
+        expect(undefined).toBeUndefined();
+        expect('hello').toBeDefined();
+
+        // Numbers
+        expect(10).toBeGreaterThan(5);
+        expect(10).toBeLessThanOrEqual(10);
+        expect(0.1 + 0.2).toBeCloseTo(0.3); // floating point
+
+        // Strings
+        expect('hello world').toContain('world');
+        expect('hello').toMatch(/^he/);
+        expect('hello').toHaveLength(5);
+      });
+
+  - name: Object i Array matchers
+    desc: >
+      toHaveProperty(), toMatchObject(), toContainEqual() — sprawdzanie
+      fragmentów obiektów i tablic bez porównywania całości.
+    code: |
+      it('object/array matchers', () => {
+        const user = { name: 'Jan', age: 30, role: 'admin' };
+
+        expect(user).toHaveProperty('name');
+        expect(user).toHaveProperty('age', 30);
+        expect(user).toMatchObject({ name: 'Jan' }); // partial match
+
+        const users = [
+          { id: 1, name: 'Jan' },
+          { id: 2, name: 'Anna' },
+        ];
+        expect(users).toHaveLength(2);
+        expect(users).toContainEqual({ id: 1, name: 'Jan' });
+        expect(users).toEqual(expect.arrayContaining([
+          expect.objectContaining({ name: 'Anna' }),
+        ]));
+      });
+
+  - name: Exception matchers
+    desc: >
+      toThrow() sprawdza czy funkcja rzuca wyjątek. Akceptuje string,
+      regex, lub klasę Error. Funkcję trzeba opakować w () => fn().
+    code: |
+      function divide(a: number, b: number) {
+        if (b === 0) throw new Error('Division by zero');
+        return a / b;
+      }
+
+      it('exception matchers', () => {
+        expect(() => divide(1, 0)).toThrow();
+        expect(() => divide(1, 0)).toThrow('Division by zero');
+        expect(() => divide(1, 0)).toThrow(/zero/);
+        expect(() => divide(1, 0)).toThrow(Error);
+
+        // Async
+        expect(async () => {
+          await fetchUser(-1);
+        }).rejects.toThrow('Not found');
+      });
+
+  - name: Snapshot matchers
+    desc: >
+      toMatchSnapshot() zapisuje output do pliku .snap i porównuje
+      przy następnym uruchomieniu. toMatchInlineSnapshot() zapisuje
+      snapshot inline w kodzie testowym.
+    code: |
+      it('snapshot', () => {
+        const user = { id: 1, name: 'Jan', createdAt: new Date('2024-01-01') };
+        expect(user).toMatchSnapshot();
+
+        // Inline snapshot — Vitest automatycznie wpisze wartość
+        expect(user.name).toMatchInlineSnapshot('"Jan"');
+      });
+
+  - name: Custom matchers (extend)
+    desc: >
+      expect.extend() dodaje własne matchery. Każdy matcher dostaje
+      received value i zwraca { pass, message }.
+    code: |
+      import { expect } from 'vitest';
+
+      expect.extend({
+        toBeValidEmail(received: string) {
+          const pass = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(received);
+          return {
+            pass,
+            message: () => `expected ${received} to be a valid email`,
+          };
+        },
+      });
+
+      it('custom matcher', () => {
+        expect('jan@firma.pl').toBeValidEmail();
+        expect('invalid').not.toBeValidEmail();
+      });

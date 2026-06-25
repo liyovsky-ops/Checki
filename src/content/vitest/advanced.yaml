@@ -1,0 +1,130 @@
+title: Zaawansowane techniki Vitest
+
+items:
+  - name: In-Source Testing
+    desc: >
+      Testy w tym samym pliku co kod produkcyjny — w bloku
+      if (import.meta.vitest). Tree-shaking usunie testy z prod build.
+      Idealne dla utility functions.
+    code: |
+      // src/utils/math.ts
+      export function fibonacci(n: number): number {
+        if (n <= 1) return n;
+        return fibonacci(n - 1) + fibonacci(n - 2);
+      }
+
+      // Testy inline — usunięte z production build
+      if (import.meta.vitest) {
+        const { describe, it, expect } = import.meta.vitest;
+
+        describe('fibonacci', () => {
+          it('base cases', () => {
+            expect(fibonacci(0)).toBe(0);
+            expect(fibonacci(1)).toBe(1);
+          });
+          it('recursive', () => {
+            expect(fibonacci(10)).toBe(55);
+          });
+        });
+      }
+
+      // vitest.config.ts — włącz in-source testing
+      // defineConfig({ test: { includeSource: ['src/**/*.ts'] } })
+
+  - name: Benchmarking (vi.bench)
+    desc: >
+      Wbudowany benchmarking — mierz performance kodu bez zewnętrznych narzędzi.
+      bench() mierzy czas wykonania, ops/sec, standardowe odchylenie.
+    code: |
+      // bench.ts
+      import { bench, describe } from 'vitest';
+
+      describe('array methods', () => {
+        const arr = Array.from({ length: 1000 }, (_, i) => i);
+
+        bench('for loop', () => {
+          let sum = 0;
+          for (let i = 0; i < arr.length; i++) sum += arr[i];
+        });
+
+        bench('reduce', () => {
+          arr.reduce((a, b) => a + b, 0);
+        });
+
+        bench('forEach', () => {
+          let sum = 0;
+          arr.forEach(n => sum += n);
+        });
+      });
+
+      // npx vitest bench
+
+  - name: Type Testing
+    desc: >
+      expectTypeOf() sprawdza typy w compile-time — nie runtime.
+      Testuj czy interfejsy, generics, i typy zwracane są poprawne.
+    code: |
+      import { expectTypeOf, it } from 'vitest';
+
+      function greet(name: string): string {
+        return `Hello, ${name}`;
+      }
+
+      it('type checks', () => {
+        expectTypeOf(greet).toBeFunction();
+        expectTypeOf(greet).parameter(0).toBeString();
+        expectTypeOf(greet).returns.toBeString();
+
+        expectTypeOf<string>().toEqualTypeOf<string>();
+        expectTypeOf<{ a: 1 }>().toMatchTypeOf<{ a: number }>();
+      });
+
+      // npx vitest typecheck
+
+  - name: Workspace (Monorepo)
+    desc: >
+      vitest.workspace.ts definiuje wiele projektów w monorepo.
+      Każdy projekt ma własny config, testy, environment.
+    code: |
+      // vitest.workspace.ts
+      import { defineWorkspace } from 'vitest/config';
+
+      export default defineWorkspace([
+        'packages/*/vitest.config.ts',
+        {
+          test: {
+            name: 'unit',
+            include: ['src/**/*.test.ts'],
+            environment: 'node',
+          },
+        },
+        {
+          test: {
+            name: 'browser',
+            include: ['src/**/*.browser.test.ts'],
+            environment: 'jsdom',
+          },
+        },
+      ]);
+
+      // npx vitest --workspace
+
+  - name: Vitest UI
+    desc: >
+      Przeglądarkowy dashboard do przeglądania testów — interaktywny,
+      z filtrowaniem, re-run, coverage view, module graph.
+    code: |
+      # Instalacja
+      npm install --save-dev @vitest/ui
+
+      # Uruchomienie
+      npx vitest --ui
+
+      # Otwiera http://localhost:51204/__vitest__/
+      # Features:
+      # - Drzewo testów z statusami (pass/fail/skip)
+      # - Kliknij test → szczegóły, output, czas
+      # - Re-run pojedynczego testu z UI
+      # - Coverage view (jeśli --coverage)
+      # - Module graph — zależności między plikami
+      # - Filtrowanie po statusie, nazwie, pliku

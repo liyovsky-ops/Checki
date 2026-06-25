@@ -1,0 +1,66 @@
+title: Vitest vs alternatywy test runnerów
+
+items:
+  - name: Jest
+    icon: "🃏"
+    color: "#c21325"
+    tagline: Najpopularniejszy test runner JavaScript — dojrzały ekosystem
+    pros:
+      - Ogromna społeczność — każdy problem ma rozwiązanie na SO
+      - Dojrzały ekosystem pluginów i reporterów
+      - Stabilny — używany w milionach projektów
+      - Snapshot testing wbudowany
+    cons:
+      - Wolny cold start — transformacja Babel/tsc na każdym uruchomieniu
+      - CommonJS-first — ESM support eksperymentalny
+      - Ciężka konfiguracja TypeScript (ts-jest lub @swc/jest)
+      - Watch mode wolniejszy niż Vitest (brak Vite HMR graph)
+    vs: Jest dla dojrzałych projektów z dużym ekosystemem i legacy code. Vitest dla nowych projektów Vite/TS z priorytetem na szybkość.
+
+  - name: Playwright Test
+    icon: "🎭"
+    color: "#2ead33"
+    tagline: E2E testing przeglądarek z wbudowanym test runnerem
+    pros:
+      - Cross-browser E2E (Chromium, Firefox, WebKit)
+      - Auto-waiting na elementy — zero flaky selectors
+      - Trace viewer do debugowania
+      - Codegen — nagrywa testy z przeglądarki
+    cons:
+      - E2E only — nie do unit testów
+      - Cięższy setup (przeglądarki ~500MB)
+      - Wolniejszy niż unit testy (real browser)
+      - Inna filozofia — testuje UI, nie logikę
+    vs: Playwright dla E2E (pełne scenariusze użytkownika). Vitest dla unit/integration (logika, API, components). Używaj OBU razem.
+
+  - name: Bun Test
+    icon: "🍞"
+    color: "#fbf0df"
+    tagline: Wbudowany test runner w Bun — najszybszy na rynku
+    pros:
+      - Ekstremalnie szybki — natywny runner w Rust
+      - Zero konfiguracji — bun test just works
+      - Kompatybilny z Jest API
+      - Wbudowany w Bun — nie instalujesz osobno
+    cons:
+      - Wymaga Bun runtime (nie Node.js)
+      - Młody ekosystem — mniej pluginów
+      - Nie wszystkie Jest features zaimplementowane
+      - Bun nie jest jeszcze production-stable dla wszystkich use cases
+    vs: Bun Test dla projektów Bun-native. Vitest dla Vite/Node.js ecosystem z dojrzalszym toolingiem.
+
+  - name: Node.js Test Runner (node:test)
+    icon: "🟩"
+    color: "#68a063"
+    tagline: Wbudowany test runner Node.js — zero zależności
+    pros:
+      - Zero instalacji — wbudowany od Node.js 18
+      - Natywna szybkość — brak overhead zewnętrznego runnera
+      - Stabilny API (node:assert, node:test)
+      - Idealne do bibliotek bez zależności
+    cons:
+      - Minimalistyczny — brak mocking framework, snapshot testing
+      - Brak watch mode z HMR
+      - Brak coverage wbudowany (wymaga c8/istanbul)
+      - Mały ekosystem vs Jest/Vitest
+    vs: node:test dla minimalistycznych bibliotek bez zależności. Vitest dla aplikacji z potrzebą mocking, snapshots, UI, coverage.

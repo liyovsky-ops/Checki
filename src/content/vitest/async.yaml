@@ -1,0 +1,105 @@
+title: Async Testing & Concurrency
+
+items:
+  - name: Async/Await testy
+    desc: >
+      Vitest natywnie obsługuje async/await w testach. Zwróć Promise
+      lub użyj async/await — Vitest poczeka na rozwiązanie.
+    code: |
+      import { expect, it } from 'vitest';
+
+      async function fetchData(): Promise<string> {
+        return 'data';
+      }
+
+      it('async/await', async () => {
+        const data = await fetchData();
+        expect(data).toBe('data');
+      });
+
+      it('resolves', async () => {
+        await expect(fetchData()).resolves.toBe('data');
+      });
+
+      it('rejects', async () => {
+        const failFn = () => Promise.reject(new Error('fail'));
+        await expect(failFn()).rejects.toThrow('fail');
+      });
+
+  - name: Concurrent testy
+    desc: >
+      it.concurrent() uruchamia testy równolegle wewnątrz jednego pliku.
+      Domyślnie testy w pliku są sekwencyjne — concurrent pozwala na paralelizację.
+    code: |
+      import { describe, it, expect } from 'vitest';
+
+      describe('concurrent tests', () => {
+        it.concurrent('test 1', async () => {
+          await new Promise(r => setTimeout(r, 100));
+          expect(1).toBe(1);
+        });
+
+        it.concurrent('test 2', async () => {
+          await new Promise(r => setTimeout(r, 100));
+          expect(2).toBe(2);
+        });
+
+        // Oba kończą się w ~100ms zamiast ~200ms
+      });
+
+      // Cały describe concurrent
+      describe.concurrent('all parallel', () => {
+        it('a', async () => { /* ... */ });
+        it('b', async () => { /* ... */ });
+      });
+
+  - name: Timeout per test
+    desc: >
+      Domyślny timeout to 5000ms. Zmień per test lub globalnie.
+      Przydatne dla slow integration testów lub szybkich unit testów.
+    code: |
+      import { it, expect } from 'vitest';
+
+      // Custom timeout per test (10 sekund)
+      it('slow integration test', async () => {
+        const result = await callExternalAPI();
+        expect(result.status).toBe(200);
+      }, 10000);
+
+      // W vitest.config.ts
+      // testTimeout: 10000 — globalnie
+
+  - name: Retry (flakey tests)
+    desc: >
+      it.retry(N) powtarza test N razy jeśli failuje. Przydatne dla
+      flaky testów (network, timing, race conditions).
+    code: |
+      import { it, expect } from 'vitest';
+
+      it('flakey test', async () => {
+        const result = await unstableAPI();
+        expect(result).toBeDefined();
+      }, { retry: 3 }); // powtórz max 3 razy
+
+  - name: beforeAll / afterAll async
+    desc: >
+      Setup i teardown mogą być async — Vitest czeka na Promise.
+      beforeAll uruchamia się raz per describe, beforeEach per test.
+    code: |
+      import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+
+      let db: Database;
+
+      beforeAll(async () => {
+        db = await connectToTestDB();
+        await db.migrate();
+      });
+
+      afterAll(async () => {
+        await db.close();
+      });
+
+      it('reads from DB', async () => {
+        const users = await db.query('SELECT * FROM users');
+        expect(users).toHaveLength(0);
+      });

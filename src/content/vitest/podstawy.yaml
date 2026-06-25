@@ -1,0 +1,95 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Vitest?
+  firstComponent: Pierwszy test Vitest
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Vitest?
+  desc: >
+    Vitest to Vite-native test runner — korzysta z transformacji Vite (esbuild) zamiast
+    kompilacji Babel/tsc. Natywne ESM, TypeScript out-of-the-box, hot module reloading
+    w watch mode. API kompatybilne z Jest — migracja to zmiana importów. In-source testing
+    pozwala pisać testy obok kodu w tym samym pliku. Vitest UI daje przeglądarkowy dashboard
+    do przeglądania testów. Benchmarking wbudowany.
+
+concepts:
+  - title: Vite-Powered
+    desc: >
+      Vitest używa pipeline Vite do transformacji kodu — esbuild dla TS/JSX,
+      Vite plugins działają w testach. Nie potrzebujesz babel-jest, ts-jest,
+      ani żadnych transformerów. Konfiguracja z vite.config.ts jest shared.
+    icon: "⚡"
+  - title: Kompatybilność z Jest
+    desc: >
+      API jest 95% kompatybilne z Jest — describe, it, expect, vi.fn() (=jest.fn()),
+      vi.mock() (=jest.mock()), vi.spyOn() (=jest.spyOn()). Migracja z Jest =
+      zmiana importów i zamiana jest. na vi.
+    icon: "🔄"
+  - title: ESM Native
+    desc: >
+      Vitest rozumie import/export natywnie — nie transpiluje do CommonJS.
+      Nie potrzebujesz esModuleInterop, allowSyntheticDefaultImports ani
+      __esModule hacks. Importy działają jak w przeglądarce.
+    icon: "📦"
+  - title: Watch Mode z HMR
+    desc: >
+      Watch mode nie re-runuje WSZYSTKICH testów — tylko te dotknięte zmianą.
+      Korzysta z Vite HMR graph do inteligentnego wykrywania dependencji.
+      Szybkość feedback loop: zmiana → test w milisekundach.
+    icon: "👁️"
+  - title: In-Source Testing
+    desc: >
+      Testy mogą żyć w tym samym pliku co kod produkcyjny — w bloku
+      if (import.meta.vitest). Tree-shaking usunie testy z production build.
+      Idealne do utility functions i pure logic.
+    icon: "📝"
+  - title: Vitest UI
+    desc: >
+      --ui otwiera przeglądarkowy dashboard do przeglądania testów, wyników,
+      coverage. Interaktywny — kliknij test żeby zobaczyć szczegóły, re-run,
+      filtruj po statusie.
+    icon: "🖥️"
+
+whenToUse:
+  - Projekty oparte na Vite (React + Vite, Vue + Vite, SvelteKit)
+  - Nowe projekty TypeScript — zero konfiguracji transformerów
+  - Migracja z Jest gdy performance jest problem
+  - In-source testing dla utility libraries
+  - Projekty ESM-first (bez CommonJS)
+  - Benchmarking (vi.bench wbudowany)
+
+firstComponent: |
+  # Instalacja
+  npm install --save-dev vitest
+
+  # math.ts — moduł do testowania
+  export function sum(a: number, b: number): number {
+    return a + b;
+  }
+
+  export function multiply(a: number, b: number): number {
+    return a * b;
+  }
+
+  # math.test.ts — test
+  import { describe, it, expect } from 'vitest';
+  import { sum, multiply } from './math';
+
+  describe('math functions', () => {
+    it('adds numbers', () => {
+      expect(sum(1, 2)).toBe(3);
+    });
+
+    it('multiplies numbers', () => {
+      expect(multiply(3, 4)).toBe(12);
+    });
+
+    it('handles negatives', () => {
+      expect(sum(-1, -2)).toBe(-3);
+    });
+  });
+
+  # Uruchomienie
+  npx vitest        # watch mode (domyślnie)
+  npx vitest run    # single run (CI)

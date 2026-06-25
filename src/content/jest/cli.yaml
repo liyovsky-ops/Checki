@@ -1,0 +1,429 @@
+title: Komendy Jest
+
+groups:
+  - name: Uruchamianie testów
+    icon: "🚀"
+    commands:
+      - cmd: npx jest
+        desc: Uruchom wszystkie testy
+        detail:
+          what: Znajduje pliki *.test.js, *.spec.js i uruchamia wszystkie testy.
+          how: Szuka plików w __tests__/ lub z sufiksem .test.js/.spec.js.
+          tips:
+            - 'npx jest --verbose — szczegółowy output z nazwami testów'
+      - cmd: npx jest --watch
+        desc: Watch mode — re-run po zmianach
+        detail:
+          what: Obserwuje zmiany plików i re-runuje powiązane testy automatycznie.
+          how: Inteligentne wykrywanie — uruchamia tylko testy dotknięte zmianą.
+          tips:
+            - 'Naciśnij "a" w watch mode żeby uruchomić wszystkie testy'
+            - 'Naciśnij "p" żeby filtrować po nazwie pliku'
+      - cmd: npx jest --watchAll
+        desc: Watch mode — re-run WSZYSTKIE po zmianach
+        detail:
+          what: Jak --watch ale uruchamia wszystkie testy przy każdej zmianie.
+          how: Bez inteligentnego filtrowania — wolniejsze ale pewniejsze.
+          tips:
+            - 'Używaj --watch (nie --watchAll) w dużych projektach'
+      - cmd: npx jest path/to/test.js
+        desc: Uruchom konkretny plik testowy
+        detail:
+          what: Uruchamia tylko testy z podanego pliku.
+          how: Akceptuje glob patterns i częściowe nazwy.
+          tips:
+            - 'npx jest user — uruchomi user.test.js, user.spec.js, itp.'
+      - cmd: npx jest -t "test name"
+        desc: Uruchom testy po nazwie (filter)
+        detail:
+          what: Filtruje testy po nazwie — uruchamia tylko te których opis pasuje.
+          how: Akceptuje regex lub string.
+          flags:
+            - flag: '-t "adds numbers"'
+              desc: Filtruj po opisie testu
+          tips:
+            - 'npx jest -t "should return" — uruchomi wszystkie testy z "should return"'
+      - cmd: npx jest --bail
+        desc: Zatrzymaj po pierwszym failurze
+        detail:
+          what: Przerywa uruchomienie po pierwszym teście który nie przejdzie.
+          how: Oszczędza czas — nie uruchamia reszty gdy wiesz że jest problem.
+          tips:
+            - '--bail=3 — zatrzymaj po 3 failach'
+      - cmd: npx jest --onlyChanged
+        desc: Uruchom tylko testy dotknięte zmianami (git)
+        detail:
+          what: Porównuje z git HEAD i uruchamia testy powiązane ze zmienionymi plikami.
+          how: Wymaga git. Inteligentnie analizuje dependency graph.
+          tips:
+            - 'Idealne w pre-commit hook'
+      - cmd: npx jest --lastCommit
+        desc: Uruchom testy dotknięte ostatnim commitem
+        detail:
+          what: Jak --onlyChanged ale porównuje z poprzednim commitem.
+          how: Przydatne w CI po pushu.
+          tips:
+            - 'npx jest --changedSince=main — porównaj z branch main'
+      - cmd: npx jest --forceExit
+        desc: Wymuś zakończenie po testach
+        detail:
+          what: Zabija process po zakończeniu testów nawet jeśli są open handles.
+          how: Przydatne gdy testy zostawiają otwarte połączenia (DB, HTTP).
+          tips:
+            - '--detectOpenHandles — pokaż JAKIE handles są otwarte zamiast force exit'
+      - cmd: npx jest --detectOpenHandles
+        desc: Wykryj niezamknięte handles (debug hanging tests)
+        detail:
+          what: Pokazuje które async operacje nie zostały zakończone po testach.
+          how: Pomaga debugować testy które się zawieszają.
+          tips:
+            - 'Zazwyczaj: niezamknięte połączenie DB, open server, pending timer'
+
+  - name: Coverage
+    icon: "📊"
+    commands:
+      - cmd: npx jest --coverage
+        desc: Uruchom testy z raportem coverage
+        detail:
+          what: Generuje raport pokrycia kodu — statements, branches, functions, lines.
+          how: Używa Istanbul pod spodem. Raport w coverage/ katalogu.
+          tips:
+            - 'Otwórz coverage/lcov-report/index.html w przeglądarce'
+      - cmd: npx jest --coverage --coverageReporters=text
+        desc: Coverage w terminalu (bez HTML)
+        detail:
+          what: Wyświetla tabelę coverage w terminalu zamiast generowania plików.
+          how: Szybsze — nie tworzy HTML raportu.
+          tips:
+            - 'Idealne w CI — tekst w logach, bez artefaktów'
+      - cmd: npx jest --collectCoverageFrom="src/**/*.js"
+        desc: Coverage tylko dla konkretnych plików
+        detail:
+          what: Zbiera coverage tylko z plików pasujących do patternu.
+          how: Ignoruje testy, node_modules, config files.
+          tips:
+            - 'Wyklucz: --collectCoverageFrom="!src/**/*.test.js"'
+      - cmd: npx jest --coverageThreshold='{"global":{"lines":80}}'
+        desc: Wymuś minimum 80% coverage (fail jeśli mniej)
+        detail:
+          what: Test suite failuje jeśli coverage jest poniżej progu.
+          how: Ustawiaj w jest.config.js dla trwałej konfiguracji.
+          tips:
+            - 'branches, functions, lines, statements — osobne progi'
+
+  - name: Konfiguracja
+    icon: "🔧"
+    commands:
+      - cmd: npx jest --init
+        desc: Wygeneruj jest.config.js interaktywnie
+        detail:
+          what: Wizard który pyta o środowisko (node/jsdom), coverage, transform i generuje config.
+          how: Tworzy jest.config.js w root projektu.
+          tips:
+            - 'Alternatywa: sekcja "jest" w package.json'
+      - cmd: npx jest --showConfig
+        desc: Pokaż aktualną konfigurację
+        detail:
+          what: Wyświetla resolved config — przydatne do debugowania.
+          how: Pokazuje paths, transforms, module resolution.
+          tips:
+            - 'Sprawdź transform żeby zobaczyć czy TypeScript jest poprawnie skonfigurowany'
+      - cmd: npx jest --config=jest.config.ci.js
+        desc: Użyj custom config file
+        detail:
+          what: Załaduj konfigurację z innego pliku niż domyślny.
+          how: Przydatne do osobnych konfiguracji dev/CI.
+          tips:
+            - 'CI config: bez watch, z coverage, z bail'
+      - cmd: npx jest --testEnvironment=jsdom
+        desc: Uruchom testy w symulowanym DOM (jsdom)
+        detail:
+          what: Symuluje przeglądarkę — window, document, localStorage dostępne w testach.
+          how: Domyślne dla Create React App. Dla Node.js użyj --testEnvironment=node.
+          tips:
+            - 'jsdom dla React/DOM testów, node dla API/backend testów'
+      - cmd: npx jest --testEnvironment=node
+        desc: Uruchom testy w środowisku Node.js (bez DOM)
+        detail:
+          what: Czyste Node.js — brak window, document. Szybsze niż jsdom.
+          how: Domyślne od Jest 27+. Używaj dla backend/API testów.
+          tips:
+            - 'Ustaw per-plik: /** @jest-environment node */ na górze pliku testowego'
+
+  - name: Debug i diagnostyka
+    icon: "🐛"
+    commands:
+      - cmd: node --inspect-brk node_modules/.bin/jest --runInBand
+        desc: Debug testów z Node.js inspector
+        detail:
+          what: Uruchamia Jest z debuggerem — breakpointy w VS Code lub Chrome DevTools.
+          how: --runInBand wyłącza paralelizację (wymagane dla debuggera).
+          tips:
+            - 'W VS Code: attach to process, lub użyj launch.json z "jest" presetu'
+      - cmd: npx jest --runInBand
+        desc: Uruchom testy sekwencyjnie (nie równolegle)
+        detail:
+          what: Jeden test za drugim zamiast paralelnie. Wolniejsze ale deterministyczne.
+          how: Wymagane przy debugowaniu, shared state, lub ograniczonych zasobach.
+          tips:
+            - 'Użyj w CI jeśli testy failują na race conditions'
+      - cmd: npx jest --verbose
+        desc: Szczegółowy output z nazwami testów
+        detail:
+          what: Wyświetla drzewo describe/test z statusami (PASS/FAIL).
+          how: Przydatne do przeglądania struktury test suite.
+          tips:
+            - 'Domyślnie: verbose gdy 1 plik testowy'
+      - cmd: npx jest --no-cache
+        desc: Wyczyść cache i uruchom testy
+        detail:
+          what: Ignoruje cache transformacji — wymusza re-transpilację wszystkiego.
+          how: Przydatne gdy testy failują po zmianie konfiguracji babel/typescript.
+          tips:
+            - 'npx jest --clearCache — wyczyść cache bez uruchamiania testów'
+      - cmd: npx jest --clearCache
+        desc: Wyczyść cache Jest
+        detail:
+          what: Usuwa katalog cache (/tmp/jest_*). Nie uruchamia testów.
+          how: Przydatne po upgrade Jest, zmianie transform, zmianie konfiguracji.
+          tips:
+            - 'Cache przechowuje transpilowane pliki — oszczędza czas re-transformacji'
+      - cmd: npx jest --listTests
+        desc: Wylistuj pliki testowe (bez uruchamiania)
+        detail:
+          what: Pokazuje jakie pliki testowe Jest znalazł. Debug test discovery.
+          how: Przydatne gdy testy nie są uruchamiane — sprawdź czy plik jest wykrywany.
+          tips:
+            - 'npx jest --listTests | wc -l — ile plików testowych'
+
+  - name: Snapshot management
+    icon: "📸"
+    commands:
+      - cmd: npx jest --updateSnapshot
+        desc: Aktualizuj snapshots (po celowej zmianie)
+        detail:
+          what: Nadpisuje istniejące .snap pliki nowym output. Testy przechodzą.
+          how: Używaj PO celowej zmianie renderowania — nie ślepo!
+          flags:
+            - flag: '-u'
+              desc: Skrót dla --updateSnapshot
+          tips:
+            - 'Przeglądnij diff ZANIM zrobisz update — upewnij się że zmiana jest celowa'
+      - cmd: npx jest --ci
+        desc: Tryb CI — fail na nowym/brakującym snapshot
+        detail:
+          what: W CI nie tworzy nowych snapshotów — jeśli brakuje .snap, test failuje.
+          how: Zapobiega przypadkowemu zatwierdzeniu zmienionych snapshotów.
+          tips:
+            - 'Zawsze commituj .snap pliki — CI je porównuje'
+
+  - name: Parallel i performance
+    icon: "⚡"
+    commands:
+      - cmd: npx jest --maxWorkers=50%
+        desc: Ogranicz liczbę workerów (CPU usage)
+        detail:
+          what: Używa 50% dostępnych rdzeni CPU do uruchamiania testów.
+          how: Domyślnie używa n-1 rdzeni. Zmniejsz w CI z limitowanymi zasobami.
+          flags:
+            - flag: '--maxWorkers=2'
+              desc: Dokładnie 2 workery
+            - flag: '--maxWorkers=50%'
+              desc: Połowa dostępnych rdzeni
+          tips:
+            - 'W Docker/CI: --maxWorkers=2 zapobiega OOM'
+      - cmd: npx jest --shard=1/3
+        desc: Podziel testy na 3 części, uruchom 1/3
+        detail:
+          what: Dzieli test suite na N shardów i uruchamia tylko wskazany.
+          how: Przydatne do paralelizacji w CI — 3 joby, każdy z innym shardem.
+          tips:
+            - 'CI matrix: shard 1/3, 2/3, 3/3 — 3× szybszy pipeline'
+      - cmd: npx jest --passWithNoTests
+        desc: Nie failuj jeśli brak testów
+        detail:
+          what: Wychodzi z kodem 0 nawet gdy żaden test nie został znaleziony.
+          how: Przydatne w monorepo z pakietami bez testów.
+          tips:
+            - 'Domyślnie: brak testów = exit code 1 (fail)'
+
+  - name: Instalacja
+    icon: "📦"
+    commands:
+      - cmd: npm install --save-dev jest
+        desc: Instalacja Jest
+        detail:
+          what: Instaluje Jest jako dev dependency.
+          how: 'Dodaj "test": "jest" do package.json scripts.'
+          tips:
+            - 'npm install --save-dev jest @types/jest — z TypeScript types'
+      - cmd: npm install --save-dev ts-jest @types/jest typescript
+        desc: Jest z TypeScript
+        detail:
+          what: Instaluje ts-jest transformer + typy + TypeScript.
+          how: Dodaj transform w jest.config.js.
+          tips:
+            - 'Alternatywa: @swc/jest — szybszy niż ts-jest'
+      - cmd: npm install --save-dev @testing-library/react @testing-library/jest-dom
+        desc: Jest + React Testing Library
+        detail:
+          what: Testing Library dla React + custom DOM matchery.
+          how: Standard w React testing — render, screen, fireEvent.
+          tips:
+            - 'Dodaj setupFilesAfterSetup: ["@testing-library/jest-dom"] do jest.config'
+      - cmd: npm install --save-dev jest-environment-jsdom
+        desc: Instalacja jsdom environment
+        detail:
+          what: Od Jest 28 jsdom nie jest wbudowany — trzeba zainstalować osobno.
+          how: Ustaw testEnvironment="jsdom" w config.
+          tips:
+            - 'Wymagane dla React/DOM testów od Jest 28+'
+      - cmd: npm install --save-dev @swc/jest @swc/core
+        desc: SWC transformer (szybsza alternatywa ts-jest)
+        detail:
+          what: SWC kompiluje TypeScript 20× szybciej niż ts-jest.
+          how: 'transform: { "^.+\\.tsx?$": "@swc/jest" } w jest.config'
+          tips:
+            - 'Nie sprawdza typów — użyj tsc --noEmit osobno'
+      - cmd: npm install --save-dev msw
+        desc: Mock Service Worker (API mocking)
+        detail:
+          what: Interceptuje HTTP na poziomie network — mockuj API bez zmian w kodzie.
+          how: rest.get, rest.post handlers w test setup.
+          tips:
+            - 'Działa też w przeglądarce — te same handlers w testach i dev'
+
+  - name: Filtrowanie i selekcja
+    icon: "🔎"
+    commands:
+      - cmd: npx jest --testPathPattern="user"
+        desc: Filtruj pliki testowe po ścieżce (regex)
+        detail:
+          what: Uruchamia testy z plików których ścieżka pasuje do regex.
+          how: 'npx jest --testPathPattern="api" — pliki z "api" w ścieżce.'
+          tips:
+            - 'Łącz z -t dla podwójnego filtra: plik + nazwa testu'
+      - cmd: npx jest --testPathIgnorePatterns="/e2e/"
+        desc: Ignoruj pliki testowe po ścieżce
+        detail:
+          what: Pomija pliki testowe pasujące do patternu.
+          how: Przydatne do pomijania e2e testów w unit test run.
+          tips:
+            - 'Domyślnie ignoruje: /node_modules/'
+      - cmd: npx jest --changedSince=main
+        desc: Testy dotknięte zmianami od brancha main
+        detail:
+          what: Porównuje z branch main i uruchamia testy powiązane ze zmienionymi plikami.
+          how: Wymaga git. Idealne w PR CI pipeline.
+          tips:
+            - 'npx jest --changedSince=HEAD~3 — ostatnie 3 commity'
+      - cmd: npx jest --findRelatedTests src/utils/math.js
+        desc: Znajdź i uruchom testy powiązane z plikiem
+        detail:
+          what: Analizuje dependency graph i uruchamia testy które importują podany plik.
+          how: Przydatne w pre-commit hook — testuj tylko to co zmieniłeś.
+          tips:
+            - 'lint-staged + --findRelatedTests = szybkie pre-commit testy'
+      - cmd: npx jest --testNamePattern="should.*create"
+        desc: Filtruj testy po nazwie (regex)
+        detail:
+          what: Uruchamia tylko testy których opis pasuje do regex.
+          how: Dokładniejszy niż -t — obsługuje pełne regex.
+          tips:
+            - '--testNamePattern="^User" — testy zaczynające się od "User"'
+
+  - name: Mocking z CLI
+    icon: "🎭"
+    commands:
+      - cmd: npx jest --clearMocks
+        desc: Automatycznie czyść mocki między testami
+        detail:
+          what: Resetuje stan mocków (calls, instances) przed każdym testem.
+          how: Alternatywa do ręcznego jest.clearAllMocks() w beforeEach.
+          tips:
+            - 'Ustaw w config: clearMocks: true — nie musisz pamiętać o cleanup'
+      - cmd: npx jest --restoreMocks
+        desc: Przywróć oryginalne implementacje po każdym teście
+        detail:
+          what: Automatycznie przywraca spy/mock do oryginalnej implementacji po teście.
+          how: Bezpieczniejsze niż clearMocks — przywraca zachowanie, nie tylko stan.
+          tips:
+            - 'restoreMocks: true w config — zapobiega leak mockow między testami'
+      - cmd: npx jest --resetModules
+        desc: Resetuj cache modułów między testami
+        detail:
+          what: Każdy test dostaje świeże require/import — brak shared state z modułów.
+          how: Przydatne gdy moduły mają side effects lub mutable state.
+          tips:
+            - 'Wolniejsze — moduły są re-evaluowane per test. Używaj gdy potrzebne.'
+
+  - name: Output i raportowanie
+    icon: "📋"
+    commands:
+      - cmd: npx jest --silent
+        desc: Ukryj console.log output z testów
+        detail:
+          what: Suppressuje stdout/stderr z testów — czyste output.
+          how: console.log, console.warn w testach nie pojawiają się w terminalu.
+          tips:
+            - '--silent --verbose — nazwy testów BEZ logów z kodu'
+      - cmd: npx jest --colors
+        desc: Wymuś kolorowy output
+        detail:
+          what: Kolorowy output nawet gdy terminal nie jest TTY (np. CI pipe).
+          how: Przydatne w CI gdzie output jest redirectowany.
+          tips:
+            - '--no-colors — wyłącz kolory (plain text logów)'
+      - cmd: npx jest --notify
+        desc: Desktop notification po testach
+        detail:
+          what: Pokazuje system notification z wynikiem testów (pass/fail).
+          how: Wymaga node-notifier. Przydatne z --watch.
+          tips:
+            - 'npm install --save-dev node-notifier'
+      - cmd: npx jest --changedFilesWithAncestor
+        desc: Testy dla zmieniony plików + ich zależności
+        detail:
+          what: Rozszerzona wersja --onlyChanged — uwzględnia transitive dependencies.
+          how: Plik A importuje B, B się zmienił — testy A też się uruchomią.
+          tips:
+            - 'Najdokładniejsze wykrywanie powiązanych testów'
+
+  - name: Integracja CI/CD
+    icon: "🔁"
+    commands:
+      - cmd: npx jest --ci --coverage --forceExit
+        desc: Optymalna konfiguracja dla CI
+        detail:
+          what: CI mode + coverage + force exit. Standard dla pipeline.
+          how: --ci zapobiega nowym snapshotom, --coverage generuje raport, --forceExit kończy process.
+          tips:
+            - 'Dodaj --maxWorkers=2 w Docker z limitowanymi zasobami'
+      - cmd: npx jest --json --outputFile=results.json
+        desc: Output jako JSON (parseable przez CI)
+        detail:
+          what: Generuje JSON raport z wynikami testów.
+          how: Przydatne do parsowania w CI, custom reporterów, dashboardów.
+          tips:
+            - 'Łącz z --coverage dla pełnego raportu'
+      - cmd: npx jest --reporters=default --reporters=jest-junit
+        desc: JUnit XML reporter (GitHub Actions, Jenkins)
+        detail:
+          what: Generuje raport JUnit XML — standard dla CI systemów.
+          how: npm install --save-dev jest-junit. CI automatycznie parsuje.
+          tips:
+            - 'GitHub Actions: dorny/test-reporter@v1 parsuje JUnit XML'
+      - cmd: npx jest --logHeapUsage
+        desc: Pokaż zużycie pamięci per test suite
+        detail:
+          what: Wyświetla heap usage po każdym test suite — debug memory leaks.
+          how: Przydatne gdy testy OOMują w CI.
+          tips:
+            - 'Rosnący heap = memory leak w teardown'
+      - cmd: npx jest --workerIdleMemoryLimit=512MB
+        desc: Restart workera po przekroczeniu limitu pamięci
+        detail:
+          what: Worker jest restartowany gdy zużyje ponad 512MB RAM.
+          how: Zapobiega OOM w CI z limitowaną pamięcią.
+          tips:
+            - 'Domyślnie: brak limitu. Ustaw w CI: 256-512MB'

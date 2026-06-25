@@ -1,0 +1,397 @@
+title: Komendy Vitest
+
+groups:
+  - name: Uruchamianie testów
+    icon: "🚀"
+    commands:
+      - cmd: npx vitest
+        desc: Watch mode — domyślny tryb Vitest
+        detail:
+          what: Uruchamia testy i obserwuje zmiany. Re-runuje dotknięte testy automatycznie.
+          how: Vite HMR graph wykrywa które testy dotknęła zmiana — tylko one się re-runują.
+          tips:
+            - 'Naciśnij "a" żeby uruchomić wszystkie testy'
+            - 'Naciśnij "f" żeby uruchomić failujące ponownie'
+      - cmd: npx vitest run
+        desc: Single run — uruchom raz i zakończ
+        detail:
+          what: Uruchamia wszystkie testy raz bez watch mode. Idealne dla CI.
+          how: Exit code 0 = pass, 1 = fail.
+          tips:
+            - 'CI: npx vitest run --coverage --reporter=junit'
+      - cmd: npx vitest run src/utils/
+        desc: Uruchom testy z konkretnego katalogu
+        detail:
+          what: Filtruje testy po ścieżce — uruchamia tylko z podanego katalogu.
+          how: Akceptuje glob patterns.
+          tips:
+            - 'npx vitest run src/utils/math.test.ts — konkretny plik'
+      - cmd: npx vitest -t "should add"
+        desc: Filtruj testy po nazwie
+        detail:
+          what: Uruchamia tylko testy których opis zawiera podany string.
+          how: Case-insensitive substring match.
+          tips:
+            - 'npx vitest -t "should.*return" — regex pattern'
+      - cmd: npx vitest --bail 1
+        desc: Zatrzymaj po pierwszym failurze
+        detail:
+          what: Przerywa uruchomienie po N failach.
+          how: '--bail 1 = stop po pierwszym fail. --bail 3 = po trzecim.'
+          tips:
+            - 'Szybki feedback — nie czekaj na resztę gdy już wiesz że jest problem'
+      - cmd: npx vitest --changed
+        desc: Testy dotknięte zmianami (git)
+        detail:
+          what: Porównuje z git HEAD i uruchamia testy powiązane ze zmienionymi plikami.
+          how: Inteligentna analiza dependency graph (dzięki Vite).
+          tips:
+            - 'npx vitest --changed HEAD~1 — porównaj z poprzednim commitem'
+      - cmd: npx vitest --passWithNoTests
+        desc: Nie failuj gdy brak testów
+        detail:
+          what: Exit 0 nawet gdy żaden test nie został znaleziony.
+          how: Przydatne w monorepo z pakietami bez testów.
+          tips:
+            - 'Domyślnie: brak testów = exit 0 (inaczej niż Jest)'
+      - cmd: npx vitest related src/utils/math.ts
+        desc: Uruchom testy powiązane z plikiem
+        detail:
+          what: Analizuje dependency graph i uruchamia testy importujące podany plik.
+          how: Przydatne w pre-commit hook.
+          tips:
+            - 'npx vitest related src/api/*.ts — wiele plików'
+      - cmd: npx vitest --sequence.shuffle
+        desc: Randomizuj kolejność testów
+        detail:
+          what: Uruchamia testy w losowej kolejności — wykrywa hidden dependencies.
+          how: Jeśli testy failują przy losowej kolejności = shared state.
+          tips:
+            - '--sequence.seed=1234 — powtarzalny random seed'
+
+  - name: Watch mode
+    icon: "👁️"
+    commands:
+      - cmd: npx vitest --watch
+        desc: Jawne włączenie watch mode (domyślne)
+        detail:
+          what: Obserwuje pliki i re-runuje testy. Domyślne zachowanie npx vitest.
+          how: Korzysta z Vite HMR — instant feedback.
+          tips:
+            - 'Interaktywne komendy: a=all, f=failed, p=filter, q=quit'
+      - cmd: npx vitest --no-watch
+        desc: Wyłącz watch mode
+        detail:
+          what: Alternatywa dla npx vitest run — single run bez watch.
+          how: Identyczne zachowanie jak vitest run.
+          tips:
+            - 'W CI --no-watch jest domyślne (CI=true auto-detected)'
+      - cmd: npx vitest --forceRerunTriggers="vite.config.ts"
+        desc: Re-run wszystko po zmianie konkretnego pliku
+        detail:
+          what: Wymusza re-run wszystkich testów gdy zmieni się podany plik.
+          how: "Domyślnie zmiana vite.config.ts lub vitest.config.ts triggeruje full rerun."
+          tips:
+            - 'Dodaj pliki konfiguracyjne które wpływają na wszystkie testy'
+
+  - name: Coverage
+    icon: "📊"
+    commands:
+      - cmd: npx vitest run --coverage
+        desc: Uruchom testy z raportem coverage
+        detail:
+          what: Generuje raport pokrycia kodu. Wymaga @vitest/coverage-v8 lub istanbul.
+          how: Raport w coverage/ katalogu — HTML, text, lcov.
+          tips:
+            - 'npm install --save-dev @vitest/coverage-v8 — najpierw zainstaluj'
+      - cmd: npx vitest run --coverage --coverage.reporter=text
+        desc: Coverage w terminalu
+        detail:
+          what: Tabela coverage w terminalu bez generowania plików.
+          how: Szybsze — idealne dla CI logów.
+          tips:
+            - '--coverage.reporter=lcov — dla code quality tools (SonarQube)'
+      - cmd: npx vitest run --coverage --coverage.include="src/**"
+        desc: Coverage tylko dla src/
+        detail:
+          what: Zbiera coverage tylko z plików w src/.
+          how: Ignoruje testy, config, node_modules.
+          tips:
+            - '--coverage.exclude="**/*.test.ts" — wykluczaj test pliki'
+      - cmd: npx vitest run --coverage --coverage.thresholds.lines=80
+        desc: Wymuś minimum 80% coverage
+        detail:
+          what: Fail jeśli line coverage poniżej 80%.
+          how: "Osobne progi - lines, branches, functions, statements.
+          tips:
+            - 'W vitest.config.ts: coverage.thresholds = { lines: 80 }'
+      - cmd: npx vitest run --coverage --coverage.all
+        desc: Coverage z plikami bez testów (0%)
+        detail:
+          what: Uwzględnia WSZYSTKIE pliki w raporcie, nawet te bez testów (0%).
+          how: Realny obraz pokrycia — nie ukrywa plików bez testów.
+          tips:
+            - 'Bez --all: plik bez testu nie pojawia się w raporcie'
+
+  - name: UI i reporting
+    icon: "🖥️"
+    commands:
+      - cmd: npx vitest --ui
+        desc: Uruchom z Vitest UI (przeglądarkowy dashboard)
+        detail:
+          what: Otwiera interaktywny dashboard w przeglądarce.
+          how: Wymaga @vitest/ui. Drzewo testów, statusy, re-run, coverage.
+          tips:
+            - 'npm install --save-dev @vitest/ui'
+      - cmd: npx vitest --ui --coverage
+        desc: UI z coverage view
+        detail:
+          what: Dashboard z widokiem coverage per plik — kliknij plik, zobacz które linie pokryte.
+          how: Łączy testy z coverage w jednym interfejsie.
+          tips:
+            - 'Module graph — wizualizacja zależności między plikami'
+      - cmd: npx vitest --reporter=verbose
+        desc: Szczegółowy output (verbose)
+        detail:
+          what: Wyświetla drzewo describe/it z statusami i czasami.
+          how: Przydatne do przeglądania struktury test suite.
+          tips:
+            - '--reporter=dot — minimalistyczny (. per passing test)'
+      - cmd: npx vitest --reporter=json --outputFile=results.json
+        desc: JSON reporter
+        detail:
+          what: Generuje JSON z wynikami testów — parseable przez CI.
+          how: Przydatne do custom dashboardów.
+          tips:
+            - '--reporter=junit — JUnit XML dla CI (GitHub Actions, Jenkins)'
+      - cmd: npx vitest --reporter=html
+        desc: HTML reporter
+        detail:
+          what: Generuje statyczny HTML raport z wynikami testów.
+          how: Otwórz w przeglądarce — podobny do Vitest UI ale offline.
+          tips:
+            - 'npm install --save-dev @vitest/html-reporter'
+
+  - name: Konfiguracja
+    icon: "🔧"
+    commands:
+      - cmd: npx vitest --config vitest.config.ts
+        desc: Custom config file
+        detail:
+          what: Załaduj konfigurację z innego pliku.
+          how: Domyślnie czyta vitest.config.ts, potem vite.config.ts.
+          tips:
+            - 'vitest.config.ts rozszerza vite.config.ts — shared plugins'
+      - cmd: npx vitest --environment jsdom
+        desc: DOM environment (jsdom)
+        detail:
+          what: Symuluje przeglądarkę — window, document dostępne w testach.
+          how: Dla React/Vue/Svelte komponentów.
+          tips:
+            - '--environment happy-dom — szybsza alternatywa'
+      - cmd: npx vitest --environment happy-dom
+        desc: Happy DOM environment (szybszy jsdom)
+        detail:
+          what: Lżejsza implementacja DOM — 2-3× szybsza niż jsdom.
+          how: npm install --save-dev happy-dom.
+          tips:
+            - 'Wystarczający dla większości testów komponentów'
+      - cmd: npx vitest --environment node
+        desc: Node.js environment (bez DOM)
+        detail:
+          what: Czyste Node.js — brak window, document. Najszybsze.
+          how: Domyślne. Dla API, backend, utility testów.
+          tips:
+            - 'Ustaw per-plik: // @vitest-environment jsdom'
+      - cmd: npx vitest --pool threads
+        desc: Thread pool (domyślny)
+        detail:
+          what: Uruchamia testy w worker threads. Szybsze niż forks.
+          how: Domyślne od Vitest 1.0.
+          tips:
+            - '--pool forks — osobne procesy (izolacja jak Jest)'
+      - cmd: npx vitest --pool forks
+        desc: Fork pool (izolacja jak Jest)
+        detail:
+          what: Każdy plik testowy w osobnym procesie — pełna izolacja.
+          how: Wolniejsze ale bezpieczniejsze przy shared state.
+          tips:
+            - 'Użyj gdy testy mutują globale lub mają side effects'
+      - cmd: npx vitest --isolate false
+        desc: Wyłącz izolację między testami
+        detail:
+          what: Wszystkie testy w jednym kontekście — najszybsze ale ryzykowne.
+          how: Shared state między plikami! Użyj tylko dla read-only testów.
+          tips:
+            - 'Może przyspieszyć suite 2-3× kosztem izolacji'
+
+  - name: Type checking
+    icon: "🔷"
+    commands:
+      - cmd: npx vitest typecheck
+        desc: Uruchom type testy (expectTypeOf)
+        detail:
+          what: Sprawdza expectTypeOf() asercje — typy, nie runtime.
+          how: Nie uruchamia kodu — tylko sprawdza typy przez tsc.
+          tips:
+            - 'npx vitest typecheck --run — single run'
+      - cmd: npx vitest typecheck --watch
+        desc: Type checking w watch mode
+        detail:
+          what: Obserwuje zmiany i re-checkuje typy.
+          how: Szybki feedback na zmiany w interfejsach/typach.
+          tips:
+            - 'Łącz z normalnymi testami: npx vitest --typecheck'
+
+  - name: Benchmark
+    icon: "⏱️"
+    commands:
+      - cmd: npx vitest bench
+        desc: Uruchom benchmarki
+        detail:
+          what: Uruchamia pliki *.bench.ts z bench() funkcjami.
+          how: Mierzy ops/sec, avg time, min/max, standardowe odchylenie.
+          tips:
+            - 'npx vitest bench --reporter=json — JSON output'
+      - cmd: npx vitest bench --reporter=verbose
+        desc: Benchmarki z detalami
+        detail:
+          what: Szczegółowy output z każdym benchmarkiem — ops/sec, percentyle.
+          how: Porównaj wyniki między iteracjami.
+          tips:
+            - 'Przydatne do porównywania algorytmów i optymalizacji'
+
+  - name: Debug
+    icon: "🐛"
+    commands:
+      - cmd: npx vitest --inspect-brk
+        desc: Debug z Node.js inspector
+        detail:
+          what: Uruchamia Vitest z debuggerem — breakpointy w VS Code.
+          how: Pauzuje przed pierwszym testem. Attach z VS Code debugger.
+          tips:
+            - 'W VS Code: Debug → Attach to Node Process'
+      - cmd: npx vitest --single-thread
+        desc: Single thread mode (debug)
+        detail:
+          what: Wszystkie testy w głównym wątku — łatwiejsze debugowanie.
+          how: Alternatywa dla --inspect-brk gdy chcesz console.log debugging.
+          tips:
+            - 'Wolniejsze ale deterministyczne — brak race conditions'
+      - cmd: npx vitest --printConsole
+        desc: Pokaż console.log output
+        detail:
+          what: Wyświetla stdout/stderr z testów w terminalu.
+          how: Domyślnie Vitest suppressuje console output w testach.
+          tips:
+            - 'Przydatne do debugowania — potem usuń console.log!'
+
+  - name: Instalacja
+    icon: "📦"
+    commands:
+      - cmd: npm install --save-dev vitest
+        desc: Instalacja Vitest
+        detail:
+          what: Instaluje Vitest. Vite jest peer dependency — zainstaluj jeśli nie masz.
+          how: Działa z istniejącym vite.config.ts — shared plugins.
+          tips:
+            - 'Dodaj "test": "vitest" do package.json scripts'
+      - cmd: npm install --save-dev vitest @vitest/ui @vitest/coverage-v8
+        desc: Full Vitest setup (UI + coverage)
+        detail:
+          what: Vitest + przeglądarkowy dashboard + V8 coverage.
+          how: npx vitest --ui --coverage — pełny experience.
+          tips:
+            - 'Alternatywa coverage: @vitest/coverage-istanbul'
+      - cmd: npm install --save-dev vitest happy-dom
+        desc: Vitest z happy-dom (szybki DOM)
+        detail:
+          what: Vitest + szybsza alternatywa jsdom dla testów komponentów.
+          how: 'vitest.config.ts: environment: "happy-dom"'
+          tips:
+            - 'happy-dom jest 2-3× szybszy niż jsdom'
+      - cmd: npm install --save-dev vitest @testing-library/react jsdom
+        desc: Vitest + React Testing Library
+        detail:
+          what: Setup do testowania React komponentów z Vitest.
+          how: 'environment: "jsdom", globals: true w config.'
+          tips:
+            - 'globals: true — nie musisz importować describe, it, expect'
+      - cmd: npm install --save-dev vitest msw
+        desc: Vitest + MSW (API mocking)
+        detail:
+          what: Mock Service Worker do interceptowania HTTP w testach.
+          how: setupServer() w test setup, rest.get/post handlers.
+          tips:
+            - 'Te same handlers w testach i dev — DRY API mocking'
+
+  - name: Filtrowanie
+    icon: "🔎"
+    commands:
+      - cmd: npx vitest --testPathPattern="api"
+        desc: Filtruj pliki testowe po ścieżce (regex)
+        detail:
+          what: Uruchamia testy z plików których ścieżka pasuje do regex.
+          how: 'npx vitest --testPathPattern="utils" — pliki z "utils" w ścieżce.'
+          tips:
+            - 'Łącz z -t dla podwójnego filtra: plik + nazwa testu'
+      - cmd: npx vitest --exclude="**/e2e/**"
+        desc: Ignoruj pliki testowe po ścieżce
+        detail:
+          what: Pomija pliki testowe pasujące do glob pattern.
+          how: Przydatne do pomijania e2e testów w unit test run.
+          tips:
+            - 'Domyślnie exclude: node_modules, dist'
+      - cmd: npx vitest --testTimeout 10000
+        desc: Custom timeout per test (10s)
+        detail:
+          what: Zmienia domyślny timeout z 5000ms na 10000ms.
+          how: Przydatne dla slow integration testów.
+          tips:
+            - 'Per-test: it("slow", async () => {...}, 15000)'
+      - cmd: npx vitest --hookTimeout 30000
+        desc: Timeout dla beforeAll/afterAll (30s)
+        detail:
+          what: Dłuższy timeout dla setup/teardown hooks.
+          how: Przydatne gdy beforeAll łączy się z bazą/API.
+          tips:
+            - 'Domyślnie: hookTimeout = testTimeout'
+      - cmd: npx vitest --maxConcurrency 5
+        desc: Max równoległych testów w jednym pliku
+        detail:
+          what: Ogranicza ile it.concurrent() testów leci naraz.
+          how: Domyślnie: 5. Zmniejsz dla resource-intensive testów.
+          tips:
+            - 'Osobne od --pool threads — to jest wewnątrz jednego pliku'
+      - cmd: npx vitest --clearScreen false
+        desc: Nie czyść terminala między re-runami
+        detail:
+          what: Zachowuje historię output w terminalu.
+          how: Domyślnie watch mode czyści ekran przy re-runie.
+          tips:
+            - 'Przydatne do porównywania wyników między runami'
+
+  - name: CI/CD
+    icon: "🔁"
+    commands:
+      - cmd: npx vitest run --coverage --reporter=junit --outputFile=results.xml
+        desc: Optymalna konfiguracja CI
+        detail:
+          what: Single run + coverage + JUnit XML. Standard dla pipeline.
+          how: CI auto-detects (CI=true) — wyłącza watch mode automatycznie.
+          tips:
+            - 'GitHub Actions: actions/upload-artifact dla coverage/'
+      - cmd: npx vitest run --shard=1/3
+        desc: Sharding testów w CI (parallelizacja)
+        detail:
+          what: Dzieli testy na 3 części, uruchamia 1/3. CI matrix 3 joby = 3× szybciej.
+          how: '--shard=1/3, --shard=2/3, --shard=3/3 w osobnych CI jobech.'
+          tips:
+            - 'Łącz z --coverage --merge-reports żeby złączyć coverage z shardów'
+      - cmd: npx vitest run --retry 2
+        desc: Retry failujących testów (flaky test handling)
+        detail:
+          what: Powtarza failujące testy max 2 razy. Jeśli przejdzie na retry = pass.
+          how: Przydatne dla flaky testów w CI (network, timing).
+          tips:
+            - 'Nie nadużywaj — maskuje prawdziwe problemy'

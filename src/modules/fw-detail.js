@@ -36,6 +36,14 @@ import { FW_TENSORFLOW_DATA }    from '../data/fw_tensorflow.js';
 import { FW_MONGODB_DATA }       from '../data/fw_mongodb.js';
 import { FW_CREWAI_DATA }       from '../data/fw_crewai.js';
 import { FW_SELENIUM_DATA }     from '../data/fw_selenium.js';
+import { FW_VUE_DATA }          from '../data/fw_vue.js';
+import { FW_EXPRESSJS_DATA }    from '../data/fw_expressjs.js';
+import { FW_SVELTE_DATA }       from '../data/fw_svelte.js';
+import { FW_ANGULAR_DATA }      from '../data/fw_angular.js';
+import { FW_JEST_DATA }         from '../data/fw_jest.js';
+import { FW_VITEST_DATA }       from '../data/fw_vitest.js';
+import { FW_NEXTJS_DATA }      from '../data/fw_nextjs.js';
+import { FW_TAILWIND_DATA }    from '../data/fw_tailwind.js';
 
 let activeTab = 'podstawy';
 let activeFw  = 'react';
@@ -60,6 +68,14 @@ const FW_DATA_MAP = {
   mongodb: FW_MONGODB_DATA,
   crewai: FW_CREWAI_DATA,
   selenium: FW_SELENIUM_DATA,
+  vuejs: FW_VUE_DATA,
+  expressjs: FW_EXPRESSJS_DATA,
+  svelte: FW_SVELTE_DATA,
+  angular: FW_ANGULAR_DATA,
+  jest: FW_JEST_DATA,
+  vitest: FW_VITEST_DATA,
+  nextjs: FW_NEXTJS_DATA,
+  tailwindcss: FW_TAILWIND_DATA,
 };
 
 export function openFramework(fw) {
