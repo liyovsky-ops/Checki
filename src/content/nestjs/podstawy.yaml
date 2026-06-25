@@ -1,0 +1,107 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać NestJS?
+  firstComponent: Pierwsza aplikacja NestJS
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest NestJS?
+  desc: >
+    NestJS to framework do budowy skalowalnych server-side aplikacji w Node.js z TypeScript.
+    Inspirowany Angularem — moduły, dekoratory, dependency injection, middleware. Pod spodem
+    używa Express (domyślnie) lub Fastify. Struktura wymusza porządek w kodzie — każdy
+    serwis, kontroler i moduł ma swoje miejsce. Idealny do dużych API, mikroserwisów
+    i aplikacji enterprise.
+
+concepts:
+  - title: Moduły (@Module)
+    desc: >
+      Każda aplikacja NestJS składa się z modułów. Moduł grupuje powiązane kontrolery,
+      serwisy i providery. AppModule to root, inne moduły (UsersModule, AuthModule)
+      rejestrują się w nim. Moduły mogą być importowane między sobą.
+    icon: "📦"
+  - title: Kontrolery (@Controller)
+    desc: >
+      Kontroler obsługuje HTTP requesty. Dekorator @Controller('users') definiuje
+      prefix URL. Metody z @Get(), @Post(), @Put(), @Delete() mapują na endpointy.
+      Kontroler deleguje logikę do serwisów — nie zawiera business logic.
+    icon: "🎮"
+  - title: Providery & Serwisy (@Injectable)
+    desc: >
+      Provider to klasa z dekoratorem @Injectable() — NestJS automatycznie
+      tworzy instancję i wstrzykuje ją gdzie potrzeba (Dependency Injection).
+      Serwisy zawierają business logic, repozytoria obsługują bazę danych.
+    icon: "💉"
+  - title: Dekoratory
+    desc: >
+      NestJS intensywnie używa dekoratorów TypeScript: @Controller, @Get, @Post,
+      @Body, @Param, @Query, @UseGuards, @UseInterceptors. Dekoratory deklaratywnie
+      definiują zachowanie — nie musisz pisać boilerplate.
+    icon: "🏷️"
+  - title: Pipes (walidacja)
+    desc: >
+      Pipe transformuje lub waliduje dane wejściowe przed dotarciem do handlera.
+      ValidationPipe z class-validator automatycznie waliduje DTO (Data Transfer Objects)
+      i zwraca 400 z listą błędów jeśli dane są niepoprawne.
+    icon: "🔧"
+  - title: Guards (autoryzacja)
+    desc: >
+      Guard decyduje czy request ma dostęp do endpointu. AuthGuard sprawdza JWT token,
+      RolesGuard sprawdza role użytkownika. Zwraca true (dostęp) lub false (403 Forbidden).
+    icon: "🛡️"
+
+whenToUse:
+  - Duże REST API z wieloma modułami — NestJS wymusza strukturę
+  - Microservices z transportem (Redis, RabbitMQ, Kafka, gRPC)
+  - Aplikacje enterprise gdzie TypeScript i DI są wymagane
+  - Zespoły które znają Angular — identyczny mental model
+  - GraphQL API — wbudowane wsparcie z @nestjs/graphql
+  - WebSocket real-time — wbudowany gateway
+
+firstComponent: |
+  # Instalacja
+  npm i -g @nestjs/cli
+  nest new my-api
+
+  # src/app.controller.ts
+  import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+  import { AppService } from './app.service';
+
+  @Controller('users')
+  export class AppController {
+    constructor(private readonly appService: AppService) {}
+
+    @Get()
+    findAll() {
+      return this.appService.findAll();
+    }
+
+    @Get(':id')
+    findOne(@Param('id') id: string) {
+      return this.appService.findOne(+id);
+    }
+
+    @Post()
+    create(@Body() body: { name: string; email: string }) {
+      return this.appService.create(body);
+    }
+  }
+
+  # src/app.service.ts
+  import { Injectable } from '@nestjs/common';
+
+  @Injectable()
+  export class AppService {
+    private users = [];
+
+    findAll() { return this.users; }
+    findOne(id: number) { return this.users.find(u => u.id === id); }
+    create(data: any) {
+      const user = { id: Date.now(), ...data };
+      this.users.push(user);
+      return user;
+    }
+  }
+
+  # Uruchomienie
+  npm run start:dev

@@ -1,0 +1,66 @@
+title: Jest vs alternatywy
+
+items:
+  - name: Vitest
+    icon: "⚡"
+    color: "#646cff"
+    tagline: Vite-native test runner — ESM, szybki HMR, kompatybilny z Jest API
+    pros:
+      - Natywne ESM — nie trzeba transpilować importów
+      - Hot Module Reloading w watch mode — tylko zmienione testy
+      - Kompatybilne API z Jest — migracja to zmiana importu
+      - In-source testing — testy obok kodu w tym samym pliku
+    cons:
+      - Młodszy ekosystem — mniej pluginów niż Jest
+      - Wymaga Vite lub kompatybilnego bundlera
+      - Snapshot format różni się od Jest
+      - Mniej materiałów edukacyjnych
+    vs: Vitest dla nowych projektów Vite/React/Vue. Jest dla istniejących projektów, stabilność, większy ekosystem.
+
+  - name: Mocha
+    icon: "☕"
+    color: "#8D6748"
+    tagline: Elastyczny test runner — BDD/TDD, dowolne assertion library
+    pros:
+      - Bardzo elastyczny — wybierasz assertion lib (Chai), mock lib (Sinon)
+      - Długa historia — dojrzały, stabilny, dużo materiałów
+      - Supports wiele reporterów (spec, dot, nyan, HTML)
+      - Browser testing przez mocha-headless-chrome
+    cons:
+      - Nie ma wbudowanych asercji — potrzebujesz Chai
+      - Nie ma wbudowanego mockowania — potrzebujesz Sinon
+      - Nie ma wbudowanego coverage — potrzebujesz Istanbul/nyc
+      - Więcej konfiguracji niż Jest (3 pakiety zamiast 1)
+    vs: Mocha dla maksymalnej elastyczności i custom setup. Jest dla zero-config i all-in-one.
+
+  - name: Cypress (Component Testing)
+    icon: "🌲"
+    color: "#69d3a7"
+    tagline: E2E + Component testing z real browser
+    pros:
+      - Testy w prawdziwej przeglądarce — widzi CSS, DOM, events
+      - Time-travel debugger — kliknij krok i zobacz state
+      - Świetne do komponentów React/Vue/Angular
+      - Visual testing i video recording
+    cons:
+      - Znacznie wolniejszy niż Jest (uruchamia przeglądarkę)
+      - Nie nadaje się do unit testów logiki biznesowej
+      - Tylko Chromium (od niedawna Firefox)
+      - Duże zużycie pamięci
+    vs: Cypress do E2E i visual component testing. Jest do unit testów i szybkiego feedback loop.
+
+  - name: Testing Library
+    icon: "🐙"
+    color: "#e33332"
+    tagline: Nie framework — utility library do testowania UI z perspektywy użytkownika
+    pros:
+      - Testuj jak użytkownik — getByRole, getByText zamiast selektorów CSS
+      - Framework agnostic — React, Vue, Angular, Svelte
+      - Wymusza dobre praktyki — nie testuj implementation details
+      - Doskonała dokumentacja i community
+    cons:
+      - To NIE jest test runner — potrzebujesz Jest/Vitest
+      - Krzywa nauki — inne podejście niż enzyme
+      - Asynchroniczne queries mogą być tricky
+      - Nie zastępuje E2E testów
+    vs: Testing Library to companion dla Jest, nie alternatywa. Używaj razem — Jest runner + Testing Library queries.

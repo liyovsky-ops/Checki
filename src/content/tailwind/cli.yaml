@@ -1,0 +1,353 @@
+title: Komendy Tailwind CSS
+
+groups:
+  - name: Instalacja
+    icon: "📦"
+    commands:
+      - cmd: npm install -D tailwindcss @tailwindcss/vite
+        desc: Instalacja Tailwind CSS v4 z Vite
+        detail:
+          what: Instaluje Tailwind CSS 4 z pluginem Vite — zero konfiguracji, automatyczne wykrywanie klas.
+          how: "Dodaj plugin do vite.config.js i @import 'tailwindcss' w CSS."
+          tips:
+            - 'Tailwind v4 nie wymaga tailwind.config.js — konfiguracja w CSS'
+      - cmd: npm install -D tailwindcss postcss autoprefixer
+        desc: Instalacja z PostCSS (uniwersalna)
+        detail:
+          what: Tailwind jako PostCSS plugin — działa z każdym bundlerem.
+          how: Dodaj do postcss.config.js.
+          tips:
+            - 'npx tailwindcss init — generuje tailwind.config.js'
+      - cmd: npx tailwindcss init
+        desc: Generuj tailwind.config.js
+        detail:
+          what: Tworzy plik konfiguracyjny z domyślnymi wartościami.
+          how: Edytuj content, theme.extend, plugins.
+          flags:
+            - flag: --full
+              desc: Generuj z WSZYSTKIMI domyślnymi wartościami (do reference)
+            - flag: -p
+              desc: Generuj też postcss.config.js
+          tips:
+            - 'npx tailwindcss init -p — oba pliki naraz'
+      - cmd: npx tailwindcss init --full
+        desc: Generuj config z pełnymi defaults
+        detail:
+          what: Tworzy tailwind.config.js ze WSZYSTKIMI domyślnymi kolorami, spacing, fontami. Referencyjna wersja.
+          how: Przydatne do zobaczenia jakie wartości są dostępne domyślnie.
+          tips:
+            - 'Plik jest duży (~2000 linii) — nie commituj, używaj jako reference'
+      - cmd: npm install -D @tailwindcss/typography @tailwindcss/forms
+        desc: Instalacja oficjalnych pluginów
+        detail:
+          what: Typography (prose) + Forms (reset stylów formularzy).
+          how: Dodaj do plugins array w tailwind.config.js.
+          tips:
+            - 'npm install -D @tailwindcss/container-queries — container queries plugin'
+      - cmd: npm install -D prettier prettier-plugin-tailwindcss
+        desc: Instalacja Prettier z automatycznym sortowaniem klas
+        detail:
+          what: Prettier plugin automatycznie sortuje klasy Tailwind w spójnej kolejności.
+          how: Dodaj do .prettierrc lub prettier.config.js.
+          tips:
+            - 'Zero konfiguracji — plugin automatycznie wykrywa Tailwind'
+
+  - name: CLI Build
+    icon: "🔨"
+    commands:
+      - cmd: npx tailwindcss -i ./src/input.css -o ./dist/output.css
+        desc: Kompiluj CSS (one-shot)
+        detail:
+          what: Skanuje content files, generuje CSS z użytymi klasami.
+          how: "Input = plik z @import 'tailwindcss', output = gotowy CSS."
+          tips:
+            - 'Wynikowy plik zawiera TYLKO klasy których użyłeś'
+      - cmd: npx tailwindcss -i ./src/input.css -o ./dist/output.css --watch
+        desc: Watch mode — kompiluj przy zmianach
+        detail:
+          what: Obserwuje pliki i rekompiluje CSS automatycznie.
+          how: Idealne do development bez bundlera.
+          tips:
+            - 'Ctrl+C żeby zatrzymać'
+      - cmd: npx tailwindcss -i ./src/input.css -o ./dist/output.css --minify
+        desc: Kompiluj i minifikuj CSS (produkcja)
+        detail:
+          what: Generuje zminifikowany CSS — usuwa whitespace, komentarze, skraca nazwy.
+          how: Zawsze używaj --minify na produkcji.
+          tips:
+            - 'Wynikowy CSS waży 5-15KB gzipped (vs 300KB+ surowy Tailwind)'
+      - cmd: NODE_ENV=production npx tailwindcss -i ./src/input.css -o ./dist/output.css
+        desc: Build produkcyjny z tree-shaking
+        detail:
+          what: NODE_ENV=production włącza dodatkowe optymalizacje.
+          how: Usuwa unused CSS, minifikuje, optimalizuje.
+          tips:
+            - 'W Vite/Webpack NODE_ENV jest automatycznie ustawiane'
+
+  - name: Klasy — Layout
+    icon: "📐"
+    commands:
+      - cmd: flex items-center justify-between
+        desc: Flexbox — wycentruj pionowo, rozłóż poziomo
+        detail:
+          what: "flex = display:flex, items-center = align-items:center, justify-between = justify-content:space-between."
+          how: Najczęstszy pattern — nawigacja, nagłówki, toolbary.
+          tips:
+            - 'flex-col — zmień na kolumnę (pionowo)'
+            - 'gap-4 — przestrzeń między dziećmi'
+      - cmd: grid grid-cols-3 gap-4
+        desc: Grid — 3 kolumny z gap
+        detail:
+          what: CSS Grid z 3 equal columns i 1rem gap.
+          how: 'grid-cols-{1-12} — liczba kolumn. gap-{n} — spacing.'
+          tips:
+            - 'grid-cols-[200px_1fr_200px] — custom template'
+            - 'col-span-2 — element zajmuje 2 kolumny'
+      - cmd: container mx-auto px-4
+        desc: Centered container z padding
+        detail:
+          what: container = max-width per breakpoint, mx-auto = center, px-4 = side padding.
+          how: Standardowy page wrapper.
+          tips:
+            - 'max-w-7xl mx-auto px-4 — alternatywa z konkretnym max-width'
+      - cmd: absolute inset-0
+        desc: Absolutne pozycjonowanie — wypełnij rodzica
+        detail:
+          what: "position:absolute, top/right/bottom/left = 0."
+          how: Overlay, backdrop, fill parent.
+          tips:
+            - 'Rodzic potrzebuje relative'
+      - cmd: sticky top-0 z-50
+        desc: Sticky header
+        detail:
+          what: Element przykleja się na górze przy scrollu.
+          how: sticky + top-0 + z-50 (z-index żeby był nad resztą).
+          tips:
+            - 'backdrop-blur-sm bg-white/80 — efekt szklany'
+      - cmd: overflow-hidden
+        desc: Ukryj overflow
+        detail:
+          what: "overflow:hidden — obcinaj content poza granicami."
+          how: Przydatne dla rounded corners na image (rounded-lg + overflow-hidden).
+          tips:
+            - 'overflow-y-auto — scrollbar na Y, overflow-x-hidden — ukryj X'
+      - cmd: aspect-video
+        desc: "Aspect ratio 16:9"
+        detail:
+          what: "aspect-ratio 16/9."
+          how: Video embeds, thumbnails.
+          tips:
+            - 'aspect-square — 1:1, aspect-[4/3] — custom ratio'
+
+  - name: Klasy — Spacing
+    icon: "📏"
+    commands:
+      - cmd: p-4 px-6 py-2
+        desc: Padding — all sides, horizontal, vertical
+        detail:
+          what: p-4 = 1rem all. px-6 = 1.5rem left+right. py-2 = 0.5rem top+bottom.
+          how: 'Skala: 0, 0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24.'
+          tips:
+            - 'pt-4 pb-2 — osobno top i bottom'
+      - cmd: m-4 mx-auto mt-8
+        desc: Margin — all, horizontal auto, top
+        detail:
+          what: m-4 = 1rem all. mx-auto = center block. mt-8 = 2rem top.
+          how: Analogiczne do padding ale na external spacing.
+          tips:
+            - '-mt-4 — negatywny margin (overlap)'
+      - cmd: space-y-4
+        desc: Vertical spacing między dziećmi
+        detail:
+          what: Dodaje margin-top do każdego dziecka oprócz pierwszego.
+          how: Alternatywa do gap (działa z blokowymi elementami).
+          tips:
+            - 'space-x-4 — horizontal spacing'
+      - cmd: gap-4
+        desc: Gap w flex/grid
+        detail:
+          what: Spacing między elementami w flex lub grid.
+          how: gap-x-4 gap-y-2 — osobne spacing per axis.
+          tips:
+            - 'Preferuj gap nad space-y/space-x w nowych projektach'
+
+  - name: Klasy — Typography
+    icon: "🔤"
+    commands:
+      - cmd: text-xl font-bold text-gray-900
+        desc: Duży, bold, ciemny tekst
+        detail:
+          what: text-xl = 1.25rem, font-bold = 700, text-gray-900 = prawie czarny.
+          how: 'Rozmiary: text-xs → text-9xl. Wagi: font-thin → font-black.'
+          tips:
+            - 'tracking-tight — mniejszy letter-spacing (nagłówki)'
+            - 'leading-relaxed — większy line-height (body text)'
+      - cmd: truncate
+        desc: Obcinaj tekst z wielokropkiem
+        detail:
+          what: "overflow:hidden + text-overflow:ellipsis + white-space:nowrap."
+          how: Element musi mieć width/max-width.
+          tips:
+            - 'line-clamp-3 — obcinaj po 3 liniach'
+      - cmd: prose
+        desc: Piękna typografia (plugin)
+        detail:
+          what: "Plugin @tailwindcss/typography — class=\"prose\" stylizuje markdown/CMS content."
+          how: Nagłówki, akapity, listy, code blocks, tabele — wszystko ostylowane.
+          tips:
+            - 'prose-lg — większy, prose-sm — mniejszy'
+            - 'prose-invert — dark mode'
+      - cmd: uppercase tracking-wide text-xs font-semibold
+        desc: Label / badge style
+        detail:
+          what: Uppercase letters, wider spacing, small, semi-bold.
+          how: Standardowy pattern dla labelek, kategorii, badgeów.
+          tips:
+            - 'text-gray-500 — szary kolor dla secondary labels'
+
+  - name: Klasy — Colors & Effects
+    icon: "🎨"
+    commands:
+      - cmd: bg-blue-500 hover:bg-blue-600
+        desc: Background z hover state
+        detail:
+          what: Blue background, ciemniejszy on hover.
+          how: 'Kolory: slate, gray, red, orange, amber, yellow, green, blue, indigo, violet, purple, pink, rose.'
+          tips:
+            - 'Skala: 50 (lightest) → 950 (darkest)'
+      - cmd: bg-gradient-to-r from-blue-500 to-purple-500
+        desc: Gradient background
+        detail:
+          what: Gradient od lewej do prawej, blue → purple.
+          how: 'Directions: to-r, to-l, to-t, to-b, to-tr, to-br.'
+          tips:
+            - 'via-pink-500 — kolor pośredni w gradient'
+      - cmd: bg-black/60 backdrop-blur-sm
+        desc: Overlay z blur (modal backdrop)
+        detail:
+          what: Czarne tło z 60% opacity + blur na tle.
+          how: Standardowy modal/dialog backdrop.
+          tips:
+            - 'backdrop-blur-md — mocniejszy blur'
+      - cmd: shadow-md hover:shadow-lg transition-shadow
+        desc: Shadow z animowanym hover
+        detail:
+          what: Medium shadow, larger on hover, smooth transition.
+          how: 'shadow-sm → shadow-2xl. transition-shadow animuje zmianę.'
+          tips:
+            - 'shadow-inner — wewnętrzny cień (input focus)'
+      - cmd: ring-2 ring-blue-500 ring-offset-2
+        desc: Focus ring (accessibility)
+        detail:
+          what: 2px ring wokół elementu z offsetem.
+          how: Standardowy focus indicator. ring-offset daje przestrzeń między ring a elementem.
+          tips:
+            - 'focus:ring-2 focus:ring-blue-500 — ring on focus'
+      - cmd: opacity-50 hover:opacity-100
+        desc: Opacity z hover reveal
+        detail:
+          what: Półprzezroczysty, pełny on hover.
+          how: Przydatne do secondary actions, disabled states.
+          tips:
+            - 'disabled:opacity-50 disabled:cursor-not-allowed — disabled state'
+
+  - name: Klasy — Borders & Rounded
+    icon: "🔲"
+    commands:
+      - cmd: rounded-lg border border-gray-200
+        desc: Rounded corners + thin border
+        detail:
+          what: border-radius 0.5rem + 1px solid gray border.
+          how: 'rounded-none → rounded-full. border-0 → border-4.'
+          tips:
+            - 'rounded-t-lg — tylko top corners'
+      - cmd: divide-y divide-gray-200
+        desc: Borders między dziećmi (lista)
+        detail:
+          what: Dodaje border-top do każdego dziecka oprócz pierwszego.
+          how: Idealny do list, tabel, settings.
+          tips:
+            - 'divide-x — vertical dividers'
+      - cmd: border-l-4 border-blue-500
+        desc: Left accent border
+        detail:
+          what: 4px blue border po lewej stronie — callout, quote, alert.
+          how: Standardowy pattern dla info boxes, blockquotes.
+          tips:
+            - 'border-t-4 — accent na górze (card header)'
+
+  - name: Klasy — Responsive
+    icon: "📱"
+    commands:
+      - cmd: hidden md:block
+        desc: Ukryj na mobile, pokaż na desktop
+        detail:
+          what: "display:none domyślnie, display:block na md (768px+)."
+          how: Standardowy pattern dla desktop-only elements.
+          tips:
+            - 'md:hidden — odwrotnie: pokaż na mobile, ukryj na desktop'
+      - cmd: text-sm md:text-base lg:text-xl
+        desc: Responsive font size
+        detail:
+          what: Mały na mobile, medium na tablet, duży na desktop.
+          how: Mobile-first — bazowa = mobile, prefixy = większe ekrany.
+          tips:
+            - 'Breakpoints: sm(640) md(768) lg(1024) xl(1280) 2xl(1536)'
+      - cmd: grid-cols-1 md:grid-cols-2 lg:grid-cols-3
+        desc: Responsive grid columns
+        detail:
+          what: 1 kolumna mobile, 2 tablet, 3 desktop.
+          how: Najczęstszy pattern dla card grids.
+          tips:
+            - 'xl:grid-cols-4 — 4 kolumny na dużym ekranie'
+
+  - name: Klasy — Dark Mode
+    icon: "🌙"
+    commands:
+      - cmd: bg-white dark:bg-gray-900
+        desc: Light/dark background
+        detail:
+          what: Biały background w light, dark gray w dark mode.
+          how: "Prefiks dark: aktywuje styl w dark mode."
+          tips:
+            - 'darkMode: "class" w config — toggle class="dark" na html'
+      - cmd: text-gray-900 dark:text-gray-100
+        desc: Light/dark text color
+        detail:
+          what: Ciemny tekst w light, jasny w dark.
+          how: Standardowy pattern — odwracaj kolory.
+          tips:
+            - 'border-gray-200 dark:border-gray-700 — border colors too'
+      - cmd: dark:bg-gray-800/50
+        desc: Dark mode z opacity
+        detail:
+          what: Semi-transparent dark background.
+          how: Slash notation = opacity. /50 = 50%.
+          tips:
+            - 'Przydatne do overlayów i glassmorphism w dark mode'
+
+  - name: Klasy — Animacje
+    icon: "✨"
+    commands:
+      - cmd: transition-all duration-300 ease-in-out
+        desc: Smooth transition na wszystkich propertiach
+        detail:
+          what: Animuje każdą zmianę CSS property z 300ms duration.
+          how: "Dodaj hover, focus, group-hover prefix żeby triggerować."
+          tips:
+            - 'transition-colors — tylko kolory (szybsze niż all)'
+            - 'duration-150 — szybsza animacja'
+      - cmd: animate-spin
+        desc: Infinite rotation (loading spinner)
+        detail:
+          what: CSS animation rotate 360° infinite.
+          how: Użyj na SVG spinner icon.
+          tips:
+            - 'animate-pulse — pulsowanie (skeleton loader)'
+      - cmd: hover:scale-105
+        desc: Subtle zoom on hover
+        detail:
+          what: "transform: scale(1.05) on hover."
+          how: Dodaj transition-transform dla smooth effect.
+          tips:
+            - 'active:scale-95 — press effect (button feedback)'

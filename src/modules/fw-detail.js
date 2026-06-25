@@ -44,6 +44,8 @@ import { FW_JEST_DATA }         from '../data/fw_jest.js';
 import { FW_VITEST_DATA }       from '../data/fw_vitest.js';
 import { FW_NEXTJS_DATA }      from '../data/fw_nextjs.js';
 import { FW_TAILWIND_DATA }    from '../data/fw_tailwind.js';
+import { FW_NESTJS_DATA }     from '../data/fw_nestjs.js';
+import { FW_PRISMA_DATA }     from '../data/fw_prisma.js';
 
 let activeTab = 'podstawy';
 let activeFw  = 'react';
@@ -76,6 +78,8 @@ const FW_DATA_MAP = {
   vitest: FW_VITEST_DATA,
   nextjs: FW_NEXTJS_DATA,
   tailwindcss: FW_TAILWIND_DATA,
+  nestjs: FW_NESTJS_DATA,
+  prisma: FW_PRISMA_DATA,
 };
 
 export function openFramework(fw) {

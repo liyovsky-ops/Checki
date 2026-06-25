@@ -1,0 +1,92 @@
+title: Providery i Dependency Injection
+
+items:
+  - name: Serwis z @Injectable
+    desc: >
+      Serwis to klasa z dekoratorem @Injectable(). NestJS automatycznie tworzy
+      instancję (singleton domyślnie) i wstrzykuje do kontrolerów i innych serwisów.
+    code: |
+      import { Injectable } from '@nestjs/common';
+
+      @Injectable()
+      export class UsersService {
+        private users = [];
+
+        findAll() { return this.users; }
+
+        findOne(id: number) {
+          return this.users.find(u => u.id === id);
+        }
+
+        create(data: { name: string; email: string }) {
+          const user = { id: Date.now(), ...data };
+          this.users.push(user);
+          return user;
+        }
+
+        remove(id: number) {
+          this.users = this.users.filter(u => u.id !== id);
+        }
+      }
+
+  - name: Moduł rejestruje providery
+    desc: >
+      Moduł definiuje które serwisy są dostępne. providers rejestruje serwisy
+      wewnątrz modułu. exports udostępnia je innym modułom.
+    code: |
+      import { Module } from '@nestjs/common';
+      import { UsersController } from './users.controller';
+      import { UsersService } from './users.service';
+
+      @Module({
+        controllers: [UsersController],
+        providers: [UsersService],
+        exports: [UsersService],  // dostępny w innych modułach
+      })
+      export class UsersModule {}
+
+      // AppModule importuje UsersModule
+      @Module({
+        imports: [UsersModule, AuthModule, ProductsModule],
+      })
+      export class AppModule {}
+
+  - name: Custom providers (useFactory, useValue)
+    desc: >
+      NestJS pozwala na custom providery — useFactory (fabryka), useValue (stała),
+      useClass (alternatywna implementacja). Przydatne do konfiguracji i testów.
+    code: |
+      // useFactory — provider z logiką tworzenia
+      @Module({
+        providers: [
+          {
+            provide: 'DATABASE_CONNECTION',
+            useFactory: async (config: ConfigService) => {
+              return new Pool({ connectionString: config.get('DATABASE_URL') });
+            },
+            inject: [ConfigService],
+          },
+        ],
+      })
+      export class DatabaseModule {}
+
+      // useValue — stała wartość
+      { provide: 'API_KEY', useValue: 'my-secret-key' }
+
+      // Wstrzyknięcie custom providera
+      constructor(@Inject('DATABASE_CONNECTION') private db: Pool) {}
+
+  - name: Scope providerów (Singleton, Request, Transient)
+    desc: >
+      Domyślnie providery są singleton (jedna instancja na cały app).
+      REQUEST scope tworzy nową instancję per request. TRANSIENT per injection.
+    code: |
+      // Request-scoped — nowa instancja per HTTP request
+      @Injectable({ scope: Scope.REQUEST })
+      export class RequestLoggerService {
+        constructor(@Inject(REQUEST) private request: Request) {}
+      }
+
+      // Transient — nowa instancja za każdym razem gdy jest wstrzyknięty
+      @Injectable({ scope: Scope.TRANSIENT })
+      export class HelperService {}

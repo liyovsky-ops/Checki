@@ -1,0 +1,137 @@
+title: Reaktywność w Svelte
+
+items:
+  - name: Reactive declarations ($:)
+    desc: >
+      $: oznacza reactive statement — kod wykonuje się ponownie gdy zależności się zmienią.
+      Kompilator automatycznie śledzi co od czego zależy. Odpowiednik useEffect + useMemo.
+    code: |
+      <script>
+        let width = 10;
+        let height = 5;
+
+        // Automatycznie przelicza gdy width lub height się zmieni
+        $: area = width * height;
+        $: perimeter = 2 * (width + height);
+
+        // Reactive statement (side effect)
+        $: if (area > 100) {
+          console.log('Duży prostokąt!');
+        }
+
+        // Reactive block
+        $: {
+          console.log(`Wymiary: ${width}x${height}`);
+          console.log(`Pole: ${area}`);
+        }
+      </script>
+
+      <input type="number" bind:value={width} />
+      <input type="number" bind:value={height} />
+      <p>Pole: {area}, Obwód: {perimeter}</p>
+
+  - name: Lifecycle — onMount, onDestroy, beforeUpdate, afterUpdate
+    desc: >
+      Lifecycle functions zamiast hooków. onMount odpala po pierwszym renderze (jak useEffect([], [])).
+      onDestroy przy odmontowaniu. Prostsze niż React lifecycle.
+    code: |
+      <script>
+        import { onMount, onDestroy } from 'svelte';
+
+        let data = null;
+        let interval;
+
+        onMount(async () => {
+          // Fetch data po zamontowaniu
+          const res = await fetch('/api/data');
+          data = await res.json();
+
+          // Timer
+          interval = setInterval(() => {
+            console.log('tick');
+          }, 1000);
+        });
+
+        onDestroy(() => {
+          // Cleanup przy odmontowaniu
+          clearInterval(interval);
+        });
+      </script>
+
+  - name: Bindings — two-way data binding
+    desc: >
+      bind: tworzy two-way binding. Zmiana inputa aktualizuje zmienną,
+      zmiana zmiennej aktualizuje input. Działa z input, textarea, select, checkbox.
+    code: |
+      <script>
+        let name = '';
+        let agreed = false;
+        let color = 'red';
+        let flavours = [];
+      </script>
+
+      <!-- Text input -->
+      <input bind:value={name} />
+
+      <!-- Checkbox -->
+      <label>
+        <input type="checkbox" bind:checked={agreed} />
+        Akceptuję regulamin
+      </label>
+
+      <!-- Select -->
+      <select bind:value={color}>
+        <option>red</option>
+        <option>green</option>
+        <option>blue</option>
+      </select>
+
+      <!-- Multiple select -->
+      <select multiple bind:value={flavours}>
+        <option>Chocolate</option>
+        <option>Vanilla</option>
+        <option>Strawberry</option>
+      </select>
+
+  - name: Transitions i animacje
+    desc: >
+      Wbudowane transition directives: fade, fly, slide, scale, draw, blur.
+      Customowe transitions przez funkcje. Spring i tweened dla fizycznych animacji.
+    code: |
+      <script>
+        import { fade, fly, slide } from 'svelte/transition';
+        import { quintOut } from 'svelte/easing';
+        import { tweened } from 'svelte/motion';
+
+        let visible = true;
+        const progress = tweened(0, { duration: 400, easing: quintOut });
+      </script>
+
+      <button on:click={() => visible = !visible}>Toggle</button>
+
+      {#if visible}
+        <p transition:fade>Fade in/out</p>
+        <p in:fly={{ y: 200, duration: 500 }} out:fade>Fly in, fade out</p>
+        <div transition:slide>Slide</div>
+      {/if}
+
+      <progress value={$progress} />
+      <button on:click={() => progress.set(1)}>Complete</button>
+
+  - name: Context API — dane przez drzewo komponentów
+    desc: >
+      setContext/getContext do przekazywania danych bez props drilling.
+      Jak React Context ale prostsze — nie wymaga Provider wrappera.
+    code: |
+      <!-- Parent.svelte -->
+      <script>
+        import { setContext } from 'svelte';
+        setContext('theme', { color: 'dark', fontSize: 14 });
+      </script>
+
+      <!-- DeepChild.svelte -->
+      <script>
+        import { getContext } from 'svelte';
+        const theme = getContext('theme');
+      </script>
+      <p style="color: {theme.color}">Themed text</p>

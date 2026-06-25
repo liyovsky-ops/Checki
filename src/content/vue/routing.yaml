@@ -1,0 +1,95 @@
+title: Vue Router
+
+items:
+  - name: Podstawowa konfiguracja
+    desc: >
+      createRouter z routes array. history mode (HTML5) lub hash mode.
+      RouterView renderuje aktywny komponent, RouterLink nawiguje.
+    code: |
+      // router/index.js
+      import { createRouter, createWebHistory } from 'vue-router'
+      import Home from '../views/Home.vue'
+
+      const routes = [
+        { path: '/', component: Home },
+        { path: '/about', component: () => import('../views/About.vue') },
+        { path: '/users/:id', component: () => import('../views/UserProfile.vue') },
+        { path: '/:pathMatch(.*)*', component: () => import('../views/NotFound.vue') },
+      ]
+
+      const router = createRouter({
+        history: createWebHistory(),
+        routes,
+      })
+
+      export default router
+
+  - name: Parametry i query
+    desc: >
+      Dynamiczne segmenty :id w route, dostępne przez useRoute().
+    code: |
+      // route: /users/:id
+      <script setup>
+      import { useRoute } from 'vue-router'
+
+      const route = useRoute()
+      const userId = route.params.id
+      const page = route.query.page  // /users/5?page=2
+      </script>
+
+  - name: Nested routes
+    desc: >
+      Children routes renderowane wewnątrz parent RouterView.
+    code: |
+      const routes = [
+        {
+          path: '/dashboard',
+          component: DashboardLayout,
+          children: [
+            { path: '', component: DashboardHome },
+            { path: 'settings', component: DashboardSettings },
+            { path: 'users', component: DashboardUsers },
+          ],
+        },
+      ]
+
+  - name: Navigation Guards
+    desc: >
+      beforeEach, beforeResolve, afterEach — middleware na route changes.
+      Auth check, loading state, analytics tracking.
+    code: |
+      router.beforeEach((to, from, next) => {
+        const isAuth = !!localStorage.getItem('token')
+        if (to.meta.requiresAuth && !isAuth) {
+          next('/login')
+        } else {
+          next()
+        }
+      })
+
+      // Per-route guard
+      {
+        path: '/admin',
+        component: Admin,
+        meta: { requiresAuth: true },
+        beforeEnter: (to, from, next) => {
+          if (!isAdmin()) next('/403')
+          else next()
+        },
+      }
+
+  - name: Lazy loading i code splitting
+    desc: >
+      import() w route component = automatyczny code splitting. Webpack/Vite
+      tworzy osobny chunk per route. Ładowany on demand.
+    code: |
+      const routes = [
+        {
+          path: '/dashboard',
+          component: () => import('../views/Dashboard.vue'),  // lazy loaded
+        },
+        {
+          path: '/reports',
+          component: () => import(/* webpackChunkName: "reports" */ '../views/Reports.vue'),
+        },
+      ]

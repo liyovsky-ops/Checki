@@ -1,0 +1,140 @@
+title: Server Components vs Client Components
+
+items:
+  - name: Server Components (domyślne)
+    desc: >
+      Każdy komponent w app/ jest domyślnie Server Component. Renderuje się na serwerze,
+      zero JS do klienta. Możesz bezpośrednio czytać z bazy, filesystem, env vars.
+      NIE możesz używać useState, useEffect, onClick, window, document.
+    code: |
+      // app/users/page.tsx — Server Component (domyślny)
+      // Brak 'use client' = renderuje się na serwerze
+
+      import { db } from '@/lib/db'
+
+      export default async function UsersPage() {
+        // Bezpośredni dostęp do bazy — to się NIE wysyła do klienta
+        const users = await db.query('SELECT * FROM users LIMIT 20')
+
+        return (
+          <ul>
+            {users.map((u) => (
+              <li key={u.id}>{u.name} — {u.email}</li>
+            ))}
+          </ul>
+        )
+      }
+
+  - name: Client Components ('use client')
+    desc: >
+      Dodaj 'use client' na górze pliku gdy potrzebujesz interaktywności — useState,
+      useEffect, event handlers (onClick, onChange), browser API (window, document),
+      hooki React. Client Component jest pre-renderowany na serwerze (HTML) a potem
+      hydrowany na kliencie (JS).
+    code: |
+      'use client'
+
+      import { useState } from 'react'
+
+      export default function Counter() {
+        const [count, setCount] = useState(0)
+
+        return (
+          <button onClick={() => setCount(count + 1)}>
+            Kliknięto {count} razy
+          </button>
+        )
+      }
+
+  - name: Kiedy Server, kiedy Client?
+    desc: >
+      Reguła: zostań na serwerze jak najdłużej. Client Component tylko gdy MUSISZ
+      mieć interaktywność. Mieszaj — Server Component renderuje dane, Client Component
+      renderuje interaktywny UI wewnątrz.
+    code: |
+      // SERVER (domyślny):
+      // ✅ Fetch danych z bazy/API
+      // ✅ Dostęp do filesystem (fs.readFile)
+      // ✅ Ukrywanie sekretów (API keys, DB credentials)
+      // ✅ Ciężkie zależności (markdown parser, syntax highlighter)
+      // ✅ SEO — pełny HTML dla crawlerów
+
+      // CLIENT ('use client'):
+      // ✅ useState, useReducer, useContext
+      // ✅ useEffect, useLayoutEffect
+      // ✅ onClick, onChange, onSubmit
+      // ✅ window, document, localStorage
+      // ✅ Custom hooki z state
+      // ✅ Third-party biblioteki z hookami
+
+  - name: "Wzorzec: Server parent + Client child"
+    desc: >
+      Najlepszy wzorzec — Server Component pobiera dane, przekazuje do Client Component
+      przez props. Client Component jest interaktywny ale nie musi fetchować.
+    code: |
+      // app/dashboard/page.tsx — SERVER (pobiera dane)
+      import { db } from '@/lib/db'
+      import { Chart } from './Chart'  // Client Component
+
+      export default async function Dashboard() {
+        const stats = await db.getStats()  // fetch na serwerze
+
+        return (
+          <div>
+            <h1>Dashboard</h1>
+            {/* Przekaż dane do Client Component */}
+            <Chart data={stats} />
+          </div>
+        )
+      }
+
+      // app/dashboard/Chart.tsx — CLIENT (interaktywny)
+      'use client'
+      import { useState } from 'react'
+
+      export function Chart({ data }: { data: number[] }) {
+        const [range, setRange] = useState('7d')
+
+        return (
+          <div>
+            <select value={range} onChange={(e) => setRange(e.target.value)}>
+              <option value="7d">7 dni</option>
+              <option value="30d">30 dni</option>
+            </select>
+            {/* Renderuj chart z data + range */}
+          </div>
+        )
+      }
+
+  - name: Server Actions — mutacje bez API
+    desc: >
+      Server Actions to async funkcje które uruchamiają się na serwerze.
+      Wywołujesz je z formularza lub event handlera — Next.js automatycznie
+      tworzy POST endpoint. Zero boilerplate API routes dla mutacji.
+    code: |
+      // app/actions.ts
+      'use server'
+
+      import { db } from '@/lib/db'
+      import { revalidatePath } from 'next/cache'
+
+      export async function createPost(formData: FormData) {
+        const title = formData.get('title') as string
+        const body = formData.get('body') as string
+
+        await db.insert('posts', { title, body })
+        revalidatePath('/posts')  // odśwież cache strony /posts
+      }
+
+      // app/posts/new/page.tsx — Server Component z formularzem
+      import { createPost } from '../actions'
+
+      export default function NewPost() {
+        return (
+          <form action={createPost}>
+            <input name="title" placeholder="Tytuł" required />
+            <textarea name="body" placeholder="Treść" required />
+            <button type="submit">Opublikuj</button>
+          </form>
+        )
+      }

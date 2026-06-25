@@ -1,0 +1,97 @@
+title: Pinia — State Management
+
+items:
+  - name: Definiowanie store
+    desc: >
+      defineStore() tworzy store z state, getters (computed) i actions (methods).
+      Prostsze API niż Vuex — brak mutations, brak modules.
+    code: |
+      // stores/counter.js
+      import { defineStore } from 'pinia'
+
+      export const useCounterStore = defineStore('counter', {
+        state: () => ({
+          count: 0,
+          name: 'Counter',
+        }),
+        getters: {
+          doubleCount: (state) => state.count * 2,
+          message: (state) => `${state.name}: ${state.count}`,
+        },
+        actions: {
+          increment() {
+            this.count++
+          },
+          async fetchCount() {
+            const res = await fetch('/api/count')
+            this.count = await res.json()
+          },
+        },
+      })
+
+  - name: Setup Store (Composition API style)
+    desc: >
+      Alternatywna składnia — ref/computed/functions zamiast state/getters/actions.
+      Bliżej Composition API, bardziej elastyczne.
+    code: |
+      import { defineStore } from 'pinia'
+      import { ref, computed } from 'vue'
+
+      export const useUserStore = defineStore('user', () => {
+        const user = ref(null)
+        const isLoggedIn = computed(() => !!user.value)
+
+        async function login(email, password) {
+          const res = await fetch('/api/login', {
+            method: 'POST',
+            body: JSON.stringify({ email, password }),
+          })
+          user.value = await res.json()
+        }
+
+        function logout() {
+          user.value = null
+        }
+
+        return { user, isLoggedIn, login, logout }
+      })
+
+  - name: Użycie w komponencie
+    desc: >
+      useXxxStore() zwraca reaktywny store. Destructuring wymaga storeToRefs().
+    code: |
+      <script setup>
+      import { storeToRefs } from 'pinia'
+      import { useCounterStore } from '../stores/counter'
+
+      const store = useCounterStore()
+      const { count, doubleCount } = storeToRefs(store)
+      const { increment } = store  // actions nie potrzebują storeToRefs
+
+      // Bezpośrednio:
+      store.count++
+      store.increment()
+      store.$reset()  // reset do initial state
+      </script>
+
+      <template>
+        <p>Count: {{ count }} (double: {{ doubleCount }})</p>
+        <button @click="increment">+1</button>
+      </template>
+
+  - name: Persist plugin
+    desc: >
+      pinia-plugin-persistedstate zapisuje state do localStorage automatycznie.
+    code: |
+      // main.js
+      import { createPinia } from 'pinia'
+      import piniaPersistedState from 'pinia-plugin-persistedstate'
+
+      const pinia = createPinia()
+      pinia.use(piniaPersistedState)
+
+      // store
+      export const useSettingsStore = defineStore('settings', {
+        state: () => ({ theme: 'dark', lang: 'pl' }),
+        persist: true,  // auto-save to localStorage
+      })

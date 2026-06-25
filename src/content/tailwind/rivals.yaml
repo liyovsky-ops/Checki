@@ -1,0 +1,66 @@
+title: Tailwind CSS vs alternatywy
+
+items:
+  - name: Bootstrap
+    icon: "🅱️"
+    color: "#7952b3"
+    tagline: Component-first — gotowe komponenty, szybki start, mniej kontroli
+    pros:
+      - Gotowe komponenty (modals, navbars, carousels) — kopiujesz i działa
+      - Mniejsza krzywa uczenia — class="btn btn-primary" jest intuicyjne
+      - Grid system prosty do zrozumienia
+      - Ogromna społeczność, mnóstwo szablonów
+    cons:
+      - Wszystkie strony wyglądają tak samo (Bootstrap look)
+      - Overriding stylów jest bolesne (CSS specificity wars)
+      - Duży bundle — ładujesz cały framework nawet jeśli używasz 10%
+      - JavaScript dependency (jQuery w starszych wersjach)
+    vs: Bootstrap dla szybkich adminów i prototypów. Tailwind gdy chcesz unikalne designy z pełną kontrolą.
+
+  - name: CSS Modules
+    icon: "📦"
+    color: "#000000"
+    tagline: Scoped CSS — każdy komponent ma własne, izolowane style
+    pros:
+      - Zero konfliktów nazw — klasy scoped do komponentu
+      - Piszesz zwykły CSS — bez nowej składni
+      - Wbudowane w Next.js, Vite, CRA
+      - Composition — kompiluje do unikalnych class names
+    cons:
+      - Musisz pisać CSS od zera (brak design systemu)
+      - Plik .module.css per komponent — dużo plików
+      - Brak utility approach — każda zmiana = nowa reguła CSS
+      - Responsive/dark mode wymaga ręcznego @media
+    vs: CSS Modules gdy chcesz izolację bez dodatkowych narzędzi. Tailwind gdy chcesz szybkość i spójny design system.
+
+  - name: Styled Components / Emotion
+    icon: "💅"
+    color: "#DB7093"
+    tagline: CSS-in-JS — style jako JavaScript, dynamiczne, prop-driven
+    pros:
+      - Style oparte na propsach (color={primary} → generuje CSS)
+      - Automatyczny vendor prefix
+      - Theming wbudowany (ThemeProvider)
+      - Zero unused CSS (tylko co rendrujesz)
+    cons:
+      - Runtime cost — generuje CSS w runtime (FOUC possible)
+      - Duży bundle (styled-components ~12KB gzipped)
+      - Server Components (React 19) — problemy z CSS-in-JS w RSC
+      - Debugowanie — wygenerowane class names (sc-aXZVg)
+    vs: Styled Components gdy potrzebujesz dynamicznych style na propsach. Tailwind gdy chcesz zero runtime cost i Server Components compatibility.
+
+  - name: UnoCSS
+    icon: "⚡"
+    color: "#333333"
+    tagline: Atomic CSS engine — szybszy niż Tailwind, bardziej elastyczny
+    pros:
+      - 5× szybszy build niż Tailwind (instant HMR)
+      - Kompatybilny z Tailwind classes (preset)
+      - Pure CSS Icons (ikony jako klasy)
+      - Attributify mode (atrybuty HTML zamiast class)
+    cons:
+      - Mniejsza społeczność i ekosystem
+      - Mniej dokumentacji i tutoriali
+      - Brak oficjalnych komponentów (shadcn/ui jest dla Tailwind)
+      - Wymaga dodatkowej konfiguracji
+    vs: UnoCSS dla power userów którzy chcą szybkość i elastyczność. Tailwind dla większości projektów — ekosystem i community wins.

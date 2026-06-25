@@ -1,0 +1,92 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Express?
+  firstComponent: Pierwszy serwer Express
+  firstComponentLang: javascript
+
+intro:
+  title: Czym jest Express.js?
+  desc: >
+    Express to minimalny, unopinionated framework webowy dla Node.js. Middleware chain,
+    routing, request/response handling — i nic więcej. Nie narzuca ORM, template engine,
+    ani struktury projektu. Ty decydujesz. Najpopularniejszy backend framework w JavaScript
+    ecosystem — fundament tysięcy API i SPA backendów.
+
+concepts:
+  - title: Middleware
+    desc: >
+      Funkcja (req, res, next) która przetwarza request. Middleware chain: każdy
+      middleware robi swoją robotę i wywołuje next() żeby przekazać dalej. Logging,
+      auth, CORS, body parsing — wszystko to middleware.
+    icon: "🔗"
+  - title: Routing
+    desc: >
+      app.get('/users', handler), app.post('/users', handler). HTTP method + path →
+      handler function. Router() grupuje routes w moduły. Parametry URL: /users/:id.
+    icon: "🛣️"
+  - title: Request / Response
+    desc: >
+      req.params, req.query, req.body — dane z requestu. res.json(), res.send(),
+      res.status() — odpowiedź. req.headers, res.cookie() — nagłówki i cookies.
+    icon: "📨"
+  - title: Error Handling
+    desc: >
+      Middleware z 4 argumentami (err, req, res, next) łapie błędy. Centralny
+      error handler na końcu middleware chain. try/catch w async routes.
+    icon: "🛡️"
+  - title: Template Engines
+    desc: >
+      EJS, Pug, Handlebars — server-side rendering HTML. app.set('view engine', 'ejs').
+      Ale większość nowoczesnych apps używa Express jako pure API (JSON), nie SSR.
+    icon: "📄"
+  - title: Static Files
+    desc: >
+      express.static('public') serwuje pliki statyczne (CSS, JS, images).
+      Prosty file server wbudowany.
+    icon: "📁"
+
+whenToUse:
+  - REST API backend dla React/Vue/Angular frontend
+  - Mikroserwisy — lekki, szybki start, minimalne zależności
+  - Prototypy i MVPs — najprostszy Node.js backend
+  - BFF (Backend for Frontend) — agregacja danych z wielu źródeł
+  - Webhook handler — prosty endpoint do obsługi webhooków
+  - Gdy chcesz pełną kontrolę nad architekturą (vs NestJS opinionated)
+
+firstComponent: |
+  # Instalacja
+  mkdir my-api && cd my-api
+  npm init -y
+  npm install express
+
+  # index.js — minimalny serwer
+  const express = require('express')
+  const app = express()
+
+  app.use(express.json())  // parsuje JSON body
+
+  const users = [
+    { id: 1, name: 'Jan Kowalski' },
+    { id: 2, name: 'Anna Nowak' },
+  ]
+
+  app.get('/users', (req, res) => {
+    res.json(users)
+  })
+
+  app.get('/users/:id', (req, res) => {
+    const user = users.find(u => u.id === +req.params.id)
+    if (!user) return res.status(404).json({ error: 'Not found' })
+    res.json(user)
+  })
+
+  app.post('/users', (req, res) => {
+    const user = { id: users.length + 1, ...req.body }
+    users.push(user)
+    res.status(201).json(user)
+  })
+
+  app.listen(3000, () => console.log('Server on :3000'))
+
+  # node index.js
+  # curl http://localhost:3000/users

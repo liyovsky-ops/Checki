@@ -1,0 +1,121 @@
+title: Animacje, Stany i Pseudo-klasy
+
+items:
+  - name: Hover, Focus, Active states
+    desc: >
+      Prefixy stanów: hover:, focus:, active:, disabled:, visited:, first:, last:,
+      odd:, even:, group-hover:, peer-checked:.
+    code: |
+      <!-- Hover & focus -->
+      <button class="bg-blue-500 hover:bg-blue-600 focus:ring-2 focus:ring-blue-500
+                     active:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed
+                     transition-colors">
+        Button
+      </button>
+
+      <!-- Group hover (parent hover → child reacts) -->
+      <div class="group cursor-pointer p-4 hover:bg-gray-50 rounded-lg">
+        <h3 class="text-gray-900 group-hover:text-blue-500 transition-colors">
+          Title changes color on card hover
+        </h3>
+        <span class="opacity-0 group-hover:opacity-100 transition-opacity">
+          → appears on hover
+        </span>
+      </div>
+
+      <!-- Peer (sibling state → element reacts) -->
+      <input type="checkbox" class="peer" id="toggle" />
+      <div class="hidden peer-checked:block">
+        Visible when checkbox is checked
+      </div>
+
+      <!-- First/last/odd/even child -->
+      <ul>
+        <li class="first:pt-0 last:pb-0 odd:bg-gray-50 even:bg-white py-3">
+          List item
+        </li>
+      </ul>
+
+  - name: Transitions & Animations
+    desc: >
+      transition-{property} z duration i easing. Wbudowane animacje:
+      animate-spin, animate-ping, animate-pulse, animate-bounce.
+      Custom animacje w tailwind.config.js.
+    code: |
+      <!-- Smooth transition -->
+      <button class="transition-all duration-300 ease-in-out
+                     hover:scale-105 hover:shadow-lg">
+        Smooth hover
+      </button>
+
+      <!-- Built-in animations -->
+      <svg class="animate-spin h-5 w-5">...</svg>       <!-- Loading spinner -->
+      <span class="animate-ping absolute h-3 w-3 rounded-full bg-red-400"></span>  <!-- Notification dot -->
+      <div class="animate-pulse bg-gray-200 h-4 rounded"></div>  <!-- Skeleton loader -->
+      <div class="animate-bounce">↓</div>               <!-- Scroll indicator -->
+
+      <!-- Custom animation in config -->
+      // tailwind.config.js
+      theme: {
+        extend: {
+          animation: {
+            'fade-in': 'fadeIn 0.3s ease-out',
+            'slide-up': 'slideUp 0.2s ease-out',
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: '0' },
+              '100%': { opacity: '1' },
+            },
+            slideUp: {
+              '0%': { transform: 'translateY(10px)', opacity: '0' },
+              '100%': { transform: 'translateY(0)', opacity: '1' },
+            },
+          },
+        },
+      }
+
+  - name: Transforms i Filters
+    desc: >
+      Scale, rotate, translate, skew. Blur, brightness, contrast, grayscale,
+      backdrop-blur, backdrop-brightness.
+    code: |
+      <!-- Transforms -->
+      <div class="hover:scale-110 hover:rotate-3 transition-transform">
+        Scale + rotate on hover
+      </div>
+      <div class="translate-x-4 -translate-y-2">
+        Offset position
+      </div>
+
+      <!-- Filters -->
+      <img class="grayscale hover:grayscale-0 transition-all duration-500" src="photo.jpg">
+      <div class="blur-sm hover:blur-none transition-all">
+        Blurred until hover
+      </div>
+
+      <!-- Backdrop -->
+      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm">
+        Modal overlay with blur
+      </div>
+
+  - name: Before & After pseudo-elements
+    desc: >
+      before: i after: prefixy tworzą pseudo-elementy. content-[''] wymagany.
+      Przydatne do dekoracji, overlayów, custom markerów.
+    code: |
+      <!-- Badge z after pseudo-element -->
+      <span class="relative after:content-[''] after:absolute after:top-0 after:right-0
+                   after:w-2 after:h-2 after:bg-red-500 after:rounded-full">
+        Notification
+      </span>
+
+      <!-- Gradient overlay na obrazku -->
+      <div class="relative">
+        <img src="hero.jpg" class="w-full">
+        <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent">
+          <h1 class="absolute bottom-4 left-4 text-white text-2xl font-bold">
+            Title over image
+          </h1>
+        </div>
+      </div>

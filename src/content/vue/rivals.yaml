@@ -1,0 +1,66 @@
+title: Vue.js vs alternatywy frontend
+
+items:
+  - name: React
+    icon: "⚛️"
+    color: "#61dafb"
+    tagline: Biblioteka UI od Meta — największy ekosystem, JSX, hooks
+    pros:
+      - Największy ekosystem i community — więcej bibliotek, tutoriali, ofert pracy
+      - JSX daje pełną moc JavaScript w template
+      - React Native dla mobile
+      - Meta aktywnie rozwija (Server Components, Suspense)
+    cons:
+      - Więcej boilerplate (useState, useEffect, useCallback, useMemo)
+      - Brak oficjalnego routera/store — musisz wybierać (React Router, Zustand/Redux)
+      - Steeper learning curve (hooks rules, closure traps)
+      - Re-rendering wymaga manual optimization (memo, useMemo)
+    vs: React gdy potrzebujesz największego ekosystemu i React Native. Vue gdy chcesz szybszy start, mniej boilerplate, i oficjalne rozwiązania (Router, Pinia).
+
+  - name: Angular
+    icon: "🔺"
+    color: "#dd0031"
+    tagline: Pełny framework od Google — TypeScript, DI, RxJS
+    pros:
+      - Wszystko wbudowane (routing, forms, HTTP, i18n, animations)
+      - Silny TypeScript support od początku
+      - Dependency Injection — testowalne, modularne
+      - Google aktywnie rozwija, LTS releases
+    cons:
+      - Stroma learning curve (RxJS, decorators, modules, zones)
+      - Ciężki — duży bundle size
+      - Verbose — dużo kodu na prostą rzecz
+      - Wolniejszy development cycle niż Vue/React
+    vs: Angular dla dużych enterprise zespołów z doświadczeniem. Vue dla szybszego developmentu, mniejszych teamów, prostszych aplikacji.
+
+  - name: Svelte
+    icon: "🔥"
+    color: "#ff3e00"
+    tagline: Kompilowany framework — zero runtime, najszybszy
+    pros:
+      - Zero runtime overhead — kompiluje do vanilla JS
+      - Najczystszy syntax (let count = 0, $: doubled = count * 2)
+      - Mniejszy bundle size niż Vue/React
+      - SvelteKit — full-stack z SSR
+    cons:
+      - Mniejszy ekosystem niż Vue/React
+      - Mniej ofert pracy
+      - Kompilator = mniej standard JavaScript
+      - Debugowanie trudniejsze (compiled output)
+    vs: Svelte dla performance-critical apps i małych projektów. Vue dla większego ekosystemu, więcej bibliotek, i bardziej dojrzałego toolingu.
+
+  - name: Solid.js
+    icon: "⚡"
+    color: "#2c4f7c"
+    tagline: Reaktywny bez Virtual DOM — React-like API, Svelte-like performance
+    pros:
+      - Brak Virtual DOM — fine-grained reactivity (najszybszy)
+      - API podobne do React (signals ≈ hooks)
+      - JSX z prawdziwą reaktywnością (nie re-render)
+      - Mały bundle size
+    cons:
+      - Bardzo mały ekosystem
+      - Młody framework — mniej stabilny
+      - Mniej toolingu i bibliotek
+      - Trudniej znaleźć pomoc/tutoriale
+    vs: Solid dla bleeding-edge performance. Vue dla dojrzałości, ekosystemu i stabilności.

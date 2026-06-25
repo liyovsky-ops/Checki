@@ -1,0 +1,451 @@
+title: Komendy Next.js
+
+groups:
+  - name: Tworzenie projektu
+    icon: "🚀"
+    commands:
+      - cmd: npx create-next-app@latest my-app
+        desc: Stwórz nowy projekt Next.js
+        detail:
+          what: Interaktywny wizard tworzący projekt z TypeScript, ESLint, Tailwind, App Router, src/ directory.
+          how: Odpowiedz na pytania lub użyj flag do pominięcia interaktywnego trybu.
+          flags:
+            - flag: --typescript
+              desc: Włącz TypeScript
+            - flag: --tailwind
+              desc: Dodaj Tailwind CSS
+            - flag: --app
+              desc: Użyj App Router (domyślne od v14)
+            - flag: --src-dir
+              desc: Użyj src/ directory
+          tips:
+            - 'npx create-next-app@latest my-app --typescript --tailwind --app --src-dir — pełen setup bez pytań'
+      - cmd: npx create-next-app@latest --example with-prisma
+        desc: Stwórz projekt z gotowego przykładu
+        detail:
+          what: Klonuje gotowy starter z repozytorium Next.js examples.
+          how: '--example <nazwa> — lista na github.com/vercel/next.js/tree/canary/examples'
+          tips:
+            - '--example with-prisma — starter z Prisma ORM'
+            - '--example with-tailwindcss — starter z Tailwind'
+      - cmd: npx create-next-app@latest --use-pnpm
+        desc: Użyj pnpm zamiast npm
+        detail:
+          what: Tworzy projekt z pnpm jako package manager.
+          how: '--use-pnpm, --use-yarn, --use-bun — wybierz PM'
+          tips:
+            - 'pnpm jest szybszy i oszczędza dysk (symlinks)'
+
+  - name: Development
+    icon: "💻"
+    commands:
+      - cmd: npm run dev
+        desc: Uruchom serwer deweloperski (port 3000)
+        detail:
+          what: Startuje Next.js dev server z hot reload, error overlay, React DevTools.
+          how: Domyślnie port 3000. Turbopack (Rust bundler) od Next.js 15.
+          flags:
+            - flag: --turbopack
+              desc: Użyj Turbopack (szybszy niż webpack)
+            - flag: -p 4000
+              desc: Custom port
+            - flag: -H 0.0.0.0
+              desc: Dostępny z sieci lokalnej
+          tips:
+            - 'next dev --turbopack — 10× szybszy cold start'
+            - 'next dev -p 4000 — zmień port'
+      - cmd: next dev --turbopack
+        desc: Dev server z Turbopack (Rust, 10× szybszy)
+        detail:
+          what: Turbopack to nowy bundler napisany w Rust. Dramatycznie szybszy cold start i HMR.
+          how: Stabilny od Next.js 15. Zastępuje webpack w dev mode.
+          tips:
+            - 'Produkcyjny build nadal używa webpack — Turbopack to tylko dev'
+      - cmd: next dev --experimental-https
+        desc: Dev server z HTTPS (self-signed cert)
+        detail:
+          what: Generuje self-signed certyfikat i serwuje po HTTPS. Przydatne do OAuth, Secure cookies.
+          how: Przeglądarka pokaże warning — to normalne dla self-signed.
+          tips:
+            - 'Wymagane do testowania OAuth callbacks lokalnie'
+
+  - name: Build & Production
+    icon: "📦"
+    commands:
+      - cmd: npm run build
+        desc: Zbuduj aplikację do produkcji
+        detail:
+          what: Type-check + kompilacja + optymalizacja. Generuje .next/ z SSG stronami, server bundles, client chunks.
+          how: Wyświetla rozmiar każdej strony i strategię renderowania (static, dynamic, ISR).
+          flags:
+            - flag: --debug
+              desc: Więcej informacji o buildzie
+          tips:
+            - 'Sprawdź output — ○ = static, λ = dynamic (SSR), ISR pokazuje revalidation time'
+            - 'next build --profile — profiling dla React DevTools'
+      - cmd: npm run start
+        desc: Uruchom produkcyjny serwer
+        detail:
+          what: Serwuje zbudowaną aplikację (.next/). Wymaga wcześniejszego npm run build.
+          how: Domyślnie port 3000. To jest serwer produkcyjny Node.js.
+          tips:
+            - 'next start -p 8080 — custom port'
+            - 'Alternatywa: deploy na Vercel (zero config)'
+      - cmd: next export
+        desc: Eksportuj jako statyczne HTML (deprecated w App Router)
+        detail:
+          what: Generuje statyczne HTML pliki do hostowania na CDN bez Node.js serwera.
+          how: W App Router użyj output 'export' w next.config.js zamiast next export.
+          tips:
+            - "next.config.js: output: 'export' — nowy sposób"
+      - cmd: next info
+        desc: Pokaż informacje o środowisku Next.js
+        detail:
+          what: Wersja Next.js, Node.js, npm, OS, webpack/turbopack — przydatne do bug reports.
+          how: Kopiuj output do GitHub issues.
+          tips:
+            - 'Użyj przed otwarciem issue na GitHub'
+      - cmd: next lint
+        desc: Uruchom ESLint z regułami Next.js
+        detail:
+          what: ESLint z pluginem eslint-config-next. Sprawdza Next.js-specific rules (Image, Link, Script).
+          how: Konfiguracja w .eslintrc.json. Reguły specyficzne dla Next.js (no-img-element, no-html-link).
+          tips:
+            - 'next lint --fix — auto-fix problems'
+            - 'next lint --dir src — lint tylko src/'
+
+  - name: Routing & Navigation
+    icon: "🛤️"
+    commands:
+      - cmd: import Link from 'next/link'
+        desc: Komponent Link do client-side navigation
+        detail:
+          what: Prefetchuje stronę w tle (hover/viewport). Nawigacja bez pełnego page reload.
+          how: '<Link href="/about">O nas</Link> — zamiennik dla <a>. Automatyczny prefetch.'
+          tips:
+            - '<Link href="/blog" prefetch={false}> — wyłącz prefetch (rzadko potrzebne)'
+            - '<Link href={{ pathname: "/blog", query: { page: "2" } }}> — z query params'
+      - cmd: import { useRouter } from 'next/navigation'
+        desc: Programatyczna nawigacja (Client Component)
+        detail:
+          what: Hook do nawigacji z kodu — redirect po form submit, push/replace/back/refresh.
+          how: 'const router = useRouter(); router.push("/dashboard")'
+          tips:
+            - 'router.push("/login") — nawiguj'
+            - 'router.replace("/home") — replace (bez history entry)'
+            - 'router.refresh() — odśwież Server Component data'
+            - 'router.back() — cofnij'
+      - cmd: import { redirect } from 'next/navigation'
+        desc: Server-side redirect (Server Component)
+        detail:
+          what: Redirect z Server Component lub Server Action. Rzuca wyjątek (nie zwraca response).
+          how: 'redirect("/login") — użyj w Server Component gdy user nie jest zalogowany'
+          tips:
+            - 'redirect("/login") — 307 temporary redirect'
+            - 'permanentRedirect("/new-url") — 308 permanent'
+      - cmd: import { usePathname } from 'next/navigation'
+        desc: Aktualny pathname (Client Component)
+        detail:
+          what: Hook zwracający bieżący pathname (np. "/blog/my-post"). Bez query string.
+          how: 'const pathname = usePathname() — reactive, aktualizuje się przy nawigacji'
+          tips:
+            - 'Przydatny do active link styling w navbar'
+      - cmd: import { useSearchParams } from 'next/navigation'
+        desc: Query params (Client Component)
+        detail:
+          what: Hook zwracający URLSearchParams z query string.
+          how: 'const searchParams = useSearchParams(); searchParams.get("page")'
+          tips:
+            - 'Wymaga Suspense boundary (ssr fallback)'
+
+  - name: Data & Cache
+    icon: "📊"
+    commands:
+      - cmd: "fetch(url, { cache: 'force-cache' })"
+        desc: Static fetch — cache na stałe (SSG)
+        detail:
+          what: Domyślne zachowanie fetch w Next.js. Dane cachowane przy build i serwowane statycznie.
+          how: Odpowiedź cachowana w .next/cache. Rewalidacja przez revalidatePath/revalidateTag.
+          tips:
+            - 'Idealne dla treści która rzadko się zmienia (dokumentacja, about page)'
+      - cmd: "fetch(url, { cache: 'no-store' })"
+        desc: Dynamic fetch — fresh na każdy request (SSR)
+        detail:
+          what: Brak cache — każdy request trafia do origin. Odpowiednik getServerSideProps.
+          how: Użyj dla danych które muszą być aktualne (dashboard, profile, koszyk).
+          tips:
+            - 'Zwiększa TTFB — każdy request czeka na API'
+      - cmd: "fetch(url, { next: { revalidate: 60 } })"
+        desc: ISR — rewaliduj co 60 sekund
+        detail:
+          what: Incremental Static Regeneration — serwuj cache, re-generuj w tle co N sekund.
+          how: Pierwszy request po expiry dostaje stale data, triggeruje re-generation w tle. Następny request dostaje fresh.
+          tips:
+            - 'Kompromis między SSG (szybki) i SSR (fresh)'
+      - cmd: "import { unstable_cache } from 'next/cache'"
+        desc: Cache dowolnej async function
+        detail:
+          what: Cachuje wynik async function (nie tylko fetch). Przydatne do DB queries, computations.
+          how: 'const getCachedUser = unstable_cache(async (id) => db.findUser(id), ["user"], { revalidate: 300 })'
+          tips:
+            - 'Keyparts (["user"]) + function args = cache key'
+      - cmd: revalidatePath('/blog')
+        desc: Odśwież cache strony on-demand
+        detail:
+          what: Invaliduje cache strony /blog. Następny request re-generuje.
+          how: Użyj w Server Action po mutacji danych.
+          tips:
+            - "revalidatePath('/blog', 'page') — tylko tę stronę"
+            - "revalidatePath('/blog', 'layout') — stronę + nested pages"
+      - cmd: revalidateTag('posts')
+        desc: Odśwież wszystkie fetche z danym tagiem
+        detail:
+          what: Invaliduje cache wszystkich fetch() z next.tags = ['posts'].
+          how: Bardziej precyzyjne niż revalidatePath — celuje w dane, nie strony.
+          tips:
+            - 'fetch(url, { next: { tags: ["posts"] } }) — taguj fetch'
+
+  - name: Image & Font
+    icon: "🖼️"
+    commands:
+      - cmd: import Image from 'next/image'
+        desc: Optymalizowany komponent obrazka
+        detail:
+          what: Automatyczna optymalizacja — lazy loading, responsive sizes, WebP/AVIF, placeholder blur.
+          how: '<Image src="/hero.jpg" width={800} height={400} alt="Hero" />'
+          flags:
+            - flag: priority
+              desc: Wyłącz lazy loading (above-the-fold images)
+            - flag: fill
+              desc: Wypełnij parent container (object-fit)
+            - flag: placeholder="blur"
+              desc: Blur placeholder podczas ładowania
+          tips:
+            - 'Zawsze podawaj width/height lub fill — zapobiega layout shift'
+            - '<Image src="/logo.png" priority /> — dla hero images'
+      - cmd: import { Inter } from 'next/font/google'
+        desc: Optymalizowany Google Font
+        detail:
+          what: Self-hosted font bez external request. Zero layout shift (font-display swap).
+          how: "const inter = Inter({ subsets: ['latin'] }); <body className={inter.className}>"
+          tips:
+            - 'Font jest downloaded at build time i served from same domain'
+            - "import localFont from 'next/font/local' — custom font files"
+      - cmd: import Script from 'next/script'
+        desc: Optymalizowane ładowanie external scripts
+        detail:
+          what: Kontrola kiedy external script jest ładowany (beforeInteractive, afterInteractive, lazyOnload).
+          how: '<Script src="https://analytics.js" strategy="lazyOnload" />'
+          tips:
+            - 'strategy="lazyOnload" — ładuj po page load (analytics, chat widgets)'
+
+  - name: Konfiguracja
+    icon: "⚙️"
+    commands:
+      - cmd: next.config.js / next.config.mjs
+        desc: Główny plik konfiguracji Next.js
+        detail:
+          what: Konfiguracja kompilatora, redirects, rewrites, headers, env, images, webpack.
+          how: Export default nextConfig object.
+          tips:
+            - 'next.config.mjs — ES modules syntax'
+      - cmd: "images: { remotePatterns: [...] }"
+        desc: Zezwól na zewnętrzne obrazki
+        detail:
+          what: Whitelist domen z których next/image może optymalizować obrazki.
+          how: "remotePatterns: [{ protocol: 'https', hostname: '**.example.com' }]"
+          tips:
+            - 'Bez tego — <Image src="https://external.com/img.jpg"> wyrzuci błąd'
+      - cmd: "redirects: async () => [...]"
+        desc: Definiuj redirecty w config
+        detail:
+          what: Permanentne/tymczasowe redirecty bez middleware. Idealne do URL migrations.
+          how: "{ source: '/old-blog/:slug', destination: '/blog/:slug', permanent: true }"
+          tips:
+            - 'permanent: true = 308, false = 307'
+      - cmd: "rewrites: async () => [...]"
+        desc: URL rewrites (proxy bez redirect)
+        detail:
+          what: Rewrite URL bez zmiany URL bar w przeglądarce. Przydatne do proxy external API.
+          how: "{ source: '/api/:path*', destination: 'https://external-api.com/:path*' }"
+          tips:
+            - 'Użytkownik widzi /api/users, request idzie do external-api.com/users'
+      - cmd: "output: 'standalone'"
+        desc: Standalone output do Docker
+        detail:
+          what: Generuje standalone server bez node_modules. Mniejszy Docker image.
+          how: "output: 'standalone' w next.config.js → .next/standalone/ zawiera serwer + deps"
+          tips:
+            - 'Docker: COPY .next/standalone ./ && node server.js'
+      - cmd: "output: 'export'"
+        desc: Static HTML export (bez Node.js serwera)
+        detail:
+          what: Generuje statyczne HTML/CSS/JS. Deploy na dowolny hosting (S3, GitHub Pages, Netlify).
+          how: Nie obsługuje SSR, ISR, API Routes, middleware. Tylko SSG.
+          tips:
+            - 'Idealne do landing pages, dokumentacji, portfolio'
+
+  - name: Deployment
+    icon: "🚢"
+    commands:
+      - cmd: vercel
+        desc: Deploy na Vercel (zero config)
+        detail:
+          what: Jedno polecenie — deploy na Vercel. Auto-detects Next.js, konfiguruje edge functions, ISR, Image API.
+          how: 'npm i -g vercel && vercel — interaktywny setup. vercel --prod — produkcyjny deploy.'
+          tips:
+            - 'git push na main = auto deploy na Vercel (po połączeniu repo)'
+            - 'Preview deploys na każdy PR — unique URL do testowania'
+      - cmd: vercel env pull
+        desc: Pobierz zmienne env z Vercel do .env.local
+        detail:
+          what: Syncuje environment variables z Vercel dashboard do lokalnego .env.local.
+          how: Nie musisz ręcznie kopiować — vercel env pull robi to za Ciebie.
+          tips:
+            - 'vercel env add SECRET_KEY — dodaj env var z CLI'
+      - cmd: docker build -t my-nextjs-app .
+        desc: Zbuduj Docker image
+        detail:
+          what: Multi-stage Dockerfile z standalone output. Mały image (~100MB vs ~1GB).
+          how: "output: 'standalone' w next.config.js + Dockerfile z multi-stage build."
+          tips:
+            - 'FROM node:20-alpine AS base — użyj alpine dla mniejszego image'
+            - 'COPY .next/standalone ./ && COPY .next/static .next/static && COPY public public'
+      - cmd: npx next telemetry disable
+        desc: Wyłącz telemetrię Next.js
+        detail:
+          what: Next.js zbiera anonimowe dane o użyciu. Wyłącz jeśli nie chcesz.
+          how: Ustawienie per-machine, nie per-projekt.
+          tips:
+            - 'npx next telemetry status — sprawdź aktualny stan'
+
+  - name: Testing
+    icon: "🧪"
+    commands:
+      - cmd: npm install -D jest @testing-library/react @testing-library/jest-dom
+        desc: Setup testów z Jest + Testing Library
+        detail:
+          what: Jest jako test runner, Testing Library do renderowania komponentów React.
+          how: Dodaj jest.config.js z next/jest transformer.
+          tips:
+            - 'import { render, screen } from "@testing-library/react"'
+      - cmd: npm install -D @playwright/test
+        desc: E2E testy z Playwright
+        detail:
+          what: End-to-end testy w prawdziwej przeglądarce. Testuj pełne flow (login → dashboard → action).
+          how: 'playwright.config.ts z webServer: { command: "npm run dev" }'
+          tips:
+            - 'npx playwright test — uruchom E2E testy'
+            - 'npx playwright codegen localhost:3000 — nagraj test'
+      - cmd: npm install -D vitest @vitejs/plugin-react
+        desc: "Alternatywa - Vitest (szybszy niż Jest)"
+        detail:
+          what: Vitest — Vite-native test runner. Szybszy cold start i watch mode niż Jest.
+          how: Wymaga osobnej konfiguracji (vitest.config.ts).
+          tips:
+            - 'Vitest jest szybszy ale wymaga więcej setup niż Jest z next/jest'
+      - cmd: npx jest --watch
+        desc: Uruchom testy w trybie watch
+        detail:
+          what: Automatycznie re-runuje testy po zmianach plików.
+          how: Wymaga jest.config.js z next/jest.
+          tips:
+            - 'npx jest --watchAll — watch wszystkie, nie tylko zmienione'
+      - cmd: npx playwright show-report
+        desc: Otwórz raport HTML z E2E testów
+        detail:
+          what: Interaktywny raport z wynikami, screenshotami i trace'ami.
+          how: Generowany po npx playwright test.
+          tips:
+            - 'npx playwright test --trace on — nagrywaj trace do debugowania'
+
+  - name: Optymalizacja i analiza
+    icon: "📊"
+    commands:
+      - cmd: npx next info
+        desc: Pokaż informacje o środowisku Next.js
+        detail:
+          what: Wyświetla wersję Next.js, Node.js, OS, architekturę. Przydatne do bug reportów.
+          how: Uruchom w katalogu projektu.
+          tips:
+            - 'Dołącz output do GitHub issue przy zgłaszaniu bugów'
+      - cmd: npx @next/bundle-analyzer
+        desc: Analizuj rozmiar bundla
+        detail:
+          what: Wizualna mapa bundla — które pakiety zajmują ile. Znajdź zbędne zależności.
+          how: "npm install @next/bundle-analyzer, dodaj do next.config.js z ANALYZE=true."
+          tips:
+            - 'ANALYZE=true npm run build — generuje raport w .next/analyze/'
+      - cmd: npx next lint --fix
+        desc: Napraw problemy ESLint automatycznie
+        detail:
+          what: Automatycznie naprawia fixowalne reguły ESLint w projekcie.
+          how: Działa z next lint (wbudowany ESLint config).
+          tips:
+            - 'npx next lint --dir src — lintuj tylko src/'
+      - cmd: npm run build && npx serve .next/static
+        desc: Serwuj statyczne assety lokalnie do testów
+        detail:
+          what: Pozwala sprawdzić statyczne pliki (CSS, JS, images) po buildzie.
+          how: Serve serwuje katalog .next/static na localhost.
+          tips:
+            - 'Sprawdź rozmiar plików w .next/static/chunks/'
+      - cmd: npx next experimental-compile
+        desc: Kompilacja eksperymentalna (Turbopack)
+        detail:
+          what: Uruchamia next build z Turbopack (eksperymentalny, znacznie szybszy).
+          how: Turbopack to następca Webpack w Next.js.
+          tips:
+            - 'next dev --turbo — Turbopack w dev mode (stabilny od v15)'
+      - cmd: npx lighthouse http://localhost:3000
+        desc: Audyt wydajności strony (Lighthouse)
+        detail:
+          what: Google Lighthouse sprawdza performance, accessibility, SEO, best practices.
+          how: npm install -g lighthouse. Uruchom na działającym dev/prod serwerze.
+          tips:
+            - 'lighthouse --output html --output-path report.html — raport HTML'
+      - cmd: node -e "const fs=require('fs');console.log(JSON.parse(fs.readFileSync('.next/build-manifest.json','utf8')))"
+        desc: Sprawdź build manifest (lista plików per page)
+        detail:
+          what: build-manifest.json pokazuje jakie JS chunki ładuje każda strona.
+          how: Generowany po npm run build.
+          tips:
+            - 'Duże chunki = kod do optymalizacji (dynamic import, tree shaking)'
+      - cmd: npx next export
+        desc: Eksportuj jako statyczny HTML (SSG only)
+        detail:
+          what: Generuje statyczny HTML dla wszystkich stron (bez SSR). Deploy na S3, Netlify, GitHub Pages.
+          how: "output: 'export' w next.config.js od v13+."
+          tips:
+            - 'Nie działa ze stronami SSR (getServerSideProps)'
+            - 'Idealny dla landing pages, dokumentacji, blogów'
+      - cmd: npm install sharp
+        desc: Zainstaluj Sharp (optymalizacja obrazów)
+        detail:
+          what: Sharp to natywny moduł do resize/compress obrazów. Next.js Image wymaga go na produkcji.
+          how: npm install sharp, Next.js automatycznie go wykryje.
+          tips:
+            - 'Bez sharp na produkcji obrazki nie będą optymalizowane (squoosh fallback jest wolny)'
+      - cmd: npx next-sitemap
+        desc: Generuj sitemap.xml automatycznie
+        detail:
+          what: Generuje sitemap.xml i robots.txt na podstawie stron w App Router.
+          how: npm install next-sitemap, dodaj next-sitemap.config.js.
+          tips:
+            - 'Dodaj do postbuild script: "postbuild": "next-sitemap"'
+      - cmd: npx npm-check-updates -u
+        desc: Zaktualizuj wszystkie zależności do najnowszych
+        detail:
+          what: Sprawdza najnowsze wersje i aktualizuje package.json.
+          how: npm install -g npm-check-updates.
+          tips:
+            - 'Po aktualizacji: rm -rf node_modules && npm install'
+            - 'Sprawdź breaking changes w Next.js upgrade guide'
+      - cmd: NEXT_PRIVATE_STANDALONE=true npm run build
+        desc: Build w trybie standalone (Docker-ready)
+        detail:
+          what: Generuje standalone output — minimalny zestaw plików do uruchomienia bez node_modules.
+          how: "output: 'standalone' w next.config.js."
+          tips:
+            - 'Output w .next/standalone/ — kopiuj do Docker image'
+            - 'node .next/standalone/server.js — uruchomienie standalone'

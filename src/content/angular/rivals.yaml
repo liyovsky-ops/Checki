@@ -1,0 +1,66 @@
+title: Angular vs alternatywy frontend
+
+items:
+  - name: React
+    icon: "⚛️"
+    color: "#61dafb"
+    tagline: Biblioteka UI od Meta — elastyczna, ogromny ekosystem
+    pros:
+      - Ogromny ekosystem — więcej bibliotek i gotowych rozwiązań
+      - Elastyczność — wybierasz routing, state, styling sam
+      - JSX — logika i widok w jednym pliku
+      - React Native — ten sam kod na mobile
+    cons:
+      - Brak standardu — co projekt to inny stack (Redux vs Zustand vs Jotai)
+      - Brak wbudowanego routera, form validation, HTTP client
+      - Fragmentacja — Next.js vs Remix vs Vite vs CRA
+      - Mniej opinionated — junior nie wie co wybrać
+    vs: React dla elastyczności i ekosystemu. Angular gdy potrzebujesz pełnego frameworka z jednym "the Angular way" i enterprise support od Google.
+
+  - name: Vue.js
+    icon: "💚"
+    color: "#42b883"
+    tagline: Progresywny framework — łatwy start, skaluje do enterprise
+    pros:
+      - Najłatwiejszy do nauki z "big three"
+      - Composition API — elastyczny jak React hooks
+      - Oficjalny router (Vue Router) i state (Pinia)
+      - Świetna dokumentacja
+    cons:
+      - Mniejszy ekosystem niż React
+      - Mniej ofert pracy (szczególnie enterprise)
+      - Single-File Components mogą rosnąć bez dyscypliny
+      - Mniejsza community niż React i Angular
+    vs: Vue łatwiejszy start i lepszy DX. Angular lepszy dla dużych zespołów gdzie standaryzacja jest ważniejsza niż szybkość prototypowania.
+
+  - name: Svelte
+    icon: "🔥"
+    color: "#ff3e00"
+    tagline: Kompilowany framework — zero runtime, reaktywność w compile time
+    pros:
+      - Najmniejszy bundle — zero runtime overhead
+      - Najprostsza składnia (let count = 0 zamiast useState)
+      - SvelteKit — full-stack framework (SSR, routing, API)
+      - Szybki czas kompilacji
+    cons:
+      - Najmniejszy ekosystem z "big four"
+      - Mniej gotowych komponentów UI
+      - Trudniej znaleźć developerów z doświadczeniem
+      - Breaking changes w Svelte 5 (runes)
+    vs: Svelte dla szybkich, lekkich aplikacji z minimalnym bundle. Angular dla enterprise z dużym zespołem i long-term support.
+
+  - name: SolidJS
+    icon: "⚡"
+    color: "#2c4f7c"
+    tagline: Reactive bez Virtual DOM — wydajność React z prostotą Svelte
+    pros:
+      - Najszybszy framework w benchmarkach
+      - JSX jak React ale bez Virtual DOM
+      - Fine-grained reactivity — aktualizuje dokładnie to co się zmieniło
+      - Małe bundle size
+    cons:
+      - Bardzo mała społeczność
+      - Brak enterprise adoption
+      - Mało gotowych bibliotek
+      - Młody — API może się jeszcze zmienić
+    vs: SolidJS dla performance-critical SPA. Angular dla enterprise stability i pełnego frameworka z ekosystemem.

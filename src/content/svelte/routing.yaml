@@ -1,0 +1,117 @@
+title: SvelteKit — full-stack framework
+
+items:
+  - name: File-based routing
+    desc: >
+      Pliki w src/routes/ = ścieżki URL. +page.svelte = strona, +layout.svelte = layout,
+      +server.js = API endpoint. [param] = dynamiczny segment.
+    code: |
+      src/routes/
+        +page.svelte          → /
+        +layout.svelte        → layout dla wszystkich stron
+        about/+page.svelte    → /about
+        blog/+page.svelte     → /blog
+        blog/[slug]/+page.svelte → /blog/my-post
+        api/users/+server.js  → /api/users (API endpoint)
+
+      <!-- src/routes/blog/[slug]/+page.svelte -->
+      <script>
+        export let data;  // z load function
+      </script>
+      <h1>{data.post.title}</h1>
+      <p>{@html data.post.content}</p>
+
+  - name: Load functions — dane dla stron
+    desc: >
+      +page.js eksportuje load() — pobiera dane ZANIM strona się wyrenderuje.
+      Działa na serwerze (SSR) i kliencie (navigation). Odpowiednik getServerSideProps z Next.js.
+    code: |
+      // src/routes/blog/[slug]/+page.js
+      export async function load({ params, fetch }) {
+        const res = await fetch(`/api/posts/${params.slug}`);
+        if (!res.ok) throw error(404, 'Post not found');
+        const post = await res.json();
+        return { post };
+      }
+
+      // +page.server.js — load TYLKO na serwerze (sekrety, DB)
+      import { db } from '$lib/database';
+      export async function load({ params }) {
+        const post = await db.posts.findUnique({
+          where: { slug: params.slug }
+        });
+        return { post };
+      }
+
+  - name: Form actions — obsługa formularzy
+    desc: >
+      +page.server.js eksportuje actions — obsługa POST bez JavaScript.
+      Progressive enhancement: działa bez JS, lepiej z JS (no page reload).
+    code: |
+      // src/routes/login/+page.server.js
+      export const actions = {
+        default: async ({ request }) => {
+          const data = await request.formData();
+          const email = data.get('email');
+          const password = data.get('password');
+
+          const user = await authenticate(email, password);
+          if (!user) return fail(401, { email, error: 'Invalid credentials' });
+
+          cookies.set('session', user.token, { path: '/' });
+          throw redirect(303, '/dashboard');
+        }
+      };
+
+      <!-- +page.svelte -->
+      <script>
+        export let form;  // result from action
+      </script>
+      <form method="POST">
+        <input name="email" value={form?.email ?? ''} />
+        <input name="password" type="password" />
+        {#if form?.error}<p class="error">{form.error}</p>{/if}
+        <button>Login</button>
+      </form>
+
+  - name: API routes (+server.js)
+    desc: >
+      +server.js eksportuje GET, POST, PUT, DELETE — pełne REST API endpoints.
+      Odpowiednik Next.js API routes. Działają na serwerze.
+    code: |
+      // src/routes/api/users/+server.js
+      import { json } from '@sveltejs/kit';
+      import { db } from '$lib/database';
+
+      export async function GET({ url }) {
+        const limit = url.searchParams.get('limit') ?? 10;
+        const users = await db.users.findMany({ take: +limit });
+        return json(users);
+      }
+
+      export async function POST({ request }) {
+        const data = await request.json();
+        const user = await db.users.create({ data });
+        return json(user, { status: 201 });
+      }
+
+  - name: Adapters — deployment
+    desc: >
+      SvelteKit adapters = build output per platforma. adapter-node (Node server),
+      adapter-static (static site), adapter-vercel, adapter-cloudflare, adapter-netlify.
+    code: |
+      // svelte.config.js
+      import adapter from '@sveltejs/adapter-node';  // lub adapter-vercel, adapter-static
+
+      export default {
+        kit: {
+          adapter: adapter({
+            out: 'build',
+            polyfill: false,
+          })
+        }
+      };
+
+      // Deploy:
+      // npm run build  → generuje output w build/
+      // node build/     → startuje Node server

@@ -1,0 +1,91 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Angular?
+  firstComponent: Pierwsza aplikacja Angular
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Angular?
+  desc: >
+    Angular to pełny (batteries-included) framework od Google do budowania web aplikacji.
+    TypeScript-first, z wbudowanym routingiem, formularzami, HTTP clientem, dependency injection,
+    RxJS dla async, i CLI do scaffoldingu. Nie wybierasz bibliotek — Angular dostarcza wszystko.
+    Nowa wersja (v17+) dodała signals, standalone components, deferrable views i uprościła API.
+
+concepts:
+  - title: Standalone Components
+    desc: >
+      Od Angular 17 nie potrzebujesz NgModules. Komponent standalone importuje
+      bezpośrednio co potrzebuje — prostsze, tree-shakeable. @Component({
+      standalone: true, imports: [...] }).
+    icon: "🧱"
+  - title: TypeScript-first
+    desc: >
+      Angular wymaga TypeScript — dekoratory (@Component, @Injectable),
+      interfejsy, generic types. Silne typowanie od początku, nie opcjonalne.
+      IDE autocomplete, refactoring i error catching w compile time.
+    icon: "📘"
+  - title: Dependency Injection
+    desc: >
+      Wbudowany DI container. Deklarujesz serwis (@Injectable), Angular
+      automatycznie tworzy i wstrzykuje instancje. Singleton per scope
+      (root, component, module). Testowalność — mockuj przez DI.
+    icon: "💉"
+  - title: Signals (Angular 17+)
+    desc: >
+      Nowy system reaktywności. signal() tworzy reaktywną wartość, computed()
+      wylicza zależności, effect() reaguje na zmiany. Prostsze niż RxJS
+      dla synchronicznego stanu UI. Gradualnie zastępuje zone.js.
+    icon: "📡"
+  - title: Angular CLI
+    desc: >
+      ng generate component, ng generate service, ng build, ng test, ng deploy.
+      CLI generuje boilerplate, konfiguruje testing, buduje z AOT compilation.
+      Jeden tool do całego workflow.
+    icon: "🔧"
+  - title: RxJS Observables
+    desc: >
+      Angular używa RxJS dla async operacji: HTTP requests, WebSocket,
+      routing events, form value changes. Observables zamiast Promises.
+      Potężne ale krzywa uczenia jest stroma.
+    icon: "🔄"
+
+whenToUse:
+  - Duże zespoły enterprise z TypeScript — Angular narzuca konwencje
+  - Aplikacje z rozbudowanymi formularzami (reactive forms, walidacja)
+  - Gdy potrzebujesz ALL-IN-ONE — routing, HTTP, forms, i18n, a11y wbudowane
+  - Google stack — Angular + Firebase + GCP
+  - Migracja z AngularJS (v1) na nowoczesny Angular
+  - Gdy DI i testing są priorytetem od dnia 1
+
+firstComponent: |
+  // Instalacja
+  npm install -g @angular/cli
+  ng new my-app --standalone
+
+  // app.component.ts — standalone component
+  import { Component, signal } from '@angular/core';
+
+  @Component({
+    selector: 'app-root',
+    standalone: true,
+    template: `
+      <h1>Angular Counter</h1>
+      <p>Kliknięto: {{ count() }} razy</p>
+      <button (click)="increment()">+1</button>
+    `,
+    styles: [`
+      :host { display: block; text-align: center; padding: 2rem; }
+      button { font-size: 1.5rem; padding: 0.5rem 1rem; }
+    `]
+  })
+  export class AppComponent {
+    count = signal(0);
+
+    increment() {
+      this.count.update(n => n + 1);
+    }
+  }
+
+  // Uruchomienie
+  // ng serve --open

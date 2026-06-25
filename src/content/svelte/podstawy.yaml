@@ -1,0 +1,85 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Svelte?
+  firstComponent: Pierwszy komponent Svelte
+  firstComponentLang: svelte
+
+intro:
+  title: Czym jest Svelte?
+  desc: >
+    Svelte to kompilowany framework UI. W przeciwieństwie do React i Vue, Svelte nie
+    używa Virtual DOM — kompilator zamienia komponenty w imperatywny JavaScript
+    który bezpośrednio manipuluje DOM. Zero runtime overhead, mniejsze bundle,
+    szybsze renderowanie. Składnia jest minimalistyczna: reaktywność przez przypisanie
+    (zmień zmienną → UI się aktualizuje), nie przez useState/hooks.
+
+concepts:
+  - title: Kompilacja zamiast runtime
+    desc: >
+      Svelte to kompilator, nie biblioteka. Build step zamienia .svelte pliki w
+      zoptymalizowany JS który bezpośrednio modyfikuje DOM. Brak Virtual DOM diffing,
+      brak runtime framework. Wynik: mniejsze bundle (10-30KB vs 100KB+ React).
+    icon: "⚡"
+  - title: Reaktywność przez przypisanie
+    desc: >
+      Zmienisz zmienną → UI się aktualizuje. Nie potrzebujesz useState, setState,
+      ani żadnych hooków. let count = 0; count++ → widok reaguje. Kompilator
+      śledzi zależności i generuje kod aktualizacji DOM.
+    icon: "🔄"
+  - title: Komponenty .svelte
+    desc: >
+      Jeden plik .svelte zawiera HTML, CSS i JavaScript razem. CSS jest scoped
+      domyślnie (nie wycieknie do innych komponentów). Template syntax: {expression},
+      {#if}, {#each}, {#await}. Brak JSX — to rozszerzony HTML.
+    icon: "📄"
+  - title: Stores — globalny stan
+    desc: >
+      Svelte stores to reaktywne kontenery na dane. writable(), readable(), derived().
+      Subskrypcja przez prefix $: $store automatycznie subskrybuje i desubskrybuje.
+      Prostsze niż Redux/Vuex — zero boilerplate.
+    icon: "🗄️"
+  - title: Transitions i animacje
+    desc: >
+      Wbudowane dyrektywy transition:, in:, out:, animate:. CSS transitions i
+      spring/tweened animations bez zewnętrznych bibliotek. transition:fade,
+      transition:slide, transition:fly — gotowe do użycia.
+    icon: "✨"
+  - title: SvelteKit — full-stack framework
+    desc: >
+      SvelteKit to Next.js dla Svelte. SSR, SSG, API routes, file-based routing,
+      loading data, form actions. Deployable na Vercel, Netlify, Cloudflare, Node.
+      Oficjalny sposób budowania aplikacji Svelte.
+    icon: "🏗️"
+
+whenToUse:
+  - Wydajność jest priorytetem — mniejsze bundle, szybsze FCP
+  - Proste, czytelne komponenty bez boilerplate
+  - Aplikacje z dużą ilością animacji i transitions
+  - Gdy chcesz prostszą składnię niż React/Vue
+  - SvelteKit dla full-stack z SSR/SSG
+  - Embedded widgets i micro-frontends (mały footprint)
+
+firstComponent: |
+  <!-- App.svelte — pierwszy komponent -->
+  <script>
+    let count = 0;
+
+    function increment() {
+      count += 1;  // to wystarczy — UI reaguje!
+    }
+  </script>
+
+  <main>
+    <h1>Svelte Counter</h1>
+    <p>Kliknięto: {count} razy</p>
+    <button on:click={increment}>+1</button>
+  </main>
+
+  <style>
+    main { text-align: center; padding: 2rem; }
+    button { font-size: 1.5rem; padding: 0.5rem 1rem; }
+  </style>
+
+  <!-- Uruchomienie -->
+  <!-- npm create svelte@latest my-app -->
+  <!-- cd my-app && npm install && npm run dev -->

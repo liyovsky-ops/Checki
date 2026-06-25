@@ -1,0 +1,66 @@
+title: Prisma vs alternatywy ORM
+
+items:
+  - name: TypeORM
+    icon: "🔷"
+    color: "#e83524"
+    tagline: Decorator-based ORM dla TypeScript — Active Record i Data Mapper
+    pros:
+      - Active Record i Data Mapper patterns (wybierasz styl)
+      - Dekoratory TypeScript — czysty, deklaratywny kod
+      - Dojrzały ekosystem — duża społeczność, wiele tutoriali
+      - Migration system z auto-generowaniem i rollback
+    cons:
+      - Problemy z wydajnością na dużych projektach (query builder overhead)
+      - Bugs i niestabilne release'y — community narzeka
+      - Type safety słabsza niż Prisma (runtime errors na relacjach)
+      - Skomplikowana konfiguracja dla zaawansowanych relacji
+    vs: TypeORM dla projektów Angular/NestJS z decorator-based stylem. Prisma dla najlepszego DX i type safety — jeśli nie potrzebujesz Active Record pattern, Prisma jest lepsza.
+
+  - name: Drizzle ORM
+    icon: "💧"
+    color: "#c5f74f"
+    tagline: Lekki, SQL-like TypeScript ORM — „closest to SQL without writing SQL"
+    pros:
+      - SQL-like API — jeśli znasz SQL, znasz Drizzle
+      - Zero overhead — generuje dokładnie taki SQL jaki napiszesz
+      - Lżejszy niż Prisma — mniejszy bundle, szybszy cold start
+      - Relational queries z type-safe joins
+    cons:
+      - Młody projekt (2023) — mniejszy ekosystem i społeczność
+      - Brak GUI (odpowiednik Prisma Studio)
+      - Migracje mniej dojrzałe niż Prisma Migrate
+      - Wymaga więcej ręcznego kodu niż Prisma
+    vs: Drizzle gdy chcesz być bliżej SQL i zależy Ci na wydajności/bundle size (edge, serverless). Prisma gdy chcesz najlepszy DX, auto-generated client, Studio i dojrzałe migracje.
+
+  - name: Sequelize
+    icon: "🔗"
+    color: "#52b0e7"
+    tagline: Najpopularniejszy Node.js ORM — dojrzały, battle-tested
+    pros:
+      - Najpopularniejszy Node.js ORM — ogromna baza tutoriali i rozwiązań
+      - Wspiera PostgreSQL, MySQL, SQLite, MSSQL, MariaDB
+      - Dojrzałe migracje (sequelize-cli)
+      - Hooks, validations, scopes — bogaty feature set
+    cons:
+      - JavaScript-first — TypeScript support dodany później (słabszy)
+      - Type safety znacznie gorsza niż Prisma
+      - API jest verbose i nieintuicyjne (findAll, findOne naming)
+      - Performance issues na dużych projektach (eager loading traps)
+    vs: Sequelize dla istniejących JavaScript projektów. Prisma dla nowych TypeScript projektów — nie ma powodu żeby zaczynać z Sequelize w 2024+.
+
+  - name: Knex.js (Query Builder)
+    icon: "🔧"
+    color: "#e16426"
+    tagline: SQL query builder — nie ORM, ale fundament wielu ORMów
+    pros:
+      - Pełna kontrola nad SQL — budujesz query krok po kroku
+      - Lekki — query builder, nie ORM z modelami
+      - Fundament Objection.js i wielu custom ORMów
+      - Migracje i seeding wbudowane
+    cons:
+      - Nie jest ORM — brak modeli, relacji, auto-generated types
+      - Wymaga ręcznego pisania każdego query
+      - Brak type safety na wyniku query (any)
+      - Więcej kodu niż Prisma na ten sam efekt
+    vs: Knex gdy potrzebujesz query builder bez ORM overhead. Prisma gdy chcesz pełny ORM z type safety i DX. Większość projektów nie potrzebuje raw query buildera.

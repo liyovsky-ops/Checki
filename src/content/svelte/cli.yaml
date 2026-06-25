@@ -1,0 +1,337 @@
+title: Komendy Svelte & SvelteKit
+
+groups:
+  - name: Tworzenie projektu
+    icon: "🚀"
+    commands:
+      - cmd: npm create svelte@latest my-app
+        desc: Stwórz nowy projekt SvelteKit
+        detail:
+          what: Interaktywny wizard — wybierasz template (demo, skeleton, library), TypeScript, ESLint, Prettier, Playwright, Vitest.
+          how: 'Tworzy katalog my-app/ z pełną konfiguracją SvelteKit.'
+          tips:
+            - 'npm create svelte@latest . — w bieżącym katalogu'
+            - 'Wybierz "Skeleton project" dla czystego startu'
+      - cmd: npx degit sveltejs/template my-app
+        desc: Stwórz projekt Svelte (bez SvelteKit — standalone)
+        detail:
+          what: Minimalistyczny template Svelte bez SvelteKit. Tylko Vite + Svelte.
+          how: Dla widgetów, embeddable components, simple SPA bez SSR.
+          tips:
+            - 'Rzadko używane — SvelteKit jest rekomendowany nawet dla SPA'
+      - cmd: cd my-app && npm install
+        desc: Zainstaluj zależności
+        detail:
+          what: Instaluje Svelte, SvelteKit, Vite i inne zależności z package.json.
+          how: Standardowy npm install po create.
+          tips:
+            - 'pnpm install — szybsza alternatywa'
+      - cmd: npm run dev
+        desc: Uruchom dev server z hot reload
+        detail:
+          what: Startuje Vite dev server z HMR (Hot Module Replacement). Zmiany w .svelte pliku = instant update.
+          how: 'Domyślnie http://localhost:5173. --open otwiera przeglądarkę.'
+          flags:
+            - flag: '--open'
+              desc: Otwórz przeglądarkę automatycznie
+            - flag: '--port 3000'
+              desc: Zmień port
+            - flag: '--host'
+              desc: Udostępnij w sieci lokalnej
+          tips:
+            - 'npm run dev -- --open — otwiera przeglądarkę'
+
+  - name: Build i deploy
+    icon: "📦"
+    commands:
+      - cmd: npm run build
+        desc: Zbuduj produkcyjną wersję
+        detail:
+          what: Kompiluje Svelte do zoptymalizowanego JS, uruchamia adapter (node, static, vercel).
+          how: Output zależy od adapter — build/ (node), build/ (static), .vercel/ (vercel).
+          tips:
+            - 'npm run preview — podgląd production build lokalnie'
+      - cmd: npm run preview
+        desc: Podgląd production build
+        detail:
+          what: Uruchamia production build lokalnie. Sprawdź czy SSR, routing i API działają po buildzie.
+          how: 'http://localhost:4173 domyślnie.'
+          tips:
+            - 'Zawsze testuj preview przed deploy'
+      - cmd: node build
+        desc: Uruchom Node server (adapter-node)
+        detail:
+          what: Startuje produkcyjny Node server z SvelteKit output.
+          how: 'Wymaga @sveltejs/adapter-node. PORT env kontroluje port.'
+          tips:
+            - 'PORT=3000 node build — custom port'
+            - 'W Docker: COPY build/ . && CMD ["node", "build"]'
+      - cmd: npx svelte-kit sync
+        desc: Synchronizuj typy SvelteKit (generuj .svelte-kit/types)
+        detail:
+          what: Generuje TypeScript types dla routes, load functions, form actions. Automatycznie odpalany przez dev/build.
+          how: Ręcznie gdy types się rozjadą lub po zmianach w routing.
+          tips:
+            - 'Uruchamia się automatycznie — ręcznie tylko przy problemach z types'
+
+  - name: Routing i strony
+    icon: "🗺️"
+    commands:
+      - cmd: touch src/routes/about/+page.svelte
+        desc: Stwórz nową stronę /about
+        detail:
+          what: File-based routing — plik w routes/ = ścieżka URL.
+          how: '+page.svelte = komponent strony. +layout.svelte = shared layout.'
+          tips:
+            - 'mkdir -p src/routes/blog/[slug] && touch src/routes/blog/[slug]/+page.svelte — dynamiczne route'
+      - cmd: touch src/routes/about/+page.js
+        desc: Dodaj load function (pobieranie danych)
+        detail:
+          what: '+page.js eksportuje load() — pobiera dane ZANIM strona się wyrenderuje.'
+          how: 'export async function load({ params, fetch }) { return { data } }'
+          tips:
+            - '+page.server.js — load tylko na serwerze (sekrety, DB)'
+      - cmd: touch src/routes/api/users/+server.js
+        desc: Stwórz API endpoint /api/users
+        detail:
+          what: '+server.js eksportuje GET/POST/PUT/DELETE — REST API w SvelteKit.'
+          how: 'export async function GET() { return json(data) }'
+          tips:
+            - 'import { json, error } from "@sveltejs/kit" — helpery'
+      - cmd: touch src/routes/+layout.svelte
+        desc: Stwórz root layout
+        detail:
+          what: Layout opakowuje wszystkie strony. Navbar, footer, global styles.
+          how: '<slot /> renderuje child page content.'
+          tips:
+            - 'Nested layouts: src/routes/dashboard/+layout.svelte — layout tylko dla /dashboard/*'
+      - cmd: touch src/routes/+error.svelte
+        desc: Stwórz custom error page
+        detail:
+          what: Wyświetla się gdy load() rzuci error lub strona nie istnieje.
+          how: 'import { page } from "$app/stores"; $page.error.message'
+          tips:
+            - 'Osobny +error.svelte per route group dla custom 404'
+
+  - name: Komponenty i store
+    icon: "🧱"
+    commands:
+      - cmd: touch src/lib/components/Button.svelte
+        desc: Stwórz reusable komponent
+        detail:
+          what: src/lib/ to specjalny katalog — importujesz z "$lib/". Komponenty, utilities, stores.
+          how: 'import Button from "$lib/components/Button.svelte"'
+          tips:
+            - '$lib alias działa w całym projekcie — nie ../../../'
+      - cmd: touch src/lib/stores.js
+        desc: Stwórz plik z stores
+        detail:
+          what: Centralne miejsce na writable/readable/derived stores.
+          how: 'export const count = writable(0); — import i użyj {$count} w template'
+          tips:
+            - 'Custom stores z encapsulated logiką — export subscribe + custom methods'
+      - cmd: touch src/lib/server/db.js
+        desc: Stwórz server-only moduł
+        detail:
+          what: src/lib/server/ nie jest dostępne z klienta. Bezpieczne miejsce na DB connections, API keys.
+          how: SvelteKit rzuci error jeśli spróbujesz importować server module z client code.
+          tips:
+            - 'import { db } from "$lib/server/db" — tylko w +page.server.js i +server.js'
+
+  - name: TypeScript i typy
+    icon: "📘"
+    commands:
+      - cmd: npx svelte-check
+        desc: Sprawdź typy w całym projekcie
+        detail:
+          what: Uruchamia svelte-check — sprawdza TypeScript types, a11y, i Svelte-specific errors w .svelte plikach.
+          how: 'Odpowiednik tsc --noEmit ale rozumie .svelte pliki.'
+          flags:
+            - flag: '--watch'
+              desc: Watch mode — sprawdza przy każdej zmianie
+            - flag: '--tsconfig tsconfig.json'
+              desc: Custom tsconfig
+          tips:
+            - 'npm run check — skrót w package.json'
+            - 'Dodaj do CI pipeline'
+      - cmd: npx svelte-check --watch
+        desc: Watch mode — ciągłe sprawdzanie typów
+        detail:
+          what: Sprawdza typy przy każdej zmianie pliku. Szybszy feedback niż manual check.
+          how: Zostawia się w osobnym terminalu obok dev server.
+          tips:
+            - 'Łap type errors w real-time'
+
+  - name: Testy
+    icon: "🧪"
+    commands:
+      - cmd: npx vitest
+        desc: Uruchom testy jednostkowe
+        detail:
+          what: Vitest to natywny test runner dla Vite. Szybki, HMR w testach.
+          how: 'npm run test — uruchamia vitest.'
+          tips:
+            - 'npx vitest --watch — watch mode'
+            - 'npx vitest --coverage — z code coverage'
+      - cmd: npx vitest run
+        desc: Uruchom testy jednokrotnie (CI)
+        detail:
+          what: Uruchamia testy bez watch mode — idealne dla CI.
+          how: 'Exit code 0 = pass, 1 = fail.'
+          tips:
+            - 'npx vitest run --reporter=junit > test-results.xml — JUnit output dla CI'
+      - cmd: npx playwright test
+        desc: Uruchom E2E testy (Playwright)
+        detail:
+          what: E2E testy z Playwright. SvelteKit template opcjonalnie dodaje Playwright.
+          how: Testy w tests/ katalogu. Uruchamia przeglądarkę headless.
+          tips:
+            - 'npx playwright test --headed — z widoczną przeglądarką'
+      - cmd: "import { render } from '@testing-library/svelte'"
+        desc: Testing Library dla Svelte
+        detail:
+          what: Renderuj komponent w teście, interaktuj, assertuj.
+          how: 'render(Component, { props }); screen.getByText(); fireEvent.click()'
+          tips:
+            - 'npm install -D @testing-library/svelte @testing-library/jest-dom'
+
+  - name: Svelte 5 (Runes)
+    icon: "✨"
+    commands:
+      - cmd: "let count = $state(0)"
+        desc: Reactive state (Svelte 5)
+        detail:
+          what: $state() zastępuje let + $:. Explicit reactive declaration. TypeScript-friendly.
+          how: 'Compiler rozumie $state i generuje reaktywny kod.'
+          tips:
+            - '$state.frozen() — immutable reactive state'
+      - cmd: "let doubled = $derived(count * 2)"
+        desc: Derived value (Svelte 5)
+        detail:
+          what: $derived() zastępuje $:. Automatycznie przelicza gdy zależności się zmienią.
+          how: 'Odpowiednik $: doubled = count * 2; ale bardziej explicit.'
+          tips:
+            - '$derived.by(() => { complex logic }) — dla złożonych obliczeń'
+      - cmd: "$effect(() => { console.log(count) })"
+        desc: Side effect (Svelte 5)
+        detail:
+          what: "$effect() zastępuje $: statement. Odpala się gdy zależności się zmienią."
+          how: 'Odpowiednik useEffect w React ale z auto dependency tracking.'
+          tips:
+            - '$effect.pre() — odpala PRZED DOM update'
+            - 'Return cleanup function jak w useEffect'
+      - cmd: "let { children } = $props()"
+        desc: Props (Svelte 5)
+        detail:
+          what: $props() zastępuje export let. Destructuring props z type safety.
+          how: 'let { name, age = 25 } = $props<{ name: string; age?: number }>()'
+          tips:
+            - 'TypeScript generics dla type-safe props'
+
+  - name: Konfiguracja
+    icon: "🔧"
+    commands:
+      - cmd: cat svelte.config.js
+        desc: Główna konfiguracja SvelteKit
+        detail:
+          what: Konfiguruje adapter, preprocessors, aliasy, CSP, env.
+          how: 'export default { kit: { adapter: adapter() }, preprocess: vitePreprocess() }'
+          tips:
+            - 'kit.alias: { "$components": "src/lib/components" } — custom aliasy'
+      - cmd: cat vite.config.js
+        desc: Konfiguracja Vite
+        detail:
+          what: Vite config — plugins, server options, optimizeDeps.
+          how: 'SvelteKit automatycznie konfiguruje Vite. Edytuj dla custom plugins.'
+          tips:
+            - '@sveltejs/vite-plugin-svelte jest dodany automatycznie'
+      - cmd: touch .env
+        desc: Zmienne środowiskowe
+        detail:
+          what: PUBLIC_ prefix = dostępne w kliencie. Bez prefix = server only.
+          how: 'PUBLIC_API_URL = dostępne wszędzie. SECRET_KEY = tylko +server.js/+page.server.js'
+          tips:
+            - 'import { PUBLIC_API_URL } from "$env/static/public"'
+            - 'import { SECRET_KEY } from "$env/static/private"'
+      - cmd: npm install -D @sveltejs/adapter-static
+        desc: Zainstaluj adapter static (SSG)
+        detail:
+          what: Generuje statyczne HTML pliki zamiast Node server. Deploy na CDN.
+          how: 'Zmień adapter w svelte.config.js. Dodaj export const prerender = true; do +layout.js.'
+          tips:
+            - 'Idealne dla blogów, landing pages, dokumentacji'
+      - cmd: npm install -D @sveltejs/adapter-vercel
+        desc: Zainstaluj adapter Vercel
+        detail:
+          what: Optimized output dla Vercel. Edge functions, serverless, ISR support.
+          how: 'Zmień adapter w svelte.config.js. git push → auto deploy.'
+          tips:
+            - 'Vercel auto-detects SvelteKit — zero config deploy'
+      - cmd: npm install -D @sveltejs/adapter-node
+        desc: Zainstaluj adapter Node
+        detail:
+          what: Generuje standalone Node server. Deploy na VPS, Docker, Railway.
+          how: 'node build/ — startuje produkcyjny server.'
+          tips:
+            - 'Dockerfile: FROM node:20-slim → COPY build/ → CMD node build'
+
+  - name: Tailwind CSS
+    icon: "🌊"
+    commands:
+      - cmd: npx svelte-add@latest tailwindcss
+        desc: Dodaj Tailwind CSS do projektu
+        detail:
+          what: Auto-konfiguruje Tailwind CSS w SvelteKit. Dodaje PostCSS, config, app.css.
+          how: Jednolinijkowa integracja — zero ręcznej konfiguracji.
+          tips:
+            - 'Alternatywa: npm install -D tailwindcss @tailwindcss/vite + manual config'
+      - cmd: npm install -D tailwindcss @tailwindcss/vite
+        desc: Manual Tailwind 4 installation
+        detail:
+          what: Tailwind v4 z Vite pluginem. Dodaj do vite.config.js.
+          how: '@import "tailwindcss" w src/app.css.'
+          tips:
+            - 'Tailwind v4 nie wymaga tailwind.config.js — CSS-first config'
+
+  - name: Debugowanie
+    icon: "🐛"
+    commands:
+      - cmd: "{@debug variable}"
+        desc: Debug directive w template
+        detail:
+          what: Wstawia breakpoint w dev tools gdy zmienna się zmieni. Svelte-specific.
+          how: 'W template: {@debug user, count} — pauzuje gdy user lub count się zmieni.'
+          tips:
+            - 'Tylko w dev mode — ignorowane w production build'
+      - cmd: "console.log($$props)"
+        desc: Loguj wszystkie props komponentu
+        detail:
+          what: $$props zawiera wszystkie props przekazane do komponentu.
+          how: Przydatne do debugowania — co dokładnie dostaje komponent.
+          tips:
+            - '$$restProps — props nie zadeklarowane przez export let'
+      - cmd: npm install -D @sveltejs/vite-plugin-svelte-inspector
+        desc: Svelte Inspector (klik → source code)
+        detail:
+          what: Ctrl+Shift+Click na element → otwiera komponent w edytorze.
+          how: Automatycznie wbudowany w SvelteKit dev server.
+          tips:
+            - 'Działa out of the box — nie wymaga instalacji w nowych projektach'
+
+  - name: Instalacja rozszerzeń
+    icon: "🔌"
+    commands:
+      - cmd: npm install -D svelte-preprocess
+        desc: Preprocessor (SCSS, PostCSS, TypeScript)
+        detail:
+          what: Pozwala używać SCSS, Less, PostCSS w style tags.
+          how: 'W SvelteKit vitePreprocess() obsługuje TypeScript i PostCSS automatycznie.'
+          tips:
+            - 'Rzadko potrzebny w SvelteKit — vitePreprocess wystarczy'
+      - cmd: npm install @sveltejs/enhanced-img
+        desc: Optymalizacja obrazków
+        detail:
+          what: Automatyczny resize, format conversion (WebP, AVIF), lazy loading.
+          how: '<enhanced:img src="/photo.jpg" alt="..." /> — zamienia na zoptymalizowane source set.'
+          tips:
+            - 'Odpowiednik next/image dla SvelteKit'

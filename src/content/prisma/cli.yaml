@@ -1,0 +1,402 @@
+title: Komendy Prisma
+
+groups:
+  - name: Inicjalizacja i setup
+    icon: "📦"
+    commands:
+      - cmd: npm install prisma @prisma/client
+        desc: Instalacja Prisma CLI i Client
+        detail:
+          what: "Instaluje prisma (CLI + narzędzia) i @prisma/client (runtime query engine)."
+          how: "prisma to devDependency (CLI), @prisma/client to dependency (runtime)."
+          tips:
+            - 'npm install -D prisma — CLI tylko jako devDependency'
+            - 'npx prisma — wywołanie bez globalnej instalacji'
+      - cmd: npx prisma init
+        desc: Inicjalizuj Prisma w projekcie
+        detail:
+          what: Tworzy prisma/schema.prisma z domyślnym PostgreSQL datasource i .env z DATABASE_URL.
+          how: Jednorazowe — uruchom na początku projektu.
+          flags:
+            - flag: '--datasource-provider sqlite'
+              desc: Użyj SQLite zamiast PostgreSQL
+            - flag: '--datasource-provider mysql'
+              desc: Użyj MySQL
+          tips:
+            - 'npx prisma init --datasource-provider sqlite — najszybszy start do dev'
+            - 'Edytuj .env z prawdziwym DATABASE_URL przed migrate'
+      - cmd: npx prisma init --datasource-provider sqlite
+        desc: Inicjalizuj z SQLite (zero config)
+        detail:
+          what: SQLite nie wymaga serwera — plik .db w projekcie. Idealny do prototypów i dev.
+          how: "DATABASE_URL=\"file:./dev.db\" w .env."
+          tips:
+            - 'Zmień na PostgreSQL przed produkcją — SQLite nie obsługuje concurrent writes'
+      - cmd: npx prisma generate
+        desc: Generuj Prisma Client z schema
+        detail:
+          what: "Czyta schema.prisma i generuje type-safe client w node_modules/@prisma/client."
+          how: Uruchom po każdej zmianie schema. Automatycznie przy migrate dev.
+          tips:
+            - 'Dodaj do postinstall: "postinstall": "prisma generate" w package.json'
+            - 'npx prisma generate --watch — auto-regeneracja przy zmianach schema'
+      - cmd: npx prisma generate --watch
+        desc: Auto-regeneruj client przy zmianach schema
+        detail:
+          what: Obserwuje schema.prisma i regeneruje client automatycznie przy zapisie.
+          how: Przydatne w development — zmień schema, od razu masz nowe typy.
+          tips:
+            - 'Uruchom w osobnym terminalu obok dev servera'
+      - cmd: npx prisma validate
+        desc: Zwaliduj schema.prisma
+        detail:
+          what: Sprawdza czy schema jest poprawna (syntax, relacje, typy) bez generowania clienta.
+          how: Szybki check w CI pipeline.
+          tips:
+            - 'Dodaj do CI: npx prisma validate && npx prisma generate'
+      - cmd: npx prisma format
+        desc: Sformatuj schema.prisma
+        detail:
+          what: Auto-formatuje schema — wyrównuje pola, sortuje atrybuty, czyści whitespace.
+          how: Jak prettier ale dla schema.prisma.
+          tips:
+            - 'Dodaj do pre-commit hook: npx prisma format'
+
+  - name: Migracje
+    icon: "🔄"
+    commands:
+      - cmd: npx prisma migrate dev --name init
+        desc: Stwórz i zastosuj migrację (development)
+        detail:
+          what: Porównuje schema z bazą, generuje SQL migrację, aplikuje ją, regeneruje client.
+          how: Zawsze z --name opisującym zmianę. Migracje w prisma/migrations/.
+          flags:
+            - flag: '--name add_phone'
+              desc: Nazwa migracji (wymagana)
+            - flag: --create-only
+              desc: Generuj SQL bez aplikowania (do ręcznej edycji)
+          tips:
+            - 'npx prisma migrate dev --name add_phone_to_user — opisowa nazwa'
+            - 'Commituj prisma/migrations/ do git!'
+      - cmd: npx prisma migrate dev --create-only
+        desc: Generuj migrację BEZ aplikowania
+        detail:
+          what: Tworzy plik SQL migracji ale NIE wykonuje go. Przydatne do ręcznej edycji SQL.
+          how: Edytuj SQL → npx prisma migrate dev żeby zastosować.
+          tips:
+            - 'Użyj gdy Prisma generuje suboptimalny SQL (np. DROP + CREATE zamiast ALTER)'
+      - cmd: npx prisma migrate deploy
+        desc: Zastosuj migracje na produkcji
+        detail:
+          what: Aplikuje WSZYSTKIE pending migracje. Nie generuje nowych. Safe for CI/CD.
+          how: Idempotent — nie powtarza zastosowanych migracji.
+          tips:
+            - 'Typowy CI: npx prisma migrate deploy && node dist/main.js'
+            - 'NIGDY nie używaj migrate dev na produkcji!'
+      - cmd: npx prisma migrate status
+        desc: Sprawdź status migracji
+        detail:
+          what: Pokazuje które migracje są zastosowane, które pending, czy są problemy.
+          how: Przydatne do debugowania stanu bazy.
+          tips:
+            - 'Jeśli status pokazuje "drift" — schema nie odpowiada bazie'
+      - cmd: npx prisma migrate reset
+        desc: Reset bazy (drop + recreate + migrate + seed)
+        detail:
+          what: Dropuje bazę, tworzy od nowa, aplikuje wszystkie migracje, uruchamia seed.
+          how: TYLKO development! NIGDY na produkcji.
+          tips:
+            - 'npx prisma migrate reset --force — bez pytania'
+      - cmd: npx prisma migrate resolve --applied 20240101
+        desc: Oznacz migrację jako zastosowaną
+        detail:
+          what: Ręcznie oznacza migrację jako zastosowaną bez wykonywania SQL.
+          how: Przydatne przy baseline istniejącej bazy lub naprawie stanu migracji.
+          tips:
+            - 'npx prisma migrate resolve --rolled-back <id> — oznacz jako wycofaną'
+      - cmd: npx prisma migrate diff
+        desc: Pokaż różnicę między schema a bazą
+        detail:
+          what: Generuje SQL diff bez tworzenia migracji. Podgląd co by się zmieniło.
+          how: '--from-schema-datasource --to-schema-datamodel — porównaj bazę z schema'
+          tips:
+            - 'npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script — pełny SQL od zera'
+
+  - name: Prisma Studio i debugging
+    icon: "🖥️"
+    commands:
+      - cmd: npx prisma studio
+        desc: Otwórz GUI do bazy w przeglądarce
+        detail:
+          what: Uruchamia webowy interfejs do tabel — CRUD, filtrowanie, edycja relacji.
+          how: "Domyślnie localhost:5555. Czyta z schema.prisma."
+          flags:
+            - flag: '--port 5556'
+              desc: Zmień port
+            - flag: '--browser none'
+              desc: Nie otwieraj automatycznie przeglądarki
+          tips:
+            - 'Przydatne do seed data i debugowania relacji'
+      - cmd: npx prisma db pull
+        desc: Wciągnij schema z istniejącej bazy (introspection)
+        detail:
+          what: Czyta strukturę bazy i generuje schema.prisma z niej. Reverse engineering.
+          how: Przydatne do migracji istniejącej bazy na Prisma.
+          tips:
+            - 'Po introspection: npx prisma generate → masz client dla istniejącej bazy'
+      - cmd: npx prisma db push
+        desc: Pushuj schema do bazy BEZ migracji
+        detail:
+          what: Aplikuje schema.prisma bezpośrednio na bazę (sync). Nie tworzy pliku migracji.
+          how: TYLKO prototypy! Na produkcji używaj migrate.
+          tips:
+            - 'Szybkie prototypowanie — zmieniasz schema, db push, gotowe'
+            - 'Może DROP TABLE jeśli zmienisz model!'
+      - cmd: npx prisma db seed
+        desc: Uruchom seed script
+        detail:
+          what: Wykonuje seed script zdefiniowany w package.json ("prisma.seed").
+          how: Automatycznie uruchamiany po migrate reset.
+          tips:
+            - '"prisma": { "seed": "ts-node prisma/seed.ts" } w package.json'
+      - cmd: npx prisma db execute --file setup.sql
+        desc: Wykonaj surowy SQL na bazie
+        detail:
+          what: Uruchamia SQL z pliku bezpośrednio na bazy. Przydatne do custom setup.
+          how: Nie zmienia schema ani migracji.
+          tips:
+            - 'npx prisma db execute --stdin < setup.sql — z stdin'
+
+  - name: Prisma Client — wzorce użycia
+    icon: "🔌"
+    commands:
+      - cmd: const prisma = new PrismaClient()
+        desc: Stwórz instancję Prisma Client
+        detail:
+          what: Tworzy connection pool do bazy. JEDEN PrismaClient per aplikacja (singleton).
+          how: Nie twórz nowego clienta na każdy request — connection pool leak.
+          tips:
+            - 'W Next.js: globalThis.prisma ??= new PrismaClient()'
+            - 'W NestJS: PrismaService extends PrismaClient jako Injectable'
+      - cmd: 'prisma.$connect()'
+        desc: Jawne połączenie z bazą
+        detail:
+          what: Prisma łączy się automatycznie przy pierwszym query. $connect() robi to wcześniej.
+          how: Przydatne w serverless — pre-warm connection w cold start.
+          tips:
+            - 'Zazwyczaj niepotrzebne — lazy connection jest OK'
+      - cmd: 'prisma.$disconnect()'
+        desc: Zamknij connection pool
+        detail:
+          what: Zamyka wszystkie połączenia z bazą. Ważne przy graceful shutdown.
+          how: W HTTP server — zamknij w SIGTERM handler.
+          tips:
+            - 'process.on("SIGTERM", () => prisma.$disconnect())'
+      - cmd: 'prisma.$queryRaw`SELECT * FROM "User"`'
+        desc: Surowy SQL query (type-safe template literal)
+        detail:
+          what: Wykonaj raw SQL z template literal (auto-parametryzacja, SQL injection safe).
+          how: Wynik jest any[] — dodaj typ generyczny dla type safety.
+          tips:
+            - 'prisma.$queryRaw<User[]>`SELECT * FROM "User" WHERE id = ${id}`'
+            - 'Template literal = parametryzowane query (safe)'
+      - cmd: 'prisma.$executeRaw`UPDATE "User" SET name = ${name}`'
+        desc: Surowy SQL bez wyniku (INSERT/UPDATE/DELETE)
+        detail:
+          what: Wykonaj raw SQL który modyfikuje dane. Zwraca liczbę zmodyfikowanych rows.
+          how: Przydatne do bulk operations lub SQL features nieobsługiwanych przez Prisma.
+          tips:
+            - 'const count = await prisma.$executeRaw`DELETE FROM "Log" WHERE date < ${cutoff}`'
+      - cmd: 'prisma.$transaction([...])'
+        desc: Transakcja (sequential)
+        detail:
+          what: Wykonaj tablicę operacji atomowo. Jeśli jedna failuje — wszystkie rollback.
+          how: Prostsze niż interactive transaction. Każda operacja jest niezależna.
+          tips:
+            - 'const [user, post] = await prisma.$transaction([createUser, createPost])'
+      - cmd: 'prisma.$transaction(async (tx) => {...})'
+        desc: Transakcja interaktywna (callback)
+        detail:
+          what: Pełna kontrola nad transakcją — możesz czytać dane i podejmować decyzje w środku.
+          how: Przydatne do transfer pieniędzy, rezerwacji, inventory.
+          tips:
+            - 'if (sender.balance < amount) throw new Error() — rollback w callback'
+      - cmd: 'prisma.user.findMany({ where, orderBy, take, skip })'
+        desc: Pobierz listę rekordów z filtrami
+        detail:
+          what: Type-safe query z filtrowaniem, sortowaniem i paginacją.
+          how: where = filtry, orderBy = sortowanie, take = LIMIT, skip = OFFSET.
+          tips:
+            - 'Cursor pagination: { take: 10, cursor: { id: lastId }, skip: 1 }'
+      - cmd: 'prisma.user.findUnique({ where: { email } })'
+        desc: Pobierz jeden rekord po unique field
+        detail:
+          what: "Szuka po polu z @unique lub @id. Zwraca null jeśli nie znaleziono."
+          how: Szybciej niż findFirst — używa unique index.
+          tips:
+            - 'findUniqueOrThrow — rzuca exception zamiast zwracać null'
+      - cmd: 'prisma.user.create({ data, include })'
+        desc: Stwórz nowy rekord
+        detail:
+          what: Wstawia nowy row. data = pola. include = załaduj relacje w response.
+          how: Zwraca stworzony rekord z wygenerowanym ID.
+          tips:
+            - 'Nested create: data: { posts: { create: [...] } } — stwórz z relacjami'
+      - cmd: 'prisma.user.createMany({ data: [...] })'
+        desc: Bulk insert wielu rekordów
+        detail:
+          what: Wstawia wiele rows jednym INSERT. Szybciej niż wiele create().
+          how: skipDuplicates ignoruje duplikaty zamiast failować.
+          tips:
+            - 'createMany nie zwraca stworzonych rekordów — tylko count'
+            - '{ skipDuplicates: true } — ignoruj duplikaty unique constraint'
+      - cmd: 'prisma.user.update({ where, data })'
+        desc: Aktualizuj rekord
+        detail:
+          what: Aktualizuje jeden row po unique field. Rzuca error jeśli nie istnieje.
+          how: Atomic operations — { increment, decrement, multiply, divide }.
+          tips:
+            - 'data: { views: { increment: 1 } } — atomowy inkrement'
+      - cmd: 'prisma.user.updateMany({ where, data })'
+        desc: Bulk update wielu rekordów
+        detail:
+          what: Aktualizuje wiele rows pasujących do where. Zwraca count.
+          how: Nie zwraca zaktualizowanych rekordów — tylko liczbę.
+          tips:
+            - 'prisma.post.updateMany({ where: { published: false }, data: { published: true } })'
+      - cmd: 'prisma.user.upsert({ where, create, update })'
+        desc: Create or Update (upsert)
+        detail:
+          what: Jeśli rekord istnieje — update. Jeśli nie — create. Atomowe.
+          how: where = szukaj, create = dane do stworzenia, update = dane do aktualizacji.
+          tips:
+            - 'Idealne do sync — zawsze masz aktualny rekord bez sprawdzania czy istnieje'
+      - cmd: 'prisma.user.delete({ where: { id } })'
+        desc: Usuń rekord
+        detail:
+          what: Usuwa jeden row po unique field. Rzuca error jeśli nie istnieje.
+          how: "Cascade delete zależy od konfiguracji onDelete w schema."
+          tips:
+            - 'deleteMany — bulk delete z where filtrem'
+      - cmd: 'prisma.user.count({ where })'
+        desc: Policz rekordy
+        detail:
+          what: COUNT(*) z opcjonalnym filtrem. Szybciej niż findMany + .length.
+          how: Zwraca number.
+          tips:
+            - 'prisma.user.count({ where: { role: "ADMIN" } }) — ile adminów'
+      - cmd: 'prisma.user.aggregate({ _avg, _sum, _count })'
+        desc: Agregacje (AVG, SUM, MIN, MAX)
+        detail:
+          what: SQL aggregations z type-safe API.
+          how: _avg, _sum, _min, _max, _count na polach numerycznych.
+          tips:
+            - 'prisma.order.aggregate({ _sum: { total: true }, _avg: { total: true } })'
+
+  - name: Zaawansowane query patterns
+    icon: "🧩"
+    commands:
+      - cmd: 'prisma.user.groupBy({ by: ["role"], _count: true })'
+        desc: Group By z agregacją
+        detail:
+          what: SQL GROUP BY z type-safe API. Grupuj po polach, agreguj wyniki.
+          how: by = pola do grupowania, having = filtr na grupach.
+          tips:
+            - 'having: { price: { _avg: { gt: 100 } } } — filtr na agregacie'
+      - cmd: 'prisma.user.findMany({ distinct: ["role"] })'
+        desc: Unikalne wartości (DISTINCT)
+        detail:
+          what: Zwraca unikalne kombinacje pól. Odpowiednik SELECT DISTINCT.
+          how: distinct na jednym lub wielu polach.
+          tips:
+            - 'prisma.user.findMany({ distinct: ["city", "country"] }) — unikalne pary'
+      - cmd: 'prisma.user.findMany({ cursor: { id: 10 }, take: 5, skip: 1 })'
+        desc: Cursor-based pagination
+        detail:
+          what: Paginacja po cursor (ID ostatniego rekordu) zamiast offset. Stabilna przy zmianach danych.
+          how: cursor = start from, take = ile, skip = 1 (pomiń cursor element).
+          tips:
+            - 'Lepsze niż offset pagination dla infinite scroll'
+      - cmd: 'prisma.user.findMany({ select: { _count: { select: { posts: true } } } })'
+        desc: Count relacji bez ładowania
+        detail:
+          what: Policz powiązane rekordy bez eager loading. Lżejsze niż include.
+          how: _count w select — zwraca liczbę zamiast tablicy.
+          tips:
+            - 'Idealne do wyświetlania "User (5 posts)" bez ładowania postów'
+      - cmd: 'prisma.$queryRawUnsafe(sql, ...params)'
+        desc: Raw SQL z dynamicznym query (uwaga na injection!)
+        detail:
+          what: Wykonuje dynamicznie budowany SQL. NIE jest safe by default — musisz parametryzować.
+          how: Użyj TYLKO gdy template literal ($queryRaw) nie wystarczy.
+          tips:
+            - 'NIGDY nie konkatenuj user input! Zawsze parametryzuj.'
+      - cmd: 'prisma.user.findFirst({ where, orderBy })'
+        desc: Pobierz pierwszy pasujący rekord
+        detail:
+          what: Jak findMany ale zwraca pierwszy wynik lub null. Nie wymaga unique field.
+          how: Przydatne z orderBy — "najnowszy post", "najdroższy produkt".
+          tips:
+            - 'findFirstOrThrow — rzuca wyjątek zamiast null'
+      - cmd: 'prisma.user.deleteMany({ where: { createdAt: { lt: cutoff } } })'
+        desc: Bulk delete z filtrem
+        detail:
+          what: Usuwa wszystkie rekordy pasujące do where. Zwraca count.
+          how: "Uwaga: nie triggeruje cascade jeśli nie skonfigurujesz onDelete w schema."
+          tips:
+            - 'Cleanup job: deleteMany stare logi, expired sessions'
+      - cmd: 'prisma.$use(async (params, next) => { ... })'
+        desc: Middleware (deprecated — użyj extensions)
+        detail:
+          what: Interceptor na każdy query. Logowanie, soft delete, audit trail.
+          how: Deprecated w Prisma 5+ — migruj na Prisma Client Extensions.
+          tips:
+            - 'Prisma Client Extensions ($extends) to nowszy, lepszy API'
+      - cmd: 'prisma.$extends({ query: { user: { findMany } } })'
+        desc: Prisma Client Extensions
+        detail:
+          what: Rozszerzenia clienta — custom methods, computed fields, query interceptors.
+          how: Nowszy zamiennik middleware. Composable, type-safe.
+          tips:
+            - 'Soft delete extension: override delete → update({ deletedAt: now() })'
+      - cmd: 'prisma.user.findMany({ relationLoadStrategy: "join" })'
+        desc: Strategia ładowania relacji (join vs query)
+        detail:
+          what: Prisma domyślnie robi osobne query per relacja. join strategia robi SQL JOIN.
+          how: Preview feature — wymaga previewFeatures = ["relationJoins"] w schema.
+          tips:
+            - 'JOIN jest szybszy dla 1:1 i 1:N. Osobne queries lepsze dla M:N'
+
+  - name: Środowisko i konfiguracja
+    icon: "🔧"
+    commands:
+      - cmd: 'DATABASE_URL="postgresql://user:pass@host:5432/db"'
+        desc: Ustaw connection string w .env
+        detail:
+          what: Prisma czyta DATABASE_URL z .env. Format zależy od provider.
+          how: PostgreSQL, MySQL, SQLite, SQL Server, MongoDB — każdy ma inny format.
+          tips:
+            - 'SQLite: DATABASE_URL="file:./dev.db"'
+            - 'PostgreSQL: DATABASE_URL="postgresql://user:pass@localhost:5432/mydb?schema=public"'
+            - 'MySQL: DATABASE_URL="mysql://user:pass@localhost:3306/mydb"'
+      - cmd: npx prisma version
+        desc: Pokaż wersję Prisma
+        detail:
+          what: Wyświetla wersje Prisma CLI, Client, Engine.
+          how: Sprawdź czy CLI i Client mają tę samą wersję.
+          tips:
+            - 'Mismatched versions = dziwne błędy. Zawsze upgrade obu razem.'
+      - cmd: 'PRISMA_LOG_LEVEL=query npx prisma ...'
+        desc: Włącz logowanie zapytań SQL
+        detail:
+          what: Prisma loguje każdy SQL query z parametrami i czasem wykonania.
+          how: Przydatne do debugowania slow queries.
+          tips:
+            - 'new PrismaClient({ log: ["query", "info", "warn", "error"] }) — programowo'
+      - cmd: npx prisma debug
+        desc: Diagnostyka Prisma
+        detail:
+          what: Wyświetla informacje diagnostyczne — wersje, ścieżki, zmienne env.
+          how: Przydatne przy zgłaszaniu bugów.
+          tips:
+            - 'Dołącz output do issue na GitHub'

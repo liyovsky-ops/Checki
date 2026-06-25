@@ -1,0 +1,91 @@
+title: Responsive Design & Dark Mode
+
+items:
+  - name: Breakpoints — mobile-first responsive
+    desc: >
+      Tailwind jest mobile-first. Bazowe style = mobile. Prefixy dodają style DLA WIĘKSZYCH ekranów:
+      sm (640px+), md (768px+), lg (1024px+), xl (1280px+), 2xl (1536px+).
+      Czytaj: "na md i wyżej zastosuj ten styl".
+    code: |
+      <!-- Tekst: mały na mobile, większy na desktop -->
+      <h1 class="text-xl md:text-3xl lg:text-5xl">
+        Responsive heading
+      </h1>
+
+      <!-- Grid: 1 kolumna mobile, 2 tablet, 3 desktop -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div>Card 1</div>
+        <div>Card 2</div>
+        <div>Card 3</div>
+      </div>
+
+      <!-- Ukryj na mobile, pokaż na desktop -->
+      <nav class="hidden lg:flex items-center gap-4">
+        Desktop navigation
+      </nav>
+
+      <!-- Pokaż na mobile, ukryj na desktop -->
+      <button class="lg:hidden">
+        ☰ Mobile menu
+      </button>
+
+  - name: Dark Mode
+    desc: >
+      Prefiks dark: aktywuje style w dark mode. Dwie strategie:
+      media (automatycznie z prefers-color-scheme) lub class (toggle ręczny,
+      dodaj class="dark" na html element).
+    code: |
+      <!-- Dark mode colors -->
+      <div class="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
+        Content adapts to theme
+      </div>
+
+      <!-- Dark mode border and shadow -->
+      <div class="border border-gray-200 dark:border-gray-700
+                  shadow-md dark:shadow-gray-900/50">
+        Card
+      </div>
+
+      <!-- Toggle strategy (tailwind.config.js) -->
+      <!-- darkMode: 'class' → toggle z JS -->
+      <!-- darkMode: 'media' → automatycznie z OS setting -->
+
+      <!-- JavaScript toggle -->
+      <script>
+        document.documentElement.classList.toggle('dark')
+      </script>
+
+  - name: Container queries i arbitrary values
+    desc: >
+      Arbitrary values: klasy z custom wartościami w nawiasach kwadratowych.
+      Zamiast dodawać custom config, pisz: bg-[#1da1f2], w-[calc(100%-2rem)], top-[117px].
+      Container queries: @container do responsive relative to parent, nie viewport.
+    code: |
+      <!-- Arbitrary values -->
+      <div class="bg-[#1da1f2]">Custom Twitter blue</div>
+      <div class="w-[calc(100%-2rem)]">Calc width</div>
+      <div class="grid-cols-[200px_1fr_200px]">Custom grid template</div>
+      <div class="text-[clamp(1rem,2vw,2rem)]">Clamp font size</div>
+
+      <!-- Container queries -->
+      <div class="@container">
+        <div class="@md:flex @md:gap-4">
+          Responds to container width, not viewport
+        </div>
+      </div>
+
+  - name: Print i inne media modifiers
+    desc: >
+      print: — style dla drukowania. motion-safe: / motion-reduce: — respektuj
+      prefers-reduced-motion. portrait: / landscape: — orientacja.
+    code: |
+      <!-- Ukryj nawigację przy drukowaniu -->
+      <nav class="print:hidden">Navigation</nav>
+
+      <!-- Pokaż URL linków przy drukowaniu -->
+      <a class="print:after:content-['_('_attr(href)_')']" href="/page">Link</a>
+
+      <!-- Wyłącz animacje jeśli user preferuje -->
+      <div class="motion-safe:animate-bounce motion-reduce:animate-none">
+        Respects user motion preferences
+      </div>

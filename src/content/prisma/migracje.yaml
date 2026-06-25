@@ -1,0 +1,101 @@
+title: Prisma Migrate — migracje schematu
+
+items:
+  - name: Workflow migracji
+    desc: >
+      Zmiana schema.prisma → prisma migrate dev generuje SQL → aplikuje na bazę →
+      regeneruje client. Migracje w prisma/migrations/ — commituj do git.
+    code: |
+      # 1. Zmień schema.prisma (dodaj pole, model, relację)
+      # 2. Wygeneruj i zastosuj migrację
+      npx prisma migrate dev --name add_phone_to_user
+
+      # Prisma:
+      # - Porównuje schema z bazą (diff)
+      # - Generuje SQL migrację w prisma/migrations/YYYYMMDDHHMMSS_add_phone_to_user/
+      # - Aplikuje SQL na bazę
+      # - Regeneruje Prisma Client
+
+      # Wygenerowany SQL (przykład):
+      # ALTER TABLE "User" ADD COLUMN "phone" TEXT;
+
+  - name: Migracja na produkcji
+    desc: >
+      prisma migrate deploy aplikuje WSZYSTKIE pending migracje. Nie generuje nowych.
+      Bezpieczne w CI/CD — idempotent, nie zmieni schema.prisma.
+    code: |
+      # W CI/CD pipeline lub przy deploy
+      npx prisma migrate deploy
+
+      # Sprawdź status migracji
+      npx prisma migrate status
+
+      # Typowy Dockerfile
+      # RUN npx prisma generate
+      # CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+
+  - name: Reset bazy (development only)
+    desc: >
+      prisma migrate reset dropuje bazę, tworzy od nowa, aplikuje wszystkie migracje,
+      uruchamia seed. TYLKO na dev — NIGDY na produkcji.
+    code: |
+      # Reset (drop + recreate + migrate + seed)
+      npx prisma migrate reset
+
+      # Force reset bez pytania
+      npx prisma migrate reset --force
+
+      # Seed script (prisma/seed.ts)
+      // package.json:
+      // "prisma": { "seed": "ts-node prisma/seed.ts" }
+
+      import { PrismaClient } from '@prisma/client'
+      const prisma = new PrismaClient()
+
+      async function main() {
+        await prisma.user.createMany({
+          data: [
+            { email: 'admin@x.com', name: 'Admin', role: 'ADMIN' },
+            { email: 'user@x.com', name: 'User' },
+          ],
+        })
+      }
+      main()
+
+  - name: Rozwiązywanie problemów z migracjami
+    desc: >
+      Baseline migration dla istniejącej bazy, resolve dla failujących migracji,
+      ręczna edycja SQL gdy auto-generated nie wystarczy.
+    code: |
+      # Baseline — istniejąca baza, zaczynasz migracje
+      npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/migrations/0_init/migration.sql
+      npx prisma migrate resolve --applied 0_init
+
+      # Resolve — oznacz migrację jako zastosowaną (bez wykonywania)
+      npx prisma migrate resolve --applied 20240101120000_add_phone
+
+      # Resolve — oznacz migrację jako wycofaną
+      npx prisma migrate resolve --rolled-back 20240101120000_add_phone
+
+      # Ręczna edycja SQL migracji
+      # Edytuj prisma/migrations/XXXXXX/migration.sql PRZED deploy
+      # Przydatne dla: data backfill, custom indexes, triggers
+
+  - name: Niebezpieczne operacje — co unikać
+    desc: >
+      Prisma ostrzega przed destructive operations. Usunięcie pola/modelu = DROP COLUMN/TABLE.
+      Zmiana typu pola może wymagać ręcznej migracji z data conversion.
+    code: |
+      # ⚠️ NIEBEZPIECZNE — Prisma ostrzega:
+      # - Usunięcie modelu → DROP TABLE (dane tracone!)
+      # - Usunięcie pola → DROP COLUMN
+      # - Zmiana typu pola → może wymagać CAST
+      # - Dodanie @unique na polu z duplikatami → migracja failuje
+
+      # BEZPIECZNY PATTERN (expand-contract):
+      # 1. Dodaj nowe pole (nullable)
+      # 2. Deploy → backfill dane
+      # 3. Usuń stare pole w osobnej migracji
+
+      # Sprawdź co migracja zrobi BEZ aplikowania:
+      npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --script

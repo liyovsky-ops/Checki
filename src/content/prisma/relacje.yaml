@@ -1,0 +1,139 @@
+title: Relacje w Prisma
+
+items:
+  - name: One-to-Many (1:N)
+    desc: >
+      Najpopularniejsza relacja. User ma wiele Posts. @relation definiuje foreign key.
+      Pole tablicowe (Post[]) po stronie "many", pole skalarne + foreign key po stronie "one".
+    code: |
+      model User {
+        id    Int    @id @default(autoincrement())
+        email String @unique
+        posts Post[]                    // strona "many"
+      }
+
+      model Post {
+        id       Int  @id @default(autoincrement())
+        title    String
+        author   User @relation(fields: [authorId], references: [id])
+        authorId Int                    // foreign key
+      }
+
+      // Query z relacją
+      const userWithPosts = await prisma.user.findUnique({
+        where: { id: 1 },
+        include: { posts: true },
+      })
+
+      // Nested create
+      const user = await prisma.user.create({
+        data: {
+          email: 'jan@x.com',
+          posts: {
+            create: [
+              { title: 'Post 1' },
+              { title: 'Post 2' },
+            ],
+          },
+        },
+      })
+
+  - name: Many-to-Many (M:N)
+    desc: >
+      Implicit (Prisma zarządza join table) lub explicit (własna join table z extra polami).
+      Implicit jest prostsze — Prisma tworzy _PostToTag table automatycznie.
+    code: |
+      // Implicit M:N — Prisma zarządza join table
+      model Post {
+        id    Int    @id @default(autoincrement())
+        title String
+        tags  Tag[]
+      }
+
+      model Tag {
+        id    Int    @id @default(autoincrement())
+        name  String @unique
+        posts Post[]
+      }
+
+      // Explicit M:N — własna join table z extra polami
+      model User {
+        id          Int          @id @default(autoincrement())
+        memberships Membership[]
+      }
+
+      model Team {
+        id          Int          @id @default(autoincrement())
+        memberships Membership[]
+      }
+
+      model Membership {
+        user     User     @relation(fields: [userId], references: [id])
+        userId   Int
+        team     Team     @relation(fields: [teamId], references: [id])
+        teamId   Int
+        role     String   @default("member")    // extra pole!
+        joinedAt DateTime @default(now())
+
+        @@id([userId, teamId])         // composite primary key
+      }
+
+  - name: One-to-One (1:1)
+    desc: >
+      User ma jeden Profile. @unique na foreign key wymusza 1:1.
+      Strona z foreign key jest "owning side" relacji.
+    code: |
+      model User {
+        id      Int      @id @default(autoincrement())
+        email   String   @unique
+        profile Profile?             // opcjonalny profil
+      }
+
+      model Profile {
+        id     Int    @id @default(autoincrement())
+        bio    String?
+        avatar String?
+        user   User   @relation(fields: [userId], references: [id])
+        userId Int    @unique         // @unique = 1:1
+      }
+
+  - name: Self-relation (drzewo, hierarchia)
+    desc: >
+      Model odnosi się do samego siebie. Employee → manager (Employee).
+      Przydatne do drzew kategorii, komentarzy z replies, org chart.
+    code: |
+      model Employee {
+        id         Int        @id @default(autoincrement())
+        name       String
+        manager    Employee?  @relation("management", fields: [managerId], references: [id])
+        managerId  Int?
+        reports    Employee[] @relation("management")
+      }
+
+      model Comment {
+        id       Int       @id @default(autoincrement())
+        text     String
+        parent   Comment?  @relation("replies", fields: [parentId], references: [id])
+        parentId Int?
+        replies  Comment[] @relation("replies")
+      }
+
+  - name: Cascade delete i referential actions
+    desc: >
+      Co się dzieje gdy usuwasz parent? Cascade (usuń children), SetNull, Restrict (blokuj).
+      Konfigurujesz per relacja w schema.
+    code: |
+      model User {
+        id    Int    @id @default(autoincrement())
+        posts Post[]
+      }
+
+      model Post {
+        id       Int  @id @default(autoincrement())
+        author   User @relation(fields: [authorId], references: [id],
+                       onDelete: Cascade,     // usuń posty gdy user usunięty
+                       onUpdate: Cascade)
+        authorId Int
+      }
+
+      // Opcje: Cascade, Restrict, NoAction, SetNull, SetDefault

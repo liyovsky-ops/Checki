@@ -1,0 +1,88 @@
+title: Utility Classes — kategorie
+
+items:
+  - name: Layout & Flexbox
+    desc: >
+      Flex, grid, position, display — buduj layouty bez custom CSS.
+      flex, items-center, justify-between, grid, grid-cols-3, gap-4,
+      absolute, relative, fixed, sticky.
+    code: |
+      <!-- Flexbox centered -->
+      <div class="flex items-center justify-between p-4">
+        <span>Left</span>
+        <span>Right</span>
+      </div>
+
+      <!-- Grid 3 kolumny -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-gray-100 p-4 rounded">Col 1</div>
+        <div class="bg-gray-100 p-4 rounded">Col 2</div>
+        <div class="bg-gray-100 p-4 rounded">Col 3</div>
+      </div>
+
+      <!-- Sticky header -->
+      <header class="sticky top-0 z-50 bg-white shadow-sm">
+        Navigation
+      </header>
+
+  - name: Spacing (Padding & Margin)
+    desc: >
+      p-{n} = padding, m-{n} = margin. Skala: 0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32, 40, 48, 56, 64, 72, 80, 96.
+      Kierunkowe: px- (horizontal), py- (vertical), pt- (top), pr- (right), pb- (bottom), pl- (left).
+      Negatywne: -m-2. Auto: mx-auto (center block).
+    code: |
+      <!-- Padding i margin -->
+      <div class="p-4 m-2">              <!-- padding 1rem, margin 0.5rem -->
+      <div class="px-6 py-3">            <!-- horizontal 1.5rem, vertical 0.75rem -->
+      <div class="mt-8 mb-4">            <!-- margin-top 2rem, margin-bottom 1rem -->
+      <div class="mx-auto max-w-lg">     <!-- centered, max-width -->
+      <div class="space-y-4">            <!-- gap between children -->
+
+  - name: Typography
+    desc: >
+      Font size: text-xs → text-9xl. Weight: font-light → font-black.
+      Line height: leading-none → leading-loose. Letter spacing: tracking-tight → tracking-widest.
+      Text color: text-gray-900. Text align: text-left, text-center, text-right.
+      Truncate: truncate (overflow hidden + ellipsis).
+    code: |
+      <h1 class="text-4xl font-bold tracking-tight text-gray-900">
+        Heading
+      </h1>
+      <p class="text-sm text-gray-600 leading-relaxed">
+        Body text with relaxed line height
+      </p>
+      <span class="text-xs uppercase tracking-wide text-gray-500 font-semibold">
+        Label
+      </span>
+      <p class="truncate w-48">
+        Very long text that will be truncated with ellipsis...
+      </p>
+
+  - name: Colors & Backgrounds
+    desc: >
+      Kolory: slate, gray, zinc, neutral, stone, red, orange, amber, yellow, lime, green,
+      emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink, rose.
+      Skala: 50 (lightest) → 950 (darkest). bg-{color}-{shade}, text-{color}-{shade},
+      border-{color}-{shade}. Opacity: bg-blue-500/50 = 50% opacity.
+    code: |
+      <div class="bg-blue-500 text-white">           <!-- blue background -->
+      <div class="bg-gradient-to-r from-blue-500 to-purple-500"> <!-- gradient -->
+      <div class="bg-black/60 backdrop-blur-sm">     <!-- overlay with blur -->
+      <div class="border border-gray-200">           <!-- subtle border -->
+      <div class="ring-2 ring-blue-500">             <!-- focus ring -->
+
+  - name: Borders & Shadows
+    desc: >
+      rounded-none → rounded-full. border-0 → border-4. shadow-sm → shadow-2xl.
+      Ring: ring-{n} ring-{color}. Divide: divide-y divide-gray-200 (borders between children).
+    code: |
+      <div class="rounded-lg border border-gray-200 shadow-md">
+        Card with rounded corners, border, and shadow
+      </div>
+      <div class="rounded-full w-12 h-12 bg-blue-500">
+        Circle avatar
+      </div>
+      <ul class="divide-y divide-gray-200">
+        <li class="py-3">Item 1</li>
+        <li class="py-3">Item 2</li>
+      </ul>

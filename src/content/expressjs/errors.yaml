@@ -1,0 +1,130 @@
+title: Error Handling
+
+items:
+  - name: Error handling middleware
+    desc: >
+      Express error handler ma 4 argumenty: (err, req, res, next). Musi być zarejestrowany
+      PO wszystkich route'ach. Łapie błędy z next(err) i throw w async handlerach.
+    code: |
+      // Error handler — 4 argumenty!
+      app.use((err, req, res, next) => {
+        console.error(err.stack);
+        res.status(err.status || 500).json({
+          error: err.message || 'Internal Server Error',
+        });
+      });
+
+      // Rzucanie błędu w route
+      app.get('/risky', (req, res, next) => {
+        try {
+          throw new Error('Something went wrong');
+        } catch (err) {
+          next(err); // przekaż do error handlera
+        }
+      });
+
+  - name: Custom error classes
+    desc: >
+      Twórz własne klasy błędów z status code i message.
+      Pozwala error handlerowi zwrócić odpowiedni HTTP status.
+    code: |
+      class AppError extends Error {
+        constructor(message, status = 500) {
+          super(message);
+          this.status = status;
+        }
+      }
+
+      class NotFoundError extends AppError {
+        constructor(resource = 'Resource') {
+          super(`${resource} not found`, 404);
+        }
+      }
+
+      class ValidationError extends AppError {
+        constructor(message) {
+          super(message, 422);
+        }
+      }
+
+      // Użycie
+      app.get('/users/:id', async (req, res, next) => {
+        try {
+          const user = await db.findUser(req.params.id);
+          if (!user) throw new NotFoundError('User');
+          res.json(user);
+        } catch (err) {
+          next(err);
+        }
+      });
+
+  - name: Async error wrapper
+    desc: >
+      Express 4 nie łapie automatycznie rejected promises. Wrapper asyncHandler
+      automatycznie przekazuje błędy z async funkcji do next().
+    code: |
+      // Wrapper — eliminuje try/catch w każdym route
+      const asyncHandler = (fn) => (req, res, next) =>
+        Promise.resolve(fn(req, res, next)).catch(next);
+
+      // Bez wrappera — trzeba try/catch
+      app.get('/users', async (req, res, next) => {
+        try {
+          const users = await db.getUsers();
+          res.json(users);
+        } catch (err) {
+          next(err);
+        }
+      });
+
+      // Z wrapperem — czyściej
+      app.get('/users', asyncHandler(async (req, res) => {
+        const users = await db.getUsers();
+        res.json(users);
+      }));
+
+      // Express 5 łapie async errors automatycznie!
+
+  - name: 404 handler
+    desc: >
+      Middleware na końcu (przed error handler) łapie requesty
+      które nie pasują do żadnego route'a.
+    code: |
+      // Wszystkie route'y tutaj...
+      app.get('/users', ...);
+      app.get('/posts', ...);
+
+      // 404 — po wszystkich route'ach
+      app.use((req, res) => {
+        res.status(404).json({
+          error: 'Not Found',
+          path: req.path,
+          method: req.method,
+        });
+      });
+
+      // Error handler — na samym końcu
+      app.use((err, req, res, next) => {
+        res.status(err.status || 500).json({ error: err.message });
+      });
+
+  - name: Validation z express-validator
+    desc: >
+      express-validator waliduje i sanityzuje req.body/query/params.
+      Zwraca czytelne błędy walidacji zamiast crashowania na złym input.
+    code: |
+      const { body, validationResult } = require('express-validator');
+
+      app.post('/users',
+        body('email').isEmail().normalizeEmail(),
+        body('password').isLength({ min: 8 }),
+        body('name').trim().notEmpty(),
+        (req, res) => {
+          const errors = validationResult(req);
+          if (!errors.isEmpty()) {
+            return res.status(422).json({ errors: errors.array() });
+          }
+          // dane są zwalidowane i zsanityzowane
+          res.status(201).json({ user: req.body });
+        }
+      );

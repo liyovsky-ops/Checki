@@ -1,0 +1,114 @@
+title: Microservices i WebSocket
+
+items:
+  - name: TCP microservice
+    desc: >
+      NestJS ma wbudowany transport layer dla mikroserwisów. TCP, Redis, RabbitMQ,
+      Kafka, gRPC — przełączasz transport bez zmiany kodu. @MessagePattern obsługuje
+      wiadomości, @EventPattern obsługuje eventy (fire-and-forget).
+    code: |
+      // math.service.ts — microservice
+      import { Controller } from '@nestjs/common';
+      import { MessagePattern, EventPattern } from '@nestjs/microservices';
+
+      @Controller()
+      export class MathController {
+        @MessagePattern({ cmd: 'sum' })
+        sum(data: "number[]): number {"
+          return data.reduce((a, b) => a + b, 0);
+        }
+
+        @EventPattern('user_created')
+        handleUserCreated(data: "{ name: string }) {"
+          console.log('New user:', data.name);
+        }
+      }
+
+      // main.ts — microservice bootstrap
+      const app = await NestFactory.createMicroservice(AppModule, {
+        transport: Transport.TCP,
+        options: "{ host: '0.0.0.0', port: 3001 },"
+      });
+      await app.listen();
+
+  - name: Client — wywołanie mikroserwisu
+    desc: >
+      ClientProxy wysyła wiadomości do mikroserwisu. send() czeka na odpowiedź
+      (request-response), emit() jest fire-and-forget (event).
+    code: |
+      @Module({
+        imports: [
+          ClientsModule.register([{
+            name: 'MATH_SERVICE',
+            transport: Transport.TCP,
+            options: "{ host: 'math-service', port: 3001 },"
+          }]),
+        ],
+      })
+      export class AppModule {}
+
+      // Wywołanie
+      @Controller()
+      export class AppController {
+        constructor(@Inject('MATH_SERVICE') private client: ClientProxy) {}
+
+        @Get('sum')
+        sum() {
+          return this.client.send({ cmd: 'sum' }, [1, 2, 3, 4, 5]);
+        }
+
+        @Post('users')
+        createUser(@Body() dto: CreateUserDto) {
+          this.client.emit('user_created', dto);  // fire-and-forget
+          return { status: 'created' };
+        }
+      }
+
+  - name: WebSocket Gateway
+    desc: >
+      @WebSocketGateway() tworzy WebSocket server. @SubscribeMessage obsługuje
+      wiadomości od klienta. Wbudowane rooms, broadcast, namespace.
+    code: |
+      import { WebSocketGateway, SubscribeMessage, MessageBody,
+               WebSocketServer, ConnectedSocket } from '@nestjs/websockets';
+      import { Server, Socket } from 'socket.io';
+
+      @WebSocketGateway({ cors: "{ origin: '*' } })"
+      export class ChatGateway {
+        @WebSocketServer() server: Server;
+
+        @SubscribeMessage('message')
+        handleMessage(
+          @MessageBody() data: "{ room: string; text: string },"
+          @ConnectedSocket() client: Socket,
+        ) {
+          this.server.to(data.room).emit('message', {
+            user: client.id,
+            text: data.text,
+          });
+        }
+
+        @SubscribeMessage('join')
+        handleJoin(@MessageBody() room: "string, @ConnectedSocket() client: Socket) {"
+          client.join(room);
+          return { event: 'joined', data: room };
+        }
+      }
+
+  - name: "Redis Transport"
+    desc: >
+      Zmiana transportu na Redis — jeden liner w konfiguracji. Kod kontrolera
+      pozostaje identyczny. Redis Pub/Sub jako message broker między serwisami.
+    code: |
+      // Zmiana z TCP na Redis
+      const app = await NestFactory.createMicroservice(AppModule, {
+        transport: Transport.REDIS,
+        options: "{ host: 'redis', port: 6379 },"
+      });
+
+      // Client też zmienia transport
+      ClientsModule.register([{
+        name: 'MATH_SERVICE',
+        transport: Transport.REDIS,
+        options: "{ host: 'redis', port: 6379 },"
+      }])

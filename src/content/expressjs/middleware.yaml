@@ -1,0 +1,73 @@
+title: Middleware — łańcuch przetwarzania
+
+items:
+  - name: Czym jest middleware
+    desc: >
+      Middleware to funkcja (req, res, next). Przetwarza request, może go zmodyfikować,
+      zakończyć (res.send()) lub przekazać dalej (next()). Middleware chain = pipeline.
+    code: |
+      // Prosty logger middleware
+      function logger(req, res, next) {
+        console.log(`${req.method} ${req.url} — ${new Date().toISOString()}`)
+        next()  // przekaż do następnego middleware
+      }
+
+      app.use(logger)  // globalny — na każdy request
+
+  - name: Wbudowane middleware
+    desc: >
+      Express ma 3 wbudowane: express.json() (parsuje JSON body), express.urlencoded()
+      (parsuje form data), express.static() (serwuje pliki).
+    code: |
+      app.use(express.json())                          // { "name": "Jan" } → req.body
+      app.use(express.urlencoded({ extended: true }))  // form data → req.body
+      app.use(express.static('public'))                // public/style.css → /style.css
+
+  - name: Third-party middleware
+    desc: >
+      cors, helmet, morgan, compression, cookie-parser — popularne middleware
+      instalowane z npm.
+    code: |
+      const cors = require('cors')
+      const helmet = require('helmet')
+      const morgan = require('morgan')
+
+      app.use(cors())           // CORS headers
+      app.use(helmet())         // security headers (CSP, HSTS, X-Frame)
+      app.use(morgan('dev'))    // HTTP request logger
+
+  - name: Route-specific middleware
+    desc: >
+      Middleware tylko na konkretnych routes — auth check, validation.
+    code: |
+      function requireAuth(req, res, next) {
+        const token = req.headers.authorization?.split(' ')[1]
+        if (!token) return res.status(401).json({ error: 'No token' })
+        try {
+          req.user = jwt.verify(token, SECRET)
+          next()
+        } catch {
+          res.status(403).json({ error: 'Invalid token' })
+        }
+      }
+
+      // Tylko na /admin routes
+      app.use('/admin', requireAuth)
+
+      // Lub na konkretnym route
+      app.get('/profile', requireAuth, (req, res) => {
+        res.json({ user: req.user })
+      })
+
+  - name: Kolejność middleware ma znaczenie
+    desc: >
+      Middleware wykonuje się W KOLEJNOŚCI rejestracji. Jeśli auth middleware
+      jest po route handler — nie zadziała.
+    code: |
+      // ❌ ZŁE — route przed middleware
+      app.get('/secret', handler)
+      app.use(authMiddleware)  // za późno!
+
+      // ✅ DOBRE — middleware przed route
+      app.use(authMiddleware)
+      app.get('/secret', handler)

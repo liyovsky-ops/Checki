@@ -1,0 +1,130 @@
+title: Data Fetching — SSR, SSG, ISR, Streaming
+
+items:
+  - name: fetch() w Server Components
+    desc: >
+      W Server Components używasz natywnego fetch() bezpośrednio w komponencie.
+      Next.js rozszerza fetch o cache i revalidation. Domyślnie: cache=force-cache (SSG).
+      cache=no-store = SSR (fresh na każdy request).
+    code: |
+      // SSG — cache domyślnie (generowane raz przy build)
+      async function getProducts() {
+        const res = await fetch('https://api.example.com/products')
+        return res.json()
+      }
+
+      // SSR — fresh data na każdy request
+      async function getUser(id: string) {
+        const res = await fetch(`https://api.example.com/users/${id}`, {
+          cache: 'no-store',
+        })
+        return res.json()
+      }
+
+      // ISR — rewaliduj co 60 sekund
+      async function getPosts() {
+        const res = await fetch('https://api.example.com/posts', {
+          next: { revalidate: 60 },
+        })
+        return res.json()
+      }
+
+      // Użycie w komponencie
+      export default async function ProductsPage() {
+        const products = await getProducts()
+        return <ProductList products={products} />
+      }
+
+  - name: generateStaticParams — static paths
+    desc: >
+      Dla dynamicznych stron SSG musisz powiedzieć Next.js jakie [param] wartości
+      wygenerować przy buildzie. generateStaticParams zastępuje getStaticPaths z pages/.
+    code: |
+      // app/blog/[slug]/page.tsx
+      export async function generateStaticParams() {
+        const posts = await fetch('https://api.example.com/posts').then(r => r.json())
+        return posts.map((post: { slug: string }) => ({
+          slug: post.slug,
+        }))
+      }
+
+      export default async function BlogPost({
+        params,
+      }: {
+        params: Promise<{ slug: string }>
+      }) {
+        const { slug } = await params
+        const post = await fetch(`https://api.example.com/posts/${slug}`).then(r => r.json())
+        return (
+          <article>
+            <h1>{post.title}</h1>
+            <div>{post.content}</div>
+          </article>
+        )
+      }
+
+  - name: Streaming z React Suspense
+    desc: >
+      Zamiast czekać na WSZYSTKIE dane — streamuj HTML w kawałkach. Szybki
+      initial paint z loading.tsx, dane doładowują się asynchronicznie.
+      Użytkownik widzi skeleton natychmiast, treść pojawia się gdy gotowa.
+    code: |
+      import { Suspense } from 'react'
+
+      // Wolny fetch — nie blokuje reszty strony
+      async function SlowData() {
+        const data = await fetch('https://slow-api.com/data', {
+          cache: 'no-store',
+        }).then(r => r.json())
+        return <div>{data.result}</div>
+      }
+
+      export default function Dashboard() {
+        return (
+          <div>
+            <h1>Dashboard</h1>  {/* renderuje się NATYCHMIAST */}
+
+            <Suspense fallback={<div>Ładowanie danych...</div>}>
+              <SlowData />  {/* streamuje się gdy gotowe */}
+            </Suspense>
+          </div>
+        )
+      }
+
+  - name: Parallel & Sequential data fetching
+    desc: >
+      Domyślnie Server Components fetchują sekwencyjnie (waterfall). Użyj Promise.all
+      do równoległego fetchowania. Albo użyj Suspense — każdy komponent fetchuje
+      niezależnie i streamuje wynik.
+    code: |
+      // ❌ Sekwencyjne (waterfall) — drugie czeka na pierwsze
+      export default async function Page() {
+        const user = await getUser()     // 200ms
+        const posts = await getPosts()   // 300ms
+        // Total: 500ms (200 + 300)
+        return <div>{user.name}: {posts.length} posts</div>
+      }
+
+      // ✅ Równoległe — oba naraz
+      export default async function Page() {
+        const [user, posts] = await Promise.all([
+          getUser(),    // 200ms
+          getPosts(),   // 300ms
+        ])
+        // Total: 300ms (max z obu)
+        return <div>{user.name}: {posts.length} posts</div>
+      }
+
+      // ✅ Streaming — niezależne Suspense boundaries
+      export default function Page() {
+        return (
+          <div>
+            <Suspense fallback={<UserSkeleton />}>
+              <UserInfo />   {/* fetchuje niezależnie */}
+            </Suspense>
+            <Suspense fallback={<PostsSkeleton />}>
+              <PostsList />  {/* fetchuje niezależnie */}
+            </Suspense>
+          </div>
+        )
+      }

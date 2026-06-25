@@ -1,0 +1,356 @@
+title: Komendy Express.js
+
+groups:
+  - name: Instalacja i setup
+    icon: "📦"
+    commands:
+      - cmd: npm init -y && npm install express
+        desc: Nowy projekt z Express
+        detail:
+          what: Tworzy package.json i instaluje Express jako zależność.
+          how: npm init -y generuje domyślny package.json. express to jedyna wymagana zależność.
+          tips:
+            - 'npm install express cors helmet morgan — typowy starter pack'
+            - 'npm install -D nodemon — auto-restart przy zmianach'
+      - cmd: npx express-generator myapp
+        desc: Wygeneruj szkielet projektu Express
+        detail:
+          what: Generator tworzy pełną strukturę z views, routes, public, bin/www.
+          how: 'npx express-generator --no-view myapp — bez template engine (dla API)'
+          tips:
+            - '--view=pug — z Pug template engine'
+            - '--view=ejs — z EJS templates'
+      - cmd: npm install express cors helmet morgan dotenv
+        desc: Typowy stack Express API
+        detail:
+          what: Express + CORS + security headers + logger + env variables.
+          how: Minimum do produkcyjnego API. Dodaj express-validator i passport wg potrzeb.
+          tips:
+            - 'npm install -D nodemon typescript @types/express — dev dependencies'
+      - cmd: npm install -D nodemon
+        desc: Auto-restart serwera przy zmianach
+        detail:
+          what: nodemon monitoruje pliki i restartuje serwer automatycznie przy każdym zapisie.
+          how: 'package.json: "dev": "nodemon app.js"'
+          tips:
+            - 'nodemon --ignore tests/ — ignoruj katalog testów'
+            - 'nodemon --ext js,json,yaml — monitoruj dodatkowe rozszerzenia'
+      - cmd: npm install -D typescript @types/express @types/node ts-node
+        desc: Setup TypeScript dla Express
+        detail:
+          what: TypeScript + typy Express + ts-node do uruchamiania .ts bezpośrednio.
+          how: 'npx tsc --init → tsconfig.json. ts-node app.ts zamiast node app.js.'
+          tips:
+            - '"dev": "nodemon --exec ts-node src/app.ts" — nodemon + TypeScript'
+      - cmd: npm install express-async-errors
+        desc: Automatyczne łapanie async errors (Express 4)
+        detail:
+          what: Monkey-patchuje Express żeby automatycznie łapał rejected promises w async handlerach.
+          how: 'require("express-async-errors") na początku app.js — bez try/catch w routach.'
+          tips:
+            - 'Express 5 ma to wbudowane — ten pakiet nie będzie potrzebny'
+
+  - name: Uruchamianie serwera
+    icon: "🚀"
+    commands:
+      - cmd: node app.js
+        desc: Uruchom serwer Express
+        detail:
+          what: Startuje serwer Node.js z aplikacją Express.
+          how: app.listen(3000) w app.js nasłuchuje na porcie 3000.
+          tips:
+            - 'PORT=8080 node app.js — zmień port przez env variable'
+      - cmd: npx nodemon app.js
+        desc: Uruchom z auto-restart (development)
+        detail:
+          what: nodemon monitoruje pliki i restartuje serwer przy zmianach.
+          how: Idealne do development — nie musisz ręcznie restartować po każdej zmianie.
+          tips:
+            - 'nodemon --delay 2 — czekaj 2s po zmianie przed restartem'
+      - cmd: NODE_ENV=production node app.js
+        desc: Uruchom w trybie produkcyjnym
+        detail:
+          what: NODE_ENV=production wyłącza debug output, włącza view caching, optymalizuje Express.
+          how: Express sprawdza process.env.NODE_ENV — na production jest 3× szybszy.
+          tips:
+            - 'Nigdy nie uruchamiaj produkcji z nodemon — użyj PM2'
+      - cmd: npx pm2 start app.js -i max
+        desc: Produkcyjny process manager z clusterem
+        detail:
+          what: PM2 zarządza procesami Node.js — auto-restart, clustering, logi, monitoring.
+          how: '-i max = tyle workerów ile rdzeni CPU. Wykorzystuje multi-core.'
+          flags:
+            - flag: '-i max'
+              desc: Cluster mode — worker per CPU core
+            - flag: '--name myapp'
+              desc: Nazwa procesu
+            - flag: '--watch'
+              desc: Auto-restart przy zmianach (dev)
+          tips:
+            - 'pm2 logs — podgląd logów wszystkich workerów'
+            - 'pm2 monit — dashboard z CPU/RAM per worker'
+      - cmd: npx pm2 stop myapp
+        desc: Zatrzymaj aplikację PM2
+        detail:
+          what: Gracefully zatrzymuje wszystkie worker procesy.
+          how: pm2 stop <name|id> zatrzymuje, pm2 delete usuwa z listy.
+          tips:
+            - 'pm2 restart myapp — restart bez downtime'
+            - 'pm2 reload myapp — zero-downtime reload (graceful)'
+
+  - name: Middleware
+    icon: "🔧"
+    commands:
+      - cmd: app.use(express.json())
+        desc: Parsuj JSON body w requestach
+        detail:
+          what: Middleware parsujący Content-Type application/json. Wynik w req.body.
+          how: Bez tego req.body jest undefined dla POST/PUT z JSON payload.
+          tips:
+            - 'app.use(express.json({ limit: "10mb" })) — zwiększ limit rozmiaru body'
+      - cmd: "app.use(express.urlencoded({ extended: true }))"
+        desc: Parsuj URL-encoded form data
+        detail:
+          what: Parsuje dane z formularzy HTML (application/x-www-form-urlencoded).
+          how: 'extended: true używa qs library (nested objects). false = querystring (flat).'
+          tips:
+            - 'Potrzebne dla klasycznych form submittów (nie JSON API)'
+      - cmd: app.use(cors())
+        desc: Włącz CORS dla wszystkich origins
+        detail:
+          what: Dodaje Access-Control-Allow-Origin i inne CORS headers do responses.
+          how: 'npm install cors. Bez argumentów = allow all origins (dev only!).'
+          tips:
+            - "cors({ origin: 'https://myapp.com' }) — ogranicz do konkretnego origin"
+            - "cors({ credentials: true }) — pozwól na cookies cross-origin"
+      - cmd: app.use(helmet())
+        desc: Dodaj security headers
+        detail:
+          what: Ustawia 15 security headers jedną linią — CSP, HSTS, X-Frame-Options, etc.
+          how: npm install helmet. Chroni przed XSS, clickjacking, MIME sniffing.
+          tips:
+            - 'helmet({ contentSecurityPolicy: false }) — wyłącz CSP jeśli psuje frontend'
+      - cmd: app.use(morgan('dev'))
+        desc: Loguj HTTP requesty
+        detail:
+          what: Loguje method, URL, status code, response time, size dla każdego requestu.
+          how: "npm install morgan. Formaty: 'dev' (kolorowy), 'combined' (Apache), 'tiny'."
+          tips:
+            - "morgan('combined', { stream: accessLogStream }) — logi do pliku"
+      - cmd: app.use(compression())
+        desc: Kompresuj responses (gzip/brotli)
+        detail:
+          what: Automatycznie kompresuje response body gzip lub brotli. Zmniejsza transfer o 60-80%.
+          how: npm install compression. Transparent — klient dostaje Content-Encoding header.
+          tips:
+            - 'Na produkcji lepiej kompresuj na Nginx/CDN zamiast w Node.js'
+      - cmd: app.use(express.static('public'))
+        desc: Serwuj pliki statyczne
+        detail:
+          what: Serwuje pliki z katalogu public/ (HTML, CSS, JS, obrazki) bez route handlerów.
+          how: "GET /style.css → public/style.css. GET /img/logo.png → public/img/logo.png."
+          tips:
+            - "app.use('/assets', express.static('public')) — z prefixem URL"
+            - 'express.static(path, { maxAge: "1d" }) — cache headers'
+      - cmd: app.use('/api', rateLimiter)
+        desc: Rate limiting na API routes
+        detail:
+          what: Ogranicza liczbę requestów per IP/window. Chroni przed brute force i DoS.
+          how: "npm install express-rate-limit. rateLimit({ windowMs: 15*60*1000, max: 100 })"
+          tips:
+            - 'Użyj Redis store dla distributed rate limiting (rate-limit-redis)'
+
+  - name: Routing
+    icon: "🛣️"
+    commands:
+      - cmd: app.get('/path', handler)
+        desc: Zdefiniuj GET route
+        detail:
+          what: Handler wywoływany dla GET /path. Najczęstsza metoda — pobieranie danych.
+          how: "handler = (req, res) => { res.json(data) }"
+          tips:
+            - 'app.get("/users/:id", handler) — z parametrem URL'
+      - cmd: app.post('/path', handler)
+        desc: Zdefiniuj POST route
+        detail:
+          what: Handler wywoływany dla POST /path. Tworzenie nowych zasobów.
+          how: "Dane w req.body (wymaga express.json() middleware)."
+          tips:
+            - 'res.status(201).json(created) — zwróć 201 Created'
+      - cmd: app.put('/path/:id', handler)
+        desc: Zdefiniuj PUT route (update)
+        detail:
+          what: Handler dla PUT — pełna aktualizacja zasobu.
+          how: "req.params.id + req.body = ID zasobu + nowe dane."
+          tips:
+            - 'app.patch() dla częściowej aktualizacji'
+      - cmd: app.delete('/path/:id', handler)
+        desc: Zdefiniuj DELETE route
+        detail:
+          what: Handler dla DELETE — usuwanie zasobu.
+          how: "res.sendStatus(204) — 204 No Content (standardowa odpowiedź na DELETE)."
+          tips:
+            - 'Soft delete (set deleted_at) vs hard delete (usunięcie z DB)'
+      - cmd: const router = express.Router()
+        desc: Stwórz modularny router
+        detail:
+          what: Router grupuje route'y w osobny moduł. Rejestrujesz go z app.use().
+          how: "router.get('/', handler) + app.use('/api/users', router)"
+          tips:
+            - 'Osobny plik per router: routes/users.js, routes/posts.js'
+      - cmd: app.use('/api', apiRouter)
+        desc: Zamontuj router z prefixem
+        detail:
+          what: Wszystkie route'y w apiRouter dostają prefix /api.
+          how: "router.get('/users') → GET /api/users"
+          tips:
+            - 'Zagnieżdżanie: app.use("/api/v1", v1Router)'
+
+  - name: Request i Response
+    icon: "📨"
+    commands:
+      - cmd: req.body
+        desc: Odczytaj JSON body z POST/PUT
+        detail:
+          what: Obiekt z danymi z request body. Wymaga express.json() middleware.
+          how: "POST { name: 'Jan' } → req.body.name === 'Jan'"
+          tips:
+            - 'Zawsze waliduj req.body — nigdy nie ufaj input od klienta'
+      - cmd: req.params
+        desc: Odczytaj parametry URL
+        detail:
+          what: "Parametry z URL pattern. /users/:id → req.params.id"
+          how: "Zawsze string — parseInt(req.params.id) do konwersji na number."
+          tips:
+            - 'req.params.id jest ZAWSZE string — nie porównuj z === do number'
+      - cmd: req.query
+        desc: Odczytaj query string
+        detail:
+          what: "Parametry z ?key=value. /search?q=express → req.query.q === 'express'"
+          how: Zawsze string lub undefined. Waliduj przed użyciem.
+          tips:
+            - '?page=1&limit=10 → req.query.page === "1" (string!)'
+      - cmd: res.json(data)
+        desc: Wyślij JSON response
+        detail:
+          what: Serializuje obiekt do JSON, ustawia Content-Type i wysyła.
+          how: "res.json({ users: [] }) → 200 OK + application/json"
+          tips:
+            - 'res.status(201).json(data) — z custom status code'
+      - cmd: res.status(code)
+        desc: Ustaw HTTP status code
+        detail:
+          what: Ustawia status code odpowiedzi. Chainable z .json(), .send().
+          how: "res.status(404).json({ error: 'Not found' })"
+          tips:
+            - '200 OK, 201 Created, 204 No Content, 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 422 Unprocessable, 429 Too Many Requests, 500 Internal'
+      - cmd: res.redirect(url)
+        desc: Przekieruj na inny URL
+        detail:
+          what: Wysyła 302 redirect (domyślnie). Klient automatycznie nawiguje do nowego URL.
+          how: "res.redirect('/login') lub res.redirect(301, '/new-url') dla permanent."
+          tips:
+            - '301 = permanent (SEO), 302 = temporary, 307 = temporary (zachowuje method)'
+
+  - name: Error Handling
+    icon: "🐛"
+    commands:
+      - cmd: app.use((err, req, res, next) => { })
+        desc: Zdefiniuj globalny error handler
+        detail:
+          what: Error handler middleware — 4 argumenty. Łapie wszystkie błędy z next(err).
+          how: Musi być zarejestrowany PO wszystkich route'ach. Jedna linia łapie wszystko.
+          tips:
+            - 'Loguj err.stack do pliku/monitoring, NIE wysyłaj stack trace do klienta'
+      - cmd: next(err)
+        desc: Przekaż błąd do error handlera
+        detail:
+          what: Wywołanie next z argumentem Error przekazuje go do error handler middleware.
+          how: "catch(err) { next(err) } — w try/catch lub .catch()"
+          tips:
+            - 'next() bez argumentu = następny middleware. next(err) = error handler.'
+      - cmd: "require('express-async-errors')"
+        desc: Auto-catch async errors (Express 4)
+        detail:
+          what: Eliminuje potrzebę try/catch w async handlerach. Automatycznie łapie rejected promises.
+          how: Dodaj na początku app.js — monkey-patchuje Express routing.
+          tips:
+            - 'Express 5 ma to wbudowane — nie potrzebujesz tego pakietu'
+
+  - name: Bezpieczeństwo
+    icon: "🔐"
+    commands:
+      - cmd: app.use(helmet())
+        desc: Security headers jedną linią
+        detail:
+          what: Ustawia CSP, HSTS, X-Frame-Options, X-Content-Type-Options i 11 innych headers.
+          how: npm install helmet. Dodaj jako pierwszy middleware po express.json().
+          tips:
+            - 'Najłatwiejszy security win — jedna linia kodu, 15 headerów'
+      - cmd: app.disable('x-powered-by')
+        desc: Ukryj Express w response headers
+        detail:
+          what: Domyślnie Express dodaje X-Powered-By header. Wyłączenie ukrywa framework.
+          how: helmet() robi to automatycznie. Manualnie jeśli nie używasz helmet.
+          tips:
+            - 'Atakujący szukają konkretnych frameworków — nie pomagaj im'
+      - cmd: app.set('trust proxy', 1)
+        desc: Zaufaj reverse proxy (za Nginx/LB)
+        detail:
+          what: Pozwala Express poprawnie czytać req.ip i req.protocol za reverse proxy.
+          how: "1 = zaufaj pierwszemu proxy. 'loopback' = zaufaj localhost proxy."
+          tips:
+            - 'Bez tego req.ip zwraca IP proxy, nie klienta'
+            - 'NIE ustawiaj na true (trust all) — security risk'
+
+  - name: Testy
+    icon: "🧪"
+    commands:
+      - cmd: npm install -D supertest jest
+        desc: Setup testów HTTP dla Express
+        detail:
+          what: supertest testuje Express app bez startowania serwera. Jest jako test runner.
+          how: "const request = require('supertest'); request(app).get('/users').expect(200)"
+          tips:
+            - 'Eksportuj app bez app.listen() — supertest sam startuje serwer'
+      - cmd: npx jest --watchAll
+        desc: Uruchom testy w trybie watch
+        detail:
+          what: Jest monitoruje pliki i re-runuje testy przy zmianach.
+          how: '--watchAll uruchamia wszystkie. --watch tylko zmienione.'
+          tips:
+            - 'jest --coverage — raport pokrycia kodu'
+      - cmd: npx jest --coverage
+        desc: Testy z raportem pokrycia
+        detail:
+          what: Generuje raport coverage — które linie kodu są testowane.
+          how: Raport HTML w coverage/lcov-report/index.html.
+          tips:
+            - 'Cel: >80% coverage na krytycznych routes'
+
+  - name: Deploy
+    icon: "🚢"
+    commands:
+      - cmd: npx pm2 start app.js --name myapp -i max
+        desc: Deploy z PM2 cluster mode
+        detail:
+          what: PM2 cluster = worker per CPU core. Auto-restart na crash. Zero-downtime reload.
+          how: 'pm2 reload myapp — graceful restart bez downtime.'
+          tips:
+            - 'pm2 startup — auto-start PM2 po restarcie serwera'
+            - 'pm2 save — zapisz listę procesów'
+      - cmd: docker build -t my-express-app .
+        desc: Zbuduj Docker image
+        detail:
+          what: Buduje obraz Docker z Express app na podstawie Dockerfile.
+          how: "FROM node:20-slim, COPY package*.json, RUN npm ci --production, CMD node app.js"
+          tips:
+            - 'Multi-stage build dla mniejszego image'
+            - 'node:20-slim zamiast node:20 — 5× mniejszy image'
+      - cmd: npx pm2 ecosystem
+        desc: Wygeneruj ecosystem.config.js (PM2)
+        detail:
+          what: Plik konfiguracyjny PM2 z ustawieniami deploymentu, env variables, cluster.
+          how: 'pm2 start ecosystem.config.js — uruchom z konfiguracją.'
+          tips:
+            - 'Konfiguruj env_production i env_development osobno'

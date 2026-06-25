@@ -1,0 +1,128 @@
+title: Komponenty Svelte
+
+items:
+  - name: Struktura komponentu .svelte
+    desc: >
+      Każdy komponent to plik .svelte z trzema sekcjami: script (logika),
+      markup (HTML template), style (scoped CSS). Wszystko w jednym pliku.
+    code: |
+      <!-- UserCard.svelte -->
+      <script>
+        export let name;      // prop — przyjmuje od rodzica
+        export let email;
+        let showEmail = false;
+      </script>
+
+      <div class="card">
+        <h3>{name}</h3>
+        {#if showEmail}
+          <p>{email}</p>
+        {/if}
+        <button on:click={() => showEmail = !showEmail}>
+          {showEmail ? 'Ukryj' : 'Pokaż'} email
+        </button>
+      </div>
+
+      <style>
+        .card {
+          border: 1px solid #ddd;
+          padding: 1rem;
+          border-radius: 8px;
+        }
+      </style>
+
+  - name: Props i binding
+    desc: >
+      Props deklarujesz przez export let. Two-way binding przez bind:value.
+      Reactive declarations ($:) reagują na zmianę zależności.
+    code: |
+      <!-- Form.svelte -->
+      <script>
+        let name = '';
+        let email = '';
+        $: isValid = name.length > 0 && email.includes('@');
+        $: greeting = `Cześć, ${name}!`;
+      </script>
+
+      <input bind:value={name} placeholder="Imię" />
+      <input bind:value={email} placeholder="Email" />
+      <p>{greeting}</p>
+      <button disabled={!isValid}>Wyślij</button>
+
+  - name: Logika template — if/each/await
+    desc: >
+      Bloki {#if}, {#each}, {#await} do warunkowego renderowania,
+      iteracji i obsługi asynchronicznych danych. Czytelniejsze niż JSX.
+    code: |
+      <script>
+        let items = ['React', 'Svelte', 'Vue'];
+        let promise = fetch('/api/users').then(r => r.json());
+      </script>
+
+      <!-- Warunkowe -->
+      {#if items.length > 0}
+        <ul>
+          {#each items as item, i (item)}
+            <li>{i + 1}. {item}</li>
+          {/each}
+        </ul>
+      {:else}
+        <p>Brak elementów</p>
+      {/if}
+
+      <!-- Async -->
+      {#await promise}
+        <p>Ładowanie...</p>
+      {:then users}
+        {#each users as user}
+          <p>{user.name}</p>
+        {/each}
+      {:catch error}
+        <p>Błąd: {error.message}</p>
+      {/await}
+
+  - name: Events i dispatch
+    desc: >
+      on:click, on:submit, on:keydown — event handlers. createEventDispatcher()
+      do emitowania custom events z child do parent.
+    code: |
+      <!-- Child.svelte -->
+      <script>
+        import { createEventDispatcher } from 'svelte';
+        const dispatch = createEventDispatcher();
+
+        function handleClick() {
+          dispatch('message', { text: 'Hello from child!' });
+        }
+      </script>
+      <button on:click={handleClick}>Wyślij</button>
+
+      <!-- Parent.svelte -->
+      <script>
+        import Child from './Child.svelte';
+        function handleMessage(event) {
+          alert(event.detail.text);
+        }
+      </script>
+      <Child on:message={handleMessage} />
+
+  - name: Slots — kompozycja komponentów
+    desc: >
+      Slots pozwalają przekazywać HTML content do komponentu.
+      Named slots ({slot name="header"}) dla wielu miejsc.
+    code: |
+      <!-- Card.svelte -->
+      <div class="card">
+        <div class="header">
+          <slot name="header">Domyślny nagłówek</slot>
+        </div>
+        <div class="body">
+          <slot>Domyślna treść</slot>
+        </div>
+      </div>
+
+      <!-- Użycie -->
+      <Card>
+        <span slot="header">Mój tytuł</span>
+        <p>Treść karty</p>
+      </Card>

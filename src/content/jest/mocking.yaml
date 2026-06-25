@@ -1,0 +1,147 @@
+title: Mocking — mockowanie w Jest
+
+items:
+  - name: jest.fn() — mock functions
+    desc: >
+      jest.fn() tworzy pustą mock function. Śledzi wywołania (calls), argumenty,
+      return values. mockReturnValue ustawia wartość zwracaną. mockImplementation
+      ustawia pełną implementację.
+    code: |
+      test('mock function basics', () => {
+        const mockFn = jest.fn();
+        mockFn('hello');
+        mockFn('world');
+
+        expect(mockFn).toHaveBeenCalledTimes(2);
+        expect(mockFn).toHaveBeenCalledWith('hello');
+        expect(mockFn).toHaveBeenLastCalledWith('world');
+      });
+
+      test('mock return values', () => {
+        const getPrice = jest.fn()
+          .mockReturnValueOnce(10)
+          .mockReturnValueOnce(20)
+          .mockReturnValue(0);
+
+        expect(getPrice()).toBe(10);  // first call
+        expect(getPrice()).toBe(20);  // second call
+        expect(getPrice()).toBe(0);   // all subsequent
+      });
+
+      test('mock implementation', () => {
+        const multiply = jest.fn((a, b) => a * b);
+        expect(multiply(3, 4)).toBe(12);
+        expect(multiply).toHaveBeenCalledWith(3, 4);
+      });
+
+  - name: jest.mock() — mockowanie modułów
+    desc: >
+      jest.mock('module') mockuje cały moduł automatycznie. Wszystkie eksporty stają się
+      jest.fn(). Możesz podać factory function dla custom implementacji.
+    code: |
+      // users.js
+      const axios = require('axios');
+      async function getUsers() {
+        const { data } = await axios.get('/api/users');
+        return data;
+      }
+
+      // users.test.js
+      jest.mock('axios');
+      const axios = require('axios');
+      const { getUsers } = require('./users');
+
+      test('fetches users', async () => {
+        const mockUsers = [{ id: 1, name: 'Jan' }];
+        axios.get.mockResolvedValue({ data: mockUsers });
+
+        const users = await getUsers();
+        expect(users).toEqual(mockUsers);
+        expect(axios.get).toHaveBeenCalledWith('/api/users');
+      });
+
+  - name: jest.spyOn() — szpiegowanie metod
+    desc: >
+      jest.spyOn() obserwuje wywołania istniejącej metody BEZ zastępowania jej.
+      Możesz opcjonalnie mockReturnValue. mockRestore() przywraca oryginał.
+    code: |
+      const calculator = {
+        add: (a, b) => a + b,
+      };
+
+      test('spy on method', () => {
+        const spy = jest.spyOn(calculator, 'add');
+
+        const result = calculator.add(2, 3);
+        expect(result).toBe(5);  // oryginalna implementacja dziala
+        expect(spy).toHaveBeenCalledWith(2, 3);
+
+        spy.mockRestore();
+      });
+
+      test('spy with mock', () => {
+        const spy = jest.spyOn(console, 'log').mockImplementation();
+        console.log('test');
+        expect(spy).toHaveBeenCalledWith('test');
+        spy.mockRestore();
+      });
+
+  - name: Timer mocks
+    desc: >
+      jest.useFakeTimers() kontroluje setTimeout, setInterval, Date.now.
+      jest.advanceTimersByTime(ms) przesuwa czas. jest.runAllTimers() wykonuje
+      wszystkie pending timery. Idealne do testowania debounce, retry, polling.
+    code: |
+      function debounce(fn, delay) {
+        let timer;
+        return (...args) => {
+          clearTimeout(timer);
+          timer = setTimeout(() => fn(...args), delay);
+        };
+      }
+
+      test('debounce', () => {
+        jest.useFakeTimers();
+        const callback = jest.fn();
+        const debounced = debounce(callback, 300);
+
+        debounced('a');
+        debounced('b');
+        debounced('c');
+
+        expect(callback).not.toHaveBeenCalled();
+
+        jest.advanceTimersByTime(300);
+        expect(callback).toHaveBeenCalledTimes(1);
+        expect(callback).toHaveBeenCalledWith('c');
+
+        jest.useRealTimers();
+      });
+
+  - name: Manual mocks (__mocks__)
+    desc: >
+      Katalog __mocks__/ obok modułu zawiera mock implementation.
+      Jest automatycznie używa go przy jest.mock(). Przydatne dla
+      powtarzalnych mocków (fs, axios, database client).
+    code: |
+      # Struktura:
+      # src/
+      #   utils/
+      #     api.js
+      #     __mocks__/
+      #       api.js      <-- manual mock
+
+      # src/utils/__mocks__/api.js
+      const fetchUser = jest.fn(() =>
+        Promise.resolve({ id: 1, name: 'Mock User' })
+      );
+      module.exports = { fetchUser };
+
+      # test — automatycznie użyje manual mock
+      jest.mock('./utils/api');
+      const { fetchUser } = require('./utils/api');
+
+      test('uses manual mock', async () => {
+        const user = await fetchUser();
+        expect(user.name).toBe('Mock User');
+      });

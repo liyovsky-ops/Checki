@@ -1,0 +1,66 @@
+title: Next.js vs alternatywy full-stack React
+
+items:
+  - name: Remix
+    icon: "💿"
+    color: "#e8f2ff"
+    tagline: Web-standards-first full-stack React framework
+    pros:
+      - Web standards (fetch, Response, FormData) zamiast custom API
+      - Nested routes z error boundaries i loading states
+      - Progressive enhancement — formularze działają bez JS
+      - Brak custom cache layer — polega na HTTP cache
+    cons:
+      - Mniejszy ekosystem i community niż Next.js
+      - Brak Image optimization (next/image jest killer feature)
+      - Brak ISR (Incremental Static Regeneration)
+      - Mniej tutoriali i zasobów edukacyjnych
+    vs: Remix lepszy gdy cenisz web standards i progressive enhancement. Next.js gdy potrzebujesz SSG/ISR, Image optimization, i deploy na Vercel.
+
+  - name: Nuxt
+    icon: "💚"
+    color: "#00dc82"
+    tagline: Full-stack framework dla Vue.js
+    pros:
+      - Vue.js ekosystem (Pinia, Vuetify, PrimeVue)
+      - Auto-imports (nie musisz importować ref, computed)
+      - Nitro server engine — deploy anywhere
+      - Prostsza mental model niż React Server Components
+    cons:
+      - Mniejszy ekosystem niż React/Next.js
+      - Mniej ofert pracy w porównaniu z React
+      - SSR/SSG mniej dojrzałe niż Next.js
+      - Wolniejszy development frameworka
+    vs: Nuxt jeśli preferujesz Vue.js. Next.js jeśli chcesz największy ekosystem i rynek pracy.
+
+  - name: SvelteKit
+    icon: "🔥"
+    color: "#ff3e00"
+    tagline: Full-stack Svelte — kompilowany, zero runtime
+    pros:
+      - Svelte kompiluje do vanilla JS — mniejszy bundle
+      - Prostsza składnia (no useState, no useEffect)
+      - Server load functions — jasny data flow
+      - Form actions z progressive enhancement
+    cons:
+      - Najmniejszy ekosystem z trzech
+      - Mniej dojrzały niż Next.js
+      - Mniej komponentów UI dostępnych
+      - Trudniej znaleźć deweloperów Svelte
+    vs: SvelteKit najlepsza DX i performance. Next.js wygrywa ekosystemem, community i rynkiem pracy.
+
+  - name: Astro
+    icon: "🚀"
+    color: "#ff5d01"
+    tagline: Content-first framework — zero JS domyślnie
+    pros:
+      - Zero JS domyślnie — HTML only, islands of interactivity
+      - Obsługuje React, Vue, Svelte, Preact w jednym projekcie
+      - Idealny do stron content-heavy (blogi, dokumentacja, marketing)
+      - Extremely fast — MPA (multi-page app) architecture
+    cons:
+      - Nie nadaje się do SPA/aplikacji z dużą interaktywnością
+      - Islands architecture = ograniczone state sharing
+      - Nie jest full-stack framework (brak API routes jak Next.js)
+      - Mniejszy ekosystem niż Next.js
+    vs: Astro dla content sites (blog, docs, landing pages). Next.js dla full-stack web applications.

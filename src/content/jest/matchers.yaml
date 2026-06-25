@@ -1,0 +1,119 @@
+title: Matchers — asercje Jest
+
+items:
+  - name: Equality matchers
+    desc: >
+      toBe() sprawdza strict equality (===). toEqual() sprawdza deep equality (obiekty, tablice).
+      toStrictEqual() jak toEqual ale sprawdza też undefined properties i typy konstruktorów.
+    code: |
+      test('equality matchers', () => {
+        // toBe — strict equality (===)
+        expect(2 + 2).toBe(4);
+        expect('hello').toBe('hello');
+
+        // toEqual — deep equality (obiekty)
+        expect({ name: 'Jan', age: 30 }).toEqual({ name: 'Jan', age: 30 });
+        expect([1, 2, 3]).toEqual([1, 2, 3]);
+
+        // toStrictEqual — strict deep (sprawdza undefined props)
+        expect({ a: 1 }).not.toStrictEqual({ a: 1, b: undefined });
+      });
+
+  - name: Truthiness matchers
+    desc: >
+      toBeNull, toBeUndefined, toBeDefined, toBeTruthy, toBeFalsy — sprawdzanie
+      wartości null/undefined/truthy/falsy. Przydatne do walidacji odpowiedzi API.
+    code: |
+      test('truthiness', () => {
+        const user = null;
+        expect(user).toBeNull();
+        expect(user).toBeFalsy();
+
+        const name = 'Jan';
+        expect(name).toBeDefined();
+        expect(name).toBeTruthy();
+
+        const missing = undefined;
+        expect(missing).toBeUndefined();
+      });
+
+  - name: Number matchers
+    desc: >
+      toBeGreaterThan, toBeLessThan, toBeCloseTo (floating point).
+      toBeCloseTo jest krytyczne dla float — 0.1 + 0.2 !== 0.3 w IEEE 754.
+    code: |
+      test('numbers', () => {
+        expect(10).toBeGreaterThan(5);
+        expect(10).toBeGreaterThanOrEqual(10);
+        expect(3).toBeLessThan(5);
+
+        // floating point — NIGDY nie używaj toBe dla float!
+        expect(0.1 + 0.2).toBeCloseTo(0.3); // OK
+        // expect(0.1 + 0.2).toBe(0.3); // FAIL!
+      });
+
+  - name: String matchers
+    desc: >
+      toMatch sprawdza string z regex lub substring. toContain sprawdza czy
+      tablica/iterable zawiera element. toHaveLength sprawdza długość.
+    code: |
+      test('strings', () => {
+        expect('hello world').toMatch(/world/);
+        expect('hello world').toMatch('world');
+        expect('error: file not found').toMatch(/error/i);
+      });
+
+      test('arrays', () => {
+        const fruits = ['apple', 'banana', 'cherry'];
+        expect(fruits).toContain('banana');
+        expect(fruits).toHaveLength(3);
+        expect(new Set(fruits)).toContain('cherry');
+      });
+
+  - name: Exception matchers
+    desc: >
+      toThrow sprawdza czy funkcja rzuca wyjątek. Możesz sprawdzić typ błędu,
+      message (string lub regex), lub instancję Error.
+    code: |
+      function divide(a, b) {
+        if (b === 0) throw new Error('Division by zero');
+        return a / b;
+      }
+
+      test('exceptions', () => {
+        expect(() => divide(10, 0)).toThrow();
+        expect(() => divide(10, 0)).toThrow('Division by zero');
+        expect(() => divide(10, 0)).toThrow(/zero/);
+        expect(() => divide(10, 0)).toThrow(Error);
+
+        expect(() => divide(10, 2)).not.toThrow();
+      });
+
+  - name: Object matchers
+    desc: >
+      toHaveProperty sprawdza czy obiekt ma daną właściwość. toMatchObject
+      sprawdza częściowe dopasowanie (subset). expect.objectContaining
+      dla elastycznego matchowania w zagnieżdżonych strukturach.
+    code: |
+      const user = {
+        name: 'Jan',
+        address: { city: 'Warszawa', zip: '00-001' },
+        roles: ['admin', 'user'],
+      };
+
+      test('object matchers', () => {
+        expect(user).toHaveProperty('name');
+        expect(user).toHaveProperty('address.city', 'Warszawa');
+
+        // toMatchObject — partial match
+        expect(user).toMatchObject({ name: 'Jan' });
+        expect(user).toMatchObject({
+          address: { city: 'Warszawa' },
+        });
+
+        // expect.objectContaining — w zagnieżdżonych asercjach
+        expect(user).toEqual(expect.objectContaining({
+          name: 'Jan',
+          roles: expect.arrayContaining(['admin']),
+        }));
+      });

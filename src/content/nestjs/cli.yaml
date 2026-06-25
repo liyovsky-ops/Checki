@@ -1,0 +1,388 @@
+title: Komendy NestJS
+
+groups:
+  - name: CLI — generowanie
+    icon: "🏗️"
+    commands:
+      - cmd: nest new my-api
+        desc: Stwórz nowy projekt NestJS
+        detail:
+          what: Generuje pełny projekt z TypeScript, ESLint, Jest, strukturą modułów.
+          how: Wybierasz package manager (npm/yarn/pnpm). Generuje src/, test/, tsconfig, package.json.
+          tips:
+            - 'nest new my-api --strict — włącza strict TypeScript'
+            - 'nest new my-api --skip-git — bez inicjalizacji git'
+      - cmd: nest generate module users
+        desc: Wygeneruj moduł
+        detail:
+          what: Tworzy plik users.module.ts i automatycznie rejestruje w AppModule.
+          how: 'nest g mo users — skrót. Tworzy @Module({}) z dekoratorem.'
+          tips:
+            - 'nest g mo users --no-spec — bez pliku testowego'
+      - cmd: nest generate controller users
+        desc: Wygeneruj kontroler
+        detail:
+          what: Tworzy users.controller.ts z dekoratorem @Controller i rejestruje w module.
+          how: 'nest g co users — skrót.'
+          tips:
+            - 'Automatycznie dodaje do najbliższego modułu'
+      - cmd: nest generate service users
+        desc: Wygeneruj serwis
+        detail:
+          what: Tworzy users.service.ts z @Injectable() i rejestruje jako provider w module.
+          how: 'nest g s users — skrót.'
+          tips:
+            - 'nest g s users --flat — bez osobnego katalogu'
+      - cmd: nest generate resource users
+        desc: Wygeneruj pełny CRUD resource
+        detail:
+          what: Generuje moduł + kontroler + serwis + DTO + entity jedną komendą. Pyta o transport (REST/GraphQL/Microservice/WebSocket).
+          how: 'nest g res users — najszybszy sposób na pełny CRUD.'
+          tips:
+            - 'Wybierz REST → generuje @Get, @Post, @Put, @Delete + CreateDto + UpdateDto'
+      - cmd: nest generate guard auth
+        desc: Wygeneruj guard
+        detail:
+          what: Tworzy auth.guard.ts implementujący CanActivate.
+          how: 'nest g gu auth'
+          tips:
+            - 'Dodaj logikę JWT/role verification w canActivate()'
+      - cmd: nest generate pipe validation
+        desc: Wygeneruj pipe
+        detail:
+          what: Tworzy validation.pipe.ts implementujący PipeTransform.
+          how: 'nest g pi validation'
+          tips:
+            - 'Pipe transformuje lub waliduje dane wejściowe'
+      - cmd: nest generate interceptor logging
+        desc: Wygeneruj interceptor
+        detail:
+          what: Tworzy logging.interceptor.ts implementujący NestInterceptor.
+          how: 'nest g in logging'
+          tips:
+            - 'Interceptory opakowują handler — logowanie, cache, timing'
+      - cmd: nest generate middleware logger
+        desc: Wygeneruj middleware
+        detail:
+          what: Tworzy logger.middleware.ts implementujący NestMiddleware.
+          how: 'nest g mi logger'
+          tips:
+            - 'Middleware działa jak Express middleware — next()'
+      - cmd: nest generate filter http-exception
+        desc: Wygeneruj exception filter
+        detail:
+          what: Tworzy http-exception.filter.ts implementujący ExceptionFilter.
+          how: 'nest g f http-exception'
+          tips:
+            - 'Filter przechwytuje wyjątki i formatuje response'
+      - cmd: nest generate decorator roles
+        desc: Wygeneruj custom dekorator
+        detail:
+          what: Tworzy roles.decorator.ts z SetMetadata.
+          how: 'nest g d roles'
+          tips:
+            - 'Custom dekoratory do metadanych na endpointach'
+      - cmd: nest generate gateway chat
+        desc: Wygeneruj WebSocket gateway
+        detail:
+          what: Tworzy chat.gateway.ts z @WebSocketGateway().
+          how: 'nest g ga chat'
+          tips:
+            - 'Gateway obsługuje WebSocket events'
+
+  - name: Uruchomienie i development
+    icon: "🚀"
+    commands:
+      - cmd: npm run start:dev
+        desc: Uruchom z hot-reload (watch mode)
+        detail:
+          what: Startuje serwer z automatycznym restartem przy zmianach plików.
+          how: Pod spodem ts-node z --watch. Najszybszy tryb dev.
+          tips:
+            - 'Domyślny port: 3000'
+            - 'nest start --watch — alternatywna komenda'
+      - cmd: npm run start:debug
+        desc: Uruchom z debuggerem
+        detail:
+          what: Startuje z Node.js --inspect. Podłącz VS Code debugger.
+          how: 'nest start --debug --watch'
+          tips:
+            - 'VS Code: Run → Attach to Node Process'
+      - cmd: npm run start:prod
+        desc: Uruchom produkcyjnie (skompilowany JS)
+        detail:
+          what: Uruchamia skompilowany kod z dist/. Bez TypeScript overhead.
+          how: 'npm run build && node dist/main.js'
+          tips:
+            - 'Zawsze buduj przed produkcyjnym uruchomieniem'
+      - cmd: npm run build
+        desc: Skompiluj TypeScript do JavaScript
+        detail:
+          what: tsc kompiluje src/ do dist/. Produkcyjny output.
+          how: 'Output w dist/. tsconfig.build.json kontroluje opcje.'
+          tips:
+            - 'npm run build -- --watch — kompilacja w trybie watch'
+
+  - name: Testy
+    icon: "🧪"
+    commands:
+      - cmd: npm run test
+        desc: Uruchom unit testy (Jest)
+        detail:
+          what: Uruchamia Jest na plikach *.spec.ts.
+          how: 'Każdy moduł/kontroler/serwis ma swój spec file.'
+          tips:
+            - 'npm run test -- --watch — tryb watch'
+            - 'npm run test -- --coverage — raport pokrycia'
+      - cmd: npm run test:e2e
+        desc: Uruchom testy end-to-end
+        detail:
+          what: Uruchamia testy z test/ katalogu — pełne HTTP requesty do aplikacji.
+          how: 'supertest + Jest. Testuje pełny flow request → response.'
+          tips:
+            - 'test/app.e2e-spec.ts — domyślny plik e2e'
+      - cmd: npm run test:cov
+        desc: Testy z coverage raportem
+        detail:
+          what: Uruchamia testy i generuje raport pokrycia kodu (Istanbul/v8).
+          how: 'Coverage w coverage/ katalogu. HTML report: coverage/lcov-report/index.html.'
+          tips:
+            - 'Cel: >80% pokrycia na serwisach i kontrolerach'
+
+  - name: Konfiguracja i środowisko
+    icon: "⚙️"
+    commands:
+      - cmd: npm i @nestjs/config
+        desc: Instalacja modułu konfiguracji
+        detail:
+          what: Ładuje zmienne z .env do ConfigService. Walidacja z Joi.
+          how: 'ConfigModule.forRoot({ isGlobal: true }) w AppModule.'
+          tips:
+            - 'configService.get<string>("DATABASE_URL") — type-safe access'
+      - cmd: npm i @nestjs/swagger swagger-ui-express
+        desc: Instalacja Swagger/OpenAPI
+        detail:
+          what: Automatyczna dokumentacja API z dekoratorów.
+          how: 'SwaggerModule.setup("api", app, document) w main.ts.'
+          tips:
+            - 'http://localhost:3000/api — Swagger UI'
+            - '@ApiTags, @ApiOperation, @ApiResponse — dekoratory dokumentacji'
+      - cmd: npm i @nestjs/typeorm typeorm pg
+        desc: Instalacja TypeORM z PostgreSQL
+        detail:
+          what: ORM z dekoratorami Entity, Repository pattern, migracje.
+          how: 'TypeOrmModule.forRoot({...}) w AppModule.'
+          tips:
+            - 'TypeOrmModule.forFeature([User]) w module — rejestracja entity'
+      - cmd: npm i @nestjs/jwt @nestjs/passport passport passport-jwt
+        desc: Instalacja JWT auth z Passport
+        detail:
+          what: Token-based authentication. JwtModule + PassportModule.
+          how: 'JwtModule.register({ secret, signOptions }) w AuthModule.'
+          tips:
+            - '@UseGuards(AuthGuard("jwt")) — chroniony endpoint'
+      - cmd: npm i @nestjs/throttler
+        desc: Instalacja rate limiting
+        detail:
+          what: Wbudowany rate limiter. @Throttle() dekorator na endpointach.
+          how: 'ThrottlerModule.forRoot({ ttl: 60, limit: 10 }) w AppModule.'
+          tips:
+            - '@Throttle(5, 30) — max 5 requestów na 30 sekund'
+      - cmd: npm i @nestjs/bull bull
+        desc: Instalacja kolejki zadań (Bull)
+        detail:
+          what: Background jobs z Redis. @Process, @OnQueueEvent.
+          how: 'BullModule.forRoot({ redis: {...} }) w AppModule.'
+          tips:
+            - '@InjectQueue("email") — wstrzyknij kolejkę do serwisu'
+      - cmd: npm i @nestjs/cache-manager cache-manager
+        desc: Instalacja cache
+        detail:
+          what: Cache z Redis lub in-memory. @CacheInterceptor na endpointach.
+          how: 'CacheModule.register({ ttl: 5 }) w module.'
+          tips:
+            - '@CacheTTL(10) — custom TTL per endpoint'
+      - cmd: npm i class-validator class-transformer
+        desc: Instalacja walidacji DTO
+        detail:
+          what: Dekoratory walidacji na DTO (@IsString, @IsEmail, @Min, @Max).
+          how: 'ValidationPipe w main.ts włącza globalną walidację.'
+          tips:
+            - 'whitelist: true — usuwa pola spoza DTO automatycznie'
+      - cmd: npm i @nestjs/graphql @nestjs/apollo @apollo/server graphql
+        desc: Instalacja GraphQL
+        detail:
+          what: GraphQL API z code-first lub schema-first. Resolvers jako dekoratory.
+          how: 'GraphQLModule.forRoot({ autoSchemaFile: true }) — code-first.'
+          tips:
+            - '@Query, @Mutation, @Resolver — dekoratory GraphQL'
+
+  - name: Microservices
+    icon: "📡"
+    commands:
+      - cmd: npm i @nestjs/microservices
+        desc: Instalacja modułu microservices
+        detail:
+          what: Transport layer dla mikroserwisów — TCP, Redis, RabbitMQ, Kafka, gRPC.
+          how: 'NestFactory.createMicroservice(AppModule, { transport: Transport.TCP })'
+          tips:
+            - '@MessagePattern, @EventPattern — handlery wiadomości'
+      - cmd: npm i @nestjs/microservices amqplib amqp-connection-manager
+        desc: Microservice z RabbitMQ
+        detail:
+          what: Transport RabbitMQ dla komunikacji między serwisami.
+          how: 'transport: Transport.RMQ, options: { urls: ["amqp://..."], queue: "..." }'
+          tips:
+            - 'Guaranteed delivery z ack/nack'
+      - cmd: npm i @nestjs/microservices kafkajs
+        desc: Microservice z Kafka
+        detail:
+          what: Transport Kafka dla event streaming.
+          how: 'transport: Transport.KAFKA, options: { client: { brokers: ["..."] } }'
+          tips:
+            - 'Kafka dla high-throughput event streaming'
+      - cmd: npm i @nestjs/microservices @grpc/grpc-js @grpc/proto-loader
+        desc: Microservice z gRPC
+        detail:
+          what: Binary RPC z Protocol Buffers. Type-safe, szybki.
+          how: 'transport: Transport.GRPC, options: { package: "...", protoPath: "..." }'
+          tips:
+            - '.proto file definiuje kontrakt serwisu'
+
+  - name: Database i ORM
+    icon: "🗄️"
+    commands:
+      - cmd: npx typeorm migration:generate -n CreateUsers
+        desc: Wygeneruj migrację TypeORM
+        detail:
+          what: Porównuje entity z bazą i generuje plik migracji z ALTER TABLE.
+          how: 'Wymaga synchronize: false w TypeORM config.'
+          tips:
+            - 'npx typeorm migration:run — zastosuj migracje'
+      - cmd: npx typeorm migration:run
+        desc: Zastosuj migracje
+        detail:
+          what: Aplikuje niezastosowane migracje na bazę danych.
+          how: 'Bezpieczne — każda migracja ma up() i down().'
+          tips:
+            - 'npx typeorm migration:revert — cofnij ostatnią'
+      - cmd: npx prisma migrate dev
+        desc: Prisma migracja (jeśli używasz Prisma)
+        detail:
+          what: Generuje i aplikuje migrację z Prisma schema.
+          how: 'prisma/schema.prisma → migracja SQL → baza.'
+          tips:
+            - 'npx prisma studio — GUI do bazy danych'
+
+  - name: Deployment
+    icon: "🚢"
+    commands:
+      - cmd: npm run build && node dist/main.js
+        desc: Produkcyjne uruchomienie
+        detail:
+          what: Kompiluje TypeScript i uruchamia czysty JavaScript.
+          how: 'dist/main.js — entry point produkcyjny.'
+          tips:
+            - 'Użyj PM2 lub Docker dla process management'
+      - cmd: 'docker build -t my-nest-app .'
+        desc: Build Docker image
+        detail:
+          what: Buduje obraz Docker z aplikacją NestJS.
+          how: 'Dockerfile: FROM node:20-slim, COPY, RUN npm ci, CMD node dist/main.js'
+          tips:
+            - 'Multi-stage build dla mniejszego obrazu'
+      - cmd: nest build --webpack
+        desc: Build z Webpack (szybszy cold start)
+        detail:
+          what: Bundluje aplikację do jednego pliku JS. Szybszy cold start na serverless.
+          how: 'Wymaga webpack i ts-loader.'
+          tips:
+            - 'Przydatne dla Lambda/Cloud Functions'
+
+  - name: Zaawansowane CLI
+    icon: "🧩"
+    commands:
+      - cmd: nest g resource users
+        desc: Generuj pełny CRUD resource (controller + service + module + DTO + entity)
+        detail:
+          what: Tworzy komplet plików dla REST API resource w jednym poleceniu.
+          how: 'Pyta o typ transportu (REST, GraphQL, Microservice, WebSocket).'
+          tips:
+            - 'Najszybszy sposób na nowy endpoint CRUD'
+      - cmd: nest g interceptor logging
+        desc: Generuj interceptor
+        detail:
+          what: Tworzy interceptor — przechwytuje request/response (logowanie, cache, transformacja).
+          how: 'Interceptor implementuje NestInterceptor z metodą intercept().'
+          tips:
+            - 'Interceptory działają jak middleware ale z dostępem do ExecutionContext'
+      - cmd: nest g filter http-exception
+        desc: Generuj exception filter
+        detail:
+          what: Tworzy custom exception filter — obsługa błędów z custom response.
+          how: 'Filter implementuje ExceptionFilter z metodą catch().'
+          tips:
+            - '@UseFilters(HttpExceptionFilter) na kontrolerze lub globalnie'
+      - cmd: nest g decorator roles
+        desc: Generuj custom decorator
+        detail:
+          what: Tworzy custom dekorator do metadanych (role, permissions, public endpoints).
+          how: 'SetMetadata() + Reflector w Guard do odczytania.'
+          tips:
+            - '@Roles("admin") na endpoincie → Guard sprawdza rolę'
+      - cmd: nest g class dto/create-user
+        desc: Generuj DTO (Data Transfer Object)
+        detail:
+          what: Tworzy klasę DTO do walidacji input z class-validator.
+          how: 'Dekoratory @IsString(), @IsEmail(), @MinLength() na polach.'
+          tips:
+            - 'ValidationPipe globalnie: app.useGlobalPipes(new ValidationPipe())'
+      - cmd: nest g middleware auth
+        desc: Generuj middleware
+        detail:
+          what: Tworzy middleware — przetwarza request przed kontrolerem.
+          how: 'Middleware implementuje NestMiddleware z metodą use(req, res, next).'
+          tips:
+            - 'Apply w module: consumer.apply(AuthMiddleware).forRoutes("*")'
+      - cmd: npm run test:cov
+        desc: Testy z raportem coverage
+        detail:
+          what: Uruchamia testy i generuje raport pokrycia kodu.
+          how: 'Jest z --coverage flag.'
+          tips:
+            - 'Target: 80%+ coverage na services, 60%+ na controllers'
+      - cmd: npm run test:debug
+        desc: Testy w trybie debug
+        detail:
+          what: Uruchamia Jest z Node.js debuggerem — breakpointy w VS Code.
+          how: '--runInBand dla sequential execution.'
+          tips:
+            - 'Attach debugger VS Code na port 9229'
+      - cmd: nest info
+        desc: Pokaż informacje o projekcie NestJS
+        detail:
+          what: Wyświetla wersje NestJS packages, Node.js, TypeScript, OS.
+          how: 'Przydatne do diagnostyki i zgłaszania bugów.'
+          tips:
+            - 'Dołącz output do GitHub issue'
+      - cmd: nest g library my-lib
+        desc: Generuj shared library (monorepo)
+        detail:
+          what: Tworzy reusable library w NestJS monorepo workspace.
+          how: 'Library w libs/ — shared code między aplikacjami.'
+          tips:
+            - 'nest g app second-app — dodaj drugą aplikację do monorepo'
+      - cmd: nest g app microservice-users
+        desc: Generuj nową aplikację w monorepo
+        detail:
+          what: Tworzy nową aplikację NestJS w tym samym workspace.
+          how: 'Każda app ma osobny main.ts, shared libraries.'
+          tips:
+            - 'Monorepo: nest new my-project → nest g app service-a → nest g app service-b'
+      - cmd: npm run start:prod
+        desc: Uruchom produkcyjnie (po build)
+        detail:
+          what: Uruchamia skompilowaną aplikację z dist/.
+          how: 'node dist/main.js — bez ts-node, bez dev overhead.'
+          tips:
+            - 'Dodaj NODE_ENV=production dla optymalizacji'

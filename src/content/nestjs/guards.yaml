@@ -1,0 +1,117 @@
+title: Guards, Pipes i Interceptory
+
+items:
+  - name: AuthGuard — JWT authentication
+    desc: >
+      Guard decyduje czy request ma dostęp do endpointu. @UseGuards(AuthGuard)
+      na kontrolerze lub metodzie wymusza autoryzację. Passport.js integration wbudowane.
+    code: |
+      import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+      import { JwtService } from '@nestjs/jwt';
+
+      @Injectable()
+      export class AuthGuard implements CanActivate {
+        constructor(private jwt: JwtService) {}
+
+        canActivate(context: ExecutionContext): boolean {
+          const request = context.switchToHttp().getRequest();
+          const token = request.headers.authorization?.split(' ')[1];
+          if (!token) throw new UnauthorizedException();
+          try {
+            request.user = this.jwt.verify(token);
+            return true;
+          } catch {
+            throw new UnauthorizedException('Invalid token');
+          }
+        }
+      }
+
+      // Użycie
+      @Controller('profile')
+      @UseGuards(AuthGuard)
+      export class ProfileController {
+        @Get()
+        getProfile(@Req() req) { return req.user; }
+      }
+
+  - name: RolesGuard — autoryzacja ról
+    desc: >
+      RolesGuard sprawdza czy użytkownik ma wymaganą rolę. Custom dekorator @Roles()
+      definiuje wymagane role na endpoincie. Reflector czyta metadane dekoratora.
+    code: |
+      // roles.decorator.ts
+      import { SetMetadata } from '@nestjs/common';
+      export const Roles = (...roles: string[]) => SetMetadata('roles', roles);
+
+      // roles.guard.ts
+      @Injectable()
+      export class RolesGuard implements CanActivate {
+        constructor(private reflector: Reflector) {}
+
+        canActivate(context: ExecutionContext): boolean {
+          const requiredRoles = this.reflector.get<string[]>('roles', context.getHandler());
+          if (!requiredRoles) return true;
+          const { user } = context.switchToHttp().getRequest();
+          return requiredRoles.some(role => user.roles?.includes(role));
+        }
+      }
+
+      // Użycie
+      @Post()
+      @Roles('admin')
+      @UseGuards(AuthGuard, RolesGuard)
+      create(@Body() dto: CreateUserDto) { ... }
+
+  - name: Pipes — transformacja i walidacja
+    desc: >
+      Pipe przetwarza dane przed dotarciem do handlera. ParseIntPipe konwertuje string
+      na number. ValidationPipe waliduje DTO. Custom pipes dla specjalnych transformacji.
+    code: |
+      // Wbudowane pipes
+      @Get(':id')
+      findOne(@Param('id', ParseIntPipe) id: number) {
+        return this.usersService.findOne(id);
+        // "abc" → 400 Bad Request automatycznie
+      }
+
+      @Get()
+      findAll(@Query('status', new DefaultValuePipe('active')) status: string) {
+        return this.usersService.findByStatus(status);
+      }
+
+      // Custom pipe
+      @Injectable()
+      export class ParseDatePipe implements PipeTransform {
+        transform(value: string): Date {
+          const date = new Date(value);
+          if (isNaN(date.getTime())) throw new BadRequestException('Invalid date');
+          return date;
+        }
+      }
+
+  - name: Interceptory — logowanie, cache, transformacja
+    desc: >
+      Interceptor opakowuje handler — może modyfikować request/response, logować,
+      mierzyć czas, cache'ować. Działa jak middleware ale z pełnym dostępem do
+      execution context.
+    code: |
+      @Injectable()
+      export class LoggingInterceptor implements NestInterceptor {
+        intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+          const now = Date.now();
+          const method = context.switchToHttp().getRequest().method;
+          const url = context.switchToHttp().getRequest().url;
+
+          return next.handle().pipe(
+            tap(() => console.log(`${method} ${url} — ${Date.now() - now}ms`)),
+          );
+        }
+      }
+
+      // Globalny interceptor
+      app.useGlobalInterceptors(new LoggingInterceptor());
+
+      // Cache interceptor (wbudowany)
+      @UseInterceptors(CacheInterceptor)
+      @Get()
+      findAll() { return this.productsService.findAll(); }

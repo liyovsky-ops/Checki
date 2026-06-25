@@ -1,0 +1,153 @@
+title: Signals & RxJS
+
+items:
+  - name: Signals (Angular 16+)
+    desc: >
+      Signals to nowy reaktywny prymityw Angular — prostsza alternatywa dla RxJS
+      do zarządzania stanem w komponentach. signal() tworzy wartość reaktywną,
+      computed() tworzy derived value, effect() reaguje na zmiany.
+    code: |
+      import { Component, signal, computed, effect } from '@angular/core';
+
+      @Component({
+        selector: 'app-counter',
+        standalone: true,
+        template: `
+          <p>Count: {{ count() }}</p>
+          <p>Double: {{ double() }}</p>
+          <button (click)="increment()">+1</button>
+          <button (click)="reset()">Reset</button>
+        `
+      })
+      export class CounterComponent {
+        count = signal(0);
+        double = computed(() => this.count() * 2);
+
+        constructor() {
+          effect(() => {
+            console.log('Count changed to:', this.count());
+          });
+        }
+
+        increment() { this.count.update(v => v + 1); }
+        reset() { this.count.set(0); }
+      }
+
+  - name: RxJS Observables — podstawy
+    desc: >
+      RxJS to biblioteka reactive programming wbudowana w Angular. Observable
+      emituje wartości w czasie, operatory (map, filter, switchMap) je transformują,
+      subscribe() konsumuje. Pipes łączą operatory w chain.
+    code: |
+      import { Component, OnInit, OnDestroy } from '@angular/core';
+      import { HttpClient } from '@angular/common/http';
+      import { Observable, Subscription, interval } from 'rxjs';
+      import { map, filter, take } from 'rxjs/operators';
+
+      @Component({ selector: 'app-demo', template: '...' })
+      export class DemoComponent implements OnInit, OnDestroy {
+        private sub!: Subscription;
+
+        constructor(private http: HttpClient) {}
+
+        ngOnInit() {
+          // HTTP request — Observable
+          this.http.get<User[]>('/api/users').pipe(
+            map(users => users.filter(u => u.active)),
+          ).subscribe(activeUsers => {
+            console.log(activeUsers);
+          });
+
+          // Timer — emituje co sekundę, bierze 10 wartości
+          this.sub = interval(1000).pipe(
+            take(10),
+            map(n => `Tick ${n}`)
+          ).subscribe(msg => console.log(msg));
+        }
+
+        ngOnDestroy() {
+          this.sub.unsubscribe(); // ZAWSZE unsubscribe!
+        }
+      }
+
+  - name: AsyncPipe — auto-subscribe w template
+    desc: >
+      AsyncPipe automatycznie subskrybuje Observable w template i unsubskrybuje
+      przy destroy. Eliminuje ręczne subscribe/unsubscribe — mniej kodu, mniej memory leaks.
+    code: |
+      import { Component } from '@angular/core';
+      import { AsyncPipe, NgFor } from '@angular/common';
+      import { HttpClient } from '@angular/common/http';
+      import { Observable } from 'rxjs';
+
+      @Component({
+        selector: 'app-users',
+        standalone: true,
+        imports: [AsyncPipe, NgFor],
+        template: `
+          @if (users$ | async; as users) {
+            @for (user of users; track user.id) {
+              <p>{{ user.name }}</p>
+            }
+          } @else {
+            <p>Ładowanie...</p>
+          }
+        `
+      })
+      export class UsersComponent {
+        users$: Observable<User[]>;
+
+        constructor(private http: HttpClient) {
+          this.users$ = this.http.get<User[]>('/api/users');
+        }
+      }
+
+  - name: Subject i BehaviorSubject
+    desc: >
+      Subject to Observable który można też ręcznie emitować wartości.
+      BehaviorSubject trzyma ostatnią wartość i emituje ją nowym subskrybentom.
+      Używane do komunikacji między komponentami i serwisami.
+    code: |
+      import { Injectable } from '@angular/core';
+      import { BehaviorSubject } from 'rxjs';
+
+      @Injectable({ providedIn: 'root' })
+      export class AuthService {
+        private userSubject = new BehaviorSubject<User | null>(null);
+        user$ = this.userSubject.asObservable();
+
+        login(user: User) {
+          this.userSubject.next(user);
+        }
+
+        logout() {
+          this.userSubject.next(null);
+        }
+
+        get isLoggedIn(): boolean {
+          return this.userSubject.value !== null;
+        }
+      }
+
+  - name: Kluczowe operatory RxJS
+    desc: >
+      switchMap (anuluj poprzedni request), debounceTime (czekaj na pauzę),
+      distinctUntilChanged (ignoruj duplikaty), catchError (obsługa błędów),
+      combineLatest (łącz wiele strumieni).
+    code: |
+      import { switchMap, debounceTime, distinctUntilChanged, catchError } from 'rxjs/operators';
+      import { combineLatest, of } from 'rxjs';
+
+      // Search z debounce
+      this.searchControl.valueChanges.pipe(
+        debounceTime(300),
+        distinctUntilChanged(),
+        switchMap(query => this.http.get(`/api/search?q=${query}`).pipe(
+          catchError(err => of([]))  // zwróć pusty array przy błędzie
+        ))
+      ).subscribe(results => this.results = results);
+
+      // Łączenie wielu strumieni
+      combineLatest([this.user$, this.settings$]).pipe(
+        map(([user, settings]) => ({ user, settings }))
+      ).subscribe(data => console.log(data));

@@ -1,0 +1,99 @@
+title: Schema i Modele
+
+items:
+  - name: Definiowanie modeli
+    desc: >
+      Model = tabela w bazie. Pola z typami (String, Int, Boolean, DateTime, Float, Json).
+      @id oznacza primary key, @unique — unikalne pole, @default — wartość domyślna.
+    code: |
+      model Product {
+        id          Int      @id @default(autoincrement())
+        name        String
+        description String?          // ? = nullable
+        price       Float
+        inStock     Boolean  @default(true)
+        tags        String[]         // tablica (PostgreSQL)
+        metadata    Json?            // JSON column
+        createdAt   DateTime @default(now())
+        updatedAt   DateTime @updatedAt   // auto-update
+        category    Category @relation(fields: [categoryId], references: [id])
+        categoryId  Int
+
+        @@index([categoryId])        // index na foreign key
+        @@map("products")            // custom nazwa tabeli
+      }
+
+  - name: Enums
+    desc: >
+      Prisma enum mapuje na database enum (PostgreSQL) lub CHECK constraint.
+      Type-safe w client — TypeScript widzi dozwolone wartości.
+    code: |
+      enum Role {
+        USER
+        ADMIN
+        MODERATOR
+      }
+
+      enum OrderStatus {
+        PENDING
+        PROCESSING
+        SHIPPED
+        DELIVERED
+        CANCELLED
+      }
+
+      model User {
+        id   Int    @id @default(autoincrement())
+        role Role   @default(USER)
+      }
+
+      // Użycie — TypeScript auto-complete
+      await prisma.user.create({
+        data: { role: 'ADMIN' }  // TS error jeśli niepoprawna wartość
+      })
+
+  - name: Mapowanie typów i atrybuty
+    desc: >
+      @db.VarChar(255) mapuje na konkretny typ bazy. @default(uuid()) generuje UUID.
+      @@unique tworzy composite unique constraint na wielu polach.
+    code: |
+      model Account {
+        id        String   @id @default(uuid())    // UUID zamiast auto-increment
+        email     String   @db.VarChar(255)         // VARCHAR(255)
+        bio       String?  @db.Text                 // TEXT column
+        balance   Decimal  @db.Decimal(10, 2)       // DECIMAL(10,2)
+        tenantId  String
+        slug      String
+
+        @@unique([tenantId, slug])        // composite unique
+        @@index([tenantId, email])         // composite index
+      }
+
+  - name: Multi-file schema (Prisma 5.15+)
+    desc: >
+      Od Prisma 5.15 schema można rozbić na wiele plików. Każdy model w osobnym pliku.
+      prismaSchemaFolder w generator config.
+    code: |
+      // schema/base.prisma
+      datasource db {
+        provider = "postgresql"
+        url      = env("DATABASE_URL")
+      }
+      generator client {
+        provider        = "prisma-client-js"
+        previewFeatures = ["prismaSchemaFolder"]
+      }
+
+      // schema/user.prisma
+      model User {
+        id    Int    @id @default(autoincrement())
+        email String @unique
+        posts Post[]
+      }
+
+      // schema/post.prisma
+      model Post {
+        id       Int  @id @default(autoincrement())
+        author   User @relation(fields: [authorId], references: [id])
+        authorId Int
+      }

@@ -1,0 +1,129 @@
+title: Angular Router
+
+items:
+  - name: Konfiguracja routingu
+    desc: >
+      Angular Router mapuje URL-e na komponenty. Definiujesz routes jako tablicę
+      obiektów {path, component}. RouterOutlet renderuje komponent dla bieżącej ścieżki.
+    code: |
+      // app.routes.ts
+      import { Routes } from '@angular/router';
+      import { HomeComponent } from './home.component';
+      import { UsersComponent } from './users.component';
+      import { UserDetailComponent } from './user-detail.component';
+
+      export const routes: Routes = [
+        { path: '', component: HomeComponent },
+        { path: 'users', component: UsersComponent },
+        { path: 'users/:id', component: UserDetailComponent },
+        { path: '**', redirectTo: '' },  // fallback
+      ];
+
+      // app.component.ts
+      @Component({
+        selector: 'app-root',
+        standalone: true,
+        imports: [RouterOutlet, RouterLink],
+        template: `
+          <nav>
+            <a routerLink="/" routerLinkActive="active">Home</a>
+            <a routerLink="/users" routerLinkActive="active">Users</a>
+          </nav>
+          <router-outlet />
+        `
+      })
+      export class AppComponent {}
+
+  - name: Route guards — CanActivate
+    desc: >
+      Guards chronią routes — CanActivate sprawdza czy user może wejść na stronę.
+      Zwraca true (pozwól) lub UrlTree (redirect). Functional guards (Angular 15+)
+      zamiast klas.
+    code: |
+      // auth.guard.ts (functional guard — Angular 15+)
+      import { inject } from '@angular/core';
+      import { CanActivateFn, Router } from '@angular/router';
+      import { AuthService } from './auth.service';
+
+      export const authGuard: CanActivateFn = () => {
+        const auth = inject(AuthService);
+        const router = inject(Router);
+
+        if (auth.isLoggedIn) return true;
+        return router.createUrlTree(['/login']);
+      };
+
+      // Użycie w routes
+      export const routes: Routes = [
+        { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] },
+        { path: 'admin', component: AdminComponent, canActivate: [authGuard, adminGuard] },
+      ];
+
+  - name: Lazy loading modułów
+    desc: >
+      Lazy loading ładuje moduł/komponent dopiero gdy user nawiguje do danej ścieżki.
+      Zmniejsza initial bundle size — admin panel nie ładuje się dla zwykłego usera.
+    code: |
+      export const routes: Routes = [
+        { path: '', component: HomeComponent },
+        {
+          path: 'admin',
+          loadComponent: () => import('./admin/admin.component')
+            .then(m => m.AdminComponent),
+          canActivate: [authGuard, adminGuard],
+        },
+        {
+          path: 'settings',
+          loadChildren: () => import('./settings/settings.routes')
+            .then(m => m.settingsRoutes),
+        },
+      ];
+
+  - name: Resolver — pre-fetch danych
+    desc: >
+      Resolver pobiera dane ZANIM komponent się wyrenderuje. Użytkownik widzi
+      stronę z danymi od razu, nie loading spinner.
+    code: |
+      // user.resolver.ts
+      import { inject } from '@angular/core';
+      import { ResolveFn } from '@angular/router';
+      import { UserService } from './user.service';
+
+      export const userResolver: ResolveFn<User> = (route) => {
+        const userService = inject(UserService);
+        return userService.getById(route.paramMap.get('id')!);
+      };
+
+      // routes
+      { path: 'users/:id', component: UserDetailComponent, resolve: { user: userResolver } }
+
+      // W komponencie — dane dostępne od razu
+      export class UserDetailComponent {
+        user = inject(ActivatedRoute).snapshot.data['user'];
+      }
+
+  - name: Parametry i query params
+    desc: >
+      Route params (:id w URL) i query params (?sort=name) — odczyt przez
+      ActivatedRoute. Params są Observable — reagują na zmiany bez reload.
+    code: |
+      import { Component, inject } from '@angular/core';
+      import { ActivatedRoute } from '@angular/router';
+      import { switchMap } from 'rxjs/operators';
+
+      @Component({ selector: 'app-user', template: '...' })
+      export class UserDetailComponent {
+        private route = inject(ActivatedRoute);
+
+        ngOnInit() {
+          // Reactive — reaguje na zmianę :id bez reload
+          this.route.paramMap.pipe(
+            switchMap(params => this.userService.getById(params.get('id')!))
+          ).subscribe(user => this.user = user);
+
+          // Query params
+          this.route.queryParamMap.subscribe(params => {
+            this.sort = params.get('sort') ?? 'name';
+          });
+        }
+      }

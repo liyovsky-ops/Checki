@@ -1,0 +1,365 @@
+title: Komendy Angular
+
+groups:
+  - name: Tworzenie projektu
+    icon: "🚀"
+    commands:
+      - cmd: ng new my-app
+        desc: Stwórz nowy projekt Angular
+        detail:
+          what: Generuje pełny projekt Angular z TypeScript, routing, testy, linter, build config.
+          how: Angular CLI tworzy strukturę z src/app/, angular.json, package.json, tsconfig.
+          flags:
+            - flag: --standalone
+              desc: Standalone components (bez NgModules)
+            - flag: --routing
+              desc: Dodaj Angular Router
+            - flag: --style=scss
+              desc: SCSS zamiast CSS
+            - flag: --ssr
+              desc: Server-Side Rendering (Angular Universal)
+          tips:
+            - 'ng new my-app --standalone --routing --style=scss — rekomendowany setup'
+            - 'ng new my-app --ssr — z SSR od startu'
+      - cmd: ng new my-app --standalone --routing --style=scss
+        desc: Rekomendowany setup nowego projektu
+        detail:
+          what: Standalone components, routing, SCSS — najlepszy start dla nowego projektu Angular 17+.
+          how: Bez NgModules, z tree-shakeable routing i preprocessorem CSS.
+          tips:
+            - 'To jest "the Angular way" od wersji 17+'
+      - cmd: ng new my-app --no-standalone
+        desc: Projekt z tradycyjnymi NgModules
+        detail:
+          what: Klasyczna architektura modułowa — AppModule, feature modules, shared modules.
+          how: Używaj gdy musisz kompatybilność z legacy Angular codebase.
+          tips:
+            - 'Dla nowych projektów preferuj --standalone'
+
+  - name: Generowanie kodu
+    icon: "⚙️"
+    commands:
+      - cmd: ng generate component user-card
+        desc: Wygeneruj nowy komponent
+        detail:
+          what: Tworzy komponent z plikami .ts, .html, .css, .spec.ts.
+          how: 'ng g c user-card — skrócona wersja. Rejestruje w module automatycznie.'
+          flags:
+            - flag: --standalone
+              desc: Standalone component (domyślne w Angular 17+)
+            - flag: --inline-template
+              desc: Template w .ts zamiast osobnego .html
+            - flag: --inline-style
+              desc: Style w .ts zamiast osobnego .css
+            - flag: --skip-tests
+              desc: Bez pliku .spec.ts
+          tips:
+            - 'ng g c features/users/user-card — generuj w podkatalogu'
+            - 'ng g c user-card --flat — bez tworzenia katalogu'
+      - cmd: ng generate service auth
+        desc: Wygeneruj serwis
+        detail:
+          what: "Tworzy serwis z @Injectable providedIn root — singleton w całej aplikacji."
+          how: 'ng g s auth — skrócona wersja.'
+          tips:
+            - 'Serwis jest automatycznie singleton (providedIn: root)'
+      - cmd: ng generate guard auth
+        desc: Wygeneruj route guard
+        detail:
+          what: Tworzy functional guard (CanActivateFn) dla ochrony routes.
+          how: 'ng g guard auth — Angular 15+ tworzy functional guard.'
+          tips:
+            - 'Dodaj guard do canActivate w routes config'
+      - cmd: ng generate pipe currency-format
+        desc: Wygeneruj custom pipe
+        detail:
+          what: Pipe transformuje dane w template — {{ value | myPipe }}.
+          how: 'ng g p currency-format — tworzy PipeTransform class.'
+          tips:
+            - 'Używaj pure pipes (domyślne) dla performance — przelicza tylko gdy input się zmienia'
+      - cmd: ng generate directive highlight
+        desc: Wygeneruj dyrektywę
+        detail:
+          what: Dyrektywa modyfikuje zachowanie/wygląd elementu DOM.
+          how: 'ng g d highlight — tworzy @Directive class.'
+          tips:
+            - 'Structural directives (*ngIf) vs attribute directives ([ngClass])'
+      - cmd: ng generate interceptor auth
+        desc: Wygeneruj HTTP interceptor
+        detail:
+          what: Interceptor przechwytuje HTTP requesty/odpowiedzi — auth tokens, logging, errors.
+          how: 'ng g interceptor auth — Angular 15+ tworzy functional interceptor.'
+          tips:
+            - 'Rejestruj w provideHttpClient(withInterceptors([...]))'
+      - cmd: ng generate resolver user
+        desc: Wygeneruj route resolver
+        detail:
+          what: Resolver pre-fetches dane zanim komponent się wyrenderuje.
+          how: 'ng g resolver user — tworzy ResolveFn.'
+          tips:
+            - 'Dodaj do resolve w route config'
+      - cmd: ng generate module features/admin
+        desc: Wygeneruj NgModule (legacy)
+        detail:
+          what: Tworzy moduł z NgModule dekoratorem. Legacy — preferuj standalone.
+          how: 'ng g m features/admin — z opcjami --routing, --module=app.'
+          tips:
+            - 'W nowych projektach standalone components zastępują moduły'
+      - cmd: ng generate enum user-role
+        desc: Wygeneruj TypeScript enum
+        detail:
+          what: Tworzy plik z TypeScript enum.
+          how: 'ng g e user-role'
+          tips:
+            - 'Preferuj union types zamiast enum w TypeScript'
+      - cmd: ng generate interface user
+        desc: Wygeneruj TypeScript interface
+        detail:
+          what: Tworzy plik z TypeScript interface.
+          how: 'ng g i user'
+          tips:
+            - 'ng g i user --type=model — dodaje suffix .model.ts'
+      - cmd: ng generate class api-config
+        desc: Wygeneruj TypeScript class
+        detail:
+          what: Tworzy klasę TypeScript z opcjonalnym plikiem testowym.
+          how: 'ng g cl api-config'
+          tips:
+            - 'Używaj klas do modeli danych lub utility classes'
+      - cmd: ng generate library shared-ui
+        desc: Wygeneruj bibliotekę (monorepo)
+        detail:
+          what: Tworzy reużywalną bibliotekę w projects/ katalogu.
+          how: Buduje osobno, publikowalny na npm. Dla shared components w monorepo.
+          tips:
+            - 'ng build shared-ui — buduj bibliotekę osobno'
+            - 'Preferuj Nx zamiast Angular CLI libraries dla monorepos'
+
+  - name: Serwer deweloperski
+    icon: "🖥️"
+    commands:
+      - cmd: ng serve
+        desc: Uruchom dev server z hot reload
+        detail:
+          what: Startuje dev server na localhost:4200 z auto-reload przy zmianach.
+          how: Webpack/esbuild kompiluje TypeScript → bundle → serwuje z HMR.
+          flags:
+            - flag: --port 3000
+              desc: Zmień port (domyślnie 4200)
+            - flag: --open
+              desc: Otwórz przeglądarkę automatycznie
+            - flag: --ssl
+              desc: HTTPS z self-signed cert
+            - flag: --host 0.0.0.0
+              desc: Dostępne z sieci lokalnej
+          tips:
+            - 'ng serve --port 3000 --open — dev server na :3000 z auto-open'
+      - cmd: ng serve --configuration=production
+        desc: Dev server z produkcyjnym buildem
+        detail:
+          what: Serwuje produkcyjny bundle (minified, AOT) lokalnie — testowanie przed deploy.
+          how: Używa konfiguracji production z angular.json.
+          tips:
+            - 'Wolniejszy build ale testuje dokładnie to co pójdzie na produkcję'
+      - cmd: ng serve --hmr
+        desc: Hot Module Replacement (zachowuje state)
+        detail:
+          what: HMR zamienia moduły w runtime bez full page reload — zachowuje state komponentów.
+          how: Domyślne od Angular 15+. Szybsze niż pełny reload.
+          tips:
+            - 'HMR nie zawsze zachowuje state — restartuj jeśli widzisz stale data'
+
+  - name: Build i produkcja
+    icon: "📦"
+    commands:
+      - cmd: ng build
+        desc: Zbuduj projekt na produkcję
+        detail:
+          what: Kompiluje TypeScript, AOT, tree-shaking, minifikacja → dist/ folder.
+          how: Output w dist/my-app/. Deploy na dowolny static hosting.
+          flags:
+            - flag: --configuration=production
+              desc: Produkcyjny build (domyślny dla ng build)
+            - flag: --output-hashing=all
+              desc: Hash w nazwach plików (cache busting)
+            - flag: --source-map=false
+              desc: Bez source map (mniejszy bundle)
+          tips:
+            - 'ng build — domyślnie buduje produkcję od Angular 12+'
+      - cmd: ng build --stats-json
+        desc: Build z webpack stats (analiza bundle)
+        detail:
+          what: Generuje stats.json do analizy bundle size (webpack-bundle-analyzer).
+          how: 'npx webpack-bundle-analyzer dist/my-app/stats.json — wizualizacja.'
+          tips:
+            - 'Znajdź duże biblioteki i lazy-loaduj je'
+      - cmd: ng build --ssr
+        desc: Build z Server-Side Rendering
+        detail:
+          what: Buduje client + server bundle dla Angular Universal (SSR).
+          how: Output w dist/my-app/browser/ i dist/my-app/server/.
+          tips:
+            - 'node dist/my-app/server/main.js — uruchom SSR server'
+
+  - name: Testy
+    icon: "🧪"
+    commands:
+      - cmd: ng test
+        desc: Uruchom unit testy (Karma + Jasmine)
+        detail:
+          what: Uruchamia testy w prawdziwej przeglądarce (Chrome) z Karma test runner.
+          how: Pliki *.spec.ts obok komponentów. Jasmine API (describe, it, expect).
+          flags:
+            - flag: --watch=false
+              desc: Uruchom raz (CI mode)
+            - flag: --code-coverage
+              desc: Generuj raport coverage
+            - flag: --browsers=ChromeHeadless
+              desc: Headless Chrome (CI)
+          tips:
+            - 'ng test --watch=false --code-coverage — CI mode z coverage'
+            - 'ng test --include=**/user.* — testuj tylko pliki user.*'
+      - cmd: ng test --code-coverage
+        desc: Testy z raportem pokrycia kodu
+        detail:
+          what: Generuje raport coverage w coverage/ katalogu (HTML + LCOV).
+          how: Istanbul instrumentuje kod i liczy pokrycie statements/branches/functions/lines.
+          tips:
+            - 'Otwórz coverage/index.html w przeglądarce'
+      - cmd: ng e2e
+        desc: Uruchom testy end-to-end
+        detail:
+          what: E2E testy przeglądarki. Angular CLI nie ma wbudowanego E2E — dodaj Cypress lub Playwright.
+          how: 'ng add @cypress/schematic — dodaje Cypress do projektu.'
+          tips:
+            - 'Cypress lub Playwright — nie Protractor (deprecated)'
+
+  - name: Linting i formatowanie
+    icon: "✨"
+    commands:
+      - cmd: ng lint
+        desc: Uruchom ESLint na projekcie
+        detail:
+          what: Sprawdza kod pod kątem błędów i best practices.
+          how: 'ng add @angular-eslint/schematics — dodaje ESLint. TSLint jest deprecated.'
+          flags:
+            - flag: --fix
+              desc: Auto-fix problemów
+          tips:
+            - 'ng lint --fix — napraw automatycznie co się da'
+      - cmd: npx prettier --write "src/**/*.ts"
+        desc: Formatuj kod Prettier
+        detail:
+          what: Automatycznie formatuje TypeScript/HTML/CSS wg reguł.
+          how: 'npm i -D prettier — zainstaluj. Dodaj .prettierrc.'
+          tips:
+            - 'Zintegruj z ESLint: eslint-config-prettier'
+
+  - name: Aktualizacja i migracja
+    icon: "⬆️"
+    commands:
+      - cmd: ng update
+        desc: Sprawdź dostępne aktualizacje
+        detail:
+          what: Pokazuje listę pakietów Angular do aktualizacji z instrukcjami.
+          how: Angular CLI automatycznie migruje breaking changes (schematics).
+          tips:
+            - 'Zawsze commituj PRZED ng update — łatwiej rollback'
+      - cmd: ng update @angular/cli @angular/core
+        desc: Aktualizuj Angular do najnowszej wersji
+        detail:
+          what: Aktualizuje Angular CLI i core + uruchamia migracje (schematics).
+          how: Schematics automatycznie zmieniają deprecated API, rename importów.
+          tips:
+            - 'update.angular.io — oficjalny guide migracji między wersjami'
+            - 'ng update @angular/core@17 — update do konkretnej wersji'
+      - cmd: ng add @angular/material
+        desc: Dodaj Angular Material do projektu
+        detail:
+          what: Instaluje Material + CDK, konfiguruje theme, fonts, animations.
+          how: Schematic modyfikuje angular.json, styles, app module automatycznie.
+          tips:
+            - 'Wybierz theme: Indigo/Pink, Deep Purple/Amber, Pink/Blue Grey, Purple/Green'
+      - cmd: ng add @angular/pwa
+        desc: Dodaj Progressive Web App support
+        detail:
+          what: Dodaje Service Worker, manifest.json, offline support.
+          how: Schematic konfiguruje ngsw-config.json z cache strategies.
+          tips:
+            - 'PWA działa tylko w production build (ng build + http-server)'
+
+  - name: Konfiguracja i environment
+    icon: "🔧"
+    commands:
+      - cmd: ng config
+        desc: Czytaj/pisz konfigurację angular.json
+        detail:
+          what: Programowy dostęp do ustawień angular.json.
+          how: 'ng config projects.my-app.architect.build.options.outputPath'
+          tips:
+            - 'angular.json to główny plik konfiguracyjny Angular CLI'
+      - cmd: "environment.ts / environment.prod.ts"
+        desc: Zmienne środowiskowe per build
+        detail:
+          what: Angular CLI podmienia environment file przy build na podstawie --configuration.
+          how: 'fileReplacements w angular.json mapuje environment.ts → environment.prod.ts.'
+          tips:
+            - 'import { environment } from "../environments/environment" — w kodzie'
+            - 'Nie commituj sekretów do environment files!'
+
+  - name: Deployment
+    icon: "🚢"
+    commands:
+      - cmd: ng deploy
+        desc: Deploy na platformę hostingową
+        detail:
+          what: Buduje i deployuje na skonfigurowaną platformę (Firebase, Netlify, Vercel).
+          how: 'ng add @angular/fire — Firebase deploy. ng add ngx-deploy-npm — npm publish.'
+          tips:
+            - 'ng add @angular/fire → ng deploy — Firebase hosting'
+      - cmd: "docker build -t my-angular-app ."
+        desc: Zbuduj obraz Docker
+        detail:
+          what: Multi-stage Docker build — ng build w node image, serve z nginx.
+          how: 'FROM node:20 AS build → ng build → FROM nginx:alpine → COPY dist/'
+          tips:
+            - 'Użyj nginx dla static hosting, nie node server'
+      - cmd: npx http-server dist/my-app/browser
+        desc: Serwuj production build lokalnie
+        detail:
+          what: Prosty HTTP server do testowania produkcyjnego buildu lokalnie.
+          how: Serwuje statyczne pliki z dist/ katalogu.
+          tips:
+            - 'Testuj SSR: node dist/my-app/server/main.js'
+
+  - name: Narzędzia debugowania
+    icon: "🐛"
+    commands:
+      - cmd: ng analytics
+        desc: Zarządzaj Angular CLI analytics
+        detail:
+          what: Włącz/wyłącz wysyłanie anonimowych danych użytkowania do Google.
+          how: 'ng analytics disable — wyłącz. ng analytics info — status.'
+          tips:
+            - 'ng analytics disable — rekomendowane dla prywatności'
+      - cmd: ng version
+        desc: Pokaż wersje Angular CLI i pakietów
+        detail:
+          what: Wyświetla wersje CLI, core, compiler, platform, TypeScript, Node, npm.
+          how: Przydatne do raportowania bugów.
+          tips:
+            - 'ng v — skrócona wersja'
+      - cmd: ng doc Router
+        desc: Otwórz dokumentację Angular w przeglądarce
+        detail:
+          what: Otwiera angular.io/api z wyszukiwanym terminem.
+          how: 'ng doc HttpClient — szybki dostęp do API docs.'
+          tips:
+            - 'Przydatne do szybkiego sprawdzenia API bez opuszczania terminala'
+      - cmd: npx @angular/language-service
+        desc: Angular Language Service (IDE)
+        detail:
+          what: Autocomplete, error checking, go-to-definition w templates HTML.
+          how: Zainstaluj Angular Language Service extension w VS Code.
+          tips:
+            - 'Wymagany dla dobrego DX w Angular — bez tego templates nie mają intellisense'

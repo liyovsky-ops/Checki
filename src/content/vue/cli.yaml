@@ -1,0 +1,342 @@
+title: Komendy Vue.js
+
+groups:
+  - name: Tworzenie projektu
+    icon: "🚀"
+    commands:
+      - cmd: npm create vue@latest my-app
+        desc: Stwórz nowy projekt Vue 3 (create-vue)
+        detail:
+          what: Interaktywny kreator projektu Vue 3 z Vite. Wybierasz TypeScript, Router, Pinia, ESLint, Vitest.
+          how: create-vue to oficjalny scaffolder. Generuje projekt z Vite, nie webpack.
+          tips:
+            - 'cd my-app && npm install && npm run dev — start po utworzeniu'
+            - 'Wybierz TypeScript + Router + Pinia dla pełnego setup'
+      - cmd: npm create nuxt my-nuxt-app
+        desc: Stwórz projekt Nuxt 3 (full-stack)
+        detail:
+          what: Nuxt 3 z SSR, file-based routing, auto-imports. Full-stack Vue.
+          how: Nuxt generuje projekt z Nitro server, Vue Router, i domyślną konfiguracją.
+          tips:
+            - 'npx nuxi init my-app — alternatywna składnia'
+      - cmd: npm init vue@latest -- --typescript
+        desc: Stwórz projekt z TypeScript od razu
+        detail:
+          what: Pomija interaktywny prompt i tworzy z TS.
+          how: Flaga -- --typescript przekazuje do create-vue.
+          tips:
+            - 'Dodaj --router --pinia dla pełnego setup bez promptów'
+
+  - name: Development
+    icon: "💻"
+    commands:
+      - cmd: npm run dev
+        desc: Uruchom dev server (Vite)
+        detail:
+          what: Vite dev server z HMR. Zmiany w .vue plikach odświeżają się w <50ms.
+          how: Domyślnie port 5173. Otwiera http://localhost:5173.
+          tips:
+            - 'npm run dev -- --port 3000 — zmień port'
+            - 'npm run dev -- --host — dostęp z sieci lokalnej'
+      - cmd: npm run build
+        desc: Buduj produkcyjny bundle
+        detail:
+          what: Vite + Rollup buduje zoptymalizowany bundle (minified, tree-shaken, code-split).
+          how: Output w dist/. Statyczne pliki gotowe do deploy.
+          tips:
+            - 'npm run preview — podgląd produkcyjnego buildu lokalnie'
+      - cmd: npm run preview
+        desc: Podgląd produkcyjnego buildu
+        detail:
+          what: Serwuje dist/ lokalnie żeby sprawdzić build przed deploy.
+          how: Port 4173 domyślnie.
+          tips:
+            - 'Sprawdź czy lazy-loaded routes działają po buildzie'
+      - cmd: npm run type-check
+        desc: Sprawdź typy TypeScript (vue-tsc)
+        detail:
+          what: vue-tsc sprawdza typy w .vue plikach (tsc tego nie obsługuje).
+          how: Wymaga vue-tsc w devDependencies.
+          tips:
+            - 'Dodaj do CI pipeline — type-check przed merge'
+      - cmd: npx vue-tsc --noEmit
+        desc: Type check bez generowania plików
+        detail:
+          what: Sprawdza typy bez outputu JS. Szybki check w CI.
+          how: vue-tsc rozumie .vue SFC, standard tsc nie.
+          tips:
+            - 'Alternatywa: npx vue-tsc --noEmit --watch — ciągły type checking'
+
+  - name: Komponenty
+    icon: "🧱"
+    commands:
+      - cmd: defineProps()
+        desc: Deklaruj props komponentu
+        detail:
+          what: Macro kompilatora — deklaruje jakie props przyjmuje komponent.
+          how: W <script setup>. Nie wymaga importu. TypeScript generic dla typów.
+          tips:
+            - "defineProps<{ title: string; count: number }>() — TypeScript"
+            - "defineProps({ title: String, count: Number }) — JavaScript"
+      - cmd: defineEmits()
+        desc: Deklaruj emity (eventy) komponentu
+        detail:
+          what: Deklaruje jakie eventy komponent może emitować do rodzica.
+          how: 'const emit = defineEmits([''update'', ''delete''])'
+          tips:
+            - "emit('update', payload) — emituj event z danymi"
+      - cmd: defineModel()
+        desc: Two-way binding (v-model) na custom komponencie
+        detail:
+          what: Vue 3.4+ macro. Automatycznie tworzy prop + emit dla v-model.
+          how: 'const model = defineModel()'
+          tips:
+            - 'Zastępuje ręczne defineProps + defineEmits dla v-model'
+      - cmd: defineExpose()
+        desc: Eksponuj metody komponentu do rodzica (ref)
+        detail:
+          what: W <script setup> nic nie jest domyślnie dostępne przez ref. defineExpose() jawnie eksponuje.
+          how: 'defineExpose({ reset, validate })'
+          tips:
+            - 'Rodzic: const child = ref(); child.value.reset()'
+      - cmd: defineSlots()
+        desc: Deklaruj sloty z typami (TypeScript)
+        detail:
+          what: Type-safe slot definitions. Vue 3.3+.
+          how: 'defineSlots<{ default(props: { item: Item }): any }>()'
+          tips:
+            - 'Przydatne dla scoped slots z TypeScript'
+
+  - name: Reaktywność
+    icon: "⚡"
+    commands:
+      - cmd: ref(initialValue)
+        desc: Stwórz reaktywną referencję
+        detail:
+          what: Opakowuje wartość w reaktywny obiekt. Dostęp przez .value w script, bez .value w template.
+          how: 'const count = ref(0); count.value++'
+          tips:
+            - 'ref() dla prymitywów (number, string, boolean)'
+            - 'ref() też dla obiektów — ale reactive() jest wygodniejszy'
+      - cmd: reactive(object)
+        desc: Stwórz reaktywny obiekt (bez .value)
+        detail:
+          what: Cały obiekt jest reaktywny. Nie wymaga .value. Nie działa z prymitywami.
+          how: 'const state = reactive({ count: 0, name: ''Vue'' })'
+          tips:
+            - 'Destructuring traci reaktywność! Użyj toRefs()'
+      - cmd: computed(() => ...)
+        desc: Derived state — automatycznie przelicza
+        detail:
+          what: Cachowany getter. Re-compute tylko gdy zależności się zmienią.
+          how: 'const doubled = computed(() => count.value * 2)'
+          tips:
+            - 'computed jest readonly domyślnie'
+            - 'Writable computed: computed({ get, set })'
+      - cmd: watch(source, callback)
+        desc: Obserwuj zmiany reaktywnych danych
+        detail:
+          what: Reaguj na zmiany konkretnego źródła. Dostęp do old i new value.
+          how: 'watch(count, (newVal, oldVal) => { ... })'
+          tips:
+            - 'watch([a, b], ([newA, newB]) => { ... }) — wiele źródeł'
+            - '{ immediate: true } — wywołaj od razu'
+            - '{ deep: true } — obserwuj nested changes'
+      - cmd: watchEffect(callback)
+        desc: Auto-tracking side effects
+        detail:
+          what: Automatycznie śledzi zależności w callbacku i re-run gdy się zmienią.
+          how: 'watchEffect(() => { console.log(count.value) })'
+          tips:
+            - 'Odpowiednik useEffect bez deps array w React'
+            - 'Cleanup: watchEffect((onCleanup) => { onCleanup(() => ...) })'
+      - cmd: toRef(object, key)
+        desc: Stwórz ref z property reaktywnego obiektu
+        detail:
+          what: Zachowuje reaktywność przy destructuring z reactive().
+          how: 'const name = toRef(state, ''name'')'
+          tips:
+            - 'toRefs(state) — wszystkie property na raz'
+      - cmd: shallowRef(value)
+        desc: Płytka reaktywność (tylko .value, nie nested)
+        detail:
+          what: Tylko zmiana .value triggeruje update, nie nested mutations.
+          how: 'Optymalizacja dla dużych obiektów gdzie nie potrzebujesz deep reactivity.'
+          tips:
+            - 'triggerRef(shallowRef) — ręcznie wymuś update'
+
+  - name: Lifecycle
+    icon: "🔄"
+    commands:
+      - cmd: onMounted(callback)
+        desc: Po zamontowaniu komponentu (DOM ready)
+        detail:
+          what: Odpowiednik componentDidMount. DOM jest dostępny.
+          how: Fetch data, setup event listeners, initialize libraries.
+          tips:
+            - 'onMounted(async () => { data.value = await fetch(...) })'
+      - cmd: onUpdated(callback)
+        desc: Po każdym renderze (re-render)
+        detail:
+          what: Odpowiednik componentDidUpdate. Uważaj — może być wywoływany wielokrotnie.
+          how: Rzadko potrzebny. Nie modyfikuj state wewnątrz.
+          tips:
+            - 'Preferuj watch() zamiast onUpdated — bardziej precyzyjne'
+      - cmd: onUnmounted(callback)
+        desc: Przed usunięciem komponentu
+        detail:
+          what: Cleanup. Usuń event listenery, timery, subscriptions.
+          how: 'onUnmounted(() => clearInterval(timer))'
+          tips:
+            - 'Odpowiednik componentWillUnmount / useEffect cleanup'
+      - cmd: onBeforeMount(callback)
+        desc: Przed montowaniem (DOM jeszcze nie gotowy)
+        detail:
+          what: Rzadko używany. Przydatny do SSR setup.
+          how: DOM nie jest jeszcze dostępny.
+          tips:
+            - 'Preferuj onMounted — DOM jest gotowy'
+      - cmd: onErrorCaptured(callback)
+        desc: Przechwytuj errory z child komponentów
+        detail:
+          what: Error boundary. Łapie błędy z dzieci.
+          how: 'onErrorCaptured((err, instance, info) => { ... })'
+          tips:
+            - 'Return false żeby zatrzymać propagację errora'
+
+  - name: Router
+    icon: "🛣️"
+    commands:
+      - cmd: npm install vue-router@4
+        desc: Instalacja Vue Router 4
+        detail:
+          what: Oficjalny router dla Vue 3. Deklaratywne routes, guards, lazy loading.
+          how: 'Vue Router 4 dla Vue 3. Vue Router 3 dla Vue 2.'
+          tips:
+            - 'createRouter({ history: createWebHistory(), routes })'
+      - cmd: useRouter()
+        desc: Dostęp do instancji routera (nawigacja)
+        detail:
+          what: Programowa nawigacja — push, replace, go, back.
+          how: 'const router = useRouter(); router.push(''/dashboard'')'
+          tips:
+            - 'router.push({ name: ''user'', params: { id: 5 } })'
+      - cmd: useRoute()
+        desc: Dostęp do aktualnej route (params, query)
+        detail:
+          what: Reaktywny obiekt z aktualną route — params, query, hash, meta.
+          how: 'const route = useRoute(); route.params.id'
+          tips:
+            - 'watch(() => route.params.id, (newId) => { ... })'
+      - cmd: router.beforeEach(guard)
+        desc: Globalny navigation guard
+        detail:
+          what: Middleware na każdą zmianę route. Auth check, loading state.
+          how: 'router.beforeEach((to, from) => { if (!auth) return ''/login'' })'
+          tips:
+            - 'Return false — anuluj nawigację'
+            - 'Return string — redirect'
+
+  - name: Pinia
+    icon: "🍍"
+    commands:
+      - cmd: npm install pinia
+        desc: Instalacja Pinia
+        detail:
+          what: Oficjalny state management dla Vue 3. Prostszy niż Vuex.
+          how: 'const pinia = createPinia(); app.use(pinia)'
+          tips:
+            - 'pinia-plugin-persistedstate — auto-save do localStorage'
+      - cmd: defineStore(id, options)
+        desc: Zdefiniuj store
+        detail:
+          what: Tworzy store z state, getters, actions. Lub setup function z ref/computed/functions.
+          how: 'export const useUserStore = defineStore(''user'', { ... })'
+          tips:
+            - 'Options: { state, getters, actions }'
+            - 'Setup: () => { const x = ref(); return { x } }'
+      - cmd: storeToRefs(store)
+        desc: Destructuring z zachowaniem reaktywności
+        detail:
+          what: Bez storeToRefs destructuring traci reaktywność. storeToRefs zachowuje.
+          how: 'const { count, name } = storeToRefs(store)'
+          tips:
+            - 'Actions nie potrzebują storeToRefs — destructuruj bezpośrednio'
+      - cmd: store.$reset()
+        desc: Reset state do initial values
+        detail:
+          what: Przywraca state do wartości początkowych. Tylko Options Store.
+          how: 'store.$reset()'
+          tips:
+            - 'Setup Store nie ma $reset — zaimplementuj ręcznie'
+      - cmd: store.$patch(partialState)
+        desc: Batch update state
+        detail:
+          what: Aktualizuje wiele properties naraz w jednym renderze.
+          how: 'store.$patch({ count: 0, name: ''reset'' })'
+          tips:
+            - 'store.$patch((state) => { state.items.push(item) }) — callback form'
+
+  - name: Testowanie
+    icon: "🧪"
+    commands:
+      - cmd: npm install -D vitest @vue/test-utils
+        desc: Instalacja testów dla Vue
+        detail:
+          what: Vitest (test runner) + Vue Test Utils (mounting, interaction).
+          how: Vitest jest natywny dla Vite — zero konfiguracji.
+          tips:
+            - 'happy-dom lub jsdom jako test environment'
+      - cmd: mount(Component, options)
+        desc: Zamontuj komponent w teście
+        detail:
+          what: Vue Test Utils mount() renderuje komponent z opcjami (props, slots, plugins).
+          how: 'import { mount } from ''@vue/test-utils'''
+          tips:
+            - 'shallowMount — renderuj bez children (shallow rendering)'
+      - cmd: wrapper.find(selector)
+        desc: Znajdź element w zamontowanym komponencie
+        detail:
+          what: CSS selector na rendered DOM. Zwraca DOMWrapper.
+          how: 'wrapper.find(''button'').trigger(''click'')'
+          tips:
+            - 'wrapper.findComponent(ChildComponent) — znajdź child komponent'
+      - cmd: wrapper.trigger(event)
+        desc: Symuluj event na elemencie
+        detail:
+          what: Triggeruje DOM event (click, input, submit).
+          how: 'await wrapper.find(''button'').trigger(''click'')'
+          tips:
+            - 'await nextTick() po trigger jeśli state się zmienia'
+      - cmd: vitest --watch
+        desc: Uruchom testy z watch mode
+        detail:
+          what: Re-run testów przy zmianach plików.
+          how: Vitest domyślnie działa w watch mode.
+          tips:
+            - 'vitest run — jednorazowe uruchomienie (CI)'
+
+  - name: Narzędzia
+    icon: "🔧"
+    commands:
+      - cmd: npm install -D @vitejs/plugin-vue
+        desc: Vite plugin dla Vue SFC
+        detail:
+          what: Obsługuje .vue pliki w Vite. Domyślnie w create-vue.
+          how: 'import vue from ''@vitejs/plugin-vue''; plugins: [vue()]'
+          tips:
+            - 'Już zainstalowany jeśli używasz create-vue'
+      - cmd: npx vue-devtools
+        desc: Standalone Vue DevTools
+        detail:
+          what: DevTools jako osobna aplikacja (nie extension przeglądarki).
+          how: Przydatne gdy extension nie działa lub na Electron.
+          tips:
+            - 'Preferuj browser extension — wygodniejsze'
+      - cmd: npm install -D unplugin-auto-import unplugin-vue-components
+        desc: Auto-import komponentów i composables
+        detail:
+          what: Automatycznie importuje Vue API (ref, computed) i komponenty bez import statements.
+          how: Konfiguracja w vite.config.ts.
+          tips:
+            - 'Nuxt ma auto-imports wbudowane domyślnie'

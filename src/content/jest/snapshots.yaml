@@ -1,0 +1,100 @@
+title: Snapshot Testing
+
+items:
+  - name: Podstawowy snapshot
+    desc: >
+      toMatchSnapshot() serializuje wartość i zapisuje do pliku .snap.
+      Przy kolejnych uruchomieniach porównuje z zapisanym. Zmiana = fail
+      (musisz świadomie zaktualizować: jest --updateSnapshot).
+    code: |
+      function renderUser(user) {
+        return `<div class="user">
+          <h1>${user.name}</h1>
+          <p>${user.email}</p>
+        </div>`;
+      }
+
+      test('renders user correctly', () => {
+        const html = renderUser({ name: 'Jan', email: 'jan@test.pl' });
+        expect(html).toMatchSnapshot();
+      });
+
+      // Pierwszy run: tworzy __snapshots__/user.test.js.snap
+      // Kolejne runy: porównuje z zapisanym
+      // Update: npx jest --updateSnapshot
+
+  - name: Inline snapshots
+    desc: >
+      toMatchInlineSnapshot() zapisuje snapshot WEWNĄTRZ kodu testu,
+      nie w osobnym pliku. Jest automatycznie wstawia wartość.
+      Lepsze dla małych wartości — widzisz expected obok testu.
+    code: |
+      test('inline snapshot', () => {
+        const config = { port: 3000, host: 'localhost', debug: true };
+
+        expect(config).toMatchInlineSnapshot(`
+          {
+            "debug": true,
+            "host": "localhost",
+            "port": 3000,
+          }
+        `);
+      });
+
+  - name: Property matchers w snapshots
+    desc: >
+      Dynamiczne wartości (ID, daty, random) psują snapshots.
+      Property matchers pozwalają sprawdzić typ zamiast wartości.
+    code: |
+      test('user with dynamic fields', () => {
+        const user = {
+          id: Math.random(),
+          name: 'Jan',
+          createdAt: new Date(),
+        };
+
+        expect(user).toMatchSnapshot({
+          id: expect.any(Number),
+          createdAt: expect.any(Date),
+        });
+        // Snapshot zapisze: id: Any<Number>, createdAt: Any<Date>
+        // name: 'Jan' będzie porównany dokładnie
+      });
+
+  - name: Snapshot serializers
+    desc: >
+      Custom serializers formatują output snapshots. Przydatne dla
+      komponentów React (enzyme-to-json), styled-components, custom obiektów.
+    code: |
+      // jest.config.js
+      module.exports = {
+        snapshotSerializers: ['enzyme-to-json/serializer'],
+      };
+
+      // Zamiast: <Component ... /> (nieczytelny React element)
+      // Snapshot pokaże czytelny HTML-like output
+
+  - name: Snapshot best practices
+    desc: >
+      Snapshots to NIE replacement dla unit testów. Używaj dla output rendering,
+      konfiguracji, API response shapes. Nie dla logiki biznesowej.
+    code: |
+      // DOBRZE — snapshot dla renderowanego HTML
+      test('button renders correctly', () => {
+        expect(render(<Button label="Click" />)).toMatchSnapshot();
+      });
+
+      // ŹLE — snapshot dla logiki biznesowej
+      test('calculates tax', () => {
+        // expect(calculateTax(100, 0.23)).toMatchSnapshot();
+        // ^ NIE RÓB TEGO — użyj toBe(23)
+        expect(calculateTax(100, 0.23)).toBe(23);
+      });
+
+      // DOBRZE — snapshot dla config/API shape
+      test('API response shape', () => {
+        expect(apiResponse).toMatchSnapshot({
+          id: expect.any(String),
+          timestamp: expect.any(Number),
+        });
+      });

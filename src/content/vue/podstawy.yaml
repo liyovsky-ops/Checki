@@ -1,0 +1,93 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Vue?
+  firstComponent: Pierwsza aplikacja Vue
+  firstComponentLang: vue
+
+intro:
+  title: Czym jest Vue.js?
+  desc: >
+    Vue.js to progresywny framework UI — możesz użyć go jako biblioteki do jednego
+    widgetu lub jako pełnego frameworka z routingiem, state managementem i SSR.
+    Reaktywny system danych, Single File Components (SFC), Composition API.
+    Łatwiejszy start niż React, bardziej opiniated niż React, mniej niż Angular.
+    Idealny dla dev-ów którzy chcą produktywność bez boilerplate'u.
+
+concepts:
+  - title: Reaktywność
+    desc: >
+      Vue automatycznie śledzi zależności między danymi a DOM. Zmieniasz zmienną —
+      UI się aktualizuje. Nie musisz wywoływać setState() jak w React. ref() i reactive()
+      tworzą reaktywne dane, computed() to derived state.
+    icon: "⚡"
+  - title: Single File Components (SFC)
+    desc: >
+      Plik .vue = template + script + style w jednym. HTML, logika i CSS
+      razem — kolokacja zamiast separacji. Scoped styles nie wyciekają do innych
+      komponentów. <script setup> to skrócona składnia Composition API.
+    icon: "📄"
+  - title: Composition API
+    desc: >
+      Vue 3 API do organizacji logiki — ref(), reactive(), computed(), watch(),
+      onMounted(). Composables (use*) to odpowiednik React hooks — reużywalna logika
+      wyciągnięta z komponentu. Zastępuje Options API z Vue 2.
+    icon: "🔧"
+  - title: Dyrektywy
+    desc: >
+      v-if, v-for, v-model, v-bind, v-on — specjalne atrybuty w template.
+      v-model to two-way binding (input ↔ zmienna). v-for renderuje listy.
+      v-if/v-show kontroluje widoczność. Można pisać własne dyrektywy.
+    icon: "📌"
+  - title: Vue Router
+    desc: >
+      Oficjalny router. Deklaratywne route'y, nested routes, route guards
+      (beforeEach), lazy loading komponentów (import()). Hash mode i history mode.
+    icon: "🛣️"
+  - title: Pinia (State Management)
+    desc: >
+      Oficjalny store dla Vue 3. Zastąpił Vuex. defineStore() z state, getters,
+      actions. Type-safe, DevTools support, hot module replacement. Prostszy API
+      niż Redux/Vuex.
+    icon: "🍍"
+
+whenToUse:
+  - Szybki start bez konfiguracji — Vue CLI / Vite generuje projekt w sekundy
+  - Progresywna adopcja — dodaj Vue do istniejącej strony lub buduj SPA od zera
+  - Gdy chcesz reaktywność bez boilerplate'u (vs React setState)
+  - Małe-średnie aplikacje gdzie Angular byłby overkill
+  - Team z mixed doświadczeniem — łatwiejszy learning curve niż React
+  - SSR z Nuxt — odpowiednik Next.js dla Vue
+
+firstComponent: |
+  # Instalacja
+  npm create vue@latest my-app
+  cd my-app && npm install && npm run dev
+
+  # App.vue — pierwszy komponent
+  <script setup>
+  import { ref, computed } from 'vue'
+
+  const count = ref(0)
+  const doubled = computed(() => count.value * 2)
+
+  function increment() {
+    count.value++
+  }
+  </script>
+
+  <template>
+    <h1>Counter: {{ count }}</h1>
+    <p>Doubled: {{ doubled }}</p>
+    <button @click="increment">+1</button>
+  </template>
+
+  <style scoped>
+  button {
+    padding: 8px 16px;
+    background: #42b883;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  </style>

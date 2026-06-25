@@ -1,0 +1,113 @@
+title: Async Testing w Jest
+
+items:
+  - name: async/await w testach
+    desc: >
+      Najprostszy sposób — oznacz test jako async, użyj await. Jest automatycznie
+      czeka na Promise. Jeśli Promise rejectuje — test failuje.
+    code: |
+      async function fetchUser(id) {
+        const res = await fetch(`/api/users/${id}`);
+        if (!res.ok) throw new Error('Not found');
+        return res.json();
+      }
+
+      test('fetches user', async () => {
+        const user = await fetchUser(1);
+        expect(user.name).toBe('Jan');
+      });
+
+      test('handles errors', async () => {
+        await expect(fetchUser(999)).rejects.toThrow('Not found');
+      });
+
+  - name: Promises (resolves / rejects)
+    desc: >
+      expect().resolves i expect().rejects pozwalają testować Promises
+      bez async/await. WAŻNE: zawsze return lub await Promise w teście!
+    code: |
+      function fetchData() {
+        return Promise.resolve({ data: 'hello' });
+      }
+
+      function fetchError() {
+        return Promise.reject(new Error('fail'));
+      }
+
+      test('resolves', () => {
+        return expect(fetchData()).resolves.toEqual({ data: 'hello' });
+      });
+
+      test('rejects', () => {
+        return expect(fetchError()).rejects.toThrow('fail');
+      });
+
+  - name: Callbacks (done)
+    desc: >
+      Dla callback-based API użyj parametru done. Jest czeka na wywołanie done().
+      Jeśli done() nie zostanie wywołane w timeout — test failuje.
+    code: |
+      function fetchWithCallback(callback) {
+        setTimeout(() => callback(null, { data: 'ok' }), 100);
+      }
+
+      test('callback style', (done) => {
+        fetchWithCallback((err, result) => {
+          expect(err).toBeNull();
+          expect(result.data).toBe('ok');
+          done();
+        });
+      });
+
+  - name: Mocking async functions
+    desc: >
+      mockResolvedValue i mockRejectedValue do mockowania async functions.
+      Łączenie z jest.mock() dla API calls.
+    code: |
+      const api = {
+        getUser: async (id) => { /* real API call */ },
+      };
+
+      test('mock async', async () => {
+        api.getUser = jest.fn()
+          .mockResolvedValueOnce({ id: 1, name: 'Jan' })
+          .mockRejectedValueOnce(new Error('Network error'));
+
+        const user = await api.getUser(1);
+        expect(user.name).toBe('Jan');
+
+        await expect(api.getUser(2)).rejects.toThrow('Network error');
+      });
+
+  - name: Fake timers z async
+    desc: >
+      Kombinacja fake timers z async wymaga ostrożności. Użyj
+      jest.advanceTimersByTimeAsync() dla async timerów.
+    code: |
+      function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
+      async function retryWithDelay(fn, retries = 3) {
+        for (let i = 0; i < retries; i++) {
+          try { return await fn(); } catch (e) {
+            if (i === retries - 1) throw e;
+            await delay(1000 * (i + 1));
+          }
+        }
+      }
+
+      test('retry with fake timers', async () => {
+        jest.useFakeTimers();
+        const fn = jest.fn()
+          .mockRejectedValueOnce(new Error('fail'))
+          .mockResolvedValueOnce('ok');
+
+        const promise = retryWithDelay(fn);
+        await jest.advanceTimersByTimeAsync(1000);
+        const result = await promise;
+
+        expect(result).toBe('ok');
+        expect(fn).toHaveBeenCalledTimes(2);
+        jest.useRealTimers();
+      });

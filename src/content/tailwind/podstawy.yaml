@@ -1,0 +1,78 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Tailwind?
+  firstComponent: Pierwszy komponent Tailwind
+  firstComponentLang: html
+
+intro:
+  title: Czym jest Tailwind CSS?
+  desc: >
+    Tailwind CSS to utility-first CSS framework — zamiast pisać własne klasy CSS (.card, .btn-primary),
+    składasz design z małych utility classes bezpośrednio w HTML: flex, items-center, bg-blue-500,
+    rounded-lg, shadow-md. Każda klasa robi dokładnie jedną rzecz. Brzmi jak inline styles? Nie —
+    Tailwind daje responsive, hover states, dark mode, i JIT compiler który generuje tylko te klasy
+    których używasz. Wynikowy CSS waży kilka KB, nie kilkaset.
+
+concepts:
+  - title: Utility-First
+    desc: >
+      Zamiast class="card" z 20 linii CSS, piszesz class="bg-white rounded-lg shadow-md p-6".
+      Każda klasa = jedna właściwość CSS. Zero abstrakcji, zero naming conventions — widzisz
+      co element robi patrząc na HTML.
+    icon: "🔧"
+  - title: Design System wbudowany
+    desc: >
+      Tailwind ma gotowy design system — spójne kolory (slate-100 do slate-900), spacing (p-1 do p-96),
+      typography (text-sm do text-9xl), breakpoints (sm/md/lg/xl/2xl). Nie wymyślasz od zera —
+      korzystasz z gotowej, spójnej skali.
+    icon: "🎨"
+  - title: JIT Compiler
+    desc: >
+      Just-In-Time compiler generuje CSS on-demand. Używasz bg-[#1da1f2]? JIT tworzy tę klasę
+      w locie. Wynikowy CSS zawiera TYLKO klasy których użyłeś — zero dead CSS, bundle kilka KB.
+    icon: "⚡"
+  - title: Responsive Design
+    desc: >
+      Prefixy breakpointów: sm:, md:, lg:, xl:, 2xl: — class="text-sm md:text-base lg:text-xl"
+      zmienia rozmiar tekstu na różnych ekranach. Mobile-first — bazowe style to mobile, prefixy
+      dodają style dla większych ekranów.
+    icon: "📱"
+  - title: Dark Mode
+    desc: >
+      Prefiks dark: — class="bg-white dark:bg-gray-900 text-gray-900 dark:text-white".
+      Działa z prefers-color-scheme (auto) lub class strategy (toggle ręczny).
+    icon: "🌙"
+  - title: Customization
+    desc: >
+      tailwind.config.js — rozszerzaj kolory, fonty, spacing, breakpoints. Wszystko jest
+      konfigurowalne. Dodaj własne kolory brandowe, custom fonty, niestandardowe breakpoints.
+    icon: "⚙️"
+
+whenToUse:
+  - Rapid prototyping — design w minutach, nie godzinach
+  - Design systems — spójna skala kolorów, spacing, typografii
+  - Projekty z designerem — Tailwind = język designu w kodzie
+  - Gdy CSS modules / styled-components to za dużo abstrakcji
+  - SPA (React, Vue, Svelte) i SSR (Next.js, Nuxt)
+  - Gdy chcesz mały bundle CSS (JIT = kilka KB)
+
+firstComponent: |
+  <!-- Instalacja -->
+  npm install -D tailwindcss @tailwindcss/vite
+
+  <!-- Card component -->
+  <div class="max-w-sm mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+    <img class="w-full h-48 object-cover" src="/photo.jpg" alt="Photo">
+    <div class="p-6">
+      <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-2">
+        Tytuł karty
+      </h2>
+      <p class="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
+        Opis karty z utility classes — zero custom CSS.
+      </p>
+      <button class="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg
+                     text-sm font-medium transition-colors">
+        Action
+      </button>
+    </div>
+  </div>

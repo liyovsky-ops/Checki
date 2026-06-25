@@ -1,0 +1,116 @@
+title: Request i Response
+
+items:
+  - name: Request object — odczyt danych
+    desc: >
+      req zawiera wszystko co klient wysłał: body (POST data), params (URL), query (query string),
+      headers, cookies, IP, method, path. express.json() middleware parsuje JSON body automatycznie.
+    code: |
+      app.use(express.json()); // parsuj JSON body
+      app.use(express.urlencoded({ extended: true })); // parsuj form data
+
+      app.post('/api/data', (req, res) => {
+        console.log(req.body);       // { name: "Jan" } — z JSON body
+        console.log(req.params);     // { id: "42" } — z URL
+        console.log(req.query);      // { page: "1" } — z query string
+        console.log(req.headers);    // { 'content-type': 'application/json' }
+        console.log(req.ip);         // "127.0.0.1"
+        console.log(req.method);     // "POST"
+        console.log(req.path);       // "/api/data"
+        console.log(req.hostname);   // "localhost"
+        console.log(req.get('Authorization')); // header value
+        res.json({ received: true });
+      });
+
+  - name: Response — wysyłanie odpowiedzi
+    desc: >
+      res ma metody do wysyłania odpowiedzi: json(), send(), sendFile(), redirect(),
+      status(), set() (headers), cookie(). Każda odpowiedź może mieć status code i headers.
+    code: |
+      // JSON response
+      app.get('/api/users', (req, res) => {
+        res.json({ users: [], total: 0 });
+      });
+
+      // Status code + JSON
+      app.post('/api/users', (req, res) => {
+        res.status(201).json({ id: 1, ...req.body });
+      });
+
+      // Plain text
+      app.get('/health', (req, res) => {
+        res.send('OK');
+      });
+
+      // No content
+      app.delete('/api/users/:id', (req, res) => {
+        res.sendStatus(204); // 204 No Content
+      });
+
+      // Redirect
+      app.get('/old-page', (req, res) => {
+        res.redirect(301, '/new-page');
+      });
+
+      // File download
+      app.get('/download', (req, res) => {
+        res.download('./files/report.pdf', 'report.pdf');
+      });
+
+      // Custom headers
+      app.get('/api/data', (req, res) => {
+        res.set('X-Request-Id', 'abc-123');
+        res.set('Cache-Control', 'no-cache');
+        res.json({ data: 'value' });
+      });
+
+  - name: Cookies i sesje
+    desc: >
+      res.cookie() ustawia cookie, req.cookies czyta (wymaga cookie-parser middleware).
+      express-session daje server-side sessions z Redis/MongoDB store.
+    code: |
+      const cookieParser = require('cookie-parser');
+      app.use(cookieParser());
+
+      // Ustaw cookie
+      app.post('/login', (req, res) => {
+        res.cookie('token', 'abc123', {
+          httpOnly: true,  // niedostępne z JS
+          secure: true,    // tylko HTTPS
+          sameSite: 'strict',
+          maxAge: 3600000, // 1h w ms
+        });
+        res.json({ loggedIn: true });
+      });
+
+      // Czytaj cookie
+      app.get('/profile', (req, res) => {
+        const token = req.cookies.token;
+        if (!token) return res.status(401).json({ error: 'Not logged in' });
+        res.json({ user: 'Jan' });
+      });
+
+  - name: Streaming i chunked responses
+    desc: >
+      res jest WritableStream — możesz streamować duże dane bez buforowania w pamięci.
+      Przydatne do dużych plików, Server-Sent Events, real-time logów.
+    code: |
+      // Stream pliku
+      const fs = require('fs');
+      app.get('/logs', (req, res) => {
+        res.set('Content-Type', 'text/plain');
+        fs.createReadStream('./app.log').pipe(res);
+      });
+
+      // Server-Sent Events
+      app.get('/events', (req, res) => {
+        res.set({
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        });
+        const interval = setInterval(() => {
+          res.write(`data: ${JSON.stringify({ time: Date.now() })}\n\n`);
+        }, 1000);
+        req.on('close', () => clearInterval(interval));
+      });

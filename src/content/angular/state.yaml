@@ -1,0 +1,147 @@
+title: Services & Dependency Injection
+
+items:
+  - name: Services — logika biznesowa poza komponentami
+    desc: >
+      Service to klasa z @Injectable która enkapsuluje logikę biznesową, HTTP calls,
+      state management. DI (Dependency Injection) wstrzykuje serwis do komponentów
+      automatycznie — nie tworzysz instancji ręcznie.
+    code: |
+      import { Injectable } from '@angular/core';
+      import { HttpClient } from '@angular/common/http';
+      import { Observable } from 'rxjs';
+
+      @Injectable({ providedIn: 'root' })  // singleton — jedna instancja w całej app
+      export class UserService {
+        private apiUrl = '/api/users';
+
+        constructor(private http: HttpClient) {}
+
+        getAll(): Observable<User[]> {
+          return this.http.get<User[]>(this.apiUrl);
+        }
+
+        getById(id: string): Observable<User> {
+          return this.http.get<User>(`${this.apiUrl}/${id}`);
+        }
+
+        create(user: Partial<User>): Observable<User> {
+          return this.http.post<User>(this.apiUrl, user);
+        }
+
+        delete(id: string): Observable<void> {
+          return this.http.delete<void>(`${this.apiUrl}/${id}`);
+        }
+      }
+
+  - name: Dependency Injection — inject() function
+    desc: >
+      Angular 14+ pozwala na inject() zamiast constructor injection.
+      Czystszy kod, działa w functional guards, resolvers, interceptors.
+    code: |
+      import { Component, inject } from '@angular/core';
+      import { UserService } from './user.service';
+      import { AuthService } from './auth.service';
+
+      @Component({ selector: 'app-dashboard', template: '...' })
+      export class DashboardComponent {
+        // Nowoczesny sposób (Angular 14+)
+        private userService = inject(UserService);
+        private auth = inject(AuthService);
+
+        users$ = this.userService.getAll();
+        currentUser$ = this.auth.user$;
+      }
+
+      // Stary sposób (constructor injection) — wciąż działa
+      // constructor(
+      //   private userService: UserService,
+      //   private auth: AuthService
+      // ) {}
+
+  - name: providedIn vs providers — scope DI
+    desc: >
+      providedIn: 'root' = singleton globalny. providers w komponencie = nowa instancja
+      per komponent. Kontrolujesz lifecycle i izolację serwisu.
+    code: |
+      // Singleton globalny — jedna instancja
+      @Injectable({ providedIn: 'root' })
+      export class AuthService { }
+
+      // Per-component — nowa instancja dla każdego komponentu
+      @Component({
+        selector: 'app-editor',
+        providers: [EditorStateService],  // izolowana instancja
+        template: '...'
+      })
+      export class EditorComponent {
+        private state = inject(EditorStateService);
+      }
+
+      // Per-route — nowa instancja per lazy-loaded route
+      export const editorRoutes: Routes = [{
+        path: 'editor',
+        component: EditorComponent,
+        providers: [EditorStateService],
+      }];
+
+  - name: HTTP Interceptors
+    desc: >
+      Interceptory przechwytują KAŻDY HTTP request/response. Dodaj auth token,
+      logging, error handling, retry logic — w jednym miejscu zamiast w każdym serwisie.
+    code: |
+      // auth.interceptor.ts (functional — Angular 15+)
+      import { HttpInterceptorFn } from '@angular/common/http';
+      import { inject } from '@angular/core';
+      import { AuthService } from './auth.service';
+
+      export const authInterceptor: HttpInterceptorFn = (req, next) => {
+        const auth = inject(AuthService);
+        const token = auth.getToken();
+
+        if (token) {
+          req = req.clone({
+            setHeaders: { Authorization: `Bearer ${token}` }
+          });
+        }
+        return next(req);
+      };
+
+      // Rejestracja w app.config.ts
+      import { provideHttpClient, withInterceptors } from '@angular/common/http';
+
+      export const appConfig = {
+        providers: [
+          provideHttpClient(withInterceptors([authInterceptor, loggingInterceptor])),
+        ]
+      };
+
+  - name: NgRx Store (opcjonalny state management)
+    desc: >
+      NgRx to Redux-like state management dla Angular. Actions, Reducers, Effects,
+      Selectors. Overkill dla małych app, standard dla enterprise z complex state.
+    code: |
+      // user.actions.ts
+      import { createAction, props } from '@ngrx/store';
+      export const loadUsers = createAction('[Users] Load');
+      export const loadUsersSuccess = createAction('[Users] Load Success', props<{ users: User[] }>());
+
+      // user.reducer.ts
+      import { createReducer, on } from '@ngrx/store';
+      export const userReducer = createReducer(
+        { users: [], loading: false },
+        on(loadUsers, state => ({ ...state, loading: true })),
+        on(loadUsersSuccess, (state, { users }) => ({ ...state, users, loading: false })),
+      );
+
+      // user.effects.ts
+      @Injectable()
+      export class UserEffects {
+        loadUsers$ = createEffect(() => this.actions$.pipe(
+          ofType(loadUsers),
+          switchMap(() => this.userService.getAll().pipe(
+            map(users => loadUsersSuccess({ users }))
+          ))
+        ));
+        constructor(private actions$: Actions, private userService: UserService) {}
+      }

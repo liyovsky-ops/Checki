@@ -1,0 +1,150 @@
+title: Komponenty Angular
+
+items:
+  - name: Podstawowy komponent
+    desc: >
+      Komponent Angular to klasa TypeScript z dekoratorem @Component. Definiujesz
+      selector (tag HTML), template (widok), styles (CSS) i logikę. Każdy komponent
+      ma lifecycle hooks (ngOnInit, ngOnDestroy) i może przyjmować @Input/@Output.
+    code: |
+      import { Component, Input, Output, EventEmitter } from '@angular/core';
+
+      @Component({
+        selector: 'app-user-card',
+        standalone: true,
+        template: `
+          <div class="card">
+            <h3>{{ user.name }}</h3>
+            <p>{{ user.email }}</p>
+            <button (click)="onSelect()">Wybierz</button>
+          </div>
+        `,
+        styles: [`
+          .card { padding: 16px; border: 1px solid #ddd; border-radius: 8px; }
+          h3 { margin: 0 0 8px; }
+        `]
+      })
+      export class UserCardComponent {
+        @Input() user!: { name: string; email: string };
+        @Output() selected = new EventEmitter<void>();
+
+        onSelect() {
+          this.selected.emit();
+        }
+      }
+
+  - name: Standalone Components (Angular 14+)
+    desc: >
+      Standalone components nie wymagają NgModule — importują zależności bezpośrednio
+      w dekoratorze @Component. Upraszcza architekturę i eliminuje boilerplate modułów.
+    code: |
+      import { Component } from '@angular/core';
+      import { CommonModule } from '@angular/common';
+      import { RouterLink } from '@angular/router';
+      import { UserCardComponent } from './user-card.component';
+
+      @Component({
+        selector: 'app-users',
+        standalone: true,
+        imports: [CommonModule, RouterLink, UserCardComponent],
+        template: `
+          <h2>Użytkownicy</h2>
+          @for (user of users; track user.id) {
+            <app-user-card [user]="user" (selected)="select(user)" />
+          }
+          <a routerLink="/add">Dodaj</a>
+        `
+      })
+      export class UsersComponent {
+        users = [
+          { id: 1, name: 'Jan', email: 'jan@firma.pl' },
+          { id: 2, name: 'Anna', email: 'anna@firma.pl' },
+        ];
+
+        select(user: any) {
+          console.log('Selected:', user.name);
+        }
+      }
+
+  - name: Template syntax — @if, @for, @switch
+    desc: >
+      Angular 17+ wprowadza nowy control flow w templates — @if, @for, @switch
+      zamiast *ngIf, *ngFor. Czytelniejszy, lepszy performance (lazy rendering).
+    code: |
+      <!-- Nowy control flow (Angular 17+) -->
+      @if (isLoggedIn) {
+        <app-dashboard />
+      } @else {
+        <app-login />
+      }
+
+      @for (item of items; track item.id) {
+        <app-item [data]="item" />
+      } @empty {
+        <p>Brak elementów</p>
+      }
+
+      @switch (status) {
+        @case ('active') { <span class="green">Aktywny</span> }
+        @case ('inactive') { <span class="gray">Nieaktywny</span> }
+        @default { <span>Nieznany</span> }
+      }
+
+  - name: Content projection (ng-content)
+    desc: >
+      ng-content pozwala na wstrzykiwanie treści z komponentu-rodzica do komponentu-dziecka.
+      Odpowiednik children w React, slot w Vue/Svelte.
+    code: |
+      // card.component.ts
+      @Component({
+        selector: 'app-card',
+        standalone: true,
+        template: `
+          <div class="card">
+            <div class="header">
+              <ng-content select="[header]" />
+            </div>
+            <div class="body">
+              <ng-content />
+            </div>
+            <div class="footer">
+              <ng-content select="[footer]" />
+            </div>
+          </div>
+        `
+      })
+      export class CardComponent {}
+
+      // Użycie:
+      // <app-card>
+      //   <h3 header>Tytuł</h3>
+      //   <p>Treść karty</p>
+      //   <button footer>Akcja</button>
+      // </app-card>
+
+  - name: Lifecycle hooks
+    desc: >
+      Angular components mają lifecycle hooks — metody wywoływane w określonych
+      momentach życia komponentu: inicjalizacja, zmiana danych, niszczenie.
+    code: |
+      import { Component, OnInit, OnDestroy, OnChanges, Input, SimpleChanges } from '@angular/core';
+
+      @Component({ selector: 'app-demo', template: '...' })
+      export class DemoComponent implements OnInit, OnChanges, OnDestroy {
+        @Input() data!: string;
+
+        ngOnChanges(changes: SimpleChanges) {
+          // Wywołany gdy @Input się zmienia
+          console.log('Data changed:', changes['data'].currentValue);
+        }
+
+        ngOnInit() {
+          // Wywołany raz po pierwszym renderze
+          console.log('Component initialized');
+        }
+
+        ngOnDestroy() {
+          // Cleanup — unsubscribe, clear timers
+          console.log('Component destroyed');
+        }
+      }

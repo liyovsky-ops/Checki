@@ -1,0 +1,120 @@
+title: Svelte Stores — zarządzanie stanem
+
+items:
+  - name: writable — store do odczytu i zapisu
+    desc: >
+      writable() tworzy store który może być odczytywany i aktualizowany.
+      Subskrypcja przez prefix $. set() nadpisuje, update() modyfikuje.
+    code: |
+      // stores.js
+      import { writable } from 'svelte/store';
+
+      export const count = writable(0);
+      export const user = writable(null);
+      export const todos = writable([]);
+
+      // Komponent
+      <script>
+        import { count, user } from './stores';
+
+        // $count automatycznie subskrybuje!
+        function increment() { count.update(n => n + 1); }
+        function reset() { count.set(0); }
+      </script>
+
+      <p>Count: {$count}</p>
+      <button on:click={increment}>+1</button>
+
+  - name: readable — store tylko do odczytu
+    desc: >
+      readable() tworzy store który nie może być modyfikowany z zewnątrz.
+      Start function ustawia wartość i może zwrócić cleanup.
+    code: |
+      import { readable } from 'svelte/store';
+
+      // Aktualny czas — aktualizuje się co sekundę
+      export const time = readable(new Date(), (set) => {
+        const interval = setInterval(() => set(new Date()), 1000);
+        return () => clearInterval(interval);  // cleanup
+      });
+
+      // Mouse position
+      export const mouse = readable({ x: 0, y: 0 }, (set) => {
+        const handler = (e) => set({ x: e.clientX, y: e.clientY });
+        window.addEventListener('mousemove', handler);
+        return () => window.removeEventListener('mousemove', handler);
+      });
+
+  - name: derived — store wyliczany z innych
+    desc: >
+      derived() tworzy store którego wartość jest obliczana z jednego lub wielu
+      innych stores. Jak useMemo ale reaktywne. Auto-aktualizuje się gdy źródło się zmieni.
+    code: |
+      import { derived } from 'svelte/store';
+      import { todos } from './stores';
+
+      // Derived z jednego store
+      export const completedCount = derived(todos,
+        $todos => $todos.filter(t => t.done).length
+      );
+
+      // Derived z wielu stores
+      import { price, quantity, tax } from './stores';
+      export const total = derived(
+        [price, quantity, tax],
+        ([$price, $quantity, $tax]) => $price * $quantity * (1 + $tax)
+      );
+
+  - name: Custom stores
+    desc: >
+      Custom store = writable z encapsulated logiką. Eksponujesz subscribe
+      (wymagane) plus custom metody. Ukrywasz set/update.
+    code: |
+      import { writable } from 'svelte/store';
+
+      function createCart() {
+        const { subscribe, set, update } = writable([]);
+
+        return {
+          subscribe,
+          addItem: (item) => update(items => [...items, item]),
+          removeItem: (id) => update(items => items.filter(i => i.id !== id)),
+          clear: () => set([]),
+        };
+      }
+
+      export const cart = createCart();
+
+      // Użycie
+      <script>
+        import { cart } from './stores';
+        cart.addItem({ id: 1, name: 'Widget', price: 9.99 });
+      </script>
+      <p>Koszyk: {$cart.length} produktów</p>
+
+  - name: Store contract i interop
+    desc: >
+      Każdy obiekt z metodą subscribe() jest store w Svelte. Możesz
+      użyć RxJS Observable, Zustand, czy własnej implementacji z $.
+    code: |
+      // Własny store — wystarczy subscribe()
+      function createTimer(interval) {
+        let value = 0;
+        const subscribers = new Set();
+
+        setInterval(() => {
+          value++;
+          subscribers.forEach(fn => fn(value));
+        }, interval);
+
+        return {
+          subscribe(fn) {
+            subscribers.add(fn);
+            fn(value);  // natychmiast wyślij aktualną wartość
+            return () => subscribers.delete(fn);
+          }
+        };
+      }
+
+      const timer = createTimer(1000);
+      // {$timer} działa w template!

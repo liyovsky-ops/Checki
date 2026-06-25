@@ -1,0 +1,128 @@
+title: Customization — tailwind.config.js
+
+items:
+  - name: Konfiguracja kolorów i theme
+    desc: >
+      tailwind.config.js rozszerza lub nadpisuje domyślny design system.
+      theme.extend dodaje nowe wartości bez usuwania domyślnych.
+      theme (bez extend) ZASTĘPUJE domyślne.
+    code: |
+      // tailwind.config.js
+      export default {
+        content: ['./src/**/*.{js,ts,jsx,tsx,html}'],
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                50: '#f0f9ff',
+                100: '#e0f2fe',
+                500: '#0ea5e9',
+                900: '#0c4a6e',
+              },
+              discord: '#5865F2',
+            },
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+            },
+            spacing: {
+              '18': '4.5rem',
+              '128': '32rem',
+            },
+            borderRadius: {
+              '4xl': '2rem',
+            },
+          },
+        },
+      }
+
+      // Użycie:
+      // <div class="bg-brand-500 font-sans rounded-4xl p-18">
+
+  - name: Pluginy
+    desc: >
+      Tailwind plugins dodają nowe utility classes, components, lub variants.
+      Oficjalne: @tailwindcss/typography, @tailwindcss/forms, @tailwindcss/aspect-ratio,
+      @tailwindcss/container-queries.
+    code: |
+      // tailwind.config.js
+      import typography from '@tailwindcss/typography'
+      import forms from '@tailwindcss/forms'
+      import containerQueries from '@tailwindcss/container-queries'
+
+      export default {
+        plugins: [
+          typography,        // class="prose" → piękna typografia dla markdown/CMS
+          forms,             // resetuje stylowanie formularzy
+          containerQueries,  // @container queries
+        ],
+      }
+
+      // Custom plugin
+      import plugin from 'tailwindcss/plugin'
+
+      export default {
+        plugins: [
+          plugin(({ addUtilities }) => {
+            addUtilities({
+              '.text-shadow': { textShadow: '2px 2px 4px rgba(0,0,0,0.1)' },
+              '.text-shadow-lg': { textShadow: '4px 4px 8px rgba(0,0,0,0.2)' },
+            })
+          }),
+        ],
+      }
+
+  - name: Content paths i purge
+    desc: >
+      content array mówi Tailwind gdzie szukać klas. JIT skanuje te pliki
+      i generuje TYLKO użyte klasy. Brakujący path = brakujące style na produkcji.
+    code: |
+      // tailwind.config.js
+      export default {
+        content: [
+          './index.html',
+          './src/**/*.{js,ts,jsx,tsx}',
+          './components/**/*.{vue,svelte}',
+          // Zewnętrzne biblioteki z Tailwind classes:
+          './node_modules/flowbite/**/*.js',
+        ],
+      }
+
+      // UWAGA: dynamiczne klasy NIE SĄ wykrywane!
+      // ❌ `bg-${color}-500` — JIT nie zobaczy tej klasy
+      // ✅ Safelist: klasy które ZAWSZE mają być w CSS
+      export default {
+        safelist: [
+          'bg-red-500',
+          'bg-green-500',
+          'bg-blue-500',
+          { pattern: /bg-(red|green|blue)-(100|500|900)/ },
+        ],
+      }
+
+  - name: Presets i konfiguracja współdzielona
+    desc: >
+      Presets pozwalają współdzielić konfigurację między projektami.
+      Firma definiuje preset z brandowymi kolorami, fontem, spacingiem —
+      każdy projekt dziedziczy.
+    code: |
+      // my-company-preset.js
+      export default {
+        theme: {
+          extend: {
+            colors: {
+              brand: { 500: '#FF6B00', 900: '#CC5500' },
+            },
+            fontFamily: {
+              sans: ['Company Font', 'sans-serif'],
+            },
+          },
+        },
+      }
+
+      // tailwind.config.js w projekcie
+      import companyPreset from './my-company-preset'
+      export default {
+        presets: [companyPreset],
+        // projekt może nadpisać/rozszerzyć preset
+      }

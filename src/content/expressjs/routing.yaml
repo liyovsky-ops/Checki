@@ -1,0 +1,103 @@
+title: Routing i parametry URL
+
+items:
+  - name: Podstawowe route'y i metody HTTP
+    desc: >
+      app.get(), app.post(), app.put(), app.delete() definiują handlery per ścieżka i metoda.
+      Każdy handler to (req, res, next) => {}. Route'y matchują w kolejności definicji.
+    code: |
+      const express = require('express');
+      const app = express();
+
+      app.get('/users', (req, res) => {
+        res.json({ users: [] });
+      });
+
+      app.post('/users', (req, res) => {
+        const data = req.body;
+        res.status(201).json({ created: data });
+      });
+
+      app.put('/users/:id', (req, res) => {
+        res.json({ id: req.params.id, updated: true });
+      });
+
+      app.delete('/users/:id', (req, res) => {
+        res.sendStatus(204);
+      });
+
+  - name: Parametry URL i query strings
+    desc: >
+      :param w ścieżce to dynamiczny parametr dostępny w req.params.
+      ?key=value w URL to query string dostępny w req.query.
+    code: |
+      // Parametr URL
+      app.get('/users/:id', (req, res) => {
+        console.log(req.params.id); // "42"
+        res.json({ id: req.params.id });
+      });
+
+      // Wiele parametrów
+      app.get('/users/:userId/posts/:postId', (req, res) => {
+        const { userId, postId } = req.params;
+        res.json({ userId, postId });
+      });
+
+      // Query strings: /search?q=express&limit=10
+      app.get('/search', (req, res) => {
+        const { q, limit } = req.query;
+        res.json({ query: q, limit: Number(limit) || 20 });
+      });
+
+  - name: Router — modularyzacja route'ów
+    desc: >
+      express.Router() grupuje route'y w osobny moduł. Rejestrujesz go w app
+      z opcjonalnym prefixem. Każdy router to mini-aplikacja z własnymi middleware.
+    code: |
+      // routes/users.js
+      const router = require('express').Router();
+
+      router.get('/', (req, res) => res.json({ users: [] }));
+      router.get('/:id', (req, res) => res.json({ id: req.params.id }));
+      router.post('/', (req, res) => res.status(201).json(req.body));
+
+      module.exports = router;
+
+      // app.js
+      const usersRouter = require('./routes/users');
+      app.use('/api/users', usersRouter);
+      // GET /api/users, GET /api/users/42, POST /api/users
+
+  - name: Route chaining i app.route()
+    desc: >
+      app.route('/path') pozwala chainować metody HTTP dla tej samej ścieżki
+      bez powtarzania path. Czytelniejsze niż osobne app.get/post/put.
+    code: |
+      app.route('/articles')
+        .get((req, res) => res.json({ articles: [] }))
+        .post((req, res) => res.status(201).json(req.body));
+
+      app.route('/articles/:id')
+        .get((req, res) => res.json({ id: req.params.id }))
+        .put((req, res) => res.json({ updated: true }))
+        .delete((req, res) => res.sendStatus(204));
+
+  - name: Regex i wildcard routes
+    desc: >
+      Express obsługuje regex patterns w route'ach i wildcard (*).
+      Przydatne do catch-all, SPA fallback i pattern matching.
+    code: |
+      // Wildcard — catch all
+      app.get('/api/*', (req, res) => {
+        res.json({ path: req.path });
+      });
+
+      // Regex — matchuje /fly, /flutter, /flexible
+      app.get(/\/fl\w+/, (req, res) => {
+        res.send('Matched: ' + req.path);
+      });
+
+      // SPA fallback — po API routes, serwuj index.html
+      app.get('*', (req, res) => {
+        res.sendFile('index.html', { root: 'public' });
+      });

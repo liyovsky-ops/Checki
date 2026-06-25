@@ -1,0 +1,66 @@
+title: NestJS vs alternatywy backend Node.js
+
+items:
+  - name: Express.js
+    icon: "🟨"
+    color: "#f7df1e"
+    tagline: Minimalny, nieopiniowany — maksymalna swoboda
+    pros:
+      - Najprostszy start — 3 linie kodu do serwera
+      - Ogromny ekosystem middleware
+      - Każdy zna Express — łatwe zatrudnianie
+      - Zero narzuconej struktury — pełna kontrola
+    cons:
+      - Brak struktury to też wada — w dużym projekcie chaos
+      - Brak DI, brak modułów — sam musisz organizować kod
+      - Brak TypeScript out of the box
+      - Brak wbudowanego wsparcia dla WebSocket, GraphQL, microservices
+    vs: Express gdy potrzebujesz prostoty i lekkości. NestJS gdy budujesz duży system z wieloma modułami i zespołem.
+
+  - name: Fastify
+    icon: "⚡"
+    color: "#ffffff"
+    tagline: Najszybszy Node.js framework — 2× szybszy od Express
+    pros:
+      - 2× szybszy niż Express w benchmarkach
+      - Schema-based validation (Ajv) wbudowana
+      - Plugin system zamiast middleware
+      - Wbudowane logowanie (Pino)
+    cons:
+      - Mniejszy ekosystem niż Express
+      - Nie wszyscy middleware Express działają z Fastify
+      - Brak DI i modułów (jak Express)
+      - Mniej zasobów edukacyjnych
+    vs: Fastify gdy wydajność jest krytyczna. NestJS używa Fastify jako adapter — możesz mieć NestJS + Fastify speed.
+
+  - name: Hono
+    icon: "🔥"
+    color: "#e36002"
+    tagline: Ultra-lekki, edge-first — działa na Cloudflare Workers, Deno, Bun
+    pros:
+      - Działa na edge (Workers, Deno Deploy, Bun)
+      - Ultra-szybki — mniejszy overhead niż Express
+      - TypeScript-first z type-safe routing
+      - Zero zależności — mały bundle
+    cons:
+      - Nowy — mniejsza społeczność
+      - Brak DI, modułów, ORM integracji
+      - Nie nadaje się do dużych monolitów
+      - Ekosystem dopiero rośnie
+    vs: Hono dla edge/serverless. NestJS dla tradycyjnych serwerów i dużych API.
+
+  - name: tRPC
+    icon: "🔷"
+    color: "#398ccb"
+    tagline: End-to-end typesafe API bez code generation
+    pros:
+      - Zero code generation — typy z backendu do frontendu automatycznie
+      - Pełna type safety (input, output, errors)
+      - Działa z React Query, Next.js, Nuxt
+      - Prostsze niż REST + OpenAPI + codegen
+    cons:
+      - Tylko TypeScript full-stack (backend + frontend)
+      - Brak REST — nie eksponujesz publicznego API
+      - Tight coupling frontend-backend
+      - Nie nadaje się do public API (brak standardowego protokołu)
+    vs: tRPC gdy masz TypeScript monorepo (full-stack). NestJS gdy budujesz public API lub microservices.

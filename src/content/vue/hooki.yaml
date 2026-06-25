@@ -1,0 +1,101 @@
+title: Composition API i Composables
+
+items:
+  - name: ref() i reactive()
+    desc: >
+      ref() opakowuje pojedynczą wartość w reaktywny obiekt (.value). reactive()
+      robi obiekt reaktywnym (bez .value). ref dla prymitywów, reactive dla obiektów.
+    code: |
+      import { ref, reactive } from 'vue'
+
+      // ref — prymitywy i dowolne wartości
+      const count = ref(0)
+      count.value++  // w script: .value
+      // w template: {{ count }} (bez .value)
+
+      // reactive — obiekty
+      const user = reactive({
+        name: 'Jan',
+        age: 25,
+      })
+      user.name = 'Anna'  // bezpośrednio, bez .value
+
+  - name: computed()
+    desc: >
+      Derived state — automatycznie przelicza się gdy zależności się zmienią.
+      Odpowiednik useMemo z React, ale automatyczny (nie musisz podawać deps).
+    code: |
+      import { ref, computed } from 'vue'
+
+      const items = ref([1, 2, 3, 4, 5])
+      const total = computed(() => items.value.reduce((a, b) => a + b, 0))
+      const even = computed(() => items.value.filter(n => n % 2 === 0))
+
+  - name: watch() i watchEffect()
+    desc: >
+      watch() obserwuje konkretne źródło i reaguje na zmiany. watchEffect()
+      automatycznie śledzi zależności (jak useEffect bez deps w React).
+    code: |
+      import { ref, watch, watchEffect } from 'vue'
+
+      const query = ref('')
+
+      // watch — jawne źródło
+      watch(query, (newVal, oldVal) => {
+        console.log(`Zmiana: ${oldVal} → ${newVal}`)
+        fetchResults(newVal)
+      }, { debounce: 300 })
+
+      // watchEffect — auto-tracking
+      watchEffect(() => {
+        console.log(`Query: ${query.value}`)
+        // automatycznie re-run gdy query.value się zmieni
+      })
+
+  - name: Lifecycle hooks
+    desc: >
+      onMounted, onUpdated, onUnmounted — odpowiedniki componentDidMount,
+      componentDidUpdate, componentWillUnmount z React class components.
+    code: |
+      import { onMounted, onUnmounted } from 'vue'
+
+      onMounted(() => {
+        console.log('Komponent zamontowany')
+        window.addEventListener('resize', onResize)
+      })
+
+      onUnmounted(() => {
+        window.removeEventListener('resize', onResize)
+      })
+
+  - name: Composables (custom hooks)
+    desc: >
+      Composable to funkcja use*() która enkapsuluje reaktywną logikę.
+      Odpowiednik custom hooks z React. Reużywalna między komponentami.
+    code: |
+      // composables/useFetch.js
+      import { ref, watchEffect } from 'vue'
+
+      export function useFetch(url) {
+        const data = ref(null)
+        const error = ref(null)
+        const loading = ref(true)
+
+        watchEffect(async () => {
+          loading.value = true
+          try {
+            const res = await fetch(url.value)
+            data.value = await res.json()
+          } catch (e) {
+            error.value = e
+          } finally {
+            loading.value = false
+          }
+        })
+
+        return { data, error, loading }
+      }
+
+      // Użycie w komponencie
+      const url = ref('/api/users')
+      const { data, loading } = useFetch(url)

@@ -1,0 +1,151 @@
+title: Prisma Client Queries
+
+items:
+  - name: CRUD podstawy — findMany, findUnique, create, update, delete
+    desc: >
+      Prisma Client generuje type-safe metody CRUD. findMany zwraca tablicę,
+      findUnique szuka po unique field, create/update/delete modyfikują dane.
+      Wszystkie zwracają Promise z typowanym wynikiem.
+    code: |
+      import { PrismaClient } from '@prisma/client'
+      const prisma = new PrismaClient()
+
+      // Pobierz wszystkich userów
+      const users = await prisma.user.findMany()
+
+      // Pobierz usera po ID (unique field)
+      const user = await prisma.user.findUnique({
+        where: { id: 1 }
+      })
+
+      // Pobierz usera po email (unique field)
+      const user2 = await prisma.user.findUnique({
+        where: { email: 'jan@firma.pl' }
+      })
+
+      // Stwórz usera
+      const newUser = await prisma.user.create({
+        data: { email: 'anna@firma.pl', name: 'Anna Nowak' }
+      })
+
+      // Aktualizuj usera
+      const updated = await prisma.user.update({
+        where: { id: 1 },
+        data: { name: 'Jan Nowak' }
+      })
+
+      // Usuń usera
+      const deleted = await prisma.user.delete({
+        where: { id: 1 }
+      })
+
+  - name: Filtrowanie i sortowanie
+    desc: >
+      where z operatorami (contains, startsWith, gt, lt, in, not), orderBy,
+      take/skip do paginacji. Wszystko type-safe — TypeScript pilnuje nazw pól.
+    code: |
+      // Filtrowanie z operatorami
+      const users = await prisma.user.findMany({
+        where: {
+          email: { contains: '@firma.pl' },
+          name: { startsWith: 'Jan' },
+          createdAt: { gte: new Date('2024-01-01') },
+          role: { in: ['ADMIN', 'MODERATOR'] },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,    // LIMIT 10
+        skip: 20,    // OFFSET 20 (strona 3 × 10)
+      })
+
+      // OR / AND / NOT
+      const results = await prisma.user.findMany({
+        where: {
+          OR: [
+            { email: { contains: 'admin' } },
+            { role: 'ADMIN' },
+          ],
+          NOT: { name: null },
+        },
+      })
+
+  - name: Include i Select — kontrola danych
+    desc: >
+      include ładuje relacje (eager loading). select wybiera konkretne pola
+      (jak GraphQL — zero over-fetching). Nie mieszaj include i select.
+    code: |
+      // Include — załaduj relacje
+      const userWithPosts = await prisma.user.findUnique({
+        where: { id: 1 },
+        include: {
+          posts: true,                    // wszystkie posty
+          posts: {                        // z filtrem
+            where: { published: true },
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+          },
+        },
+      })
+
+      // Select — wybierz pola (mniejszy payload)
+      const userEmail = await prisma.user.findMany({
+        select: {
+          id: true,
+          email: true,
+          _count: { select: { posts: true } },  // COUNT relacji
+        },
+      })
+
+  - name: Transakcje
+    desc: >
+      prisma.$transaction() wykonuje wiele operacji atomowo. Jeśli jedna failuje,
+      wszystkie się cofają. Dwa tryby: sequential (tablica) i interactive (callback).
+    code: |
+      // Sequential — tablica operacji
+      const [user, post] = await prisma.$transaction([
+        prisma.user.create({ data: { email: 'test@x.com', name: 'Test' } }),
+        prisma.post.create({ data: { title: 'Hello', authorId: 1 } }),
+      ])
+
+      // Interactive — callback z pełną kontrolą
+      const result = await prisma.$transaction(async (tx) => {
+        const sender = await tx.account.update({
+          where: { id: senderId },
+          data: { balance: { decrement: amount } },
+        })
+        if (sender.balance < 0) throw new Error('Insufficient funds')
+
+        const receiver = await tx.account.update({
+          where: { id: receiverId },
+          data: { balance: { increment: amount } },
+        })
+        return { sender, receiver }
+      })
+
+  - name: Aggregacje i grupowanie
+    desc: >
+      aggregate() — SUM, AVG, MIN, MAX, COUNT. groupBy() — GROUP BY z having.
+      count() — szybki COUNT z filtrami.
+    code: |
+      // Aggregate
+      const stats = await prisma.product.aggregate({
+        _avg: { price: true },
+        _max: { price: true },
+        _min: { price: true },
+        _sum: { price: true },
+        _count: true,
+        where: { inStock: true },
+      })
+
+      // Group By
+      const byCategory = await prisma.product.groupBy({
+        by: ['categoryId'],
+        _count: true,
+        _avg: { price: true },
+        having: { price: { _avg: { gt: 50 } } },
+        orderBy: { _count: { categoryId: 'desc' } },
+      })
+
+      // Count
+      const activeUsers = await prisma.user.count({
+        where: { posts: { some: { published: true } } },
+      })

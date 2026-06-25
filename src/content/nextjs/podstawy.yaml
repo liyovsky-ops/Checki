@@ -1,0 +1,92 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Next.js?
+  firstComponent: Twoja pierwsza strona Next.js
+  firstComponentLang: tsx
+
+intro:
+  title: Czym jest Next.js?
+  desc: >
+    Next.js to full-stack framework React od Vercel. Rozszerza React o routing oparty na plikach,
+    server-side rendering (SSR), static site generation (SSG), incremental static regeneration (ISR),
+    Server Components, API Routes i middleware. Jeden framework do frontendu I backendu —
+    nie potrzebujesz osobnego serwera Express. Używany przez TikTok, Notion, Hulu, Nike i Vercel.
+
+concepts:
+  - title: File-based Routing
+    desc: >
+      Struktura plików w app/ automatycznie staje się routing. app/about/page.tsx = /about.
+      Nie konfigurujesz routera — tworzysz pliki i foldery. Dynamiczne segmenty: [id]/page.tsx.
+      Layout.tsx owija strony w shared UI (navbar, footer) bez re-renderowania.
+    icon: "📁"
+  - title: Server Components (domyślne)
+    desc: >
+      W Next.js 14+ każdy komponent jest domyślnie Server Component — renderuje się na serwerze,
+      zero JS wysyłanego do klienta. Mniejszy bundle, szybszy Time-to-Interactive.
+      Dodaj 'use client' tylko gdy potrzebujesz interaktywności (useState, onClick, useEffect).
+    icon: "🖥️"
+  - title: Rendering Strategies
+    desc: >
+      SSR (Server-Side Rendering) — renderuj na każdy request. SSG (Static Site Generation) — generuj
+      raz przy buildzie. ISR (Incremental Static Regeneration) — SSG z automatycznym re-generowaniem
+      co N sekund. Streaming — wyślij HTML w kawałkach (React Suspense). Wybierasz per strona.
+    icon: "🔄"
+  - title: API Routes / Route Handlers
+    desc: >
+      app/api/users/route.ts to endpoint REST. Export GET, POST, PUT, DELETE jako named functions.
+      Pełny backend w tym samym projekcie — nie potrzebujesz Express. Idealne do webhooków,
+      auth callbacks, proxy do external API.
+    icon: "🔌"
+  - title: Middleware
+    desc: >
+      middleware.ts w root projektu — uruchamia się PRZED każdym requestem. Redirect,
+      rewrite URL, dodaj headers, sprawdź auth token, A/B testing, geo-routing.
+      Działa na edge (Vercel Edge Functions) — ultra-szybki.
+    icon: "⚡"
+  - title: Image & Font Optimization
+    desc: >
+      next/image automatycznie optymalizuje obrazki — lazy loading, responsive sizes,
+      WebP/AVIF format, placeholder blur. next/font ładuje Google Fonts bez layout shift
+      i bez external request — font jest self-hosted w buildzie.
+    icon: "🖼️"
+
+whenToUse:
+  - Full-stack aplikacje React (frontend + API w jednym projekcie)
+  - SEO-critical strony (SSR/SSG daje crawlerom pełny HTML)
+  - E-commerce, blogi, landing pages (SSG = ultra-szybkie)
+  - Dashboard z real-time danymi (Server Components + streaming)
+  - Gdy chcesz deploy na Vercel (zero-config, preview deploys)
+  - Prototypy — file-based routing = szybki start
+
+firstComponent: |
+  # Instalacja
+  npx create-next-app@latest my-app --typescript --tailwind --app
+  cd my-app
+
+  # app/page.tsx — strona główna
+  export default function Home() {
+    return (
+      <main className="p-8">
+        <h1 className="text-4xl font-bold">Hello Next.js!</h1>
+        <p className="mt-4 text-gray-600">
+          Ta strona renderuje się na serwerze (Server Component).
+        </p>
+      </main>
+    )
+  }
+
+  # app/about/page.tsx — podstrona /about
+  export default function About() {
+    return <h1>O nas</h1>
+  }
+
+  # app/api/hello/route.ts — API endpoint
+  import { NextResponse } from 'next/server'
+
+  export async function GET() {
+    return NextResponse.json({ message: 'Hello from API!' })
+  }
+
+  # Uruchomienie
+  npm run dev
+  # http://localhost:3000

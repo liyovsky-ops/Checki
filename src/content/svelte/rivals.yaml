@@ -1,0 +1,66 @@
+title: Svelte vs alternatywy
+
+items:
+  - name: React
+    icon: "⚛️"
+    color: "#61dafb"
+    tagline: Największy ekosystem, Virtual DOM, hooks-based
+    pros:
+      - Największy ekosystem — biblioteki, narzędzia, community
+      - Dojrzały rynek pracy — najwięcej ofert
+      - Meta backing — stabilny development
+      - React Native — mobile z tego samego kodu
+    cons:
+      - Virtual DOM overhead — diffing kosztuje
+      - Bundle size ~130KB (react + react-dom)
+      - Hooks complexity (useEffect dependency arrays, stale closures)
+      - Boilerplate — useState, useCallback, useMemo
+    vs: React gdy potrzebujesz ekosystemu i rynku pracy. Svelte gdy priorytetem jest wydajność, prostota i mały bundle.
+
+  - name: Vue.js
+    icon: "💚"
+    color: "#42b883"
+    tagline: Progresywny framework — łatwiejszy niż React, bogatszy niż Svelte
+    pros:
+      - Composition API — reaktywność jak Svelte ale z TypeScript support
+      - Single File Components — podobne do Svelte (.vue)
+      - Nuxt.js — dojrzały meta-framework (jak SvelteKit)
+      - Łagodna krzywa uczenia
+    cons:
+      - Runtime framework — Virtual DOM jak React
+      - Mniejszy ekosystem niż React
+      - Reactivity system (Proxy) ma edge cases
+      - Dwa API (Options vs Composition) — fragmentacja community
+    vs: Vue to middle ground — prostszy niż React, więcej features niż Svelte. Svelte wygrywa wydajnością i prostotą składni.
+
+  - name: Solid.js
+    icon: "⚡"
+    color: "#2c4f7c"
+    tagline: Reaktywny bez Virtual DOM — jak Svelte ale z JSX
+    pros:
+      - Zero Virtual DOM — fine-grained reactivity jak Svelte
+      - JSX syntax — familiar dla React devów
+      - Sygnały (signals) — precyzyjna reaktywność
+      - Bardzo szybki (często szybszy niż Svelte w benchmarkach)
+    cons:
+      - Mały ekosystem — niszowy
+      - Brak dojrzałego meta-frameworka (SolidStart jest wczesny)
+      - Mały rynek pracy
+      - JSX z signals wymaga mentalnego przesiadki z React
+    vs: Solid to closest competitor do Svelte pod względem podejścia. Svelte ma prostszą składnię (nie-JSX) i dojrzalszy ekosystem (SvelteKit).
+
+  - name: Angular
+    icon: "🔺"
+    color: "#dd0031"
+    tagline: Enterprise full-framework — TypeScript, DI, RxJS, wszystko wbudowane
+    pros:
+      - Pełny framework — routing, forms, HTTP, DI wbudowane
+      - TypeScript first — silne typowanie
+      - Google backing — enterprise adoption
+      - Angular CLI — scaffolding, generators
+    cons:
+      - Ciężki — duży bundle, steep learning curve
+      - Verbose — dużo boilerplate (dekoratory, moduły)
+      - RxJS required — krzywa uczenia observables
+      - Slow to iterate — major versions co rok, breaking changes
+    vs: Angular dla dużych zespołów enterprise z TypeScript. Svelte dla szybkiego developmentu, prostoty i wydajności.

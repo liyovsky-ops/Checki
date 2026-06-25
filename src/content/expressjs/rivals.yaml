@@ -1,0 +1,66 @@
+title: Express.js vs alternatywy backend Node.js
+
+items:
+  - name: Fastify
+    icon: "⚡"
+    color: "#ffffff"
+    tagline: Szybki framework Node.js — 2-3× wydajniejszy od Express
+    pros:
+      - 2-3× szybszy niż Express w benchmarkach
+      - Wbudowana walidacja schematów (JSON Schema)
+      - Pluginowy system z enkapsulacją
+      - TypeScript first-class support
+    cons:
+      - Mniejsza społeczność i ekosystem middleware
+      - Inny API — migracja z Express wymaga przeróbek
+      - Mniej tutoriali i rozwiązań na Stack Overflow
+      - Plugin system ma learning curve
+    vs: Fastify dla nowych projektów gdzie wydajność jest priorytetem. Express gdy potrzebujesz dojrzałego ekosystemu middleware i prostoty.
+
+  - name: Koa
+    icon: "🍃"
+    color: "#33333d"
+    tagline: Następnik Express od tego samego autora — async/await native
+    pros:
+      - async/await od początku (brak callback hell)
+      - Lżejszy core niż Express — mniej built-in middleware
+      - Lepsze error handling (ctx.throw)
+      - Ten sam autor co Express (TJ Holowaychuk)
+    cons:
+      - Znacznie mniejszy ekosystem middleware
+      - Mniej popularne — mniej tutoriali i zasobów
+      - Brak wbudowanego routera (potrzebujesz koa-router)
+      - Mniejszy rynek pracy
+    vs: Koa dla minimalistycznych API z czystym async/await. Express dla dojrzałego ekosystemu i łatwego onboardingu.
+
+  - name: NestJS
+    icon: "🐱"
+    color: "#e0234e"
+    tagline: Angular-style backend — dekoratory, DI, moduły, TypeScript
+    pros:
+      - Pełny framework z DI, modułami, guards, interceptors
+      - TypeScript first — decoratory, metadata, type safety
+      - Wbudowane wsparcie WebSocket, GraphQL, mikrousługi
+      - Opinionated — wymusza dobrą architekturę
+    cons:
+      - Ciężki — dużo abstrakcji i boilerplate
+      - Stroma krzywa uczenia (Angular-style patterns)
+      - Wolniejszy startup i większy bundle
+      - Zbyt dużo magii (decoratory ukrywają logikę)
+    vs: NestJS dla dużych enterprise projektów z zespołem 5+. Express dla szybkich API, prototypów i mniejszych projektów.
+
+  - name: Hono
+    icon: "🔥"
+    color: "#e36002"
+    tagline: Ultra-lekki, multi-runtime — działa wszędzie (Bun, Deno, CF Workers, Node)
+    pros:
+      - Ultra-szybki — 3-5× szybszy od Express
+      - Multi-runtime — Bun, Deno, Cloudflare Workers, Node.js
+      - Web Standards API (Request/Response)
+      - Tiny bundle — <15KB
+    cons:
+      - Młody projekt — mniej stabilne API
+      - Mały ekosystem middleware vs Express
+      - Brak wbudowanego template engine
+      - Mniej rozwiązań na SO i tutoriali
+    vs: Hono dla edge computing (CF Workers) i ultra-wydajnych API. Express dla Node.js-only projektów z dojrzałym ekosystemem.

@@ -1,0 +1,105 @@
+title: Komponenty i Props
+
+items:
+  - name: Single File Component (SFC)
+    desc: >
+      Plik .vue zawiera template, script i style w jednym. <script setup> to
+      skrócona składnia — zmienne i funkcje są automatycznie dostępne w template.
+    code: |
+      <!-- UserCard.vue -->
+      <script setup>
+      defineProps({
+        name: String,
+        email: String,
+        role: { type: String, default: 'user' }
+      })
+      </script>
+
+      <template>
+        <div class="user-card">
+          <h3>{{ name }}</h3>
+          <p>{{ email }}</p>
+          <span class="badge">{{ role }}</span>
+        </div>
+      </template>
+
+      <style scoped>
+      .user-card { padding: 16px; border: 1px solid #ddd; border-radius: 8px; }
+      .badge { background: #42b883; color: white; padding: 2px 8px; border-radius: 4px; }
+      </style>
+
+  - name: Props z TypeScript
+    desc: >
+      defineProps z generycznym typem daje type-safe props bez runtime overhead.
+    code: |
+      <script setup lang="ts">
+      interface Props {
+        title: string
+        count: number
+        items: string[]
+        onSubmit?: (value: string) => void
+      }
+
+      const props = defineProps<Props>()
+      </script>
+
+  - name: Emity (child → parent)
+    desc: >
+      defineEmits deklaruje eventy które komponent może emitować do rodzica.
+      Odpowiednik callback props z React.
+    code: |
+      <!-- child -->
+      <script setup>
+      const emit = defineEmits(['update', 'delete'])
+
+      function handleSave() {
+        emit('update', { id: 1, name: 'Jan' })
+      }
+      </script>
+
+      <!-- parent -->
+      <template>
+        <ChildComponent @update="onUpdate" @delete="onDelete" />
+      </template>
+
+  - name: Sloty (children)
+    desc: >
+      Sloty to odpowiednik children z React. Default slot, named slots,
+      scoped slots (przekazywanie danych z child do parent template).
+    code: |
+      <!-- Card.vue -->
+      <template>
+        <div class="card">
+          <div class="card-header">
+            <slot name="header">Default header</slot>
+          </div>
+          <div class="card-body">
+            <slot>Default content</slot>
+          </div>
+        </div>
+      </template>
+
+      <!-- Użycie -->
+      <Card>
+        <template #header>
+          <h2>Custom Header</h2>
+        </template>
+        <p>Body content goes here</p>
+      </Card>
+
+  - name: v-model na custom komponencie
+    desc: >
+      v-model na custom komponencie tworzy two-way binding. Komponent musi
+      przyjmować prop modelValue i emitować update:modelValue.
+    code: |
+      <!-- CustomInput.vue -->
+      <script setup>
+      const model = defineModel()
+      </script>
+
+      <template>
+        <input :value="model" @input="model = $event.target.value" />
+      </template>
+
+      <!-- Użycie -->
+      <CustomInput v-model="username" />

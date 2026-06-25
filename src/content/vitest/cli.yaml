@@ -100,7 +100,7 @@ groups:
       - cmd: npx vitest run --coverage
         desc: Uruchom testy z raportem coverage
         detail:
-          what: Generuje raport pokrycia kodu. Wymaga @vitest/coverage-v8 lub istanbul.
+          what: "Generuje raport pokrycia kodu. Wymaga @vitest/coverage-v8 lub istanbul."
           how: Raport w coverage/ katalogu — HTML, text, lcov.
           tips:
             - 'npm install --save-dev @vitest/coverage-v8 — najpierw zainstaluj'
@@ -122,7 +122,7 @@ groups:
         desc: Wymuś minimum 80% coverage
         detail:
           what: Fail jeśli line coverage poniżej 80%.
-          how: "Osobne progi - lines, branches, functions, statements.
+          how: "Osobne progi: lines, branches, functions, statements."
           tips:
             - 'W vitest.config.ts: coverage.thresholds = { lines: 80 }'
       - cmd: npx vitest run --coverage --coverage.all
@@ -140,7 +140,7 @@ groups:
         desc: Uruchom z Vitest UI (przeglądarkowy dashboard)
         detail:
           what: Otwiera interaktywny dashboard w przeglądarce.
-          how: Wymaga @vitest/ui. Drzewo testów, statusy, re-run, coverage.
+          how: "Wymaga @vitest/ui. Drzewo testów, statusy, re-run, coverage."
           tips:
             - 'npm install --save-dev @vitest/ui'
       - cmd: npx vitest --ui --coverage
@@ -360,7 +360,7 @@ groups:
         desc: Max równoległych testów w jednym pliku
         detail:
           what: Ogranicza ile it.concurrent() testów leci naraz.
-          how: Domyślnie: 5. Zmniejsz dla resource-intensive testów.
+          how: "Domyślnie 5. Zmniejsz dla resource-intensive testów."
           tips:
             - 'Osobne od --pool threads — to jest wewnątrz jednego pliku'
       - cmd: npx vitest --clearScreen false

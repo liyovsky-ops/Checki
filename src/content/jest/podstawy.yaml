@@ -1,0 +1,92 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Jest?
+  firstComponent: Pierwszy test Jest
+  firstComponentLang: javascript
+
+intro:
+  title: Czym jest Jest?
+  desc: >
+    Jest to framework testowy od Meta (Facebook), zaprojektowany z myślą o zero-config experience.
+    Wbudowany test runner, asercje, mocking, code coverage, snapshot testing — wszystko w jednym
+    pakiecie. Domyślny wybór dla React, ale działa z każdym projektem JavaScript/TypeScript.
+    Paralelne uruchamianie testów, watch mode z intelligent file detection, i bogate API do
+    mockowania modułów, timerów i API calls.
+
+concepts:
+  - title: Test Suite (describe)
+    desc: >
+      describe() grupuje powiązane testy w blok. Możesz nestować describe wewnątrz describe
+      dla hierarchii. Każdy describe ma swój scope dla beforeEach/afterEach — setup/teardown
+      per grupa testów.
+    icon: "📦"
+  - title: Test Case (test / it)
+    desc: >
+      test() lub it() definiuje pojedynczy test. Przyjmuje opis (string) i funkcję z asercjami.
+      Test przechodzi jeśli żadna asercja nie rzuci błędu. Możesz użyć test.only() do uruchomienia
+      jednego testu lub test.skip() do pominięcia.
+    icon: "✅"
+  - title: Matchers (expect)
+    desc: >
+      expect(value).toBe(expected) — serce asercji Jest. Dziesiątki matcherów: toBe (===),
+      toEqual (deep equal), toContain, toThrow, toHaveBeenCalled (mocks), toMatchSnapshot.
+      Rozszerzalne — dodaj własne matchery przez expect.extend().
+    icon: "🎯"
+  - title: Mocking
+    desc: >
+      jest.fn() tworzy mock function. jest.mock('module') mockuje cały moduł. jest.spyOn()
+      śledzi wywołania istniejącej metody. Timer mocks (jest.useFakeTimers) kontrolują
+      setTimeout/setInterval. Manual mocks w __mocks__/ katalogu.
+    icon: "🎭"
+  - title: Snapshot Testing
+    desc: >
+      toMatchSnapshot() zapisuje output do pliku .snap i porównuje przy kolejnych uruchomieniach.
+      Idealne dla komponentów React, API responses, konfiguracji. Update snapshots: jest --updateSnapshot.
+      Inline snapshots z toMatchInlineSnapshot() — snapshot w kodzie testu.
+    icon: "📸"
+  - title: Code Coverage
+    desc: >
+      Wbudowane coverage z Istanbul. --coverage generuje raport HTML/text/lcov.
+      Statements, branches, functions, lines. Konfiguracja progów w jest.config:
+      coverageThreshold. Wymuszanie minimum coverage w CI.
+    icon: "📊"
+
+whenToUse:
+  - Projekty React / React Native — Jest to domyślny test runner
+  - Testy jednostkowe i integracyjne w JavaScript/TypeScript
+  - Snapshot testing komponentów UI
+  - Mockowanie API calls, timerów, modułów
+  - Projekty wymagające zero-config setup
+  - CI/CD pipelines z coverage reporting
+
+firstComponent: |
+  # Instalacja
+  npm install --save-dev jest
+
+  # sum.js — moduł do testowania
+  function sum(a, b) {
+    return a + b;
+  }
+  module.exports = sum;
+
+  # sum.test.js — test
+  const sum = require('./sum');
+
+  describe('sum function', () => {
+    test('adds 1 + 2 to equal 3', () => {
+      expect(sum(1, 2)).toBe(3);
+    });
+
+    test('adds negative numbers', () => {
+      expect(sum(-1, -2)).toBe(-3);
+    });
+
+    test('adds zero', () => {
+      expect(sum(0, 5)).toBe(5);
+    });
+  });
+
+  # Uruchomienie
+  npx jest
+  # lub w package.json: "test": "jest"
+  # npm test

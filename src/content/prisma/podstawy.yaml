@@ -1,0 +1,107 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Prisma?
+  firstComponent: Pierwszy model Prisma
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Prisma?
+  desc: >
+    Prisma to type-safe ORM nowej generacji dla TypeScript/JavaScript. Schema-first approach —
+    definiujesz modele w pliku schema.prisma, Prisma generuje type-safe client z auto-complete.
+    Zero string-based queries, zero runtime errors na typach. Prisma Migrate zarządza schematem
+    bazy, Prisma Studio daje GUI do danych, Prisma Client wykonuje queries.
+
+concepts:
+  - title: Schema (schema.prisma)
+    desc: >
+      Jeden plik definiuje modele (tabele), relacje, datasource (jakA baza) i generator
+      (jaki client). Schema jest source of truth — z niej generuje się client i migracje.
+    icon: "📋"
+  - title: Prisma Client
+    desc: >
+      Auto-generated TypeScript client. prisma.user.findMany(), prisma.user.create() —
+      pełne auto-complete, type checking na argumentach i wyniku. Zmiana schema →
+      prisma generate → client się aktualizuje.
+    icon: "🔌"
+  - title: Prisma Migrate
+    desc: >
+      System migracji oparty na schema diff. Zmieniasz schema.prisma → prisma migrate dev
+      generuje SQL migrację i aplikuje ją. Historia migracji w prisma/migrations/.
+    icon: "🔄"
+  - title: Prisma Studio
+    desc: >
+      GUI do bazy danych w przeglądarce. npx prisma studio otwiera widok tabel z
+      CRUD operacjami. Przydatne do debugowania i seed data.
+    icon: "🖥️"
+  - title: Datasources
+    desc: >
+      Prisma wspiera PostgreSQL, MySQL, SQLite, SQL Server, MongoDB, CockroachDB.
+      Zmiana bazy = zmiana jednej linii w schema.prisma + migracja.
+    icon: "🗄️"
+  - title: Type Safety
+    desc: >
+      Każdy query jest type-safe. prisma.user.findMany({ where: { email: "..." } })
+      TypeScript sprawdza czy 'email' istnieje w modelu User. Błąd w query = compile error,
+      nie runtime crash.
+    icon: "🛡️"
+
+whenToUse:
+  - TypeScript projekty gdzie type safety jest priorytetem
+  - Nowe projekty — schema-first approach od początku
+  - Gdy chcesz auto-complete na queries (DX jest fenomenalny)
+  - Full-stack TypeScript (Next.js, NestJS, Remix) — shared types backend↔frontend
+  - Gdy migracje muszą być reviewowane w PR (SQL pliki w git)
+  - Szybkie prototypy z Prisma Studio jako GUI do bazy
+
+firstComponent: |
+  # Instalacja
+  npm install prisma @prisma/client
+  npx prisma init
+
+  # prisma/schema.prisma
+  datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+  }
+
+  generator client {
+    provider = "prisma-client-js"
+  }
+
+  model User {
+    id        Int      @id @default(autoincrement())
+    email     String   @unique
+    name      String?
+    posts     Post[]
+    createdAt DateTime @default(now())
+  }
+
+  model Post {
+    id        Int      @id @default(autoincrement())
+    title     String
+    content   String?
+    published Boolean  @default(false)
+    author    User     @relation(fields: [authorId], references: [id])
+    authorId  Int
+  }
+
+  # Generuj client i migrację
+  npx prisma migrate dev --name init
+  npx prisma generate
+
+  # Użycie w kodzie
+  import { PrismaClient } from '@prisma/client'
+  const prisma = new PrismaClient()
+
+  // Stwórz usera z postem
+  const user = await prisma.user.create({
+    data: {
+      email: 'jan@firma.pl',
+      name: 'Jan Kowalski',
+      posts: {
+        create: { title: 'Pierwszy post', content: 'Hello Prisma!' },
+      },
+    },
+    include: { posts: true },
+  })
