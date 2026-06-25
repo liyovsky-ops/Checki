@@ -1,0 +1,130 @@
+title: Akcje i Waity
+
+items:
+  - name: Klikanie, wpisywanie, nawigacja
+    desc: >
+      Podstawowe interakcje — click, send_keys, clear, submit. Każda akcja
+      czeka aż element będzie interactable (jeśli masz implicit wait).
+    code: |
+      from selenium.webdriver.common.by import By
+      from selenium.webdriver.common.keys import Keys
+
+      # Klikanie
+      driver.find_element(By.ID, "login-btn").click()
+
+      # Wpisywanie tekstu
+      email = driver.find_element(By.NAME, "email")
+      email.clear()  # wyczyść pole
+      email.send_keys("jan@firma.pl")
+
+      # Submit formularza
+      email.submit()
+
+      # Klawisz Enter
+      email.send_keys(Keys.RETURN)
+
+      # Nawigacja
+      driver.get("https://example.com")
+      driver.back()
+      driver.forward()
+      driver.refresh()
+
+  - name: WebDriverWait — explicit wait (REKOMENDOWANY)
+    desc: >
+      Czekaj na KONKRETNY warunek — element visible, clickable, text present.
+      Lepszy niż implicit wait bo precyzyjny i nie spowalnia gdy element jest od razu.
+    code: |
+      from selenium.webdriver.support.ui import WebDriverWait
+      from selenium.webdriver.support import expected_conditions as EC
+
+      wait = WebDriverWait(driver, 10)  # max 10 sekund
+
+      # Czekaj aż element będzie widoczny
+      element = wait.until(EC.visibility_of_element_located((By.ID, "result")))
+
+      # Czekaj aż element będzie klikalny
+      button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".submit")))
+      button.click()
+
+      # Czekaj aż tekst się pojawi
+      wait.until(EC.text_to_be_present_in_element((By.ID, "status"), "Sukces"))
+
+      # Czekaj aż element zniknie (loading spinner)
+      wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, ".spinner")))
+
+      # Czekaj aż tytuł strony zawiera tekst
+      wait.until(EC.title_contains("Dashboard"))
+
+      # Czekaj aż URL zmieni się
+      wait.until(EC.url_contains("/dashboard"))
+
+  - name: ActionChains — złożone interakcje
+    desc: >
+      Hover, drag & drop, right click, double click, key combinations.
+      ActionChains buduje sekwencję i wykonuje atomowo.
+    code: |
+      from selenium.webdriver.common.action_chains import ActionChains
+
+      actions = ActionChains(driver)
+
+      # Hover (najechanie myszką)
+      menu = driver.find_element(By.CSS_SELECTOR, ".dropdown")
+      actions.move_to_element(menu).perform()
+
+      # Double click
+      element = driver.find_element(By.ID, "editable")
+      actions.double_click(element).perform()
+
+      # Right click (context menu)
+      actions.context_click(element).perform()
+
+      # Drag and drop
+      source = driver.find_element(By.ID, "drag-me")
+      target = driver.find_element(By.ID, "drop-here")
+      actions.drag_and_drop(source, target).perform()
+
+      # Ctrl+A (select all)
+      actions.key_down(Keys.CONTROL).send_keys("a").key_up(Keys.CONTROL).perform()
+
+  - name: Formularze — select, checkbox, radio, upload
+    desc: >
+      Selenium obsługuje wszystkie elementy formularzy. Select class do dropdownów.
+    code: |
+      from selenium.webdriver.support.ui import Select
+
+      # Dropdown / Select
+      select = Select(driver.find_element(By.ID, "country"))
+      select.select_by_visible_text("Polska")
+      select.select_by_value("PL")
+      select.select_by_index(2)
+
+      # Checkbox
+      checkbox = driver.find_element(By.ID, "terms")
+      if not checkbox.is_selected():
+          checkbox.click()
+
+      # Radio button
+      driver.find_element(By.CSS_SELECTOR, "input[value='express']").click()
+
+      # File upload
+      upload = driver.find_element(By.CSS_SELECTOR, "input[type='file']")
+      upload.send_keys("/path/to/file.pdf")
+
+  - name: Screenshots i JavaScript execute
+    desc: >
+      Rób screenshoty stron/elementów i uruchamiaj JavaScript w kontekście strony.
+    code: |
+      # Screenshot całej strony
+      driver.save_screenshot("screenshot.png")
+
+      # Screenshot elementu
+      element = driver.find_element(By.ID, "chart")
+      element.screenshot("chart.png")
+
+      # JavaScript execution
+      driver.execute_script("window.scrollTo(0, document.body.scrollHeight)")
+      driver.execute_script("arguments[0].style.border='3px solid red'", element)
+
+      # Pobierz wartość z JS
+      title = driver.execute_script("return document.title")
+      scroll_y = driver.execute_script("return window.scrollY")

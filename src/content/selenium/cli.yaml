@@ -1,0 +1,359 @@
+title: Komendy Selenium
+
+groups:
+  - name: Instalacja
+    icon: "📦"
+    commands:
+      - cmd: pip install selenium
+        desc: Instalacja Selenium
+        detail:
+          what: Instaluje Selenium WebDriver dla Python.
+          how: Wymaga Python 3.8+.
+          tips:
+            - 'pip install selenium webdriver-manager — z auto-download sterowników'
+      - cmd: pip install webdriver-manager
+        desc: Auto-download sterowników przeglądarek
+        detail:
+          what: Automatycznie pobiera ChromeDriver/GeckoDriver — nie musisz ręcznie.
+          how: 'Service(ChromeDriverManager().install()) w kodzie.'
+          tips:
+            - 'Eliminuje "ChromeDriver version mismatch" problemy'
+      - cmd: pip install selenium-wire
+        desc: Selenium z przechwytywaniem HTTP
+        detail:
+          what: Rozszerzenie do monitorowania/modyfikowania requestów HTTP.
+          how: 'from seleniumwire import webdriver — drop-in replacement.'
+          tips:
+            - 'driver.requests — lista przechwyconych requestów'
+      - cmd: pip install pytest-selenium
+        desc: Integracja Selenium z pytest
+        detail:
+          what: Fixture driver, parametryzacja przeglądarek, screenshot on failure.
+          how: 'pytest --driver Chrome tests/'
+          tips:
+            - 'pytest --driver Firefox — zmień przeglądarkę z CLI'
+      - cmd: pip install helium
+        desc: High-level wrapper (click, write, go_to)
+        detail:
+          what: Uproszczony API — click("Login") zamiast find_element + click.
+          how: 'from helium import * — prosty import.'
+          tips:
+            - 'Mniej kodu, bardziej czytelne skrypty'
+
+  - name: Driver setup
+    icon: "🌐"
+    commands:
+      - cmd: driver = webdriver.Chrome()
+        desc: Otwórz Chrome
+        detail:
+          what: Tworzy instancję Chrome WebDriver.
+          how: Wymaga ChromeDriver w PATH lub użyj webdriver-manager.
+          tips:
+            - 'driver = webdriver.Firefox() — Firefox'
+            - 'driver = webdriver.Safari() — Safari (macOS only)'
+      - cmd: driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+        desc: Chrome z auto-download sterownika
+        detail:
+          what: Automatycznie pobiera ChromeDriver pasujący do wersji Chrome.
+          how: 'from webdriver_manager.chrome import ChromeDriverManager'
+          tips:
+            - 'Rekomendowany sposób — eliminuje version mismatch'
+      - cmd: options.add_argument("--headless=new")
+        desc: Chrome w trybie headless (bez GUI)
+        detail:
+          what: Przeglądarka bez okna — renderuje w pamięci.
+          how: Szybsze, mniej RAM, idealne dla CI/CD.
+          tips:
+            - '--headless=new — nowy headless mode (Chrome 109+)'
+            - 'Stary: --headless (deprecated)'
+      - cmd: options.add_argument("--no-sandbox")
+        desc: Wyłącz sandbox (Docker/CI)
+        detail:
+          what: Wymagane w Docker i CI — sandbox nie działa w kontenerach.
+          how: Zawsze dodawaj w CI/Docker.
+          tips:
+            - '--disable-dev-shm-usage — zapobiega crashom w Docker'
+      - cmd: options.add_argument("--window-size=1920,1080")
+        desc: Ustaw rozmiar okna
+        detail:
+          what: Rozmiar okna przeglądarki — ważne w headless (domyślnie 800x600).
+          how: Format width,height w pikselach.
+          tips:
+            - '--window-size=375,812 — iPhone viewport'
+      - cmd: options.add_argument("--disable-gpu")
+        desc: Wyłącz GPU acceleration
+        detail:
+          what: Wymagane na niektórych maszynach (CI, VPS bez GPU).
+          how: Zapobiega GPU-related crashom.
+          tips:
+            - 'Na nowszych Chrome rzadko potrzebne'
+      - cmd: options.add_argument("--user-agent=...")
+        desc: Zmień User-Agent
+        detail:
+          what: Ustaw custom User-Agent string — przydatne do scraping.
+          how: 'options.add_argument("--user-agent=Mozilla/5.0...")'
+          tips:
+            - 'Niektóre strony blokują domyślny User-Agent Selenium'
+      - cmd: options.add_argument("--proxy-server=host:port")
+        desc: Ustaw proxy
+        detail:
+          what: Kieruj ruch przez proxy (HTTP, SOCKS).
+          how: Przydatne do geo-targetowania i anonimizacji.
+          tips:
+            - '--proxy-server=socks5://localhost:1080 — SOCKS5 proxy'
+      - cmd: driver.quit()
+        desc: Zamknij przeglądarkę i zwolnij zasoby
+        detail:
+          what: Zamyka WSZYSTKIE okna i ubija proces przeglądarki.
+          how: Zawsze w finally block lub fixture teardown.
+          tips:
+            - 'driver.close() — zamyka JEDNO okno (nie ubija procesu)'
+
+  - name: Nawigacja
+    icon: "🧭"
+    commands:
+      - cmd: driver.get("https://example.com")
+        desc: Otwórz URL
+        detail:
+          what: Nawiguj do strony. Czeka aż strona się załaduje (DOMContentLoaded).
+          how: Odpowiednik wpisania URL w pasku przeglądarki.
+          tips:
+            - 'Nie czeka na AJAX/fetch — użyj WebDriverWait na elementy'
+      - cmd: driver.back()
+        desc: Wstecz (historia)
+        detail:
+          what: Przycisk "wstecz" w przeglądarce.
+          how: Nawiguje do poprzedniej strony w historii.
+          tips:
+            - 'driver.forward() — przycisk "do przodu"'
+      - cmd: driver.refresh()
+        desc: Odśwież stronę
+        detail:
+          what: F5 — przeładowuje bieżącą stronę.
+          how: Przydatne po modyfikacji localStorage/cookies.
+          tips:
+            - 'Ctrl+Shift+R (hard refresh) nie jest bezpośrednio dostępny'
+      - cmd: driver.current_url
+        desc: Pobierz aktualny URL
+        detail:
+          what: Zwraca pełny URL bieżącej strony.
+          how: Przydatne do asercji w testach (sprawdź redirect).
+          tips:
+            - 'assert "/dashboard" in driver.current_url'
+      - cmd: driver.title
+        desc: Pobierz tytuł strony
+        detail:
+          what: Zwraca tekst z tagu title.
+          how: Szybka walidacja czy jesteś na właściwej stronie.
+          tips:
+            - 'assert "Login" in driver.title'
+      - cmd: driver.page_source
+        desc: Pobierz HTML strony
+        detail:
+          what: Zwraca pełny HTML source strony (po renderowaniu JS).
+          how: Przydatne do debugowania i parsowania z BeautifulSoup.
+          tips:
+            - 'from bs4 import BeautifulSoup; soup = BeautifulSoup(driver.page_source, "html.parser")'
+
+  - name: Znajdowanie elementów
+    icon: "🔍"
+    commands:
+      - cmd: driver.find_element(By.ID, "login")
+        desc: Znajdź element po ID
+        detail:
+          what: Szuka elementu z id="login". Najszybszy selektor.
+          how: Rzuca NoSuchElementException jeśli nie znaleziony.
+          tips:
+            - 'By.ID jest najszybszy — zawsze preferuj'
+      - cmd: driver.find_element(By.CSS_SELECTOR, ".btn-primary")
+        desc: Znajdź element po CSS selector
+        detail:
+          what: CSS selektory — klasy, atrybuty, hierarchia.
+          how: Najpopularniejszy selektor — potężny i czytelny.
+          tips:
+            - '"div.card > h3" — child combinator'
+            - '"[data-testid=submit]" — po atrybucie'
+      - cmd: driver.find_element(By.XPATH, "//button[text()='OK']")
+        desc: Znajdź element po XPath
+        detail:
+          what: XPath — najpotężniejszy selektor. Chodzi po DOM w każdym kierunku.
+          how: Wolniejszy niż CSS ale umie znaleźć po tekście i parent.
+          tips:
+            - '//button[contains(text(), "Zapisz")] — partial text'
+            - '//span/parent::div — parent elementu'
+      - cmd: driver.find_element(By.NAME, "email")
+        desc: Znajdź element po atrybucie name
+        detail:
+          what: Szuka elementu z name="email". Typowe dla formularzy.
+          how: Przydatne dla input, select, textarea.
+          tips:
+            - 'By.CLASS_NAME — po klasie CSS'
+            - 'By.TAG_NAME — po tagu HTML'
+      - cmd: driver.find_elements(By.CSS_SELECTOR, ".item")
+        desc: Znajdź WIELE elementów (lista)
+        detail:
+          what: Zwraca listę elementów (może być pusta). NIE rzuca exception.
+          how: find_element (singular) vs find_elements (plural).
+          tips:
+            - 'len(elements) — ile znaleziono'
+            - 'for el in elements: print(el.text)'
+
+  - name: Akcje na elementach
+    icon: "🖱️"
+    commands:
+      - cmd: element.click()
+        desc: Kliknij element
+        detail:
+          what: Symuluje kliknięcie myszką na element.
+          how: Element musi być widoczny i klikalny.
+          tips:
+            - 'ElementClickInterceptedException — inny element zasłania'
+      - cmd: element.send_keys("tekst")
+        desc: Wpisz tekst do elementu
+        detail:
+          what: Symuluje wpisywanie z klawiatury. Dodaje tekst do istniejącego.
+          how: Działa na input, textarea.
+          tips:
+            - 'element.clear() przed send_keys żeby nadpisać'
+      - cmd: element.clear()
+        desc: Wyczyść pole tekstowe
+        detail:
+          what: Usuwa tekst z input/textarea.
+          how: Użyj przed send_keys żeby nadpisać wartość.
+          tips:
+            - 'Nie działa na contenteditable — użyj Ctrl+A + Delete'
+      - cmd: element.text
+        desc: Pobierz tekst elementu
+        detail:
+          what: Zwraca widoczny tekst elementu (bez HTML tagów).
+          how: Działa na div, span, p, h1, button — cokolwiek z tekstem.
+          tips:
+            - 'element.get_attribute("value") — wartość input/textarea'
+      - cmd: element.get_attribute("href")
+        desc: Pobierz atrybut elementu
+        detail:
+          what: Zwraca wartość dowolnego atrybutu HTML.
+          how: 'href, src, class, data-*, value — cokolwiek.'
+          tips:
+            - 'element.get_attribute("innerHTML") — HTML wewnątrz elementu'
+      - cmd: element.is_displayed()
+        desc: Czy element jest widoczny?
+        detail:
+          what: True jeśli element jest widoczny na stronie (nie ukryty CSS).
+          how: Przydatne do walidacji stanu UI.
+          tips:
+            - 'element.is_enabled() — czy nie jest disabled'
+            - 'element.is_selected() — czy checkbox/radio jest zaznaczony'
+      - cmd: element.submit()
+        desc: Submit formularza
+        detail:
+          what: Wysyła formularz w którym jest element.
+          how: Odpowiednik naciśnięcia Enter w formularzu.
+          tips:
+            - 'element.send_keys(Keys.RETURN) — alternatywa'
+
+  - name: Waity
+    icon: "⏳"
+    commands:
+      - cmd: driver.implicitly_wait(10)
+        desc: Implicit wait — czekaj max N sekund na każdy element
+        detail:
+          what: Globalny wait — każdy find_element czeka max 10s zanim rzuci exception.
+          how: Ustaw RAZ po stworzeniu driver. Działa na WSZYSTKIE find_element.
+          tips:
+            - 'NIE mieszaj z explicit waits — konflikty'
+            - 'Explicit wait > implicit wait (bardziej precyzyjny)'
+      - cmd: WebDriverWait(driver, 10).until(EC.visibility_of_element_located(...))
+        desc: Explicit wait — czekaj na konkretny warunek
+        detail:
+          what: Czeka max 10s aż element będzie widoczny. Polling co 0.5s.
+          how: REKOMENDOWANY sposób — precyzyjny, per-element.
+          tips:
+            - 'EC.element_to_be_clickable — czekaj aż klikalny'
+            - 'EC.text_to_be_present_in_element — czekaj na tekst'
+      - cmd: EC.presence_of_element_located((By.ID, "result"))
+        desc: Warunek — element istnieje w DOM
+        detail:
+          what: True gdy element istnieje w DOM (może być ukryty).
+          how: Różnica od visibility — element jest w HTML ale może mieć display:none.
+          tips:
+            - 'visibility_of_element_located — element widoczny (nie ukryty)'
+      - cmd: EC.element_to_be_clickable((By.CSS_SELECTOR, ".btn"))
+        desc: Warunek — element klikalny
+        detail:
+          what: True gdy element widoczny I enabled (nie disabled).
+          how: Najczęstszy wait przed click().
+          tips:
+            - 'Zapobiega ElementClickInterceptedException'
+      - cmd: EC.staleness_of(old_element)
+        desc: Warunek — element zniknął z DOM
+        detail:
+          what: True gdy element został usunięty z DOM (stale reference).
+          how: Przydatne po submit — czekaj aż stara strona zniknie.
+          tips:
+            - 'Po nawigacji stare elementy stają się stale'
+
+  - name: Screenshots i debug
+    icon: "📸"
+    commands:
+      - cmd: driver.save_screenshot("screenshot.png")
+        desc: Screenshot całej strony
+        detail:
+          what: Zapisuje screenshot widocznej części strony do pliku PNG.
+          how: Przydatne do debugowania i visual testing.
+          tips:
+            - 'driver.get_screenshot_as_png() — zwraca bytes zamiast pliku'
+      - cmd: element.screenshot("element.png")
+        desc: Screenshot konkretnego elementu
+        detail:
+          what: Zapisuje screenshot tylko jednego elementu.
+          how: Przydatne do visual regression testing komponentów.
+          tips:
+            - 'Wymaga że element jest widoczny na ekranie'
+      - cmd: driver.get_log("browser")
+        desc: Pobierz console.log z przeglądarki
+        detail:
+          what: Zwraca logi JavaScript console (errors, warnings, info).
+          how: Przydatne do łapania JS errors w testach.
+          tips:
+            - '"performance" — performance logs'
+            - '"driver" — WebDriver logs'
+
+  - name: Cookies i storage
+    icon: "🍪"
+    commands:
+      - cmd: driver.get_cookies()
+        desc: Pobierz wszystkie cookies
+        detail:
+          what: Zwraca listę dict z name, value, domain, path, expiry.
+          how: Przydatne do debugowania sesji.
+          tips:
+            - 'driver.get_cookie("session") — jeden cookie po nazwie'
+      - cmd: "driver.add_cookie({\"name\": \"token\", \"value\": \"abc\"})"
+        desc: Dodaj cookie
+        detail:
+          what: Dodaje cookie do przeglądarki.
+          how: Przydatne do auth bypass — dodaj session cookie zamiast logowania.
+          tips:
+            - 'Musisz być na domenie cookie (driver.get(url) najpierw)'
+      - cmd: driver.delete_all_cookies()
+        desc: Usuń wszystkie cookies
+        detail:
+          what: Czyści cookies — jak wylogowanie.
+          how: Przydatne do testowania fresh state.
+          tips:
+            - 'driver.delete_cookie("name") — usuń jeden'
+      - cmd: driver.execute_script("localStorage.setItem('key', 'val')")
+        desc: Ustaw localStorage
+        detail:
+          what: Zapisz dane w localStorage przeglądarki.
+          how: Przez JavaScript execution — brak native API.
+          tips:
+            - 'localStorage.getItem, localStorage.clear — przez execute_script'
+      - cmd: driver.execute_script("sessionStorage.clear()")
+        desc: Wyczyść sessionStorage
+        detail:
+          what: Usuwa dane z sessionStorage.
+          how: Session storage jest per-tab, czyszczone po zamknięciu taba.
+          tips:
+            - 'sessionStorage ≠ localStorage — session jest per-tab'

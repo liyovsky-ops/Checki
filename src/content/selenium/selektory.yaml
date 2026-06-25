@@ -1,0 +1,92 @@
+title: Selektory i lokalizacja elementów
+
+items:
+  - name: By.ID — najszybszy selektor
+    desc: >
+      Szukaj po atrybucie id. Najszybszy bo ID powinien być unikalny na stronie.
+      Zawsze preferuj ID jeśli element go ma.
+    code: |
+      from selenium.webdriver.common.by import By
+
+      # Znajdź element po ID
+      element = driver.find_element(By.ID, "login-button")
+      element.click()
+
+      # Znajdź input
+      email = driver.find_element(By.ID, "email")
+      email.send_keys("user@example.com")
+
+  - name: By.CSS_SELECTOR — najczęstszy selektor
+    desc: >
+      CSS selektory — jak w stylesheets. Potężne i czytelne. Obsługują klasy,
+      atrybuty, pseudo-selektory, hierarchię.
+    code: |
+      # Po klasie
+      driver.find_element(By.CSS_SELECTOR, ".btn-primary")
+
+      # Po atrybucie
+      driver.find_element(By.CSS_SELECTOR, "[data-testid='submit']")
+
+      # Zagnieżdżone
+      driver.find_element(By.CSS_SELECTOR, "div.card > h3.title")
+
+      # Nth child
+      driver.find_element(By.CSS_SELECTOR, "ul li:nth-child(3)")
+
+      # Wiele warunków
+      driver.find_element(By.CSS_SELECTOR, "input[type='email'][required]")
+
+  - name: By.XPATH — najpotężniejszy selektor
+    desc: >
+      XPath może chodzić po DOM w GÓRĘ (parent::), w dół (child::), po rodzeństwie
+      (following-sibling::). Potężny ale wolniejszy i trudniejszy do czytania.
+    code: |
+      # Po tekście
+      driver.find_element(By.XPATH, "//button[text()='Zaloguj']")
+
+      # Zawiera tekst
+      driver.find_element(By.XPATH, "//button[contains(text(), 'Zapisz')]")
+
+      # Parent elementu
+      driver.find_element(By.XPATH, "//span[@class='error']/parent::div")
+
+      # Po atrybucie
+      driver.find_element(By.XPATH, "//input[@placeholder='Szukaj...']")
+
+      # N-ty element
+      driver.find_element(By.XPATH, "(//div[@class='card'])[3]")
+
+  - name: By.CLASS_NAME, By.NAME, By.TAG_NAME, By.LINK_TEXT
+    desc: >
+      Proste selektory — szybkie ale ograniczone. CLASS_NAME szuka po klasie CSS,
+      NAME po atrybucie name (formularze), TAG_NAME po tagu HTML, LINK_TEXT po tekście linka.
+    code: |
+      # Po klasie CSS
+      driver.find_element(By.CLASS_NAME, "error-message")
+
+      # Po atrybucie name (formularze)
+      driver.find_element(By.NAME, "username")
+
+      # Po tagu HTML
+      headers = driver.find_elements(By.TAG_NAME, "h2")
+
+      # Po tekście linka
+      driver.find_element(By.LINK_TEXT, "Rejestracja")
+      driver.find_element(By.PARTIAL_LINK_TEXT, "Rejest")  # partial match
+
+  - name: find_elements — znajdź WIELE elementów
+    desc: >
+      find_element zwraca JEDEN element (pierwszy match) lub rzuca NoSuchElementException.
+      find_elements zwraca LISTĘ (może być pusta, nigdy nie rzuca exception).
+    code: |
+      # Jeden element (rzuca exception jeśli nie znaleziony)
+      button = driver.find_element(By.CSS_SELECTOR, ".submit-btn")
+
+      # Wiele elementów (pusta lista jeśli brak)
+      items = driver.find_elements(By.CSS_SELECTOR, ".product-card")
+      print(f"Znaleziono {len(items)} produktów")
+
+      for item in items:
+          title = item.find_element(By.CSS_SELECTOR, "h3").text
+          price = item.find_element(By.CSS_SELECTOR, ".price").text
+          print(f"{title}: {price}")

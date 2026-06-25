@@ -1,0 +1,91 @@
+title: Pamięć i RAG
+
+items:
+  - name: Short-term memory (sesja)
+    desc: >
+      Pamięć bieżącej sesji — agenci pamiętają co robili wcześniej w tej samej
+      sesji crew.kickoff(). Automatyczna gdy memory=True.
+    code: |
+      crew = Crew(
+          agents=[researcher, writer],
+          tasks=[research_task, write_task],
+          memory=True,  # włącz pamięć
+          verbose=True,
+      )
+      # Writer pamięta wyniki Researchera bez explicit context
+      result = crew.kickoff()
+
+  - name: Long-term memory (persist)
+    desc: >
+      Pamięć między sesjami — agent pamięta co badał tydzień temu.
+      Przechowywana w local storage (SQLite + embeddings).
+    code: |
+      crew = Crew(
+          agents=[researcher],
+          tasks=[research_task],
+          memory=True,
+          embedder={
+              "provider": "openai",
+              "config": {"model": "text-embedding-3-small"},
+          },
+      )
+      # Pierwsze uruchomienie: researcher bada temat
+      crew.kickoff()
+
+      # Drugie uruchomienie: researcher pamięta poprzednie wyniki
+      crew.kickoff()  # nie powtarza pracy
+
+  - name: Entity memory
+    desc: >
+      Pamięta fakty o konkretnych entities — osobach, firmach, produktach.
+      Agent automatycznie ekstrahuje entities z konwersacji.
+    code: |
+      # Entity memory jest automatyczna z memory=True
+      # Agent zapamiętuje:
+      # "Company X" → {"industry": "fintech", "employees": 500, "founded": 2020}
+      # "John Smith" → {"role": "CTO", "company": "Company X"}
+
+      # W kolejnych taskach agent ma dostęp do tych faktów
+
+  - name: RAG z własnymi danymi
+    desc: >
+      Użyj narzędzi RAG do przeszukiwania własnych dokumentów — PDF, TXT, CSV, JSON.
+      Agent automatycznie embeduje i searchuje po dokumentach.
+    code: |
+      from crewai_tools import (
+          PDFSearchTool,
+          TXTSearchTool,
+          DirectoryReadTool,
+      )
+
+      # RAG po PDF — agent szuka odpowiedzi w dokumentach
+      pdf_tool = PDFSearchTool(pdf="company_report.pdf")
+
+      # RAG po katalogu plików
+      docs_tool = TXTSearchTool(txt="docs/")
+
+      analyst = Agent(
+          role="Document Analyst",
+          goal="Answer questions based on company documents",
+          backstory="Expert in extracting insights from business documents.",
+          tools=[pdf_tool, docs_tool, DirectoryReadTool()],
+      )
+
+  - name: Knowledge sources (CrewAI v2)
+    desc: >
+      CrewAI v2 ma dedykowany knowledge system — dodaj źródła wiedzy bezpośrednio
+      do crew lub agenta. Automatyczny chunking, embedding, retrieval.
+    code: |
+      from crewai import Crew, Agent
+      from crewai.knowledge.source import TextFileKnowledgeSource, PDFKnowledgeSource
+
+      # Dodaj źródła wiedzy
+      text_source = TextFileKnowledgeSource(file_paths=["docs/api.md", "docs/architecture.md"])
+      pdf_source = PDFKnowledgeSource(file_paths=["reports/q4.pdf"])
+
+      crew = Crew(
+          agents=[analyst],
+          tasks=[analysis_task],
+          knowledge_sources=[text_source, pdf_source],
+      )
+      # Agenci automatycznie szukają w tych źródłach

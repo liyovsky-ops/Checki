@@ -1,0 +1,399 @@
+title: Komendy CrewAI
+
+groups:
+  - name: Instalacja i setup
+    icon: "📦"
+    commands:
+      - cmd: pip install crewai
+        desc: Instalacja CrewAI
+        detail:
+          what: Instaluje framework CrewAI z core dependencies.
+          how: Wymaga Python 3.10+.
+          tips:
+            - 'pip install crewai crewai-tools — z paczką narzędzi'
+            - 'pip install crewai[tools] — alternatywna składnia'
+      - cmd: pip install crewai crewai-tools
+        desc: Instalacja z narzędziami (search, scrape, PDF)
+        detail:
+          what: Instaluje CrewAI + oficjalne narzędzia (SerperDevTool, ScrapeWebsiteTool, FileReadTool, itd.).
+          how: crewai-tools to osobna paczka z gotowymi tools.
+          tips:
+            - 'Wymaga SERPER_API_KEY dla web search (serper.dev)'
+      - cmd: crewai create crew my_project
+        desc: Stwórz nowy projekt CrewAI z template
+        detail:
+          what: Generuje strukturę projektu z przykładowymi agentami, taskami i crew.
+          how: Tworzy katalog my_project/ z plikami agents.yaml, tasks.yaml, crew.py, main.py.
+          tips:
+            - 'cd my_project && crewai run — uruchom od razu'
+      - cmd: crewai create crew my_project --provider anthropic
+        desc: Nowy projekt z Anthropic jako LLM provider
+        detail:
+          what: Generuje projekt skonfigurowany pod Claude zamiast OpenAI.
+          how: Ustaw ANTHROPIC_API_KEY w .env.
+          tips:
+            - '--provider openai (domyślny)'
+            - '--provider google — Gemini'
+            - '--provider ollama — lokalne modele'
+      - cmd: export OPENAI_API_KEY="sk-..."
+        desc: Ustaw klucz OpenAI (domyślny provider)
+        detail:
+          what: CrewAI domyślnie używa OpenAI GPT-4. Klucz API wymagany.
+          how: Dodaj do .env lub eksportuj w terminalu.
+          tips:
+            - 'export ANTHROPIC_API_KEY="sk-ant-..." — dla Claude'
+            - 'export SERPER_API_KEY="..." — dla web search tool'
+      - cmd: export ANTHROPIC_API_KEY="sk-ant-..."
+        desc: Ustaw klucz Anthropic (Claude)
+        detail:
+          what: Dla agentów używających Claude jako LLM.
+          how: Eksportuj w terminalu lub dodaj do .env.
+          tips:
+            - 'Ustaw model w Agent: llm="anthropic/claude-sonnet-4-6"'
+
+  - name: Uruchamianie crew
+    icon: "🚀"
+    commands:
+      - cmd: crewai run
+        desc: Uruchom crew (z katalogu projektu)
+        detail:
+          what: Uruchamia crew zdefiniowaną w bieżącym katalogu (crew.py + agents.yaml + tasks.yaml).
+          how: Wymaga struktury wygenerowanej przez crewai create.
+          tips:
+            - 'Loguje output agentów do terminala'
+            - 'Wynik zapisywany w output/'
+      - cmd: python crew.py
+        desc: Uruchom crew jako zwykły skrypt Python
+        detail:
+          what: Jeśli nie używasz CLI — uruchom bezpośrednio plik z Crew.kickoff().
+          how: Standardowy Python execution.
+          tips:
+            - 'python -m crewai.cli run — alternatywna składnia CLI'
+      - cmd: crew.kickoff()
+        desc: Uruchom crew programatycznie
+        detail:
+          what: Metoda Crew która startuje cały workflow — uruchamia agentów, taski, zbiera wyniki.
+          how: Zwraca CrewOutput z results, token usage, task outputs.
+          tips:
+            - 'result = crew.kickoff() — synchronous'
+            - 'result = crew.kickoff(inputs={"topic": "AI"}) — z parametrami'
+      - cmd: 'crew.kickoff(inputs={"topic": "AI trends"})'
+        desc: Uruchom crew z parametrami wejściowymi
+        detail:
+          what: Przekaż zmienne do crew — dostępne w description tasków przez {topic}.
+          how: 'W task description: "Research {topic}" → "Research AI trends".'
+          tips:
+            - 'Inputs mogą być stringami, listami, dictami'
+      - cmd: crew.kickoff_async()
+        desc: Uruchom crew asynchronicznie
+        detail:
+          what: Async version — nie blokuje event loop. Dla FastAPI, async workflows.
+          how: 'result = await crew.kickoff_async()'
+          tips:
+            - 'Użyj z asyncio.run() jeśli nie masz event loop'
+      - cmd: crew.kickoff_for_each(inputs=[...])
+        desc: Uruchom crew dla każdego elementu listy
+        detail:
+          what: Batch processing — ta sama crew dla wielu inputów.
+          how: 'crew.kickoff_for_each(inputs=[{"topic": "AI"}, {"topic": "Cloud"}])'
+          tips:
+            - 'Równoległe wykonanie — szybsze niż pętla for'
+
+  - name: Definiowanie agentów (Python)
+    icon: "🤖"
+    commands:
+      - cmd: Agent(role="...", goal="...", backstory="...")
+        desc: Stwórz agenta z rolą i osobowością
+        detail:
+          what: Podstawowy agent z role (kim jest), goal (cel), backstory (doświadczenie).
+          how: Backstory wpływa na sposób rozumowania agenta.
+          tips:
+            - 'Im lepszy backstory, tym lepsze wyniki'
+            - 'Dodaj konkretne doświadczenie, nie ogólniki'
+      - cmd: Agent(tools=[SerperDevTool(), ...])
+        desc: Agent z narzędziami
+        detail:
+          what: Dodaj tools — agent sam decyduje kiedy ich użyć.
+          how: Lista instancji narzędzi.
+          tips:
+            - 'Agent bez narzędzi może tylko myśleć (LLM reasoning)'
+      - cmd: Agent(llm="anthropic/claude-sonnet-4-6")
+        desc: Agent z konkretnym modelem LLM
+        detail:
+          what: Zmień model LLM dla agenta — domyślnie GPT-4.
+          how: 'Format: "provider/model-name" — obsługiwane przez LiteLLM.'
+          tips:
+            - '"openai/gpt-4o" — OpenAI GPT-4o'
+            - '"anthropic/claude-sonnet-4-6" — Claude Sonnet'
+            - '"ollama/llama3.1" — lokalny model'
+      - cmd: Agent(allow_delegation=True)
+        desc: Agent który może delegować do innych
+        detail:
+          what: Agent może poprosić innego agenta w crew o pomoc z sub-zadaniem.
+          how: Przydatne dla manager agentów w hierarchical process.
+          tips:
+            - 'False (domyślnie) — agent robi sam'
+      - cmd: Agent(max_iter=15, max_rpm=10)
+        desc: Agent z limitami iteracji i rate limiting
+        detail:
+          what: Kontroluj zachowanie — max iteracji reasoning i rate limit na LLM calls.
+          how: Zapobiega nieskończonym pętlom i wysokim kosztom.
+          tips:
+            - 'max_execution_time=300 — timeout 5 minut'
+      - cmd: Agent(cache=True)
+        desc: Agent z cache na wyniki narzędzi
+        detail:
+          what: Cache'uje wyniki tool calls — ten sam input = ten sam output bez ponownego wywołania.
+          how: Oszczędza czas i koszty API.
+          tips:
+            - 'Przydatne gdy wielu agentów szuka tych samych rzeczy'
+      - cmd: Agent(verbose=True)
+        desc: Agent z logowaniem (debug mode)
+        detail:
+          what: Loguje reasoning agenta do terminala — widzisz co myśli i co robi.
+          how: Przydatne do debugowania i nauki jak agent działa.
+          tips:
+            - 'Wyłącz w produkcji — verbose generuje dużo outputu'
+      - cmd: Agent(memory=True)
+        desc: Agent z pamięcią
+        detail:
+          what: Agent pamięta wcześniejsze interakcje z bieżącej sesji.
+          how: Ustawiane na poziomie Crew, nie Agent (Crew(memory=True)).
+          tips:
+            - 'Long-term memory wymaga embedder config'
+
+  - name: Definiowanie tasków
+    icon: "📋"
+    commands:
+      - cmd: Task(description="...", expected_output="...", agent=...)
+        desc: Stwórz task z opisem i oczekiwanym wynikiem
+        detail:
+          what: Podstawowy task — opis co zrobić, jaki output oczekujesz, kto wykonuje.
+          how: Agent autonomicznie realizuje task.
+          tips:
+            - 'Im lepszy opis, tym lepszy wynik'
+            - 'expected_output definiuje FORMAT wyniku'
+      - cmd: Task(context=[previous_task])
+        desc: Task z zależnością od innego taska
+        detail:
+          what: Agent dostaje wynik previous_task jako dodatkowy kontekst.
+          how: Tworzy pipeline — research → analyze → write.
+          tips:
+            - 'context=[task1, task2] — wiele zależności'
+      - cmd: Task(output_file="report.md")
+        desc: Task z zapisem wyniku do pliku
+        detail:
+          what: Wynik taska automatycznie zapisany do pliku.
+          how: Przydatne do raportów, artykułów, danych.
+          tips:
+            - 'Katalog tworzony automatycznie'
+      - cmd: Task(human_input=True)
+        desc: Task z human-in-the-loop
+        detail:
+          what: Pauza — czeka na approval/feedback człowieka przed kontynuacją.
+          how: Dla krytycznych decyzji — review, approval.
+          tips:
+            - 'Agent pokazuje wynik, czeka na input w terminalu'
+      - cmd: Task(async_execution=True)
+        desc: Task wykonywany asynchronicznie
+        detail:
+          what: Task nie blokuje kolejnych tasków — działa w tle.
+          how: Przydatne gdy taski są niezależne i mogą iść równolegle.
+          tips:
+            - 'Uwaga na zależności — context tasks muszą być skończone'
+
+  - name: Crew i orchestration
+    icon: "👥"
+    commands:
+      - cmd: Crew(agents=[...], tasks=[...], process=Process.sequential)
+        desc: Crew sekwencyjna — taski po kolei
+        detail:
+          what: Taski wykonywane sekwencyjnie — wynik jednego → input drugiego.
+          how: Najprostszy i najczęstszy pattern.
+          tips:
+            - 'Kolejność tasków w liście = kolejność wykonania'
+      - cmd: Crew(process=Process.hierarchical, manager_agent=manager)
+        desc: Crew hierarchiczna — manager deleguje
+        detail:
+          what: Manager agent decyduje kto co robi i zbiera wyniki.
+          how: Manager sam nie wykonuje tasków — deleguje do specjalistów.
+          tips:
+            - 'manager_agent musi mieć allow_delegation=True'
+      - cmd: Crew(memory=True)
+        desc: Crew z pamięcią
+        detail:
+          what: Włącza pamięć dla wszystkich agentów w crew.
+          how: Short-term + long-term + entity memory.
+          tips:
+            - 'Wymaga embedder config dla long-term'
+      - cmd: 'Crew(memory=True, embedder={"provider": "openai", ...})'
+        desc: Crew z pamięcią i custom embedder
+        detail:
+          what: Konfiguracja embeddings dla pamięci — OpenAI, HuggingFace, Ollama.
+          how: Embeddings do semantic search w pamięci agentów.
+          tips:
+            - '"provider": "ollama" — lokalne embeddings'
+      - cmd: Crew(verbose=True)
+        desc: Crew z logowaniem
+        detail:
+          what: Loguje cały workflow — reasoning agentów, tool calls, wyniki tasków.
+          how: Debugging mode.
+          tips:
+            - 'Generuje DUŻO outputu — używaj do debugowania'
+      - cmd: Crew(max_rpm=10)
+        desc: Crew z globalnym rate limiting
+        detail:
+          what: Max requests per minute do LLM dla całej crew.
+          how: Zapobiega rate limit errors od providera.
+          tips:
+            - 'Domyślnie brak limitu — ustaw jeśli masz niski rate limit'
+      - cmd: Crew(full_output=True)
+        desc: Crew z pełnym outputem (wszystkie taski)
+        detail:
+          what: Zwraca output KAŻDEGO taska, nie tylko ostatniego.
+          how: Przydatne do debugowania i pipeline inspection.
+          tips:
+            - 'result.tasks_output — lista wyników per task'
+      - cmd: crew.usage_metrics
+        desc: Pokaż zużycie tokenów
+        detail:
+          what: Po kickoff() — ile tokenów zużyła crew (input + output per agent).
+          how: Pomaga monitorować koszty.
+          tips:
+            - 'crew.usage_metrics.total_tokens — łączne zużycie'
+
+  - name: Narzędzia (tools)
+    icon: "🔧"
+    commands:
+      - cmd: "from crewai_tools import SerperDevTool"
+        desc: Google search tool
+        detail:
+          what: Szukaj w Google — wymaga SERPER_API_KEY (serper.dev, free tier 2500 queries/mo).
+          how: Agent automatycznie szuka gdy potrzebuje informacji.
+          tips:
+            - 'serper.dev — darmowy API do Google search'
+      - cmd: "from crewai_tools import ScrapeWebsiteTool"
+        desc: Web scraping tool
+        detail:
+          what: Scrapuje stronę HTML → czysty tekst. Agent używa po znalezieniu URL.
+          how: Automatycznie parsuje HTML, usuwa skrypty, stylesheets.
+          tips:
+            - 'ScrapeWebsiteTool(website_url="...") — scrape konkretnej strony'
+      - cmd: "from crewai_tools import FileReadTool"
+        desc: Czytanie plików
+        detail:
+          what: Agent może czytać lokalne pliki — TXT, MD, JSON, CSV.
+          how: Przydatne do analizy dokumentów, kodu, konfiguracji.
+          tips:
+            - 'FileReadTool(file_path="...") — konkretny plik'
+      - cmd: "from crewai_tools import PDFSearchTool"
+        desc: Search w PDF (RAG)
+        detail:
+          what: Embeduje PDF i szuka odpowiedzi na pytania — RAG na dokumentach.
+          how: Chunking + embedding + semantic search.
+          tips:
+            - 'PDFSearchTool(pdf="report.pdf") — konkretny PDF'
+      - cmd: "from crewai_tools import CodeInterpreterTool"
+        desc: Wykonywanie kodu Python
+        detail:
+          what: Agent może pisać i uruchamiać kod Python w sandbox.
+          how: Przydatne do analizy danych, obliczeń, generowania wykresów.
+          tips:
+            - 'Uruchamia w izolowanym środowisku'
+      - cmd: "@tool(\"Custom Tool\")"
+        desc: Stwórz custom tool dekoratorem
+        detail:
+          what: Zamień funkcję Python w narzędzie CrewAI — agent może go użyć.
+          how: 'Docstring = opis dla agenta (kiedy użyć).'
+          tips:
+            - 'from crewai.tools import tool'
+
+  - name: YAML config (alternatywna definicja)
+    icon: "📄"
+    commands:
+      - cmd: "agents.yaml — definicja agentów"
+        desc: Definiuj agentów w YAML zamiast Python
+        detail:
+          what: Alternatywa do Python — agenci zdefiniowani w pliku YAML.
+          how: 'Format: agent_name → role, goal, backstory, tools, llm.'
+          tips:
+            - 'crewai create generuje ten plik automatycznie'
+      - cmd: "tasks.yaml — definicja tasków"
+        desc: Definiuj taski w YAML
+        detail:
+          what: Taski z description, expected_output, agent w YAML.
+          how: Łatwiejsze do edycji niż Python — nie wymaga restartowania.
+          tips:
+            - 'context: [task_name] — zależność między taskami'
+
+  - name: Testowanie i debugowanie
+    icon: "🧪"
+    commands:
+      - cmd: crewai test
+        desc: Uruchom testy crew
+        detail:
+          what: Testuje crew z mock LLM — sprawdza flow bez kosztów API.
+          how: Weryfikuje że agenci, taski i narzędzia są poprawnie skonfigurowane.
+          tips:
+            - 'Nie wymaga API key — mock responses'
+      - cmd: crewai log-tasks-outputs
+        desc: Pokaż output poprzednich uruchomień
+        detail:
+          what: Wyświetla zapisane outputy tasków z wcześniejszych kickoff().
+          how: Przydatne do porównywania wyników między uruchomieniami.
+          tips:
+            - 'Outputy zapisywane w .crewai/ katalogu'
+      - cmd: crewai replay <task_id>
+        desc: Powtórz task z konkretnego uruchomienia
+        detail:
+          what: Re-run taska z zapisanym kontekstem — nie musisz uruchamiać całej crew.
+          how: Przydatne do debugowania jednego taska.
+          tips:
+            - 'task_id z crewai log-tasks-outputs'
+      - cmd: crewai reset-memories
+        desc: Wyczyść pamięć agentów
+        detail:
+          what: Resetuje long-term i entity memory. Agent zaczyna od zera.
+          how: Przydatne gdy pamięć jest zanieczyszczona złymi danymi.
+          tips:
+            - '--all — wyczyść wszystkie typy pamięci'
+      - cmd: crewai train -n 3
+        desc: Trenuj crew przez N iteracji
+        detail:
+          what: Uruchamia crew N razy — każda iteracja to szansa na human feedback.
+          how: Agent uczy się z feedbacku i poprawia wyniki w kolejnych iteracjach.
+          tips:
+            - '-n 5 — 5 iteracji treningu'
+            - 'Human feedback po każdej iteracji'
+
+  - name: CrewAI Flows
+    icon: "🔄"
+    commands:
+      - cmd: "from crewai.flow.flow import Flow, start, listen"
+        desc: Import Flow API
+        detail:
+          what: Flows to system do łączenia wielu crews w pipeline z warunkami i routingiem.
+          how: Dekorator @start i @listen definiują flow.
+          tips:
+            - 'Flow to nadrzędna warstwa nad Crew'
+      - cmd: "@start() — punkt startowy flow"
+        desc: Oznacz metodę jako start flow
+        detail:
+          what: Metoda oznaczona @start() jest wywoływana pierwsza przy flow.kickoff().
+          how: Zwraca dane które trafiają do kolejnych kroków.
+          tips:
+            - 'Tylko jedna metoda @start() per Flow'
+      - cmd: "@listen(start_method) — reaguj na wynik"
+        desc: Metoda reagująca na wynik innej metody
+        detail:
+          what: Uruchom tę metodę gdy start_method zakończy się. Dostaje wynik jako input.
+          how: Tworzy chain — start → listen → listen → ...
+          tips:
+            - '@listen(method_name) — reaguj na konkretną metodę'
+      - cmd: flow.kickoff()
+        desc: Uruchom flow
+        detail:
+          what: Startuje cały flow od @start() i przechodzi przez @listen() chain.
+          how: Zwraca finalny wynik po przejściu przez wszystkie kroki.
+          tips:
+            - 'flow.kickoff(inputs={"data": "..."}) — z parametrami'

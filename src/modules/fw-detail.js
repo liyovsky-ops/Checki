@@ -34,6 +34,8 @@ import { FW_CELERY_DATA }        from '../data/fw_celery.js';
 import { FW_PLAYWRIGHT_DATA }    from '../data/fw_playwright.js';
 import { FW_TENSORFLOW_DATA }    from '../data/fw_tensorflow.js';
 import { FW_MONGODB_DATA }       from '../data/fw_mongodb.js';
+import { FW_CREWAI_DATA }       from '../data/fw_crewai.js';
+import { FW_SELENIUM_DATA }     from '../data/fw_selenium.js';
 
 let activeTab = 'podstawy';
 let activeFw  = 'react';
@@ -56,6 +58,8 @@ const FW_DATA_MAP = {
   playwright: FW_PLAYWRIGHT_DATA,
   tensorflow: FW_TENSORFLOW_DATA,
   mongodb: FW_MONGODB_DATA,
+  crewai: FW_CREWAI_DATA,
+  selenium: FW_SELENIUM_DATA,
 };
 
 export function openFramework(fw) {

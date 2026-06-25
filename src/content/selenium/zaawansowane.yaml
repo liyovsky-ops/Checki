@@ -1,0 +1,111 @@
+title: Zaawansowane techniki
+
+items:
+  - name: Headless mode — przeglądarka bez GUI
+    desc: >
+      Headless Chrome/Firefox renderuje stronę w pamięci bez otwierania okna.
+      Szybsze, mniej RAM, idealne dla CI/CD.
+    code: |
+      from selenium import webdriver
+      from selenium.webdriver.chrome.options import Options
+
+      options = Options()
+      options.add_argument("--headless=new")  # new headless mode (Chrome 109+)
+      options.add_argument("--no-sandbox")
+      options.add_argument("--disable-dev-shm-usage")
+      options.add_argument("--window-size=1920,1080")
+
+      driver = webdriver.Chrome(options=options)
+      driver.get("https://example.com")
+      driver.save_screenshot("headless.png")
+      driver.quit()
+
+  - name: Selenium Grid — testy na wielu maszynach
+    desc: >
+      Selenium Grid pozwala uruchamiać testy na wielu maszynach i przeglądarkach równolegle.
+      Hub zarządza, Nodes wykonują. Docker Compose do quick setup.
+    code: |
+      # docker-compose.yml dla Selenium Grid
+      # services:
+      #   hub:
+      #     image: selenium/hub:latest
+      #     ports: ["4442:4442", "4443:4443", "4444:4444"]
+      #   chrome:
+      #     image: selenium/node-chrome:latest
+      #     depends_on: [hub]
+      #     environment:
+      #       - SE_EVENT_BUS_HOST=hub
+
+      # Połącz się z Grid
+      from selenium import webdriver
+
+      options = webdriver.ChromeOptions()
+      driver = webdriver.Remote(
+          command_executor="http://localhost:4444/wd/hub",
+          options=options,
+      )
+
+  - name: Iframe i nowe okna/taby
+    desc: >
+      Selenium obsługuje iframe (switch_to.frame) i nowe okna (switch_to.window).
+    code: |
+      # Switch do iframe
+      iframe = driver.find_element(By.CSS_SELECTOR, "#payment-iframe")
+      driver.switch_to.frame(iframe)
+      # ... operuj wewnątrz iframe
+      driver.switch_to.default_content()  # wróć
+
+      # Nowe okno/tab
+      original = driver.current_window_handle
+      driver.find_element(By.LINK_TEXT, "Nowe okno").click()
+      # Switch do nowego
+      for handle in driver.window_handles:
+          if handle != original:
+              driver.switch_to.window(handle)
+              break
+      driver.switch_to.window(original)  # wróć
+
+  - name: Cookies i Local Storage
+    desc: >
+      Zarządzaj cookies i localStorage programowo — auth bypass, test setup.
+    code: |
+      # Cookies
+      driver.add_cookie({"name": "session", "value": "abc123", "domain": ".example.com"})
+      cookies = driver.get_cookies()
+      driver.delete_cookie("session")
+      driver.delete_all_cookies()
+
+      # Local Storage (przez JavaScript)
+      driver.execute_script("localStorage.setItem('token', 'jwt-abc')")
+      token = driver.execute_script("return localStorage.getItem('token')")
+      driver.execute_script("localStorage.clear()")
+
+  - name: Web scraping z Selenium
+    desc: >
+      Selenium do scraping stron z JavaScript (SPA, infinite scroll, login-required).
+    code: |
+      from selenium import webdriver
+      from selenium.webdriver.common.by import By
+      import time
+
+      driver = webdriver.Chrome()
+      driver.get("https://example.com/products")
+
+      # Infinite scroll
+      last_height = driver.execute_script("return document.body.scrollHeight")
+      while True:
+          driver.execute_script("window.scrollTo(0, document.body.scrollHeight)")
+          time.sleep(2)
+          new_height = driver.execute_script("return document.body.scrollHeight")
+          if new_height == last_height:
+              break
+          last_height = new_height
+
+      # Zbierz dane
+      products = driver.find_elements(By.CSS_SELECTOR, ".product-card")
+      for p in products:
+          name = p.find_element(By.CSS_SELECTOR, "h3").text
+          price = p.find_element(By.CSS_SELECTOR, ".price").text
+          print(f"{name}: {price}")
+
+      driver.quit()

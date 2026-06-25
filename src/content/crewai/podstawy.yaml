@@ -1,0 +1,114 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać CrewAI?
+  firstComponent: Pierwsza crew
+  firstComponentLang: python
+
+intro:
+  title: Czym jest CrewAI?
+  desc: >
+    CrewAI to framework do budowania zespołów AI agentów współpracujących nad złożonymi zadaniami.
+    Zamiast jednego prompta do jednego LLM, tworzysz CREW — zespół agentów z różnymi rolami
+    (researcher, writer, analyst), narzędziami (web search, file read, API calls) i celami.
+    Agenci komunikują się, delegują zadania i łączą wyniki. Myśl o tym jak o firmie w miniaturze
+    gdzie każdy pracownik (agent) ma swoją specjalizację.
+
+concepts:
+  - title: Agent
+    desc: >
+      Autonomiczna jednostka z rolą (role), celem (goal), backstory i zestawem narzędzi.
+      Agent ma osobowość — backstory wpływa na sposób myślenia. Researcher szuka faktów,
+      Writer pisze treści, Analyst analizuje dane. Każdy agent używa LLM do rozumowania
+      i narzędzi do interakcji ze światem.
+    icon: "🤖"
+  - title: Task
+    desc: >
+      Konkretne zadanie do wykonania — ma opis, oczekiwany output i przypisanego agenta.
+      Task może zależeć od innego taska (context) — np. Writer potrzebuje wyników Researchera.
+      Taski mogą być sekwencyjne lub równoległe.
+    icon: "📋"
+  - title: Crew
+    desc: >
+      Zespół agentów i tasków. Definiujesz kto w nim jest, jakie mają zadania i jak współpracują.
+      Crew.kickoff() uruchamia cały workflow. Crew może działać sekwencyjnie (agent po agencie)
+      lub hierarchicznie (manager deleguje do agentów).
+    icon: "👥"
+  - title: Tool
+    desc: >
+      Narzędzie które agent może użyć — web search, file read, API call, code execution.
+      CrewAI ma wbudowane narzędzia (SerperDevTool, FileReadTool, ScrapeWebsiteTool)
+      i pozwala tworzyć custom tools. Agent decyduje KIEDY użyć narzędzia na podstawie
+      kontekstu zadania.
+    icon: "🔧"
+  - title: Process
+    desc: >
+      Sposób koordynacji agentów w crew. Sequential — taski po kolei, wynik jednego
+      trafia do następnego. Hierarchical — manager agent deleguje do specjalistów
+      i zbiera wyniki. Consensual — agenci dyskutują i dochodzą do konsensusu.
+    icon: "⚙️"
+  - title: Memory
+    desc: >
+      CrewAI ma system pamięci — short-term (kontekst bieżącej sesji), long-term
+      (persist między sesjami), entity memory (fakty o osobach/firmach). Agenci
+      pamiętają wcześniejsze interakcje i uczą się z doświadczeń.
+    icon: "🧠"
+
+whenToUse:
+  - Złożone zadania wymagające wielu perspektyw (research + analysis + writing)
+  - Automatyzacja workflow gdzie każdy krok wymaga innej ekspertyzy
+  - Content generation pipeline (research → draft → review → publish)
+  - Data analysis z wieloma źródłami i formatami
+  - Customer support z escalation path (L1 → L2 → L3 agent)
+  - Competitive intelligence (scrape → analyze → summarize → report)
+
+firstComponent: |
+  # Instalacja
+  pip install crewai crewai-tools
+
+  # Ustaw API key
+  export OPENAI_API_KEY="sk-..."  # lub ANTHROPIC_API_KEY
+
+  # crew.py — pierwsza crew
+  from crewai import Agent, Task, Crew, Process
+
+  # Definiuj agentów
+  researcher = Agent(
+      role="Senior Research Analyst",
+      goal="Find comprehensive information about AI trends in 2024",
+      backstory="You are an experienced tech researcher with 10 years in AI/ML industry.",
+      verbose=True,
+      allow_delegation=False,
+  )
+
+  writer = Agent(
+      role="Content Writer",
+      goal="Write a compelling article based on research findings",
+      backstory="You are a tech journalist known for making complex topics accessible.",
+      verbose=True,
+      allow_delegation=False,
+  )
+
+  # Definiuj taski
+  research_task = Task(
+      description="Research the latest AI trends, focusing on LLMs, agents, and multimodal models.",
+      expected_output="A detailed summary of top 5 AI trends with examples and data.",
+      agent=researcher,
+  )
+
+  write_task = Task(
+      description="Write a 500-word article about AI trends based on the research.",
+      expected_output="A polished article ready for publication.",
+      agent=writer,
+      context=[research_task],  # writer gets researcher's output
+  )
+
+  # Utwórz i uruchom crew
+  crew = Crew(
+      agents=[researcher, writer],
+      tasks=[research_task, write_task],
+      process=Process.sequential,
+      verbose=True,
+  )
+
+  result = crew.kickoff()
+  print(result)

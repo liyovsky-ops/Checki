@@ -1,0 +1,94 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Selenium?
+  firstComponent: Pierwszy test Selenium
+  firstComponentLang: python
+
+intro:
+  title: Czym jest Selenium?
+  desc: >
+    Selenium to framework do automatyzacji przeglądarek — kontrolujesz Chrome, Firefox, Safari
+    programowo. Klikasz, wpisujesz tekst, nawigujesz, czytasz dane ze stron. Dwa główne zastosowania:
+    testowanie aplikacji webowych (E2E tests) i web scraping (zbieranie danych ze stron).
+    Selenium WebDriver komunikuje się z przeglądarką przez sterownik (ChromeDriver, GeckoDriver).
+    Najstarszy i najszerzej wspierany framework automatyzacji — od 2004 roku.
+
+concepts:
+  - title: WebDriver
+    desc: >
+      Interfejs do kontrolowania przeglądarki programowo. driver = webdriver.Chrome() otwiera
+      Chrome, driver.get(url) nawiguje, driver.find_element() znajduje elementy na stronie.
+      WebDriver komunikuje się z ChromeDriver/GeckoDriver przez HTTP (W3C WebDriver protocol).
+    icon: "🌐"
+  - title: Element
+    desc: >
+      Obiekt reprezentujący element HTML na stronie — button, input, div, link.
+      Znajdziesz go przez selektory (ID, CSS, XPath) i wykonujesz akcje (click, send_keys, text).
+      element.text czyta tekst, element.click() klika, element.send_keys() wpisuje tekst.
+    icon: "🎯"
+  - title: Selektory (Locators)
+    desc: >
+      Sposoby znajdowania elementów na stronie — By.ID, By.CSS_SELECTOR, By.XPATH,
+      By.CLASS_NAME, By.NAME, By.TAG_NAME, By.LINK_TEXT. CSS selector jest najczęstszy,
+      XPath jest najpotężniejszy (może chodzić po DOM w górę i w dół).
+    icon: "🔍"
+  - title: Waits (czekanie)
+    desc: >
+      Strony ładują się asynchronicznie — element może nie istnieć od razu.
+      Implicit wait czeka N sekund na KAŻDY element. Explicit wait (WebDriverWait)
+      czeka na KONKRETNY warunek (element visible, clickable, text present).
+      Explicit wait > implicit wait — bardziej precyzyjny.
+    icon: "⏳"
+  - title: Actions (akcje)
+    desc: >
+      Złożone interakcje — hover, drag & drop, right click, double click, key combinations.
+      ActionChains buduje sekwencję akcji i wykonuje je atomowo.
+    icon: "🖱️"
+  - title: Headless mode
+    desc: >
+      Uruchomienie przeglądarki bez GUI — szybsze, mniej pamięci, idealne do CI/CD.
+      Chrome/Firefox headless renderują stronę w pamięci bez wyświetlania okna.
+    icon: "👻"
+
+whenToUse:
+  - E2E testy aplikacji webowych (login flow, checkout, formularze)
+  - Web scraping stron z JavaScript (SPA, dynamiczny content)
+  - Automatyzacja powtarzalnych zadań w przeglądarce
+  - Screenshot testing i visual regression
+  - Testowanie na wielu przeglądarkach (Chrome, Firefox, Safari, Edge)
+  - Legacy projekty — Selenium ma największy ekosystem i community
+
+firstComponent: |
+  # Instalacja
+  pip install selenium webdriver-manager
+
+  # test_example.py — pierwszy test
+  from selenium import webdriver
+  from selenium.webdriver.common.by import By
+  from selenium.webdriver.chrome.service import Service
+  from webdriver_manager.chrome import ChromeDriverManager
+
+  # Automatycznie pobierz ChromeDriver
+  driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+
+  try:
+      # Otwórz stronę
+      driver.get("https://www.google.com")
+      print(f"Tytuł: {driver.title}")
+
+      # Znajdź pole search i wpisz tekst
+      search_box = driver.find_element(By.NAME, "q")
+      search_box.send_keys("Selenium Python")
+      search_box.submit()
+
+      # Poczekaj na wyniki
+      from selenium.webdriver.support.ui import WebDriverWait
+      from selenium.webdriver.support import expected_conditions as EC
+
+      results = WebDriverWait(driver, 10).until(
+          EC.presence_of_all_elements_located((By.CSS_SELECTOR, "h3"))
+      )
+      print(f"Znaleziono {len(results)} wyników")
+
+  finally:
+      driver.quit()

@@ -1,0 +1,95 @@
+title: Taski i Workflow
+
+items:
+  - name: Task — definicja zadania
+    desc: >
+      Task to konkretne zadanie z opisem, oczekiwanym outputem i przypisanym agentem.
+      Agent dostaje task i autonomicznie go realizuje — używając narzędzi i rozumowania.
+    code: |
+      from crewai import Task
+
+      research_task = Task(
+          description="""Research the top 5 Python web frameworks in 2024.
+          Compare: performance benchmarks, community size, learning curve,
+          ecosystem (plugins, middleware), deployment options.""",
+          expected_output="""A structured comparison table with:
+          - Framework name
+          - GitHub stars
+          - Performance (requests/sec)
+          - Best for (use case)
+          - Pros and cons""",
+          agent=researcher,
+      )
+
+  - name: Task z kontekstem (zależności)
+    desc: >
+      Task może zależeć od innego taska — context=[previous_task]. Agent dostaje
+      wynik poprzedniego taska jako dodatkowy kontekst. Tworzy pipeline.
+    code: |
+      # Pipeline: research → analyze → write
+      research_task = Task(
+          description="Research AI agent frameworks.",
+          expected_output="Detailed comparison of 5 frameworks.",
+          agent=researcher,
+      )
+
+      analysis_task = Task(
+          description="Analyze the research and identify the best framework for startups.",
+          expected_output="Recommendation with justification.",
+          agent=analyst,
+          context=[research_task],  # dostaje wynik research
+      )
+
+      write_task = Task(
+          description="Write a blog post based on the analysis.",
+          expected_output="700-word blog post ready for publication.",
+          agent=writer,
+          context=[research_task, analysis_task],  # dostaje oba wyniki
+      )
+
+  - name: Task z output do pliku
+    desc: >
+      Task może zapisać wynik do pliku — przydatne do raportów, artykułów, danych.
+    code: |
+      report_task = Task(
+          description="Generate a comprehensive market report.",
+          expected_output="A detailed PDF-ready market report.",
+          agent=analyst,
+          output_file="reports/market_analysis.md",  # zapisz do pliku
+      )
+
+  - name: Task z human input (HITL)
+    desc: >
+      human_input=True zatrzymuje wykonanie i prosi człowieka o feedback/approval
+      przed kontynuacją. Human-in-the-loop dla krytycznych decyzji.
+    code: |
+      review_task = Task(
+          description="Review the article for accuracy and tone.",
+          expected_output="Approved article or list of corrections.",
+          agent=editor,
+          human_input=True,  # pauza — czeka na approval człowieka
+      )
+
+  - name: Process — sekwencyjny vs hierarchiczny
+    desc: >
+      Sequential: taski po kolei, wynik jednego → input drugiego.
+      Hierarchical: manager agent decyduje kto co robi i zbiera wyniki.
+    code: |
+      from crewai import Crew, Process
+
+      # Sequential — prosty pipeline
+      sequential_crew = Crew(
+          agents=[researcher, writer, editor],
+          tasks=[research_task, write_task, review_task],
+          process=Process.sequential,
+      )
+
+      # Hierarchical — manager deleguje
+      hierarchical_crew = Crew(
+          agents=[manager, researcher, writer, editor],
+          tasks=[complex_task],
+          process=Process.hierarchical,
+          manager_agent=manager,
+      )
+
+      result = sequential_crew.kickoff()

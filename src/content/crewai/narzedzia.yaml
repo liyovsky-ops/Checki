@@ -1,0 +1,107 @@
+title: Narzędzia (Tools)
+
+items:
+  - name: Wbudowane narzędzia CrewAI
+    desc: >
+      CrewAI Tools to pakiet gotowych narzędzi — web search, scraping, file operations,
+      code execution. pip install crewai-tools i gotowe.
+    code: |
+      from crewai_tools import (
+          SerperDevTool,         # Google search (wymaga SERPER_API_KEY)
+          ScrapeWebsiteTool,     # scrape HTML → tekst
+          WebsiteSearchTool,     # RAG search po stronie
+          FileReadTool,          # czytaj pliki
+          DirectoryReadTool,     # listuj katalogi
+          TXTSearchTool,         # search w plikach tekstowych
+          PDFSearchTool,         # search w PDF
+          CSVSearchTool,         # search w CSV
+          JSONSearchTool,        # search w JSON
+          CodeInterpreterTool,   # uruchom Python code
+          YoutubeVideoSearchTool,# search w transkrypcji YouTube
+      )
+
+      # Użycie — przypisz do agenta
+      researcher = Agent(
+          role="Researcher",
+          goal="Find information",
+          backstory="...",
+          tools=[SerperDevTool(), ScrapeWebsiteTool()],
+      )
+
+  - name: Custom tool z dekoratorem @tool
+    desc: >
+      Stwórz własne narzędzie — dekorator @tool zamienia funkcję Python w narzędzie
+      CrewAI. Agent może go użyć gdy potrzebuje. Docstring = opis dla agenta.
+    code: |
+      from crewai.tools import tool
+
+      @tool("Stock Price Checker")
+      def check_stock_price(ticker: str) -> str:
+          """Check the current stock price for a given ticker symbol.
+          Use this when you need real-time stock market data."""
+          import yfinance as yf
+          stock = yf.Ticker(ticker)
+          price = stock.info.get('currentPrice', 'N/A')
+          return f"{ticker}: ${price}"
+
+      @tool("Database Query")
+      def query_db(sql: str) -> str:
+          """Execute a read-only SQL query against the analytics database.
+          Use for data analysis questions."""
+          import sqlite3
+          conn = sqlite3.connect("analytics.db")
+          result = conn.execute(sql).fetchall()
+          conn.close()
+          return str(result[:50])  # limit results
+
+      analyst = Agent(
+          role="Financial Analyst",
+          tools=[check_stock_price, query_db],
+          ...
+      )
+
+  - name: BaseTool — klasa custom tool
+    desc: >
+      Dla bardziej złożonych narzędzi — dziedzicz po BaseTool. Daje pełną kontrolę
+      nad walidacją, cachowaniem i error handling.
+    code: |
+      from crewai.tools import BaseTool
+      from pydantic import BaseModel, Field
+
+      class APIQueryInput(BaseModel):
+          endpoint: str = Field(..., description="API endpoint to query")
+          params: dict = Field(default={}, description="Query parameters")
+
+      class APIQueryTool(BaseTool):
+          name: str = "API Query"
+          description: str = "Query any REST API endpoint and return JSON response."
+
+          def _run(self, endpoint: str, params: dict = {}) -> str:
+              import requests
+              response = requests.get(endpoint, params=params, timeout=10)
+              response.raise_for_status()
+              return response.json()
+
+      # Użycie
+      api_tool = APIQueryTool()
+      agent = Agent(tools=[api_tool], ...)
+
+  - name: Tool z cache i rate limiting
+    desc: >
+      Narzędzia mogą cache'ować wyniki (ten sam input = ten sam output bez ponownego
+      wywołania) i mieć rate limiting.
+    code: |
+      @tool("Cached Web Search")
+      def cached_search(query: str) -> str:
+          """Search the web. Results are cached for identical queries."""
+          # CrewAI automatycznie cache'uje jeśli agent ma cache=True
+          from crewai_tools import SerperDevTool
+          return SerperDevTool().run(query)
+
+      agent = Agent(
+          role="Researcher",
+          tools=[cached_search],
+          cache=True,     # cache tool results
+          max_rpm=10,     # max 10 requests/min
+          ...
+      )

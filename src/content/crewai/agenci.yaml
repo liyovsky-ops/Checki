@@ -1,0 +1,158 @@
+title: Agenci — role, narzędzia, osobowość
+
+items:
+  - name: Definiowanie agenta z rolą i backstory
+    desc: >
+      Agent to autonomiczna jednostka z role (kim jest), goal (co chce osiągnąć),
+      backstory (doświadczenie i perspektywa). Backstory wpływa na sposób rozumowania —
+      "senior security auditor" myśli inaczej niż "junior copywriter".
+    code: |
+      from crewai import Agent
+
+      # Agent z pełną definicją
+      security_auditor = Agent(
+          role="Senior Security Auditor",
+          goal="Identify all security vulnerabilities in the codebase",
+          backstory="""You are a cybersecurity expert with 15 years experience
+          in penetration testing and code review. You've audited systems for
+          Fortune 500 companies and found critical CVEs. You are paranoid
+          by nature — you assume every input is malicious.""",
+          verbose=True,
+          allow_delegation=True,  # może delegować do innych agentów
+          max_iter=15,           # max iteracji reasoning
+          max_rpm=10,            # rate limit na LLM calls
+      )
+
+      # Agent z custom LLM
+      from langchain_anthropic import ChatAnthropic
+
+      analyst = Agent(
+          role="Data Analyst",
+          goal="Analyze data and produce actionable insights",
+          backstory="You are a data scientist with expertise in pandas and SQL.",
+          llm=ChatAnthropic(model="claude-sonnet-4-6"),
+          verbose=True,
+      )
+
+  - name: Agent z narzędziami (tools)
+    desc: >
+      Narzędzia dają agentowi superpowers — web search, file read, API calls.
+      Agent decyduje kiedy użyć narzędzia na podstawie kontekstu. Bez narzędzi
+      agent może tylko myśleć (LLM reasoning), z narzędziami może DZIAŁAĆ.
+    code: |
+      from crewai import Agent
+      from crewai_tools import (
+          SerperDevTool,       # Google search
+          ScrapeWebsiteTool,   # scrape web pages
+          FileReadTool,        # read local files
+          DirectoryReadTool,   # list directory contents
+          CodeInterpreterTool, # execute Python code
+      )
+
+      researcher = Agent(
+          role="Web Researcher",
+          goal="Find and verify information from multiple sources",
+          backstory="You are a meticulous researcher who cross-references everything.",
+          tools=[
+              SerperDevTool(),         # szukaj w Google
+              ScrapeWebsiteTool(),     # scrape znalezione strony
+              FileReadTool(),          # czytaj lokalne pliki
+          ],
+          verbose=True,
+      )
+
+      # Agent z custom tool
+      from crewai.tools import tool
+
+      @tool("Database Query")
+      def query_database(query: str) -> str:
+          """Execute a SQL query against the analytics database."""
+          import sqlite3
+          conn = sqlite3.connect("analytics.db")
+          result = conn.execute(query).fetchall()
+          conn.close()
+          return str(result)
+
+      analyst = Agent(
+          role="Database Analyst",
+          goal="Query and analyze data from the database",
+          backstory="SQL expert with 10 years experience in data analysis.",
+          tools=[query_database],
+      )
+
+  - name: Delegacja między agentami
+    desc: >
+      Agent z allow_delegation=True może poprosić innego agenta w crew o pomoc.
+      Manager agent w hierarchical process deleguje zadania do specjalistów.
+      Delegacja jest automatyczna — agent sam decyduje kiedy potrzebuje pomocy.
+    code: |
+      from crewai import Agent, Task, Crew, Process
+
+      # Manager deleguje do specjalistów
+      manager = Agent(
+          role="Project Manager",
+          goal="Coordinate the team to deliver a complete market analysis",
+          backstory="You manage a team of specialists. Delegate tasks wisely.",
+          allow_delegation=True,
+      )
+
+      researcher = Agent(
+          role="Market Researcher",
+          goal="Gather market data and competitor analysis",
+          backstory="Expert in market research with access to industry databases.",
+          allow_delegation=False,
+      )
+
+      analyst = Agent(
+          role="Financial Analyst",
+          goal="Analyze financial data and create projections",
+          backstory="CFA with 8 years in equity research.",
+          allow_delegation=False,
+      )
+
+      # Hierarchical: manager dostaje task, deleguje do researcher i analyst
+      crew = Crew(
+          agents=[manager, researcher, analyst],
+          tasks=[...],
+          process=Process.hierarchical,
+          manager_agent=manager,
+      )
+
+  - name: Agent z pamięcią (memory)
+    desc: >
+      Agenci mogą pamiętać wcześniejsze interakcje. Short-term memory = kontekst
+      bieżącej sesji. Long-term memory = persist między sesjami. Entity memory =
+      fakty o osobach, firmach, produktach.
+    code: |
+      from crewai import Crew
+
+      crew = Crew(
+          agents=[researcher, writer],
+          tasks=[research_task, write_task],
+          memory=True,              # włącz pamięć
+          embedder={                 # konfiguracja embeddings
+              "provider": "openai",
+              "config": {"model": "text-embedding-3-small"},
+          },
+          verbose=True,
+      )
+
+      # Long-term memory persist między uruchomieniami
+      # Agent pamięta co badał wcześniej i nie powtarza pracy
+
+  - name: Agent guardrails i limity
+    desc: >
+      Kontroluj zachowanie agentów — max iteracji, rate limiting, timeout.
+      Bez limitów agent może wpaść w nieskończoną pętlę rozumowania
+      lub wygenerować ogromny rachunek za API.
+    code: |
+      agent = Agent(
+          role="Researcher",
+          goal="Find information efficiently",
+          backstory="You value speed and accuracy equally.",
+          max_iter=10,          # max 10 iteracji reasoning
+          max_rpm=5,            # max 5 requests per minute do LLM
+          max_execution_time=300,  # timeout 5 minut
+          verbose=True,
+          cache=True,           # cache LLM responses
+      )

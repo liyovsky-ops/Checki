@@ -1,0 +1,66 @@
+title: Selenium vs alternatywy automatyzacji
+
+items:
+  - name: Playwright
+    icon: "🎭"
+    color: "#2ead33"
+    tagline: Nowoczesny framework E2E od Microsoftu — auto-wait, cross-browser, traces
+    pros:
+      - Auto-waiting — nie musisz pisać explicit waits ręcznie
+      - Cross-browser z jednego API (Chromium, Firefox, WebKit)
+      - Trace Viewer — interaktywny debugger z DOM snapshots
+      - Codegen — nagrywa testy z przeglądarki
+    cons:
+      - Młodszy — mniej Stack Overflow answers niż Selenium
+      - Nie obsługuje tak wielu przeglądarek (brak IE, Safari native)
+      - Cięższy download (~500MB przeglądarki)
+      - API zmienia się szybciej (breaking changes)
+    vs: Playwright to następca Selenium z lepszym DX. Selenium dla legacy projektów i maximalnej kompatybilności przeglądarek. Nowe projekty powinny zaczynać od Playwright.
+
+  - name: Cypress
+    icon: "🌲"
+    color: "#69d3a7"
+    tagline: Developer-friendly E2E — piękny Test Runner, time-travel debugger
+    pros:
+      - Piękny GUI z time-travel debugger
+      - Automatic waiting i retry
+      - Ogromna społeczność i pluginy
+      - Screenshots i video recording
+    cons:
+      - Tylko Chromium (Firefox/WebKit eksperymentalnie)
+      - Nie obsługuje wielu tabów/okien
+      - Tylko JavaScript/TypeScript (brak Python)
+      - Wolniejszy niż Playwright
+    vs: Cypress najlepszy DX w świecie JS. Selenium wygrywa Python support i multi-browser. Dla Python devów Selenium lub Playwright, nie Cypress.
+
+  - name: Puppeteer
+    icon: "🤖"
+    color: "#40b5a4"
+    tagline: Chromium automation od Google — precyzyjna kontrola Chrome
+    pros:
+      - Oficjalny tool Google do Chrome automation
+      - Pełny dostęp do Chrome DevTools Protocol
+      - Idealne do web scraping i PDF generation
+      - Szybszy niż Selenium (brak WebDriver overhead)
+    cons:
+      - Tylko Chromium (brak Firefox/Safari)
+      - Tylko JavaScript/TypeScript
+      - Brak wbudowanych asercji i test runnera
+      - Brak auto-waiting
+    vs: Puppeteer to Chrome-only automation. Selenium daje multi-browser i Python. Playwright to dosłownie następca Puppeteera z cross-browser.
+
+  - name: Beautiful Soup + requests
+    icon: "🍲"
+    color: "#3CB371"
+    tagline: Parsowanie HTML bez przeglądarki — szybki scraping statycznych stron
+    pros:
+      - Ekstremalnie szybki (bez przeglądarki)
+      - Minimal dependencies
+      - Prosty API do parsowania HTML
+      - Niskie zużycie RAM
+    cons:
+      - Nie obsługuje JavaScript (SPA = pusta strona)
+      - Brak interakcji (klik, scroll, formularz)
+      - Brak renderowania CSS (nie widzi co jest visible)
+      - Łatwo wykrywany przez anti-bot systemy
+    vs: BeautifulSoup + requests dla statycznych stron (10× szybciej). Selenium dla stron z JavaScript, login-required i dynamicznym contentem.

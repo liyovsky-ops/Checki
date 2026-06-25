@@ -1,0 +1,66 @@
+title: CrewAI vs alternatywy multi-agent
+
+items:
+  - name: AutoGen (Microsoft)
+    icon: "🤖"
+    color: "#0078d4"
+    tagline: Konwersacje między agentami — agenci rozmawiają i debugują razem
+    pros:
+      - Conversation-based — agenci dyskutują jak ludzie na spotkaniu
+      - Wbudowany code execution (Docker sandbox)
+      - Silne wsparcie Microsoftu i community
+      - GroupChat — wielu agentów w jednej konwersacji
+    cons:
+      - Steeper learning curve — więcej koncepcji do opanowania
+      - Mniej strukturyzowany workflow niż CrewAI (bardziej free-form)
+      - Trudniejszy do debugowania (konwersacje mogą się zapętlić)
+      - Cięższy setup niż CrewAI
+    vs: AutoGen lepszy do free-form dyskusji i code debugging. CrewAI lepszy do strukturyzowanych workflow z jasnym pipeline.
+
+  - name: LangGraph (LangChain)
+    icon: "🕸️"
+    color: "#1c3c3c"
+    tagline: Agenci jako grafy stanów — pełna kontrola nad flow
+    pros:
+      - Graf stanów — wizualna kontrola nad flow agenta
+      - Checkpointing — zatrzymaj i wznów agenta
+      - Human-in-the-loop wbudowany
+      - Część ekosystemu LangChain (dostęp do 1000+ narzędzi)
+    cons:
+      - Nisko-poziomowy — musisz ręcznie definiować stany i tranzycje
+      - Więcej kodu na prostą crew niż CrewAI
+      - Steep learning curve (grafy stanów nie są intuicyjne)
+      - Debugging complex graphs jest trudny
+    vs: LangGraph daje pełną kontrolę nad flow (jak state machine). CrewAI jest wyższy poziom — definiujesz agentów i taski, framework ogarnia resztę.
+
+  - name: OpenAI Agents SDK
+    icon: "✦"
+    color: "#10a37f"
+    tagline: Natywny multi-agent od OpenAI — prosty, zintegrowany z GPT
+    pros:
+      - Najprostszy API — mniej boilerplate niż CrewAI
+      - Natywna integracja z OpenAI models
+      - Wbudowane narzędzia (code interpreter, file search)
+      - Handoff between agents
+    cons:
+      - Vendor lock-in (tylko OpenAI models)
+      - Mniej customizable niż CrewAI
+      - Brak open-source (proprietary)
+      - Ograniczone memory/persistence
+    vs: OpenAI Agents najszybszy start jeśli już używasz OpenAI. CrewAI model-agnostic — działa z Claude, Gemini, Ollama.
+
+  - name: Pydantic AI
+    icon: "🤖"
+    color: "#E92063"
+    tagline: Type-safe AI agents — walidacja danych na każdym kroku
+    pros:
+      - Type safety — Pydantic models na wejściu i wyjściu agenta
+      - Model-agnostic (OpenAI, Anthropic, Gemini, Ollama)
+      - Dependency injection — łatwe testowanie
+      - Lekki — mniej abstrakcji niż CrewAI
+    cons:
+      - Single-agent focused — multi-agent wymaga ręcznej koordynacji
+      - Młody projekt — mniej tutoriali i community
+      - Brak wbudowanego workflow/pipeline
+      - Mniej narzędzi out-of-the-box
+    vs: Pydantic AI lepszy dla single-agent z type safety. CrewAI lepszy dla multi-agent workflow z koordynacją.
