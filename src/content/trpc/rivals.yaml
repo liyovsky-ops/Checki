@@ -49,18 +49,19 @@ items:
       - Brak pierwszoklasowej integracji z React Query
     vs: ts-rest gdy potrzebujesz prawdziwego REST (np. API dla innych klientów) z type safety. tRPC dla wewnętrznego TypeScript API z minimalnym boilerplate.
 
-  - name: Hono + OpenAPI
+  - name: Hono RPC
     icon: "🔥"
     color: "#E36002"
-    tagline: Ultraszybki web framework + OpenAPI spec — Edge-first, multi-runtime
+    tagline: End-to-end type safety przez klient hc<AppType> — bezpośredni rywal tRPC, Edge-first
     pros:
-      - Działa na Edge (Cloudflare Workers, Vercel Edge)
-      - Prawdziwe REST z OpenAPI dokumentacją
-      - Bardzo szybki (C-core na Bun/Cloudflare)
-      - Walidacja przez Zod + @hono/zod-openapi
+      - End-to-end types BEZ codegen — hc<typeof app> czyta typy z routera (jak tRPC)
+      - To zwykły framework HTTP — te same trasy działają jako REST (curl/Postman)
+      - Działa na Edge i multi-runtime (Cloudflare Workers, Bun, Deno, Node)
+      - Bardzo lekki i szybki; walidacja przez zValidator (Zod/Valibot)
+      - Dodatek @hono/zod-openapi generuje spec OpenAPI z tego samego kodu
     cons:
-      - Więcej konfiguracji niż tRPC
-      - Ręczne typy na frontendzie lub codegen
-      - Mniej integracji z React Query
-      - Brak automatic batch requests
-    vs: Hono gdy potrzebujesz Edge deployment lub publicznego API. tRPC dla fullstack Next.js z minimalnym setup.
+      - Brak pierwszoklasowej integracji z React Query (ręczne useQuery wokół hc)
+      - Słabszy DX niż tRPC dla zagnieżdżonych routerów i nawigacji typów
+      - Brak wbudowanych subscriptions / batchingu jak w tRPC
+      - Type inference potrafi spowolnić TS na bardzo dużym API
+    vs: Hono RPC gdy chcesz JEDEN framework dla REST + typowanego klienta na Edge. tRPC gdy chcesz najgłębszą integrację z React Query, middleware, subscriptions i ekosystem T3.

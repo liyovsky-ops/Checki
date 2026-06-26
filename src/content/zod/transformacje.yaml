@@ -80,3 +80,44 @@ items:
           })
         }
       })
+
+  - name: Async walidacja — .refine + .parseAsync
+    desc: Gdy walidacja wymaga await (np. sprawdzenie unikalności w bazie), użyj async refine. Schema z async refine MUSI być parsowany przez .parseAsync() / .safeParseAsync() — .parse() rzuci błąd.
+    code: |
+      import { z } from 'zod'
+
+      const SignupSchema = z.object({
+        email: z.string().email(),
+      }).refine(
+        async ({ email }) => {
+          const exists = await db.user.findUnique({ where: { email } })
+          return !exists                       // false → błąd walidacji
+        },
+        { message: "Email już zajęty", path: ["email"] }
+      )
+
+      // Async schema wymaga parseAsync — .parse() rzuci:
+      // "Asynchronous transform encountered during synchronous parse"
+      const result = await SignupSchema.safeParseAsync({ email: "jan@example.com" })
+      if (!result.success) console.log(result.error.flatten())
+
+  - name: z.brand — typy nominalne (branded types)
+    desc: .brand<"Tag">() tworzy typ nominalny — dwa stringi o tym samym kształcie stają się nieprzypisywalne. Zapobiega pomyleniu np. UserId z PostId, czy niezwalidowanego stringa z zwalidowanym email.
+    code: |
+      import { z } from 'zod'
+
+      // Branded type — UserId to NIE zwykły number
+      const UserId = z.number().int().positive().brand<"UserId">()
+      type UserId = z.infer<typeof UserId>   // number & { __brand: "UserId" }
+
+      const Email = z.string().email().brand<"Email">()
+      type Email = z.infer<typeof Email>
+
+      function sendTo(email: Email) { /* ... */ }
+
+      const raw = "jan@example.com"
+      // sendTo(raw)                 // ❌ błąd kompilacji — surowy string
+      sendTo(Email.parse(raw))       // ✅ tylko zwalidowana wartość przejdzie
+
+      // Brand istnieje TYLKO na poziomie typów — w runtime to zwykła wartość.
+      // Jedyny sposób uzyskania UserId to przejście przez schemat (parse).

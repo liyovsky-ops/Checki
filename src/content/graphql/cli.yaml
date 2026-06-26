@@ -181,6 +181,17 @@ groups:
           tips:
             - 'server.addValidationRule(depthLimit(7))'
             - 'Dodaj też queryComplexityLimit dla ochrony przed drogimi queries'
+      - cmd: const link = createPersistedQueryLink().concat(httpLink)
+        desc: Włącz Automatic Persisted Queries (APQ) w Apollo Client
+        detail:
+          what: APQ wysyła do serwera tylko hash (SHA-256) query zamiast całego tekstu — mniejszy payload, możliwość GET + CDN caching.
+          how: "Klient wysyła sam hash. Jeśli serwer go nie zna (cache miss), klient dosyła pełną query raz; potem serwer rozpoznaje sam hash. Apollo Server ma APQ włączone domyślnie."
+          flags:
+            - flag: 'useGETForHashedQueries: true'
+              desc: Wysyłaj zhashowane queries jako GET — pozwala cache'ować je w CDN
+          tips:
+            - "import { createPersistedQueryLink } from '@apollo/client/link/persisted-queries'"
+            - 'Trusted/registered persisted queries (allowlist hashy w buildzie) = serwer odrzuca dowolne query spoza listy — silna ochrona produkcji'
 
   - name: Deployment
     icon: "🚀"

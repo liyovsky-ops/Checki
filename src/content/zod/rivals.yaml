@@ -64,3 +64,19 @@ items:
       - Mniej tutoriali i przykładów
       - tRPC i RHF integracje mniej dojrzałe
     vs: Valibot gdy bundle size jest krytyczny (np. edge functions). Zod dla stabilności i ekosystemu integracji.
+
+  - name: ArkType
+    icon: "🏹"
+    color: "#A855F7"
+    tagline: Walidator o składni typów TS — definicje jako stringi, ekstremalna wydajność
+    pros:
+      - Składnia bliska natywnemu TypeScript — type("string.email") zamiast łańcucha metod
+      - Najszybszy runtime z porównywanych (kompiluje walidatory do zoptymalizowanych funkcji)
+      - 1:1 inference — typ i walidacja z jednej definicji, jak w Zod
+      - Świetne, czytelne komunikaty błędów wbudowane
+    cons:
+      - Składnia stringowa nietypowa — krótsza krzywa dla typów TS, dłuższa dla reszty
+      - Najmłodszy ekosystem (1.0 w 2025) — najmniej integracji i tutoriali
+      - Mniej gotowych adapterów (RHF/tRPC dochodzą przez Standard Schema)
+      - Mniejsza społeczność niż Zod
+    vs: ArkType gdy zależy ci na maksymalnej wydajności i lubisz składnię typów TS. Zod gdy chcesz dojrzały ekosystem i sprawdzony standard.

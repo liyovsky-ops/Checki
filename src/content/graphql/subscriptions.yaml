@@ -15,6 +15,10 @@ items:
       }
 
       // Resolver z PubSub
+      // UWAGA: in-memory PubSub działa tylko na JEDNEJ instancji serwera.
+      // W produkcji (kilka instancji za load balancerem) użyj
+      // graphql-redis-subscriptions — wtedy event dociera do subskrybentów
+      // podłączonych do innej instancji.
       import { PubSub } from 'graphql-subscriptions';
       const pubsub = new PubSub();
 
@@ -37,11 +41,18 @@ items:
         Subscription: {
           messageAdded: {
             // subscribe zwraca AsyncIterator
+            // graphql-subscriptions v2+: metoda nazywa się asyncIterableIterator
+            // (asyncIterator jest deprecated, ale wciąż działa)
             subscribe: (_: any, { roomId }: { roomId: string }) =>
-              pubsub.asyncIterator(`MESSAGE_ADDED_${roomId}`),
+              pubsub.asyncIterableIterator(`MESSAGE_ADDED_${roomId}`),
           }
         }
       };
+
+      // Transport: Apollo Server 4 używa biblioteki graphql-ws
+      // (stary subscriptions-transport-ws jest porzucony i niebezpieczny).
+      // npm install graphql-ws ws
+      // Serwer WebSocket podpinasz przez useServer() obok HTTP serwera.
 
       // Klient React
       const MESSAGE_SUBSCRIPTION = gql`

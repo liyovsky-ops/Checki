@@ -37,8 +37,9 @@ concepts:
   - title: Scheduler
     desc: >
       Scheduler monitoruje DAGi i triggeruje task runs zgodnie ze schedule.
-      Schedule_interval: cron string ("0 0 * * *"), timedelta, lub "@daily".
-      Catchup=True oznacza że scheduler "nadrabia" przeszłe uruchomienia.
+      Parametr schedule (od 2.4; wcześniej schedule_interval): cron string
+      ("0 0 * * *"), timedelta, "@daily" lub Dataset/Asset. Catchup=True
+      oznacza że scheduler "nadrabia" przeszłe uruchomienia.
     icon: "⏰"
   - title: XCom (Cross-Communication)
     desc: >
@@ -52,6 +53,13 @@ concepts:
       bezpiecznie w Airflow. Variable to para klucz-wartość (konfiguracja,
       flagi). Oba zarządzane przez UI lub environment variables.
     icon: "🔑"
+  - title: Pools, SLA i Trigger Rules
+    desc: >
+      Pool ogranicza współbieżność — pula slotów dla grupy tasków (np. limit
+      połączeń do bazy). SLA definiuje maksymalny czas wykonania, po przekroczeniu
+      wysyła alert. Trigger rules (all_success domyślnie, all_done, one_failed)
+      decydują kiedy task startuje względem stanu upstream.
+    icon: "🚦"
 
 whenToUse:
   - ETL/ELT pipelines — extract z baz/API, transform, load do data warehouse

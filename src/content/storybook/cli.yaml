@@ -60,10 +60,12 @@ groups:
           flags:
             - flag: '--coverage'
               desc: Generuj coverage report
-      - cmd: npx storybook test --watch
-        desc: Uruchom testy w trybie watch (Storybook 8+)
+      - cmd: npx vitest
+        desc: Uruchom stories jako testy Vitest (Storybook 8.3+ addon-test)
         detail:
-          what: Storybook 8 ma wbudowany test runner — bez osobnego test-storybook pakietu.
+          what: "Addon @storybook/experimental-addon-test zamienia każdą story w test Vitest — szybsze niż test-runner (Playwright), z trybem watch i coverage. Plugin storybookTest konfigurujesz w vitest.config.ts."
+          tips:
+            - 'W Storybook 9 addon zmienił nazwę na @storybook/addon-vitest'
 
   - name: Chromatic i visual testing
     icon: "📸"

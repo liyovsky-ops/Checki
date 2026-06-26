@@ -125,6 +125,10 @@ items:
           return Object.assign(new UserBuilder(), { ...this.state, name }) as any;
         }
 
+        setEmail<S extends string>(email: S): UserBuilder<State & { email: S }> {
+          return Object.assign(new UserBuilder(), { ...this.state, email }) as any;
+        }
+
         setAge(age: number): UserBuilder<State & { age: number }> {
           return Object.assign(new UserBuilder(), { ...this.state, age }) as any;
         }
@@ -137,5 +141,88 @@ items:
 
       const user = new UserBuilder()
         .setName('Alice')
+        .setEmail('a@b.com')
         .setAge(30)
-        .build(); // OK
+        .build(); // ✅ OK — name i email ustawione
+
+      // new UserBuilder().setName('Bob').build();
+      // ❌ błąd kompilacji — brak email, build() niedostępne
+
+  - name: const type parameters (TS 5.0)
+    desc: >
+      Modyfikator const przy parametrze typowym sprawia, że argumenty są wnioskowane
+      tak, jakby miały as const — bez ręcznego dopisywania go przy wywołaniu.
+      Idealne do funkcji przyjmujących literały: trasy, eventy, konfiguracje.
+    code: |
+      // Bez const — typ zostaje "rozszerzony"
+      function first1<T>(arr: readonly T[]): T { return arr[0]; }
+      const a = first1(['a', 'b', 'c']); // a: string
+
+      // Z const — literały zachowane bez 'as const' u wywołującego
+      function first2<const T>(arr: readonly T[]): T { return arr[0]; }
+      const b = first2(['a', 'b', 'c']); // b: 'a' | 'b' | 'c'
+
+      // Praktyczne: type-safe router
+      function route<const T extends string>(path: T): { path: T } {
+        return { path };
+      }
+      const r = route('/users/:id'); // r.path: '/users/:id'
+
+  - name: Standardowe dekoratory (TS 5.0)
+    desc: >
+      TS 5.0 wprowadził dekoratory zgodne ze standardem ECMAScript (Stage 3) — bez
+      flagi experimentalDecorators. Dekorator to funkcja owijająca klasę/metodę/pole.
+      Drugi argument (context) opisuje, co jest dekorowane. Uwaga: dekoratory parametrów
+      i metadane (reflect-metadata, NestJS, TypeORM) wciąż wymagają trybu legacy.
+    code: |
+      // Dekorator metody — logowanie wywołań (standard ES, TS 5.0+)
+      function logged<This, Args extends any[], Return>(
+        target: (this: This, ...args: Args) => Return,
+        context: ClassMethodDecoratorContext<This>
+      ) {
+        const name = String(context.name);
+        return function (this: This, ...args: Args): Return {
+          console.log(`→ ${name}(${args.join(', ')})`);
+          const result = target.call(this, ...args);
+          console.log(`← ${name} =>`, result);
+          return result;
+        };
+      }
+
+      class Calculator {
+        @logged
+        add(a: number, b: number) { return a + b; }
+      }
+
+      new Calculator().add(2, 3); // loguje wejście i wynik
+
+  - name: Explicit resource management (using, TS 5.2)
+    desc: >
+      using i await using (TS 5.2+) automatycznie zwalniają zasób na końcu bloku —
+      odpowiednik try/finally. Obiekt musi implementować Symbol.dispose
+      (lub Symbol.asyncDispose). Wymaga target/lib z ES2022+ i obsługi w runtime.
+    code: |
+      class FileHandle implements Disposable {
+        constructor(private path: string) {
+          console.log(`open ${path}`);
+        }
+        read() { return 'data'; }
+        [Symbol.dispose]() {
+          console.log(`close ${this.path}`);
+        }
+      }
+
+      function process() {
+        using file = new FileHandle('/tmp/data.txt');
+        console.log(file.read());
+        // [Symbol.dispose]() wywoła się automatycznie na końcu bloku
+      }
+
+      // Asynchroniczny wariant
+      class Connection implements AsyncDisposable {
+        async [Symbol.asyncDispose]() { /* await pool.release() */ }
+      }
+      async function query() {
+        await using conn = new Connection();
+        // zwolnione po wyjściu z bloku
+      }

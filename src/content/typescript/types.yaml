@@ -128,9 +128,83 @@ items:
       type ArrayElement<T> = T extends (infer E)[] ? E : never;
       type NumEl = ArrayElement<number[]>; // number
 
-      // Unwrap Promise
-      type Awaited<T> = T extends Promise<infer U> ? Awaited<U> : T;
+      // Unwrap Promise (własny — wbudowany Awaited istnieje od TS 4.5)
+      type MyAwaited<T> = T extends Promise<infer U> ? MyAwaited<U> : T;
 
       // Funkcja → parametry → pierwszy parametr
       type FirstParam<T extends (...args: any) => any> =
         T extends (first: infer F, ...rest: any[]) => any ? F : never;
+
+  - name: const assertions (as const)
+    desc: >
+      as const zamraża wartość na najwęższy możliwy typ literalny i robi ją readonly.
+      Tablice stają się readonly tuple, obiekty mają literalne typy pól zamiast szerokich.
+      Kluczowe do wyprowadzania union types z danych i do niezmiennych konfiguracji.
+    code: |
+      // Bez as const — typy są "szerokie"
+      const a = { method: 'GET', retries: 3 };
+      // { method: string; retries: number }
+
+      // Z as const — literalne i readonly
+      const b = { method: 'GET', retries: 3 } as const;
+      // { readonly method: 'GET'; readonly retries: 3 }
+
+      // Tablica → readonly tuple, świetne do wyprowadzania union
+      const ROLES = ['admin', 'user', 'guest'] as const;
+      type Role = typeof ROLES[number]; // 'admin' | 'user' | 'guest'
+
+      // Const w pojedynczym polu (TS 5.0+) zamiast całego obiektu
+      function config<const T>(value: T): T { return value; }
+
+  - name: Operator satisfies
+    desc: >
+      satisfies (TS 4.9+) sprawdza, czy wyrażenie pasuje do typu, NIE zmieniając
+      przy tym wywnioskowanego typu wartości. W odróżnieniu od adnotacji ": T"
+      zachowuje wąski typ literalny, dając walidację i precyzyjny autocomplete naraz.
+    code: |
+      type Config = Record<string, string | number>;
+
+      // Z adnotacją — tracisz konkretne klucze i typy wartości
+      const a: Config = { host: 'localhost', port: 8080 };
+      a.port.toFixed(); // ❌ port to string | number
+
+      // Z satisfies — walidacja + zachowany wąski typ
+      const b = { host: 'localhost', port: 8080 } satisfies Config;
+      b.port.toFixed();   // ✅ port to number
+      b.host.toUpperCase(); // ✅ host to string
+      b.missing;          // ❌ błąd — klucz nie istnieje
+
+      // Częsty wzorzec: paleta kolorów / mapa tras
+      const palette = {
+        primary: '#3178c6',
+        danger: [255, 0, 0],
+      } satisfies Record<string, string | number[]>;
+
+  - name: Type guards i assertion functions
+    desc: >
+      Type predicate (arg is Type) tworzy własny type guard zawężający typ w if/switch.
+      Assertion function (asserts arg is Type) rzuca wyjątek gdy warunek nie zachodzi,
+      a po wywołaniu TypeScript wie, że typ jest zawężony. Podstawa walidacji unknown.
+    code: |
+      interface Cat { meow(): void }
+      interface Dog { bark(): void }
+
+      // User-defined type guard
+      function isCat(animal: Cat | Dog): animal is Cat {
+        return 'meow' in animal;
+      }
+
+      function speak(animal: Cat | Dog) {
+        if (isCat(animal)) animal.meow(); // zawężone do Cat
+        else animal.bark();               // zawężone do Dog
+      }
+
+      // Assertion function — zawęża po wywołaniu
+      function assertString(val: unknown): asserts val is string {
+        if (typeof val !== 'string') throw new Error('Not a string');
+      }
+
+      function shout(input: unknown) {
+        assertString(input);
+        return input.toUpperCase(); // input to string
+      }

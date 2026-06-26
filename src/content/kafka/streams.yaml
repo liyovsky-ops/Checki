@@ -1,8 +1,8 @@
 title: Kafka Streams i przetwarzanie strumieni
 
 items:
-  - name: Faust — Kafka Streams dla Python
-    desc: Faust to Python library do stream processingu na Kafka. Agenty czytają topic i przetwarzają eventy. Tabele (changelog topics) do stateful processing.
+  - name: Faust — stream processing dla Python
+    desc: Faust to Python library do stream processingu na Kafka. Agenty czytają topic i przetwarzają eventy. Tabele (changelog topics) do stateful processing. Oryginalny Faust (Robinhood) nie jest rozwijany — używaj utrzymywanego forka faust-streaming.
     code: |
       import faust
 
@@ -23,7 +23,7 @@ items:
       orders_topic = app.topic('orders', value_type=Order)
       results_topic = app.topic('order-results', value_type=Order)
 
-      # Tabela do śledzenia stanu (persisted w Kafka)
+      # Tabela do śledzenia stanu (persisted w Kafka jako changelog topic)
       user_totals = app.Table('user-totals', default=float)
 
       # Agent — przetwarza eventy
@@ -40,3 +40,91 @@ items:
 
       # Uruchomienie
       # faust -A myapp worker -l info
+
+  - name: Faust — okna czasowe (windowed aggregation)
+    desc: Tumbling/hopping windows agregują eventy w przedziałach czasowych. Klasyczny przypadek — liczba zamówień na minutę, suma transakcji per godzina, wykrywanie anomalii.
+    code: |
+      from datetime import timedelta
+      import faust
+
+      app = faust.App('metrics', broker='kafka://localhost:9092')
+
+      class Click(faust.Record):
+          user_id: str
+
+      clicks_topic = app.topic('clicks', value_type=Click)
+
+      # Tumbling window 60s, dane wygasają po godzinie
+      clicks_per_min = (
+          app.Table('clicks-per-min', default=int)
+             .tumbling(60.0, expires=timedelta(hours=1))
+      )
+
+      @app.agent(clicks_topic)
+      async def count_clicks(clicks):
+          async for click in clicks:
+              # .current() = okno przypisane do timestampu eventu
+              clicks_per_min[click.user_id] += 1
+              # Odczyt liczby kliknięć w bieżącym oknie
+              now = clicks_per_min[click.user_id].current()
+              if now > 100:
+                  print(f'Anomalia: {click.user_id} = {now} klików/min')
+
+  - name: ksqlDB — SQL na strumieniach
+    desc: ksqlDB pozwala pisać przetwarzanie strumieni w SQL — bez kodu Java/Python. STREAM = nieskończony strumień eventów, TABLE = zmaterializowany stan (ostatnia wartość per klucz). Wykonywane przez serwer ksqlDB na bazie Kafka Streams.
+    code: |
+      -- Strumień z topica (każdy event = wiersz)
+      CREATE STREAM orders (
+          order_id  VARCHAR KEY,
+          user_id   VARCHAR,
+          amount    DOUBLE
+      ) WITH (
+          KAFKA_TOPIC = 'orders',
+          VALUE_FORMAT = 'JSON'
+      );
+
+      -- Filtrowanie i transformacja → nowy topic
+      CREATE STREAM big_orders AS
+          SELECT order_id, user_id, amount
+          FROM orders
+          WHERE amount > 1000
+          EMIT CHANGES;
+
+      -- Agregacja w oknie 1h → materialized TABLE
+      CREATE TABLE spend_per_hour AS
+          SELECT user_id,
+                 SUM(amount) AS total
+          FROM orders
+          WINDOW TUMBLING (SIZE 1 HOUR)
+          GROUP BY user_id
+          EMIT CHANGES;
+
+      -- Pull query — odpytaj bieżący stan tabeli
+      SELECT * FROM spend_per_hour WHERE user_id = 'user-123';
+
+  - name: Kafka Streams (Java) — natywna biblioteka
+    desc: Kafka Streams to oficjalna biblioteka JVM do stream processingu — działa jako zwykła aplikacja (bez osobnego klastra). Oferuje exactly-once, stanowe operacje (KTable), join, okna i RocksDB jako lokalny state store. ksqlDB jest zbudowane na Kafka Streams.
+    code: |
+      // Java — agregacja słów (word count)
+      StreamsBuilder builder = new StreamsBuilder();
+
+      KStream<String, String> lines = builder.stream("text-input");
+
+      KTable<String, Long> counts = lines
+          .flatMapValues(line -> Arrays.asList(line.toLowerCase().split("\\W+")))
+          .groupBy((key, word) -> word)
+          .count();
+
+      // Wynik (changelog) → topic wyjściowy
+      counts.toStream().to("word-counts",
+          Produced.with(Serdes.String(), Serdes.Long()));
+
+      Properties props = new Properties();
+      props.put(StreamsConfig.APPLICATION_ID_CONFIG, "wordcount-app");
+      props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+      // Exactly-once processing
+      props.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG,
+                StreamsConfig.EXACTLY_ONCE_V2);
+
+      KafkaStreams streams = new KafkaStreams(builder.build(), props);
+      streams.start();

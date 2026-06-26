@@ -86,12 +86,13 @@ groups:
               desc: Port (domyślnie 8080)
             - flag: '-D'
               desc: Uruchom jako daemon w tle
-      - cmd: airflow db init
-        desc: Zainicjuj bazę metadanych Airflow
+      - cmd: airflow db migrate
+        desc: Utwórz/zaktualizuj schemat bazy metadanych Airflow
         detail:
-          what: Tworzy tabele w bazie (SQLite domyślnie). Wymagane przy pierwszym uruchomieniu.
+          what: Tworzy lub migruje tabele w bazie (SQLite domyślnie). Zastępuje deprecated 'airflow db init' od Airflow 2.7.
           tips:
-            - 'airflow db migrate — aktualizuj schemat po upgrade Airflow'
+            - 'airflow db init jest deprecated — używaj db migrate'
+            - 'airflow db reset — wyczyść całą bazę (UWAGA: kasuje historię)'
       - cmd: airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin
         desc: Utwórz użytkownika administratora
         detail:
@@ -119,6 +120,12 @@ groups:
         desc: Pobierz wartość zmiennej
         detail:
           what: Wypisuje wartość zmiennej na stdout.
+      - cmd: airflow pools set db_pool 5 "Limit polaczen do bazy"
+        desc: Utwórz pool ograniczający współbieżność tasków
+        detail:
+          what: Tworzy pulę 5 slotów. Taski z pool='db_pool' dzielą te sloty — max 5 naraz.
+          tips:
+            - 'airflow pools list — pokaż wszystkie pule i wolne sloty'
 
   - name: Docker i lokalne środowisko
     icon: "🐳"

@@ -35,11 +35,11 @@ items:
       print(result)
 
   - name: Streaming — dane większe niż RAM
-    desc: streaming=True w collect() przetwarza dane strumieniowo — nie ładuje wszystkich danych do pamięci. Dla plików GB+ które nie mieszczą się w RAM.
+    desc: 'engine="streaming" w collect() przetwarza dane strumieniowo — nie ładuje wszystkich danych do pamięci. Dla plików GB+ które nie mieszczą się w RAM. (W Polars 1.x stare collect(streaming=True) jest deprecated — używaj engine="streaming".)'
     code: |
       import polars as pl
 
-      # 100GB parquet — streaming przez collect(streaming=True)
+      # 100GB parquet — nowy silnik streaming (Polars 1.x)
       result = (
           pl.scan_parquet("data/huge_dataset.parquet")
           .filter(pl.col("country") == "PL")
@@ -47,7 +47,7 @@ items:
           .agg(pl.col("revenue").sum())
           .sort("revenue", descending=True)
           .limit(10)
-          .collect(streaming=True)  # Nie ładuj wszystkiego do RAM
+          .collect(engine="streaming")  # Nie ładuj wszystkiego do RAM
       )
       print(result)
 

@@ -4,37 +4,36 @@ items:
   - name: Tworzenie indeksu z mappingiem
     desc: Mapping definiuje typy pól. text dla FTS, keyword dla filtrów/sortowania, date, integer, float, boolean, geo_point. Definiuj przed indeksowaniem.
     code: |
+      # ES 8.x — settings i mappings jako osobne parametry (body= deprecated)
       es.indices.create(
           index="products",
-          body={
-              "settings": {
-                  "number_of_shards": 3,
-                  "number_of_replicas": 1,
-                  "analysis": {
-                      "analyzer": {
-                          "pl_analyzer": {
-                              "type": "custom",
-                              "tokenizer": "standard",
-                              "filter": ["lowercase", "stop"]
-                          }
+          settings={
+              "number_of_shards": 3,
+              "number_of_replicas": 1,
+              "analysis": {
+                  "analyzer": {
+                      "pl_analyzer": {
+                          "type": "custom",
+                          "tokenizer": "standard",
+                          "filter": ["lowercase", "stop"]
                       }
                   }
-              },
-              "mappings": {
-                  "properties": {
-                      "name": {"type": "text", "analyzer": "pl_analyzer",
-                               "fields": {"keyword": {"type": "keyword"}}},
-                      "description": {"type": "text"},
-                      "price":    {"type": "float"},
-                      "category": {"type": "keyword"},  # Dokładne dopasowanie
-                      "brand":    {"type": "keyword"},
-                      "tags":     {"type": "keyword"},
-                      "in_stock": {"type": "boolean"},
-                      "location": {"type": "geo_point"},
-                      "created_at": {"type": "date", "format": "yyyy-MM-dd"}
-                  }
               }
-          }
+          },
+          mappings={
+              "properties": {
+                  "name": {"type": "text", "analyzer": "pl_analyzer",
+                           "fields": {"keyword": {"type": "keyword"}}},
+                  "description": {"type": "text"},
+                  "price":    {"type": "float"},
+                  "category": {"type": "keyword"},  # Dokładne dopasowanie
+                  "brand":    {"type": "keyword"},
+                  "tags":     {"type": "keyword"},
+                  "in_stock": {"type": "boolean"},
+                  "location": {"type": "geo_point"},
+                  "created_at": {"type": "date", "format": "yyyy-MM-dd"}
+              }
+          },
       )
 
   - name: Bulk indexing
@@ -65,3 +64,29 @@ items:
           raise_on_error=False,
       )
       print(f"Zindeksowano: {success}, błędy: {len(errors)}")
+
+  - name: Aliasy i zero-downtime reindex
+    desc: Alias to wskaźnik na jeden lub wiele indeksów — aplikacja pyta alias, nie fizyczny indeks. Pozwala przebudować mapping bez przerwy (mapping primary shardów jest niezmienny — trzeba reindeksować do nowego indeksu i przełączyć alias atomowo).
+    code: |
+      # Aplikacja zawsze odpytuje alias "products", nie products_v1
+      es.indices.put_alias(index="products_v1", name="products")
+
+      # Trzeba zmienić mapping? Twórz products_v2 z nowym mappingiem,
+      # przepisz dane i przełącz alias — bez przerwy dla aplikacji.
+      es.reindex(
+          source={"index": "products_v1"},
+          dest={"index": "products_v2"},
+          wait_for_completion=False,  # długi reindex jako task w tle
+      )
+
+      # Atomowe przełączenie aliasu (stary off + nowy on w jednej operacji)
+      es.indices.update_aliases(actions=[
+          {"remove": {"index": "products_v1", "alias": "products"}},
+          {"add":    {"index": "products_v2", "alias": "products"}},
+      ])
+
+      # Write alias dla data streams / rollover (is_write_index)
+      es.indices.update_aliases(actions=[
+          {"add": {"index": "logs-000002", "alias": "logs",
+                   "is_write_index": True}},
+      ])

@@ -85,12 +85,18 @@ items:
         };
       }
 
-      // W serverze — nowy DataLoader per request
-      const server = new ApolloServer({
-        typeDefs, resolvers,
-        context: ({ req }) => ({
+      // Apollo Server 4 — context NIE jest w konstruktorze,
+      // tylko w startStandaloneServer / expressMiddleware.
+      import { startStandaloneServer } from '@apollo/server/standalone';
+
+      const server = new ApolloServer({ typeDefs, resolvers });
+
+      const { url } = await startStandaloneServer(server, {
+        // context wykonuje się dla KAŻDEGO requestu — świeże dataloadery
+        context: async ({ req }) => ({
           user: getUserFromToken(req.headers.authorization),
           db,
           dataloaders: createDataLoaders(db),  // per-request!
-        })
+        }),
+        listen: { port: 4000 },
       });

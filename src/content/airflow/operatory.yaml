@@ -1,11 +1,13 @@
 title: Operatory — gotowe bloki pipeline'u
 
 items:
-  - name: PostgresOperator i HttpOperator
-    desc: Gotowe operatory do SQL i HTTP bez pisania kodu Python. PostgresOperator wykonuje SQL query, SimpleHttpOperator robi HTTP request.
+  - name: SQLExecuteQueryOperator i HttpOperator
+    desc: Gotowe operatory do SQL i HTTP bez pisania kodu Python. SQLExecuteQueryOperator wykonuje SQL na dowolnej bazie (zastępuje deprecated PostgresOperator/MySqlOperator), HttpOperator robi HTTP request (dawniej SimpleHttpOperator).
     code: |
-      from airflow.providers.postgres.operators.postgres import PostgresOperator
-      from airflow.providers.http.operators.http import SimpleHttpOperator
+      # Uwaga: PostgresOperator i SimpleHttpOperator są deprecated (providers 5.x / 4.x).
+      # Nowy, zunifikowany standard poniżej:
+      from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+      from airflow.providers.http.operators.http import HttpOperator
       from airflow.decorators import dag, task
       from datetime import datetime
       import json
@@ -14,9 +16,9 @@ items:
       def db_pipeline():
 
           # SQL na bazie zdefiniowanej w Connections jako 'my_postgres'
-          create_table = PostgresOperator(
+          create_table = SQLExecuteQueryOperator(
               task_id='create_temp_table',
-              postgres_conn_id='my_postgres',
+              conn_id='my_postgres',          # zunifikowany param (był postgres_conn_id)
               sql='''
                   CREATE TABLE IF NOT EXISTS daily_stats AS
                   SELECT date, COUNT(*) as count
@@ -26,7 +28,7 @@ items:
           )
 
           # HTTP request do zewnętrznego API
-          fetch_rates = SimpleHttpOperator(
+          fetch_rates = HttpOperator(
               task_id='fetch_exchange_rates',
               http_conn_id='exchange_rate_api',
               endpoint='/api/latest',

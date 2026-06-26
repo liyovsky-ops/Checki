@@ -82,6 +82,30 @@ groups:
         desc: Utwórz template dla dynamicznie tworzonych indeksów
         detail:
           what: Template aplikowany automatycznie do nowych indeksów pasujących do wzorca.
+      - cmd: 'curl -X POST "localhost:9200/_aliases" -H "Content-Type:application/json" -d''{"actions":[{"remove":{"index":"products_v1","alias":"products"}},{"add":{"index":"products_v2","alias":"products"}}]}'''
+        desc: Przełącz alias atomowo (zero-downtime reindex)
+        detail:
+          what: Remove + add w jednej operacji — aplikacja odpytuje alias products i nigdy nie traci dostępu.
+          tips:
+            - 'Aplikacja zawsze pyta alias, nie fizyczny indeks — mapping zmieniasz przez reindex + swap.'
+
+  - name: ILM i data streams (time-series)
+    icon: "♻️"
+    commands:
+      - cmd: 'curl -X PUT "localhost:9200/_ilm/policy/logs-policy" -H "Content-Type:application/json" -d''{"policy":{"phases":{"hot":{"actions":{"rollover":{"max_size":"50gb","max_age":"7d"}}},"delete":{"min_age":"30d","actions":{"delete":{}}}}}}'''
+        desc: Utwórz politykę ILM — rollover w hot, usuwanie po 30 dniach
+        detail:
+          what: ILM automatyzuje cykl życia indeksów time-series — rollover po rozmiarze/wieku, przejścia hot→warm→cold→delete.
+          tips:
+            - 'Podłącz politykę przez index template (index.lifecycle.name) — nowe indeksy dziedziczą ją automatycznie.'
+      - cmd: curl -X GET "localhost:9200/logs-*/_ilm/explain?pretty"
+        desc: Sprawdź w jakiej fazie ILM jest każdy indeks
+        detail:
+          what: Pokazuje fazę (hot/warm/cold), krok akcji i błędy ILM — diagnostyka rollover/przejść.
+      - cmd: 'curl -X PUT "localhost:9200/_index_template/logs-ds" -H "Content-Type:application/json" -d''{"index_patterns":["logs-*"],"data_stream":{},"template":{"settings":{"index.lifecycle.name":"logs-policy"}}}'''
+        desc: Utwórz data stream z polityką ILM (standard ES 8.x dla logów)
+        detail:
+          what: data_stream + ILM zastępują ręczne indeksy z sufiksem daty — auto-rollover, append-only, backing indices ukryte za nazwą streamu.
 
   - name: Diagnostyka i monitorowanie
     icon: "📊"

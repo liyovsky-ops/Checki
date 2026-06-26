@@ -9,7 +9,7 @@ items:
       # Wczytaj CSV — pełna kontrola typów
       df = pl.read_csv(
           "data/sales.csv",
-          dtypes={
+          schema_overrides={          # w Polars <1.0 nazywało się dtypes=
               "id":       pl.Int64,
               "price":    pl.Float64,
               "date":     pl.Date,

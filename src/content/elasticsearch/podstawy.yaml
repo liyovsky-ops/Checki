@@ -53,6 +53,20 @@ concepts:
       master (zarządza klastrem), data (przechowuje dane), coordinating (routuje requesty).
       Shard allocation — ES automatycznie rozkłada shardy między nody.
     icon: "🕸️"
+  - title: Vector Search (kNN)
+    desc: >
+      ES 8.x natywnie wspiera wyszukiwanie wektorowe. Pole dense_vector przechowuje
+      embeddingi (np. z modeli ML/LLM), a zapytanie knn znajduje najbliższych sąsiadów
+      indeksem HNSW (similarity: cosine, dot_product, l2_norm). Połączenie knn + BM25
+      daje hybrid search z reciprocal rank fusion (RRF).
+    icon: "🧠"
+  - title: ILM i Data Streams
+    desc: >
+      Index Lifecycle Management automatyzuje cykl życia indeksów: hot → warm → cold →
+      frozen → delete, z rollover po przekroczeniu rozmiaru/wieku. Data streams + ILM to
+      standard ES 8.x dla danych time-series (logi, metryki) — zastępują ręczne
+      indeksy z sufiksem daty.
+    icon: "♻️"
 
 whenToUse:
   - Pełnotekstowe wyszukiwanie z relevance scoring i autocomplete
@@ -93,14 +107,13 @@ firstComponent: |
   es.indices.refresh(index="products")
 
   # Proste wyszukiwanie pełnotekstowe
+  # ES 8.x: parametry (query, aggs, size) przekazujesz wprost — body= jest deprecated
   result = es.search(
       index="products",
-      body={
-          "query": {
-              "multi_match": {
-                  "query": "laptop wydajny",
-                  "fields": ["name^2", "description"]  # name ważniejszy 2x
-              }
+      query={
+          "multi_match": {
+              "query": "laptop wydajny",
+              "fields": ["name^2", "description"]  # name ważniejszy 2x
           }
       }
   )

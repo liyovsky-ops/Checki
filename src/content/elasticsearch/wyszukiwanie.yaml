@@ -2,26 +2,24 @@ title: Wyszukiwanie i Query DSL
 
 items:
   - name: Podstawowe typy queries
-    desc: match dla FTS, term dla dokładnego dopasowania, range dla zakresów, bool do łączenia. Query DSL to język JSON zapytań Elasticsearch.
+    desc: match dla FTS, term dla dokładnego dopasowania, range dla zakresów, bool do łączenia. Query DSL to język JSON zapytań Elasticsearch. W kliencie 8.x parametry przekazujesz wprost (body= jest deprecated).
     code: |
-      # Full-text search
-      es.search(index="products", body={
-          "query": {"match": {"description": "szybki laptop do pracy"}}
-      })
+      # Full-text search (ES 8.x — query= zamiast body=)
+      es.search(index="products",
+          query={"match": {"description": "szybki laptop do pracy"}})
 
       # Dokładne dopasowanie (keyword field)
-      es.search(index="products", body={
-          "query": {"term": {"category": "laptopy"}}
-      })
+      es.search(index="products",
+          query={"term": {"category": "laptopy"}})
 
       # Zakres ceny
-      es.search(index="products", body={
-          "query": {"range": {"price": {"gte": 1000, "lte": 5000}}}
-      })
+      es.search(index="products",
+          query={"range": {"price": {"gte": 1000, "lte": 5000}}})
 
-      # Bool query — łączenie warunków
-      es.search(index="products", body={
-          "query": {
+      # Bool query — must (scoring) + filter (cache, bez scoringu)
+      es.search(
+          index="products",
+          query={
               "bool": {
                   "must": [{"match": {"description": "laptop"}}],
                   "filter": [
@@ -33,9 +31,9 @@ items:
                   "should": [{"term": {"brand": "Dell"}}]
               }
           },
-          "sort": [{"price": "asc"}, "_score"],
-          "from": 0, "size": 20
-      })
+          sort=[{"price": "asc"}, "_score"],
+          from_=0, size=20,
+      )
 
   - name: Autocomplete i sugestie
     desc: completion suggester dla szybkiego autocomplete. search_as_you_type typ pola dla prefix matching. Edge n-grams dla dokładnej kontroli.
@@ -55,12 +53,49 @@ items:
       })
 
       # Autocomplete query (search_as_you_type)
-      es.search(index="products", body={
-          "query": {
+      es.search(index="products",
+          query={
               "multi_match": {
                   "query": "lapt",
                   "type": "bool_prefix",
                   "fields": ["name", "name._2gram", "name._3gram"]
               }
+          })
+
+  - name: Wyszukiwanie wektorowe (kNN) i hybrid search
+    desc: ES 8.x natywnie wspiera kNN na polu dense_vector (indeks HNSW). knn znajduje najbliższych sąsiadów po embeddingu, a retriever rrf łączy wyniki kNN z BM25 w hybrid search (reciprocal rank fusion).
+    code: |
+      # Mapping z polem wektorowym (np. embedding z modelu 384-wym.)
+      es.indices.create(index="docs", mappings={
+          "properties": {
+              "title": {"type": "text"},
+              "embedding": {
+                  "type": "dense_vector",
+                  "dims": 384,
+                  "index": True,
+                  "similarity": "cosine"  # lub dot_product / l2_norm
+              }
+          }
+      })
+
+      # Czyste wyszukiwanie kNN (k najbliższych sąsiadów)
+      es.search(index="docs", knn={
+          "field": "embedding",
+          "query_vector": query_embedding,  # lista 384 floatów
+          "k": 10,
+          "num_candidates": 100
+      })
+
+      # Hybrid search — RRF łączy semantykę (kNN) z BM25 (ES 8.14+)
+      es.search(index="docs", retriever={
+          "rrf": {
+              "retrievers": [
+                  {"standard": {"query": {"match": {"title": "laptop do pracy"}}}},
+                  {"knn": {"field": "embedding",
+                           "query_vector": query_embedding,
+                           "k": 10, "num_candidates": 100}}
+              ],
+              "rank_window_size": 50,
+              "rank_constant": 20
           }
       })

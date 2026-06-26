@@ -33,15 +33,18 @@ items:
     desc: Ręczna konfiguracja SSL z własnym certyfikatem lub certyfikatem CA. Nowoczesne ustawienia szyfrów — TLS 1.2/1.3, HSTS, OCSP Stapling.
     code: |
       server {
-          listen 443 ssl http2;
+          listen 443 ssl;
+          http2 on;   # nginx 1.25.1+ — zastępuje przestarzałe "listen 443 ssl http2"
+
           server_name example.com;
 
           ssl_certificate     /etc/ssl/certs/example.com.pem;
           ssl_certificate_key /etc/ssl/private/example.com.key;
 
-          # Nowoczesne protokoły
+          # Nowoczesne protokoły — TLS 1.0/1.1 są wycofane (RFC 8996)
           ssl_protocols TLSv1.2 TLSv1.3;
-          ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+          # Ciphery dotyczą tylko TLS 1.2 — w TLS 1.3 zestaw jest stały i bezpieczny
+          ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
           ssl_prefer_server_ciphers off;  # TLS 1.3 sam wybiera
 
           # Session cache — przyspiesza reconnects
@@ -49,11 +52,35 @@ items:
           ssl_session_timeout 1d;
           ssl_session_tickets off;
 
-          # OCSP Stapling — szybsza weryfikacja certyfikatu
+          # OCSP Stapling — serwer dołącza odpowiedź OCSP, klient nie pyta CA
+          # Uwaga: Let's Encrypt wygasza OCSP (2025) na rzecz CRL — dla ich certów stapling traci znaczenie
           ssl_stapling on;
           ssl_stapling_verify on;
-          resolver 8.8.8.8 8.8.4.4 valid=300s;
+          resolver 1.1.1.1 8.8.8.8 valid=300s;
 
           # HSTS — przeglądarka zawsze używa HTTPS przez rok
+          # Dodaj "; preload" dopiero po zgłoszeniu domeny na hstspreload.org
           add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
       }
+
+  - name: HTTP/3 (QUIC) — opcjonalnie
+    desc: HTTP/3 działa po UDP (QUIC) — szybszy handshake i brak head-of-line blocking. Wymaga nginx 1.25+ skompilowanego z modułem QUIC. Reklamuj HTTP/3 nagłówkiem Alt-Svc.
+    code: |
+      server {
+          # TCP — HTTP/1.1 i HTTP/2
+          listen 443 ssl;
+          http2 on;
+
+          # UDP — HTTP/3 (QUIC). reuseport tylko w JEDNYM bloku server
+          listen 443 quic reuseport;
+
+          server_name example.com;
+
+          ssl_certificate     /etc/ssl/certs/example.com.pem;
+          ssl_certificate_key /etc/ssl/private/example.com.key;
+          ssl_protocols TLSv1.2 TLSv1.3;   # HTTP/3 wymaga TLS 1.3
+
+          # Poinformuj przeglądarkę, że dostępne jest HTTP/3
+          add_header Alt-Svc 'h3=":443"; ma=86400' always;
+      }
+      # Pamiętaj otworzyć UDP/443 na firewallu: ufw allow 443/udp

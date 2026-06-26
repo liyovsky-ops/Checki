@@ -2,7 +2,7 @@ title: Integracja z Next.js App Router
 
 items:
   - name: Setup w Next.js App Router
-    desc: tRPC w Next.js App Router — handler API, TRPCProvider wrapper, Server Components z bezpośrednim wywołaniem. Bez HTTP round-trip w RSC.
+    desc: tRPC w Next.js App Router — fetch handler z onError, TRPCProvider z links (loggerLink + httpBatchLink). W tRPC v11 transformer ustawiasz NA LINKU, nie na kliencie.
     code: |
       // app/api/trpc/[trpc]/route.ts
       import { fetchRequestHandler } from '@trpc/server/adapters/fetch'
@@ -14,7 +14,13 @@ items:
           endpoint: '/api/trpc',
           req,
           router: appRouter,
-          createContext: () => createContext({ req }),
+          // fetchRequestHandler przekazuje { req, resHeaders, info }
+          createContext: (opts) => createContext(opts),
+          onError({ error, path }) {
+            if (error.code === 'INTERNAL_SERVER_ERROR') {
+              console.error(`tRPC failed on ${path}:`, error)
+            }
+          },
         })
 
       export { handler as GET, handler as POST }
@@ -23,7 +29,8 @@ items:
       'use client'
       import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
       import { trpc } from '@/utils/trpc'
-      import { httpBatchLink } from '@trpc/client'
+      import { httpBatchLink, loggerLink } from '@trpc/client'
+      import superjson from 'superjson'
       import { useState } from 'react'
 
       export function TRPCProvider({ children }: { children: React.ReactNode }) {
@@ -31,7 +38,14 @@ items:
         const [trpcClient] = useState(() =>
           trpc.createClient({
             links: [
-              httpBatchLink({ url: '/api/trpc' }),
+              // loggerLink — log requestów w dev
+              loggerLink({
+                enabled: (op) => process.env.NODE_ENV === 'development',
+              }),
+              httpBatchLink({
+                url: '/api/trpc',
+                transformer: superjson,  // v11: transformer NA LINKU
+              }),
             ],
           })
         )
@@ -45,7 +59,7 @@ items:
       }
 
   - name: Server Components — wywołanie bez HTTP
-    desc: W React Server Components możesz wywołać procedury tRPC bezpośrednio — bez HTTP. Szybszy SSR, bez waterfall. Użyj createCaller() lub createServerSideHelpers().
+    desc: W React Server Components wywołujesz procedury tRPC bezpośrednio — bez HTTP. UWAGA Next.js 15 — headers()/cookies() są ASYNC, trzeba await. createCaller() dla RSC, createServerSideHelpers() + HydrationBoundary do prefetchu Client Components.
     code: |
       // app/posts/page.tsx — Server Component
       import { appRouter } from '@/server/router'
@@ -53,10 +67,11 @@ items:
       import { headers } from 'next/headers'
 
       export default async function PostsPage() {
-        // Wywołanie bezpośrednie — bez HTTP!
-        const ctx = await createContext({ headers: headers() })
+        // Next.js 15: headers() zwraca Promise — await!
+        const ctx = await createContext({ headers: await headers() })
         const caller = appRouter.createCaller(ctx)
 
+        // Wywołanie bezpośrednie — bez round-trip HTTP
         const posts = await caller.posts.list({ limit: 10 })
 
         return (
@@ -68,17 +83,24 @@ items:
         )
       }
 
-      // Prefetch dla Client Components (hydration)
+      // === app/feed/page.tsx — Prefetch + hydration dla Client Components ===
+      // Prefetch w RSC, potem <HydrationBoundary> przekazuje cache do klienta
       import { createServerSideHelpers } from '@trpc/react-query/server'
+      import { HydrationBoundary } from '@tanstack/react-query'
       import superjson from 'superjson'
 
-      export async function generateStaticParams() {
+      export default async function FeedPage() {
         const helpers = createServerSideHelpers({
           router: appRouter,
-          ctx: await createContext({}),
+          ctx: await createContext({ headers: await headers() }),
           transformer: superjson,
         })
 
         await helpers.posts.list.prefetch({ limit: 10 })
-        return { trpcState: helpers.dehydrate() }
+
+        return (
+          <HydrationBoundary state={helpers.dehydrate()}>
+            <ClientFeed />   {/* useQuery wystartuje już z danymi */}
+          </HydrationBoundary>
+        )
       }

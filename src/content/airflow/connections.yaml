@@ -44,3 +44,26 @@ items:
 
       # Przez env (nie wymaga DB)
       # AIRFLOW_VAR_DATA_API_URL=http://api.example.com
+
+  - name: Pools i SLA — kontrola zasobów
+    desc: Pool ogranicza ile tasków biegnie równolegle (np. limit połączeń do bazy). SLA wysyła alert gdy task przekroczy zadany czas. Oba przypisuje się przez argumenty operatora/zadania.
+    code: |
+      from airflow.decorators import dag, task
+      from datetime import datetime, timedelta
+
+      # Najpierw utwórz pool w CLI lub UI:
+      #   airflow pools set db_pool 5 "Limit 5 polaczen do bazy"
+
+      @dag(start_date=datetime(2024, 1, 1), schedule='@hourly', catchup=False)
+      def resource_pipeline():
+
+          # pool — max 5 instancji tego tasku naraz w całym Airflow
+          # pool_slots — ile slotów zajmuje jedna instancja (domyślnie 1)
+          # sla — alert jeśli task nie skończy w 30 min
+          @task(pool='db_pool', sla=timedelta(minutes=30))
+          def heavy_query():
+              print("Ciężkie zapytanie ograniczone poolem db_pool")
+
+          heavy_query()
+
+      dag_instance = resource_pipeline()

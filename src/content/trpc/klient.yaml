@@ -7,6 +7,9 @@ items:
       import { trpc } from '@/utils/trpc'
 
       function PostsPage() {
+        // useUtils() to HOOK — wywołaj na górze komponentu, NIE w callbacku
+        const utils = trpc.useUtils()
+
         // Query — GET
         const { data, isLoading, error, refetch } = trpc.posts.list.useQuery(
           { limit: 10 },           // Input — typowany!
@@ -21,8 +24,8 @@ items:
         const createPost = trpc.posts.create.useMutation({
           onSuccess: (data) => {
             console.log('Utworzono post:', data)
-            // Invalidate cache list
-            trpc.useUtils().posts.list.invalidate()
+            // Invalidate cache list — użyj utils z góry komponentu
+            utils.posts.list.invalidate()
           },
           onError: (error) => {
             console.error('Błąd:', error.message)
@@ -88,4 +91,54 @@ items:
             ❤️ Like
           </button>
         )
+      }
+
+  - name: Subscriptions — real-time (SSE / WebSockets)
+    desc: tRPC v11 ma natywne subscriptions. Server zwraca async generator (yield), klient używa useSubscription. httpSubscriptionLink = transport przez SSE (działa na serverless), wsLink = WebSockets. splitLink kieruje subskrypcje na inny transport niż query/mutation.
+    code: |
+      // === SERVER: procedura subscription (async generator, v11) ===
+      import { initTRPC } from '@trpc/server'
+      import { z } from 'zod'
+      import { on } from 'node:events'
+
+      const t = initTRPC.create()
+
+      export const chatRouter = t.router({
+        onMessage: t.procedure
+          .input(z.object({ roomId: z.string() }))
+          .subscription(async function* ({ input, ctx, signal }) {
+            // Iteruj po zdarzeniach z EventEmittera aż klient się rozłączy
+            for await (const [msg] of on(ee, `room:${input.roomId}`, { signal })) {
+              yield msg as { id: string; text: string }
+            }
+          }),
+      })
+
+      // === CLIENT: konfiguracja linku (SSE) ===
+      import { createTRPCReact } from '@trpc/react-query'
+      import { httpSubscriptionLink, httpBatchLink, splitLink } from '@trpc/client'
+
+      const trpcClient = trpc.createClient({
+        links: [
+          splitLink({
+            condition: (op) => op.type === 'subscription',
+            true:  httpSubscriptionLink({ url: '/api/trpc' }), // SSE — serverless OK
+            false: httpBatchLink({ url: '/api/trpc' }),
+          }),
+        ],
+      })
+
+      // === CLIENT: hook useSubscription ===
+      function ChatRoom({ roomId }: { roomId: string }) {
+        const [messages, setMessages] = useState<Msg[]>([])
+
+        trpc.chat.onMessage.useSubscription(
+          { roomId },
+          {
+            onData: (msg) => setMessages((prev) => [...prev, msg]),
+            onError: (err) => console.error(err),
+          }
+        )
+
+        return <ul>{messages.map(m => <li key={m.id}>{m.text}</li>)}</ul>
       }

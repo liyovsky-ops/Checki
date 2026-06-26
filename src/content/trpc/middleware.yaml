@@ -86,3 +86,43 @@ items:
             })
           }),
       })
+
+  - name: errorFormatter — kształt błędów na kliencie
+    desc: errorFormatter w initTRPC.create() wzbogaca obiekt błędu o własne pola. Standardowy wzorzec — dołącz flatten() błędów Zod, żeby frontend dostał szczegóły walidacji per pole w error.data.zodError. tRPCError.cause zawiera oryginalny błąd Zod.
+    code: |
+      import { initTRPC } from '@trpc/server'
+      import { ZodError } from 'zod'
+      import superjson from 'superjson'
+
+      const t = initTRPC.context<Context>().create({
+        transformer: superjson,
+        errorFormatter({ shape, error }) {
+          return {
+            ...shape,
+            data: {
+              ...shape.data,
+              // Dołącz błędy Zod jako zodError (flatten — per pole)
+              zodError:
+                error.code === 'BAD_REQUEST' &&
+                error.cause instanceof ZodError
+                  ? error.cause.flatten()
+                  : null,
+            },
+          }
+        },
+      })
+
+      // === CLIENT: odczyt błędów walidacji per pole ===
+      function CreatePostForm() {
+        const mutation = trpc.posts.create.useMutation()
+
+        // error.data jest typowane na podstawie errorFormatter!
+        const fieldErrors = mutation.error?.data?.zodError?.fieldErrors
+
+        return (
+          <form>
+            <input name="title" />
+            {fieldErrors?.title && <span>{fieldErrors.title[0]}</span>}
+          </form>
+        )
+      }

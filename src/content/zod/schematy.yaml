@@ -22,7 +22,7 @@ items:
         .email()
         .min(5)
         .max(255)
-        .toLowerCase()     // transform przed walidacją
+        .toLowerCase()     // transform (kolejność w łańcuchu)
         .trim()
 
       // Number modyfikatory
@@ -77,3 +77,56 @@ items:
       // Dodatkowe klucze
       const StrictUser = UserSchema.strict()      // Błąd gdy nieznane klucze
       const PassUser   = UserSchema.passthrough() // Przepuść nieznane klucze
+
+  - name: Discriminated unions
+    desc: z.discriminatedUnion() dla unii obiektów rozróżnianych po jednym polu (np. type/status). Szybsze i z lepszymi błędami niż z.union — Zod od razu wie którą gałąź sprawdzić zamiast próbować wszystkich.
+    code: |
+      import { z } from 'zod'
+
+      // Unia rozróżniana po polu "status"
+      const ResponseSchema = z.discriminatedUnion("status", [
+        z.object({
+          status: z.literal("success"),
+          data:   z.object({ id: z.number(), name: z.string() }),
+        }),
+        z.object({
+          status: z.literal("error"),
+          code:   z.number(),
+          message: z.string(),
+        }),
+      ])
+
+      type ApiResponse = z.infer<typeof ResponseSchema>
+      // { status: "success"; data: {...} } | { status: "error"; code: number; message: string }
+
+      const res = ResponseSchema.parse({ status: "error", code: 404, message: "Not found" })
+      if (res.status === "error") {
+        console.log(res.code)   // TypeScript zawęża typ — res.code dostępne
+      }
+
+      // z.union próbuje WSZYSTKICH gałęzi i zwraca mylące błędy.
+      // discriminatedUnion czyta pole "status" i sprawdza tylko właściwą gałąź.
+
+  - name: z.coerce — automatyczna konwersja typów
+    desc: z.coerce.* konwertuje wejście na docelowy typ przed walidacją (przez String(), Number(), Boolean(), new Date()). Idealne dla danych z formularzy, query params i process.env, gdzie wszystko jest stringiem.
+    code: |
+      import { z } from 'zod'
+
+      // Coerce: cokolwiek → number (przez Number(input))
+      const ageSchema = z.coerce.number().int().min(0)
+      ageSchema.parse("42")     // 42 (number, nie string)
+      ageSchema.parse("3.5")    // ZodError — nie int
+
+      // Coerce dla query params / FormData (zawsze stringi)
+      const QuerySchema = z.object({
+        page:    z.coerce.number().default(1),
+        limit:   z.coerce.number().max(100).default(20),
+        active:  z.coerce.boolean(),        // "true" string → uwaga: Boolean("false") === true!
+        from:    z.coerce.date(),           // "2024-01-15" → Date
+      })
+
+      QuerySchema.parse({ page: "2", limit: "50", active: "1", from: "2024-01-15" })
+      // { page: 2, limit: 50, active: true, from: Date(...) }
+
+      // UWAGA: z.coerce.boolean() używa Boolean() — każdy niepusty string to true.
+      // Dla "true"/"false" użyj: z.enum(["true","false"]).transform(v => v === "true")

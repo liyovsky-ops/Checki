@@ -77,3 +77,64 @@ items:
       // ✓ Passes (reguły spełnione)
       // ✗ Violations (naruszenia WCAG)
       // ! Incomplete (wymaga manualnej weryfikacji)
+
+  - name: MSW — mockowanie API w Stories
+    desc: "msw-storybook-addon przechwytuje fetch/XHR przez Service Worker. Każda story dostaje własne handlery — testuj stany loading, success, error i empty bez backendu."
+    code: |
+      // npm install msw msw-storybook-addon
+      // npx msw init public/ --save   (generuje mockServiceWorker.js)
+
+      // .storybook/preview.ts — rejestracja loadera globalnie
+      import type { Preview } from '@storybook/react'
+      import { initialize, mswLoader } from 'msw-storybook-addon'
+
+      initialize()  // Start Service Worker
+
+      const preview: Preview = {
+        loaders: [mswLoader],
+      }
+      export default preview
+
+      // UserProfile.stories.tsx — handlery per story (MSW 2.x API)
+      import type { Meta, StoryObj } from '@storybook/react'
+      import { http, HttpResponse, delay } from 'msw'
+      import { UserProfile } from './UserProfile'
+
+      const meta: Meta<typeof UserProfile> = { component: UserProfile }
+      export default meta
+      type Story = StoryObj<typeof meta>
+
+      export const Success: Story = {
+        parameters: {
+          msw: {
+            handlers: [
+              http.get('/api/user', () =>
+                HttpResponse.json({ name: 'Anna', role: 'admin' })),
+            ],
+          },
+        },
+      }
+
+      export const Loading: Story = {
+        parameters: {
+          msw: {
+            handlers: [
+              http.get('/api/user', async () => {
+                await delay('infinite')  // Nigdy nie odpowiada — spinner
+                return HttpResponse.json({})
+              }),
+            ],
+          },
+        },
+      }
+
+      export const ServerError: Story = {
+        parameters: {
+          msw: {
+            handlers: [
+              http.get('/api/user', () =>
+                new HttpResponse(null, { status: 500 })),
+            ],
+          },
+        },
+      }

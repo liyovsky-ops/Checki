@@ -14,12 +14,12 @@ items:
           'batch.size': 16384,       # Batch eventy (bytes)
           'linger.ms': 5,            # Poczekaj 5ms na więcej eventów do batcha
           'compression.type': 'snappy',  # Kompresja batchy
-          'max.in.flight.requests.per.connection': 5,
-          'enable.idempotence': True,    # Exactly-once delivery
+          'max.in.flight.requests.per.connection': 5,  # <=5 wymagane przy idempotence
+          'enable.idempotence': True,    # Brak duplikatów przy retry (wymusza acks=all)
       })
 
   - name: Serializacja z Avro i Schema Registry
-    desc: Schema Registry przechowuje schematy Avro — ewolucja schema bez breaking changes. Producent serializuje eventy przez Avro.
+    desc: Schema Registry przechowuje schematy Avro — ewolucja schema bez breaking changes. Poniżej starsze API AvroProducer (confluent-kafka[avro]); nowsze wersje używają AvroSerializer + SerializingProducer.
     code: |
       from confluent_kafka.avro import AvroProducer
       from confluent_kafka import avro

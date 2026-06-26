@@ -19,7 +19,7 @@ concepts:
     desc: >
       DataFrame to tabela 2D — kolumny z nazwami i typami. Series to jedna kolumna.
       W odróżnieniu od Pandas — brak indeksu! Wiersze numerowane od 0, ale index
-      nie ma znaczenia semantycznego. Kolumny mają typy: Int64, Float64, Utf8, Date, List.
+      nie ma znaczenia semantycznego. Kolumny mają typy: Int64, Float64, String (dawniej Utf8), Date, List.
     icon: "📊"
   - title: Wyrażenia (Expressions)
     desc: >
@@ -45,7 +45,7 @@ concepts:
     desc: >
       Kluczowa różnica od Pandas — Polars nie ma named index.
       Brak df.loc[], brak df.iloc[] przez label. Zamiast tego: filter(), gather(),
-      row_index() dla numeracji. To upraszcza API i eliminuje typowe błędy Pandas.
+      with_row_index() dla numeracji. To upraszcza API i eliminuje typowe błędy Pandas.
     icon: "🚫"
   - title: Apache Arrow
     desc: >

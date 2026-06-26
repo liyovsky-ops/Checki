@@ -51,7 +51,7 @@ items:
           .agg([
               pl.col("salary").mean().alias("avg_salary"),
               pl.col("salary").max().alias("max_salary"),
-              pl.col("salary").count().alias("headcount"),
+              pl.len().alias("headcount"),   # pl.len() = liczba wierszy; .count() liczy tylko non-null
               pl.col("years").sum().alias("total_years"),
               pl.col("active").sum().alias("active_count"),
           ])

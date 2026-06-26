@@ -16,9 +16,13 @@ items:
           "outDir": "./dist",          // Gdzie trafią pliki JS
           "rootDir": "./src",          // Gdzie są pliki TS
           "strict": true,              // Wszystkie strict checks
+          "noUncheckedIndexedAccess": true, // arr[i] / obj[k] = T | undefined
+          "verbatimModuleSyntax": true,     // TS 5.0 — jasny podział import/import type
+          "isolatedModules": true,     // wymagane przez esbuild/swc/Babel
           "esModuleInterop": true,     // default imports z CommonJS
           "skipLibCheck": true,        // Pomij sprawdzanie .d.ts bibliotek
           "declaration": true,         // Generuj .d.ts pliki
+          "declarationMap": true,      // Source maps dla .d.ts (go-to-def w monorepo)
           "sourceMap": true,           // Source maps dla debugowania
           "paths": {
             "@/*": ["./src/*"]         // Path aliasy
@@ -27,6 +31,9 @@ items:
         "include": ["src/**/*.ts"],
         "exclude": ["node_modules", "dist"]
       }
+
+      // Wskazówka: zamiast pisać konfigurację od zera, dziedzicz z gotowej bazy
+      // npm i -D @tsconfig/node22  →  "extends": "@tsconfig/node22/tsconfig.json"
 
   - name: Konfiguracja dla przeglądarki (Vite/Webpack)
     desc: >

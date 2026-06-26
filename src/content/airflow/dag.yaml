@@ -40,28 +40,23 @@ items:
           # Zależności: extract → process → notify
           task_extract >> task_process >> task_notify
 
-  - name: Dynamiczne tasiki i BranchOperator
-    desc: Generowanie tasków w pętli i warunkowe rozgałęzienie pipeline'u przez BranchPythonOperator.
+  - name: Branching — @task.branch
+    desc: Warunkowe rozgałęzienie pipeline'u. Nowoczesny styl używa dekoratora @task.branch (zastępuje BranchPythonOperator) — funkcja zwraca task_id gałęzi do wykonania, reszta jest skipowana.
     code: |
       from airflow.decorators import dag, task
-      from airflow.operators.python import BranchPythonOperator
       from datetime import datetime
 
       @dag(start_date=datetime(2024, 1, 1), schedule='@weekly', catchup=False)
-      def dynamic_pipeline():
+      def branch_pipeline():
 
           @task()
           def check_data_size() -> int:
               return 1500  # Liczba rekordów
 
-          def choose_branch(ti):
-              size = ti.xcom_pull(task_ids='check_data_size')
+          # @task.branch zwraca task_id gałęzi do uruchomienia
+          @task.branch()
+          def choose_branch(size: int) -> str:
               return 'big_batch' if size > 1000 else 'small_batch'
-
-          branch = BranchPythonOperator(
-              task_id='branch_decision',
-              python_callable=choose_branch,
-          )
 
           @task()
           def big_batch():
@@ -71,7 +66,41 @@ items:
           def small_batch():
               print("Mały batch — sekwencyjnie")
 
-          size_result = check_data_size()
-          size_result >> branch >> [big_batch(), small_batch()]
+          size = check_data_size()
+          decision = choose_branch(size)
+          decision >> [big_batch(), small_batch()]
 
-      dag_instance = dynamic_pipeline()
+      dag_instance = branch_pipeline()
+
+  - name: Dynamic Task Mapping (.expand)
+    desc: Airflow 2.3+ generuje taski dynamicznie w runtime z listy/słownika przez .expand() — odpowiednik map(). Liczba instancji zależy od danych zwróconych przez upstream task (nie jest znana przy parsowaniu DAGa).
+    code: |
+      from airflow.decorators import dag, task
+      from datetime import datetime
+
+      @dag(start_date=datetime(2024, 1, 1), schedule='@daily', catchup=False)
+      def mapping_pipeline():
+
+          @task()
+          def get_files() -> list[str]:
+              # Lista znana dopiero w runtime
+              return ['a.csv', 'b.csv', 'c.csv']
+
+          @task()
+          def process_file(filename: str) -> int:
+              print(f"Przetwarzam {filename}")
+              return len(filename)
+
+          @task()
+          def summarize(counts: list[int]) -> None:
+              print(f"Łącznie {sum(counts)} z {len(counts)} plików")
+
+          # .expand() tworzy osobną instancję process_file na każdy element
+          counts = process_file.expand(filename=get_files())
+          # reduce — zebranie wszystkich wyników mapowania
+          summarize(counts)
+
+          # .partial() ustala stałe argumenty, .expand() mapowane:
+          # process_file.partial(retries=3).expand(filename=get_files())
+
+      dag_instance = mapping_pipeline()

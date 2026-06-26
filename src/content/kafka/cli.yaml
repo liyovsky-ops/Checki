@@ -166,7 +166,7 @@ groups:
         detail:
           what: Kafka 3.x używa KRaft (własny Raft) zamiast Zookeeper do metadata.
           tips:
-            - 'kafka-metadata-quorum.sh --describe --replication — repliki quorum'
+            - 'kafka-metadata-quorum.sh ... describe --replication — repliki quorum'
       - cmd: kafka-reassign-partitions.sh --bootstrap-server localhost:9092 --reassignment-json-file reassign.json --execute
         desc: Przenieś partycje między brokerami (rebalancing)
         detail:

@@ -63,4 +63,4 @@ items:
       - Drogi w chmurze (GPU instances)
       - Nie wszystkie operacje obsługiwane
       - Nie działa bez GPU
-    vs: cuDF gdy masz GPU i przetwarzasz dane dla ML. Polars gdy chcesz szybkiego CPU DataFrame bez GPU dependency.
+    vs: 'cuDF gdy masz GPU i przetwarzasz dane dla ML. Polars gdy chcesz szybkiego CPU DataFrame bez GPU dependency. Uwaga — Polars 1.x ma własny silnik GPU (collect(engine="gpu")) oparty o cuDF/RAPIDS — pisz zwykły kod Polars, a wykonanie idzie na GPU.'
