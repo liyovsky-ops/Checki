@@ -1,0 +1,156 @@
+title: Komendy Drizzle
+
+groups:
+  - name: Instalacja i setup
+    icon: "📦"
+    commands:
+      - cmd: npm install drizzle-orm postgres
+        desc: Zainstaluj Drizzle ORM i adapter PostgreSQL
+        detail:
+          what: drizzle-orm to runtime library. postgres to driver bazy. Wybierz adapter dla swojej bazy.
+          how: Zamień 'postgres' na mysql2, better-sqlite3, @libsql/client itp. według bazy.
+          tips:
+            - 'PostgreSQL: npm install drizzle-orm postgres'
+            - 'MySQL: npm install drizzle-orm mysql2'
+            - 'SQLite: npm install drizzle-orm better-sqlite3'
+            - 'Neon (serverless): npm install drizzle-orm @neondatabase/serverless'
+            - 'Turso: npm install drizzle-orm @libsql/client'
+      - cmd: npm install -D drizzle-kit
+        desc: Zainstaluj Drizzle Kit (CLI do migracji)
+        detail:
+          what: drizzle-kit to devDependency — CLI do generate/migrate/push/studio. Nie jest potrzebny w runtime.
+          how: Zawsze instaluj jako devDependency (-D).
+          tips:
+            - 'drizzle-kit jest osobnym pakietem od drizzle-orm — zainstaluj oba'
+            - 'npx drizzle-kit — uruchom bez globalnej instalacji'
+      - cmd: npx drizzle-kit generate
+        desc: Wygeneruj plik SQL migracji ze zmiany schema
+        detail:
+          what: Porównuje aktualną schema TypeScript z poprzednimi migracjami i generuje plik SQL z różnicą.
+          how: Wymaga drizzle.config.ts. Tworzy plik w folderze 'out' (np. drizzle/0001_add_column.sql).
+          flags:
+            - flag: '--config drizzle.config.ts'
+              desc: Wskaż plik konfiguracyjny (domyślnie szuka drizzle.config.ts)
+          tips:
+            - 'Commituj pliki migracji do gita — to historia zmian schema'
+            - 'Możesz edytować wygenerowany SQL przed migrate (np. dodać data backfill)'
+      - cmd: npx drizzle-kit migrate
+        desc: Zastosuj pending migracje na bazę
+        detail:
+          what: Wykonuje wszystkie pliki SQL z folderu migracji które nie zostały jeszcze zastosowane.
+          how: Śledzi historię w tabeli __drizzle_migrations. Bezpieczne do uruchomienia wielokrotnie (idempotent).
+          tips:
+            - 'Używaj w CI/CD przed startem aplikacji'
+            - 'Można też uruchomić programowo (migrate() z drizzle-orm/migrator)'
+      - cmd: npx drizzle-kit push
+        desc: Pushuj schema bezpośrednio do bazy (bez pliku migracji)
+        detail:
+          what: Aplikuje schema TypeScript na bazę danych bezpośrednio. Brak historii migracji.
+          how: TYLKO development/prototypy. Może niszczyć dane przy destructive operations.
+          flags:
+            - flag: '--force'
+              desc: Nie pytaj o destructive operations
+          tips:
+            - 'Szybkie prototypowanie — zmieniasz schema.ts, push, gotowe'
+            - 'NIGDY na produkcji — używaj generate + migrate'
+      - cmd: npx drizzle-kit pull
+        desc: Generuj schema TypeScript z istniejącej bazy (introspection)
+        detail:
+          what: Czyta strukturę bazy danych i generuje schema.ts z niej. Reverse engineering dla istniejących baz.
+          how: Wyniki zapisuje do folderu schema (konfigurowalne). Przeglądaj i dostosuj ręcznie.
+          tips:
+            - 'Dobry start dla istniejących projektów migrujących na Drizzle'
+            - 'Relations() musisz dodać ręcznie — pull ich nie generuje'
+      - cmd: npx drizzle-kit studio
+        desc: Uruchom GUI webowe do bazy danych
+        detail:
+          what: Webowy interfejs do przeglądania tabel, filtrowania i edytowania danych. Localhost na porcie 4983.
+          how: Konfiguracja z drizzle.config.ts. Otwiera https://local.drizzle.studio automatycznie.
+          flags:
+            - flag: '--port 8080'
+              desc: Zmień port (domyślnie 4983)
+          tips:
+            - 'Alternatywa dla Prisma Studio'
+            - 'Przydatne do seed data i debugowania relacji'
+
+  - name: Połączenie z bazą
+    icon: "🔌"
+    commands:
+      - cmd: drizzle(client, { schema })
+        desc: Utwórz instancję Drizzle z klientem i schema
+        detail:
+          what: Główna funkcja Drizzle — łączy driver bazy z schema TypeScript. Zwraca obiekt db do queries.
+          how: client to instancja drivera (postgres(), mysql(), itp.). schema = import * as schema.
+          tips:
+            - 'Bez { schema } db.query API nie działa (relational queries)'
+            - 'Jeden db per aplikacja — nie twórz nowego na każdy request'
+      - cmd: 'const client = postgres(process.env.DATABASE_URL!)'
+        desc: Utwórz klienta PostgreSQL (postgres.js)
+        detail:
+          what: Tworzy connection pool do PostgreSQL. DATABASE_URL to connection string.
+          how: 'Format: postgresql://user:pass@host:5432/dbname'
+          tips:
+            - '{ max: 1 } dla migracji — jeden connection na migrate script'
+            - 'Nie zamykaj klienta między requestami w long-running serverze'
+      - cmd: 'DATABASE_URL=postgresql://user:pass@host:5432/db'
+        desc: Connection string PostgreSQL w .env
+        detail:
+          what: Drizzle odczytuje DATABASE_URL z .env (przez dotenv lub natywne env).
+          how: Każda baza ma swój format connection string.
+          tips:
+            - 'SQLite: file:./local.db'
+            - 'MySQL: mysql://user:pass@host:3306/dbname'
+            - 'Neon: postgresql://user:pass@ep-xxx.neon.tech/dbname?sslmode=require'
+            - 'Turso: libsql://xxx.turso.io?authToken=TOKEN'
+
+  - name: Queries
+    icon: "🔍"
+    commands:
+      - cmd: db.select().from(table).where(condition)
+        desc: SELECT z warunkiem
+        detail:
+          what: Type-safe SELECT. Zwraca tablicę rekordów pasujących do warunku.
+          how: condition buduj z operatorów (eq, gt, like, and, or) z 'drizzle-orm'.
+          tips:
+            - '.limit(10).offset(20) — paginacja'
+            - '.orderBy(desc(table.createdAt)) — sortowanie'
+            - 'db.select({ id: table.id }) — wybierz tylko niektóre kolumny'
+      - cmd: db.insert(table).values(data).returning()
+        desc: INSERT z powrotem wstawionych danych
+        detail:
+          what: Wstawia rekord(y) i zwraca je. .values() przyjmuje obiekt lub tablicę obiektów.
+          how: ".returning() działa na PostgreSQL i SQLite. MySQL — tylko .returning({ id: table.id })."
+          tips:
+            - 'const [user] = await db.insert(users).values({...}).returning()'
+            - '.onConflictDoUpdate() — upsert'
+            - '.onConflictDoNothing() — ignoruj duplikaty'
+      - cmd: db.update(table).set(data).where(condition)
+        desc: UPDATE z warunkiem
+        detail:
+          what: Aktualizuje pasujące rekordy. Bez .where() aktualizuje WSZYSTKIE — Drizzle ostrzega.
+          how: set() przyjmuje obiekt z nowymi wartościami. Można użyć sql`` dla wyrażeń.
+          tips:
+            - 'set({ views: sql`${table.views} + 1` }) — atomowy increment'
+            - '.returning() — zwróć zaktualizowane rekordy'
+      - cmd: db.delete(table).where(condition)
+        desc: DELETE z warunkiem
+        detail:
+          what: Usuwa pasujące rekordy. Bez .where() usuwa WSZYSTKO.
+          how: .returning() zwraca usunięte rekordy.
+          tips:
+            - 'Soft delete: db.update().set({ deletedAt: new Date() }) zamiast delete'
+      - cmd: 'db.query.users.findMany({ with: { posts: true } })'
+        desc: Relational query — załaduj z relacjami
+        detail:
+          what: Automatyczny JOIN na podstawie relations(). Wymaga schema w drizzle().
+          how: "with: zagnieżdżasz relacje. Każda relacja może mieć where, limit, columns."
+          tips:
+            - 'findFirst — pierwszy pasujący rekord lub undefined'
+            - 'with: { posts: { limit: 5 } } — limit na relacji'
+      - cmd: db.transaction(async (tx) => { ... })
+        desc: Transakcja atomowa
+        detail:
+          what: Wszystkie operacje w callbacku są atomowe. throw = ROLLBACK, return = COMMIT.
+          how: tx ma to samo API co db. Używaj tx zamiast db wewnątrz transakcji.
+          tips:
+            - 'throw new Error("insufficient funds") → automatyczny rollback'

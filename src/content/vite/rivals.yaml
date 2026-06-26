@@ -1,0 +1,74 @@
+title: Vite vs alternatywy narzędzi frontendowych
+
+items:
+  - name: Webpack
+    icon: "📦"
+    color: "#8DD6F9"
+    tagline: Najpopularniejszy bundler — dojrzały, wszechstronny, wolny
+    pros:
+      - Ogromny ekosystem — tysiące loaderów i pluginów
+      - Ekstremalnie elastyczny — konfigurowalny do każdego edge case
+      - Dojrzały (od 2012) — każdy problem ma rozwiązanie
+      - Module Federation — mikrofrontendy nativ wspierane
+      - Tree-shaking, code splitting, lazy loading
+    cons:
+      - Wolny cold start — bundluje WSZYSTKO przed serwowaniem (minuty w dużych projektach)
+      - Złożona konfiguracja — webpack.config.js może mieć setki linii
+      - HMR wolniejszy niż Vite — re-bundluje zmienione moduły
+      - CommonJS-first — ESM support dodany później
+      - Ciężka konfiguracja TypeScript (ts-loader lub babel-loader)
+    vs: Webpack dla legacy projektów i ekstremalnie specyficznych potrzeb (Module Federation). Vite dla nowych projektów — 10-100× szybszy cold start, zero konfiguracji.
+
+  - name: Parcel
+    icon: "📮"
+    color: "#F0A500"
+    tagline: Zero-config bundler — działa od razu, bez konfiguracji
+    pros:
+      - Prawdziwe zero-config — wykrywa framework automatycznie
+      - Szybki — wielowątkowy, cache na dysku
+      - Automatyczna instalacja zależności
+      - Świetny DX dla małych projektów
+      - Built-in minification, code splitting, HMR
+    cons:
+      - Mniejszy ekosystem pluginów niż Webpack/Vite
+      - Trudniej dostosować — magia "zero-config" ukrywa konfigurację
+      - Wolniejszy HMR niż Vite (brak ESM native w dev)
+      - Mniejsza społeczność i mniej przykładów
+      - Niektóre zaawansowane scenariusze wymagają workaroundów
+    vs: Parcel dla szybkich prototypów i prostych projektów. Vite dla projektów wymagających kontroli nad konfiguracją i szybkiego HMR.
+
+  - name: Turbopack
+    icon: "🌀"
+    color: "#EF4444"
+    tagline: Następnik Webpacka od Vercel — ultra-szybki bundler w Rust
+    pros:
+      - Ekstremalnie szybki — napisany w Rust, incremental computation
+      - Nativne wsparcie Next.js — Vercel inwestuje mocno
+      - Inkrementalna kompilacja — zmiana pliku to mikrosekundy
+      - Kompatybilność z ekosystemem Webpack (docelowo)
+      - Wbudowany w Next.js 13+ (--turbopack flag)
+    cons:
+      - Wciąż w aktywnym rozwoju — nie wszystkie Webpack pluginy kompatybilne
+      - Głównie zintegrowany z Next.js — dla standalone użycia mniej dojrzały
+      - Mniejszy ekosystem niż Vite w 2024
+      - Mniejsza społeczność poza Next.js
+      - Produkcyjny build dopiero dojrzewa
+    vs: Turbopack dla projektów Next.js (Vercel stack). Vite dla pozostałych — React, Vue, Svelte bez Next.js. Vite ma dojrzalszy ekosystem pluginów.
+
+  - name: esbuild (standalone)
+    icon: "⚡"
+    color: "#FFCF00"
+    tagline: Najszybszy bundler na rynku — napisany w Go, 10-100× szybszy od JS bundlerów
+    pros:
+      - Absolutnie najszybszy — Go, native code, bez JS overhead
+      - Minimalistyczny — świetny do tooling, CLI, server-side bundling
+      - TypeScript i JSX natywnie (transpilacja, nie type check)
+      - Tree-shaking, minification wbudowane
+      - Vite używa esbuild do transpilacji (wewnętrznie)
+    cons:
+      - Brak code splitting dla async imports (ESM output tylko basic)
+      - Brak CSS Modules natywnie (trzeba plugin)
+      - Mały ekosystem pluginów vs Rollup/Webpack
+      - Nie obsługuje niektórych zaawansowanych Rollup features
+      - Brak HMR — to bundler, nie dev server
+    vs: esbuild dla tooling, CLI, server-side (bundlowanie skryptów Node.js). Vite używa esbuild wewnętrznie — w aplikacji frontendowej weź Vite, nie standalone esbuild.

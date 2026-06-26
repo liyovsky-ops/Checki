@@ -1,0 +1,71 @@
+title: TanStack Query vs alternatywy
+
+items:
+  - name: SWR (Vercel)
+    icon: "▲"
+    color: "#000000"
+    tagline: Lekki hook do fetchowania — stale-while-revalidate, minimalny API
+    pros:
+      - Bardzo lekki — ~4kB (TanStack Query ~13kB)
+      - Prostszy API — jeden hook useSWR zamiast konfiguracji
+      - Natywna integracja z Next.js (od Vercel)
+      - Szybki start — zero konfiguracji
+    cons:
+      - Brak useMutation — musisz pisać własne POST/PUT/DELETE
+      - Brak invalidateQueries — cache management ograniczony
+      - Brak useInfiniteQuery (jest useSWRInfinite, ale gorsze DX)
+      - Brak devtools
+      - Mniej zaawansowane optimistic updates
+    vs: SWR gdy masz prosty projekt Next.js z głównie GET requests. TanStack Query gdy potrzebujesz mutacji, invalidacji, optimistic UI i devtools.
+
+  - name: RTK Query (Redux Toolkit)
+    icon: "🔴"
+    color: "#764ABC"
+    tagline: Data fetching wbudowany w Redux — generowanie hooków z definicji API
+    pros:
+      - Zintegrowany z Redux — jeden store dla UI i server state
+      - Auto-generowanie hooków z definicji endpointów
+      - Dobre TypeScript types z RTK
+      - Dobra dokumentacja Redux Toolkit
+    cons:
+      - Wymaga Redux — dodatkowy boilerplate setup
+      - Cięższy bundle — cały Redux + Immer + RTK
+      - Mniej elastyczny niż TanStack Query (sztywna definicja API)
+      - Devtools to Redux DevTools — mniej przejrzyste dla server state
+      - Migracja istniejącego kodu trudniejsza
+    vs: RTK Query gdy już używasz Redux w projekcie i chcesz jeden store. TanStack Query dla projektów bez Redux — prostszy, bardziej elastyczny.
+
+  - name: Apollo Client (GraphQL)
+    icon: "🚀"
+    color: "#311C87"
+    tagline: Pełne rozwiązanie GraphQL — queries, mutations, subscriptions, cache
+    pros:
+      - Pełna integracja GraphQL — zapytania, mutacje, subskrypcje
+      - Zaawansowany cache InMemoryCache z normalizacją
+      - Lokalne resolvers — local state + server state razem
+      - Reactive variables dla UI state
+    cons:
+      - Tylko GraphQL — bezużyteczny przy REST API
+      - Duży bundle — ~50kB
+      - Skomplikowany setup i konfiguracja cache policies
+      - Trudniejszy debugging bez Apollo Studio
+      - Duże nakłady nauki dla nowych developerów
+    vs: Apollo Client wyłącznie dla GraphQL projektów. TanStack Query dla REST, tRPC, lub gdy GraphQL to overkill.
+
+  - name: useEffect + fetch (vanilla)
+    icon: "⚛️"
+    color: "#61DAFB"
+    tagline: Ręczne zarządzanie stanem — useState + useEffect + własny cache
+    pros:
+      - Zero zależności — wbudowane w React
+      - Pełna kontrola nad implementacją
+      - Brak dodatkowego bundle size
+      - Dobre do nauki jak działa fetching
+    cons:
+      - Race conditions — brak cancel/cleanup requestów
+      - Brak cache — każdy komponent fetchuje osobno
+      - Brak deduplication — N komponentów = N requestów
+      - Brak retry logiki
+      - Brak stale-while-revalidate
+      - Setki linii boilerplate dla loading/error/refresh
+    vs: useEffect+fetch tylko do prototypów lub prostych jednorazowych requestów. TanStack Query dla każdej produkcyjnej aplikacji.

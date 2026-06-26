@@ -1,0 +1,193 @@
+labels:
+  main: Obsługa błędów
+  mainLang: rust
+
+intro:
+  title: Error handling — Rust bez wyjątków
+  desc: >
+    Rust nie ma wyjątków (exceptions). Błędy obsługuje się jawnie przez typy zwracane.
+    Result<T, E> dla operacji które mogą się nie powieść. Option<T> dla wartości które mogą nie istnieć.
+    Kompilator zmusza Cię do obsługi wszystkich przypadków — żadnych nieoczekiwanych crash'y w produkcji.
+
+items:
+  - title: Option<T> — wartość lub brak wartości
+    desc: >
+      Option<T> zastępuje null. Some(wartość) gdy wartość istnieje, None gdy jej brak.
+      Kompilator nie pozwoli Ci użyć Option jak zwykłej wartości — musisz jawnie obsłużyć None.
+    code: |
+      fn znajdz_uzytkownika(id: u32) -> Option<String> {
+          match id {
+              1 => Some("Łukasz".to_string()),
+              2 => Some("Anna".to_string()),
+              _ => None, // brak użytkownika
+          }
+      }
+
+      fn main() {
+          // Pattern matching — najbezpieczniejszy sposób
+          match znajdz_uzytkownika(1) {
+              Some(imie) => println!("Znaleziono: {}", imie),
+              None => println!("Nie znaleziono"),
+          }
+
+          // if let — gdy interesuje nas tylko Some
+          if let Some(imie) = znajdz_uzytkownika(2) {
+              println!("Użytkownik: {}", imie);
+          }
+
+          // unwrap_or — domyślna wartość gdy None
+          let imie = znajdz_uzytkownika(99).unwrap_or("Gość".to_string());
+          println!("{}", imie); // "Gość"
+
+          // map — transformuj wartość wewnątrz Option
+          let dlugosc: Option<usize> = znajdz_uzytkownika(1).map(|s| s.len());
+          println!("{:?}", dlugosc); // Some(6)
+      }
+    lang: rust
+
+  - title: Result<T, E> — sukces lub błąd
+    desc: >
+      Result<T, E> to enum z dwiema wariantami: Ok(T) dla sukcesu i Err(E) dla błędu.
+      Używaj gdy operacja może się nie powieść z konkretnym powodem (IO, parsowanie, sieć).
+    code: |
+      use std::num::ParseIntError;
+
+      fn parsuj_liczbe(s: &str) -> Result<i32, ParseIntError> {
+          s.trim().parse::<i32>()
+      }
+
+      fn podwoj(s: &str) -> Result<i32, ParseIntError> {
+          let n = parsuj_liczbe(s)?; // ? propaguje błąd wyżej
+          Ok(n * 2)
+      }
+
+      fn main() {
+          // Pattern matching
+          match parsuj_liczbe("42") {
+              Ok(n) => println!("Liczba: {}", n),
+              Err(e) => println!("Błąd: {}", e),
+          }
+
+          // unwrap() — panic przy błędzie (używaj tylko w testach/prototypach)
+          let n = parsuj_liczbe("10").unwrap();
+          println!("{}", n);
+
+          // expect() — panic z własnym komunikatem
+          let n = parsuj_liczbe("7").expect("Powinno być poprawną liczbą");
+          println!("{}", n);
+
+          // unwrap_or_else — obsługa błędu przez domyślną wartość
+          let n = parsuj_liczbe("abc").unwrap_or_else(|_| 0);
+          println!("{}", n); // 0
+      }
+    lang: rust
+
+  - title: Operator ? — propagacja błędów
+    desc: >
+      Operator ? to skrót dla match + return Err. Jeśli Result jest Ok — rozpakowuje wartość.
+      Jeśli Err — konwertuje błąd (przez From trait) i zwraca z funkcji. Eliminuje boilerplate.
+    code: |
+      use std::fs;
+      use std::io;
+
+      fn czytaj_plik(sciezka: &str) -> Result<String, io::Error> {
+          let zawartosc = fs::read_to_string(sciezka)?; // ? zamiast match
+          Ok(zawartosc)
+      }
+
+      fn pierwsza_linia(sciezka: &str) -> Result<String, io::Error> {
+          let zawartosc = czytaj_plik(sciezka)?;
+          let linia = zawartosc.lines().next()
+              .unwrap_or("")
+              .to_string();
+          Ok(linia)
+      }
+
+      // Wiele różnych błędów — Box<dyn Error>
+      use std::error::Error;
+
+      fn skomplikowana_operacja() -> Result<i32, Box<dyn Error>> {
+          let s = fs::read_to_string("liczba.txt")?; // io::Error
+          let n: i32 = s.trim().parse()?;            // ParseIntError
+          Ok(n * 2)
+      }
+
+      fn main() {
+          match pierwsza_linia("dane.txt") {
+              Ok(linia) => println!("Pierwsza linia: {}", linia),
+              Err(e) => eprintln!("Błąd: {}", e),
+          }
+      }
+    lang: rust
+
+  - title: Własne typy błędów z thiserror
+    desc: >
+      thiserror to biblioteka do tworzenia własnych typów błędów bez boilerplate.
+      #[derive(Error)] implementuje std::error::Error. #[error("...")] definiuje komunikat.
+      Idealna dla bibliotek i API.
+    code: |
+      // Cargo.toml: thiserror = "1"
+      use thiserror::Error;
+
+      #[derive(Debug, Error)]
+      enum BladAplikacji {
+          #[error("Użytkownik o ID {id} nie istnieje")]
+          NieZnalezionyUzytkownik { id: u32 },
+
+          #[error("Błąd bazy danych: {0}")]
+          BladBazy(String),
+
+          #[error("Błąd IO")]
+          BladIO(#[from] std::io::Error),
+      }
+
+      fn pobierz_uzytkownika(id: u32) -> Result<String, BladAplikacji> {
+          if id == 0 {
+              return Err(BladAplikacji::NieZnalezionyUzytkownik { id });
+          }
+          if id > 1000 {
+              return Err(BladAplikacji::BladBazy("przekroczono limit".to_string()));
+          }
+          Ok(format!("Użytkownik {}", id))
+      }
+
+      fn main() {
+          match pobierz_uzytkownika(0) {
+              Ok(u) => println!("{}", u),
+              Err(e) => eprintln!("Błąd: {}", e),
+              // Wypisze: "Użytkownik o ID 0 nie istnieje"
+          }
+      }
+    lang: rust
+
+  - title: anyhow — obsługa błędów w aplikacjach
+    desc: >
+      anyhow::Result to wygodny typ błędu dla kodu aplikacji (nie bibliotek).
+      Akceptuje dowolny błąd implementujący std::error::Error. Dodaje context() do komunikatów.
+    code: |
+      // Cargo.toml: anyhow = "1"
+      use anyhow::{Context, Result};
+      use std::fs;
+
+      fn wczytaj_konfiguracje(sciezka: &str) -> Result<String> {
+          let zawartosc = fs::read_to_string(sciezka)
+              .with_context(|| format!("Nie można odczytać pliku: {}", sciezka))?;
+
+          let skonfigurowany = zawartosc
+              .lines()
+              .find(|l| l.starts_with("PORT="))
+              .context("Brak klucza PORT w konfiguracji")?
+              .to_string();
+
+          Ok(skonfigurowany)
+      }
+
+      fn main() -> Result<()> {
+          // main() może zwracać Result — anyhow wypisze błąd czytelnie
+          let port = wczytaj_konfiguracje("config.env")
+              .context("Błąd inicjalizacji aplikacji")?;
+
+          println!("Port: {}", port);
+          Ok(())
+      }
+    lang: rust

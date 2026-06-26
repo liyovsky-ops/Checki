@@ -1,0 +1,68 @@
+title: Socket.io — instalacja i komendy
+
+sections:
+  - title: Instalacja
+    commands:
+      - cmd: npm install socket.io
+        desc: Instalacja serwera Socket.io (Node.js)
+      - cmd: npm install socket.io-client
+        desc: Instalacja klienta (przeglądarka / React / Node.js)
+      - cmd: npm install socket.io @socket.io/redis-adapter ioredis
+        desc: Serwer + adapter Redis do skalowania horyzontalnego
+      - cmd: npm install socket.io @socket.io/admin-ui
+        desc: Serwer + panel administracyjny Socket.io
+      - cmd: npm install socket.io-mock --save-dev
+        desc: Mock do testów jednostkowych (bez prawdziwego połączenia)
+
+  - title: Uruchamianie serwera
+    commands:
+      - cmd: node server.js
+        desc: Uruchom serwer Socket.io (podstawowe)
+      - cmd: nodemon server.js
+        desc: "Serwer z hot-reload (wymaga: npm install -g nodemon)"
+      - cmd: NODE_ENV=production node server.js
+        desc: Uruchom w trybie produkcyjnym
+      - cmd: pm2 start server.js -i max
+        desc: Uruchom z PM2 w trybie cluster (wiele procesów CPU)
+
+  - title: Debugowanie
+    commands:
+      - cmd: DEBUG=socket.io* node server.js
+        desc: Pełne logi debugowania Socket.io (Linux/macOS)
+      - cmd: set DEBUG=socket.io* && node server.js
+        desc: Pełne logi debugowania Socket.io (Windows CMD)
+      - cmd: DEBUG=socket.io:server node server.js
+        desc: Logi tylko serwera Socket.io
+      - cmd: DEBUG=socket.io:client node client.js
+        desc: Logi tylko klienta Socket.io
+      - cmd: DEBUG=engine node server.js
+        desc: Logi Engine.io (warstwa transportu — WebSocket/polling)
+
+  - title: Testowanie połączenia
+    commands:
+      - cmd: "wscat -c ws://localhost:3001/socket.io/?EIO=4&transport=websocket"
+        desc: Testuj połączenie WebSocket przez wscat (npm install -g wscat)
+      - cmd: "curl 'http://localhost:3001/socket.io/?EIO=4&transport=polling'"
+        desc: Testuj transport polling przez curl
+      - cmd: npx socket.io-benchmark
+        desc: Benchmark wydajności serwera Socket.io
+
+  - title: Konfiguracja serwera — przykłady opcji
+    commands:
+      - cmd: "new Server(httpServer, { pingTimeout: 20000, pingInterval: 25000 })"
+        desc: Ustaw timeouty keep-alive (ms) — domyślnie 20000 / 25000
+      - cmd: "new Server(httpServer, { maxHttpBufferSize: 1e6 })"
+        desc: Ogranicz rozmiar wiadomości do 1MB (domyślnie 1MB)
+      - cmd: "new Server(httpServer, { transports: ['websocket'] })"
+        desc: Wymuś tylko WebSocket — wyłącz polling (szybszy handshake)
+      - cmd: "new Server(httpServer, { cors: { origin: '*' } })"
+        desc: CORS — zezwól na połączenia z dowolnej domeny (tylko dev!)
+
+  - title: Przydatne skrypty npm
+    commands:
+      - cmd: "\"dev\": \"nodemon server.js\""
+        desc: package.json — development z hot-reload
+      - cmd: "\"start\": \"node server.js\""
+        desc: package.json — produkcja
+      - cmd: "\"test\": \"jest --testPathPattern=socket\""
+        desc: package.json — testy związane z Socket.io

@@ -1,0 +1,75 @@
+title: Ekosystem Socket.io
+
+categories:
+  - name: Adaptery (skalowanie)
+    items:
+      - name: socket.io-redis-adapter
+        desc: Skaluje Socket.io na wiele instancji (klaster Node.js, wiele serwerów) przez Redis Pub/Sub. Eventy broadcastowane między instancjami — klient połączony z serwerem A dostaje event od serwera B.
+        npm: "@socket.io/redis-adapter"
+        url: https://socket.io/docs/v4/redis-adapter/
+
+      - name: socket.io-redis-streams-adapter
+        desc: Nowszy adapter oparty na Redis Streams zamiast Pub/Sub. Lepsza niezawodność — wiadomości nie są tracone gdy instancja jest offline. Zalecany dla nowych wdrożeń.
+        npm: "@socket.io/redis-streams-adapter"
+        url: https://socket.io/docs/v4/redis-streams-adapter/
+
+      - name: socket.io-mongo-adapter
+        desc: Adapter oparty na MongoDB Change Streams. Dobre gdy już używasz MongoDB i nie chcesz dodawać Redis. Nieco wyższe latency vs Redis.
+        npm: "@socket.io/mongo-adapter"
+        url: https://socket.io/docs/v4/mongo-adapter/
+
+      - name: socket.io-cluster-adapter
+        desc: Adapter dla Node.js cluster (wiele procesów na jednej maszynie). Używa IPC między procesami. Nie wymaga zewnętrznego brokera — idealny do single-server deployment.
+        npm: "@socket.io/cluster-adapter"
+        url: https://socket.io/docs/v4/cluster-adapter/
+
+  - name: Klienty
+    items:
+      - name: socket.io-client
+        desc: Oficjalny klient przeglądarkowy i Node.js. Automatyczny reconnect, fallback transport, kompatybilność z serwerem Socket.io. Dołączony do pakietu socket.io.
+        npm: socket.io-client
+        url: https://socket.io/docs/v4/client-installation/
+
+      - name: socket.io-swift-client
+        desc: Oficjalny klient iOS/macOS dla Swift. Obsługa wszystkich funkcji serwera — rooms, namespaces, ack, reconnect.
+        npm: ~
+        url: https://github.com/socketio/socket.io-client-swift
+
+      - name: socket.io-dart-client
+        desc: Klient dla Flutter/Dart. Umożliwia real-time w aplikacjach mobilnych Flutter z pełnym wsparciem dla protokołu Socket.io.
+        npm: socket_io_client (pub.dev)
+        url: https://github.com/rikulo/socket.io-client-dart
+
+  - name: Narzędzia developerskie
+    items:
+      - name: socket.io-admin-ui
+        desc: Oficjalny panel administracyjny Socket.io. Widok wszystkich połączonych klientów, rooms, namespaces, metryki, możliwość disconnectu klientów przez UI.
+        npm: "@socket.io/admin-ui"
+        url: https://admin.socket.io/
+
+      - name: socket.io-mock
+        desc: Mock klienta Socket.io do testów jednostkowych. Emuluje socket.emit/on bez prawdziwego połączenia — idealny do testowania komponentów React.
+        npm: socket.io-mock
+        url: https://github.com/stipsan/socket.io-mock
+
+      - name: socket.io-prometheus-metrics
+        desc: Eksport metryk Socket.io do Prometheusa — liczba połączeń, eventy per sekundę, rozmiary rooms. Integracja z Grafana dashboardem.
+        npm: socket.io-prometheus-metrics
+        url: https://github.com/iamkenos/socket.io-prometheus-metrics
+
+  - name: Integracje frameworków
+    items:
+      - name: nestjs/websockets + @nestjs/platform-socket.io
+        desc: Oficjalna integracja NestJS — Gateway dekoratory (@WebSocketGateway, @SubscribeMessage), pełna integracja z DI, guards, pipes, interceptors.
+        npm: "@nestjs/platform-socket.io"
+        url: https://docs.nestjs.com/websockets/gateways
+
+      - name: socket.io-next (Next.js)
+        desc: Wzorzec integracji Socket.io z Next.js przez custom server lub API Routes z socket.io upgrade. Wymaga wyłączenia Vercel edge runtime.
+        npm: ~
+        url: https://socket.io/how-to/use-with-nextjs
+
+      - name: socket.io-express-session
+        desc: Integracja Socket.io z sesjami Express. Udostępnia sesję HTTP w socket.handshake.session — przydatne gdy auth oparty na sesjach, nie JWT.
+        npm: express-socket.io-session
+        url: https://github.com/oskosk/express-socket.io-session

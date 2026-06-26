@@ -1,0 +1,233 @@
+title: Komendy Vite
+
+groups:
+  - name: Tworzenie projektu
+    icon: "🚀"
+    commands:
+      - cmd: npm create vite@latest
+        desc: Interaktywny kreator projektu Vite
+        detail:
+          what: Uruchamia kreator który pyta o nazwę projektu i szablon (React, Vue, Svelte, Vanilla itd.).
+          how: Korzysta z create-vite — oficjalny scaffolding tool Vite.
+          tips:
+            - "Zalecane: wybierz szablon TypeScript (np. react-ts, vue-ts)"
+      - cmd: npm create vite@latest my-app -- --template react-ts
+        desc: Bez interaktywnego kreatora — od razu z szablonem
+        detail:
+          what: Tworzy projekt bez pytań — od razu z podanym szablonem TypeScript.
+          how: Dostępne szablony — vanilla, vanilla-ts, vue, vue-ts, react, react-ts, react-swc-ts, preact, lit, svelte, svelte-ts, solid, qwik.
+          tips:
+            - "react-swc-ts jest szybszą wersją react-ts (SWC zamiast Babel)"
+      - cmd: npm create vite@latest my-app -- --template vue-ts
+        desc: Projekt Vue 3 + TypeScript
+        detail:
+          what: Tworzy projekt Vue 3 z TypeScript, @vitejs/plugin-vue, vite.config.ts.
+          how: Używa szablonu vue-ts z oficjalnego repozytorium Vite.
+          tips:
+            - "Dodaj Vue Router i Pinia po stworzeniu projektu"
+      - cmd: npx degit vitejs/vite/packages/create-vite/template-react-ts my-app
+        desc: Skopiuj szablon bez historii git (alternatywa)
+        detail:
+          what: Klonuje szablon Vite bez git historii — dla bardziej kontrolowanego startu.
+          how: degit kopiuje tylko pliki bez .git. Wymaga npm install po skopiowaniu.
+          tips:
+            - "Przydatne gdy chcesz zacząć bez git history"
+
+  - name: Dev server
+    icon: "🔥"
+    commands:
+      - cmd: vite
+        desc: Uruchom dev server (domyślnie port 5173)
+        detail:
+          what: Uruchamia serwer deweloperski z HMR. Serwuje pliki jako natywne ESM.
+          how: "Domyślny port: 5173. Skrót: npm run dev"
+          tips:
+            - "Cold start błyskawiczny — Vite nie bundluje, tylko serwuje ESM"
+      - cmd: vite --port 3000
+        desc: Dev server na wybranym porcie
+        detail:
+          what: Uruchamia dev server na porcie 3000 zamiast domyślnego 5173.
+          how: Możesz też ustawić w vite.config.ts — server.port.
+          tips:
+            - "--strictPort sprawia że Vite nie szuka następnego wolnego portu"
+      - cmd: vite --host
+        desc: Dev server dostępny z sieci LAN
+        detail:
+          what: Serwuje na 0.0.0.0 — dostępny z innych urządzeń w sieci lokalnej.
+          how: Vite wypisze URL z IP lokalnym (np. http://192.168.1.10:5173).
+          tips:
+            - "Przydatne do testowania na telefonie lub tablecie w tej samej sieci"
+      - cmd: vite --host --port 3000
+        desc: Dev server na porcie 3000 dostępny z sieci
+        detail:
+          what: Kombinacja hosta i portu — serwer dostępny z sieci na porcie 3000.
+          how: Możesz też ustawić oba w konfiguracji — server.host i server.port.
+          tips:
+            - "Firmy często blokują niestandardowe porty — sprawdź ustawienia sieci"
+      - cmd: vite --open
+        desc: Otwórz przeglądarkę automatycznie
+        detail:
+          what: Po uruchomieniu serwera otwiera domyślną przeglądarkę z adresem dev servera.
+          how: "Można też skonfigurować — server.open: true w vite.config.ts."
+          tips:
+            - "server.open: '/about' — otwórz konkretną stronę"
+      - cmd: vite --mode staging
+        desc: Dev server z innym mode (ładuje .env.staging)
+        detail:
+          what: Ustawia mode na 'staging' — ładuje .env.staging i .env.staging.local.
+          how: import.meta.env.MODE === 'staging' w kodzie.
+          tips:
+            - "Domyślne mode — dev dla vite, production dla vite build"
+
+  - name: Budowanie
+    icon: "📦"
+    commands:
+      - cmd: vite build
+        desc: Zbuduj produkcyjny bundle
+        detail:
+          what: Tworzy zoptymalizowany build w dist/. Tree-shaking, minifikacja, code splitting.
+          how: Używa Rollup pod spodem. Output z hashami w nazwach plików (cache busting).
+          tips:
+            - "Domyślnie do dist/ — zmień przez build.outDir w konfiguracji"
+      - cmd: vite build --mode staging
+        desc: Build dla środowiska staging
+        detail:
+          what: Build z ładowaniem zmiennych z .env.staging. import.meta.env.MODE = 'staging'.
+          how: Zmienne VITE_* z .env.staging trafiają do bundle.
+          tips:
+            - "Możesz mieć .env.staging, .env.production, .env.preview"
+      - cmd: vite build --config vite.prod.config.ts
+        desc: Build z custom plikiem konfiguracyjnym
+        detail:
+          what: Użyj innego pliku konfiguracyjnego niż domyślny vite.config.ts.
+          how: Przydatne gdy masz osobne konfiguracje dla dev i prod.
+          tips:
+            - "Możesz też używać defineConfig z funkcją — dynamiczna konfiguracja"
+      - cmd: vite build --emptyOutDir
+        desc: Wyczyść dist/ przed buildem
+        detail:
+          what: Usuwa zawartość dist/ przed nowym buildem. Domyślnie Vite to robi automatycznie.
+          how: Przydatne gdy dist/ jest poza rootem projektu.
+          tips:
+            - "Domyślnie Vite czyści outDir automatycznie (chyba że jest poza rootem)"
+      - cmd: vite build --watch
+        desc: Watch mode dla buildu
+        detail:
+          what: Rebuilduje przy każdej zmianie pliku — ciągły build (nie dev server).
+          how: Przydatne do budowania bibliotek z live reload w host projekcie.
+          tips:
+            - "Dla aplikacji — używaj vite (dev server). --watch dla bibliotek"
+      - cmd: tsc --noEmit && vite build
+        desc: Type check + build (zalecane w CI)
+        detail:
+          what: Najpierw sprawdź typy (tsc), potem zbuduj (vite build). Fail przy błędach typów.
+          how: "Vite nie sprawdza typów (esbuild tylko transpiluje) — tsc jest konieczny dla bezpieczeństwa."
+          tips:
+            - "Dodaj do package.json: \"build\": \"tsc --noEmit && vite build\""
+
+  - name: Preview
+    icon: "👁️"
+    commands:
+      - cmd: vite preview
+        desc: Serwuj produkcyjny build lokalnie
+        detail:
+          what: Uruchamia serwer statyczny serwujący dist/ na porcie 4173.
+          how: Pozwala przetestować produkcyjny build lokalnie przed deployem.
+          tips:
+            - "NIE jest to serwer produkcyjny — tylko do testowania lokalnego"
+      - cmd: vite preview --port 8080
+        desc: Preview na wybranym porcie
+        detail:
+          what: Serwuje dist/ na porcie 8080 zamiast domyślnego 4173.
+          how: Konfigurowalny przez preview.port w vite.config.ts.
+          tips:
+            - "Dla produkcji użyj nginx, serve lub platformy (Vercel, Netlify)"
+      - cmd: vite preview --host
+        desc: Preview dostępny z sieci LAN
+        detail:
+          what: Serwuje dist/ na 0.0.0.0 — dostępny z innych urządzeń.
+          how: Przydatne do testowania produkcyjnego build na telefonie.
+          tips:
+            - "Testuj routing, assets, Service Worker przed deployem"
+
+  - name: Konfiguracja i debug
+    icon: "🔧"
+    commands:
+      - cmd: vite --config path/to/vite.config.ts
+        desc: Użyj custom pliku konfiguracyjnego
+        detail:
+          what: Ładuje konfigurację z podanej ścieżki zamiast domyślnej.
+          how: Działa dla vite, vite build i vite preview.
+          tips:
+            - "Przydatne w monorepo — każdy pakiet może mieć własną konfigurację"
+      - cmd: vite --logLevel silent
+        desc: Wyłącz output logów
+        detail:
+          what: Cichy tryb — brak logów w terminalu.
+          how: "Poziomy: 'info' (domyślny) | 'warn' | 'error' | 'silent'"
+          tips:
+            - "--logLevel warn — tylko ostrzeżenia i błędy"
+      - cmd: vite --clearScreen false
+        desc: Nie czyść terminala między zmianami
+        detail:
+          what: Zachowuje historię output przy każdym HMR update.
+          how: Domyślnie Vite czyści terminal przy każdym update.
+          tips:
+            - "Przydatne do porównywania logów między zmianami"
+      - cmd: vite --debug
+        desc: Tryb debug z pełnymi logami
+        detail:
+          what: Wyświetla szczegółowe logi — co Vite robi, które pliki przetwarza.
+          how: "Bardzo dużo output. Użyj z filtrem: vite --debug hmr"
+          tips:
+            - "vite --debug vite:resolve — debug tylko resolve"
+      - cmd: vite optimize
+        desc: Ręczne uruchomienie pre-bundlingu zależności
+        detail:
+          what: Uruchamia pre-bundling node_modules (optymalizeDeps) bez uruchamiania dev servera.
+          how: Vite robi to automatycznie przy pierwszym uruchomieniu — rzadko potrzebne ręcznie.
+          tips:
+            - "Przydatne gdy dodałeś nową zależność i widzisz problemy z importami"
+
+  - name: Zmienne środowiskowe
+    icon: "🔐"
+    commands:
+      - cmd: "VITE_API_URL=https://api.dev.com vite"
+        desc: Ustaw zmienną VITE_ inline
+        detail:
+          what: Ustawia zmienną środowiskową VITE_API_URL tylko na czas bieżącego uruchomienia.
+          how: Dostępne przez import.meta.env.VITE_API_URL w kodzie.
+          tips:
+            - "Trwałe zmienne — wpisz do .env lub .env.local"
+      - cmd: vite build --mode production
+        desc: Build z mode production (domyślne)
+        detail:
+          what: Ładuje .env.production — import.meta.env.PROD = true, MODE = 'production'.
+          how: vite build domyślnie ustawia mode=production.
+          tips:
+            - "VITE_* z .env.production nadpisują .env"
+
+  - name: Instalacja
+    icon: "📥"
+    commands:
+      - cmd: npm install -D vite
+        desc: Instalacja Vite (bez szablonu)
+        detail:
+          what: Instaluje Vite jako devDependency — dla integracji w istniejącym projekcie.
+          how: Wymaga ręcznego stworzenia vite.config.ts i index.html jako entry.
+          tips:
+            - "Dla nowych projektów użyj npm create vite@latest — gotowy template"
+      - cmd: npm install -D vite @vitejs/plugin-react
+        desc: Vite + React plugin
+        detail:
+          what: Instaluje Vite i oficjalny plugin React (Babel Fast Refresh).
+          how: "Dodaj do vite.config.ts — plugins: [react()]."
+          tips:
+            - "@vitejs/plugin-react-swc dla szybszego HMR (wymaga SWC)"
+      - cmd: npm install -D vite @vitejs/plugin-vue
+        desc: Vite + Vue 3 plugin
+        detail:
+          what: Instaluje Vite i oficjalny plugin Vue 3 (.vue SFC support).
+          how: "Dodaj do vite.config.ts — plugins: [vue()]."
+          tips:
+            - "Dodaj też vue i @vue/compiler-sfc jako dependencies"

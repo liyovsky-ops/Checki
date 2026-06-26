@@ -1,0 +1,196 @@
+labels:
+  main: Selektory i optymalizacja
+  mainLang: typescript
+
+intro:
+  title: Selektory — subskrypcja na dokładnie to, czego potrzebujesz
+  desc: >
+    Domyślnie useStore() porównuje wynik selektor przez === (reference equality).
+    Jeśli selektor zwraca prymityw (string, number, boolean) — re-render tylko gdy
+    wartość się zmieni. Jeśli zwraca obiekt lub tablicę — nowy obiekt = re-render.
+    useShallow() rozwiązuje ten problem przez płytkie porównanie. Poprawne selektory
+    to różnica między aplikacją renderującą 3 razy a 30 razy przy jednej akcji.
+
+items:
+  - name: Selektor prymitywny — brak zbędnych re-renderów
+    desc: Gdy selektor zwraca prymityw (string/number/boolean), Zustand porównuje === i renderuje tylko przy zmianie wartości. Każda subskrypcja jest niezależna — podziel na osobne hooki zamiast brać cały stan.
+    code: |
+      import { useCartStore } from '../store/cartStore'
+
+      // DOBRZE — każdy hook subskrybuje jeden prymityw
+      function CartBadge() {
+        // Re-render tylko gdy zmieni się liczba items
+        const itemCount = useCartStore((s) => s.items.length)
+        return <span className="badge">{itemCount}</span>
+      }
+
+      function CartTotal() {
+        // Re-render tylko gdy zmieni się totalPrice
+        const totalPrice = useCartStore((s) => s.totalPrice)
+        return <p>Suma: {totalPrice.toFixed(2)} PLN</p>
+      }
+
+      // ŹLE — całe items powoduje re-render nawet gdy length się nie zmieni
+      function CartBadgeBad() {
+        const items = useCartStore((s) => s.items)  // Nowa tablica = re-render!
+        return <span>{items.length}</span>
+      }
+    lang: typescript
+
+  - name: useShallow — płytkie porównanie obiektów
+    desc: useShallow() porównuje pola obiektu przez ===, nie referencję obiektu. Użyj gdy musisz wyciągnąć kilka pól naraz — bez useShallow każdy re-render store to nowy obiekt i re-render komponentu.
+    code: |
+      import { useShallow } from 'zustand/react/shallow'
+      import { useUserStore } from '../store/userStore'
+
+      // BEZ useShallow — nowy obiekt przy każdym render store = zawsze re-render
+      function UserCardBad() {
+        const { name, email, avatar } = useUserStore((s) => ({
+          name:   s.name,
+          email:  s.email,
+          avatar: s.avatar,
+        }))
+        return <div>{name} — {email}</div>
+      }
+
+      // Z useShallow — re-render tylko gdy name, email lub avatar się zmieni
+      function UserCard() {
+        const { name, email, avatar } = useUserStore(
+          useShallow((s) => ({
+            name:   s.name,
+            email:  s.email,
+            avatar: s.avatar,
+          }))
+        )
+        return (
+          <div className="user-card">
+            <img src={avatar} alt={name} />
+            <div>{name}</div>
+            <div>{email}</div>
+          </div>
+        )
+      }
+
+      // Alternatywa — tablica zamiast obiektu
+      function UserActions() {
+        const [login, logout] = useUserStore(
+          useShallow((s) => [s.login, s.logout])
+        )
+        return (
+          <>
+            <button onClick={() => login('token')}>Zaloguj</button>
+            <button onClick={logout}>Wyloguj</button>
+          </>
+        )
+      }
+    lang: typescript
+
+  - name: subscribeWithSelector middleware — subskrypcja poza React
+    desc: subscribeWithSelector() daje subscribe() z selektorem i comparatorem. Subskrybuj zmiany stanu poza komponentem — w serwisach, effect handlerach, analytics. Działa bez React.
+    code: |
+      import { create }                  from 'zustand'
+      import { subscribeWithSelector }   from 'zustand/middleware'
+
+      interface AppState {
+        user:      { id: string; role: string } | null
+        sidebarOpen: boolean
+        setUser:   (user: AppState['user']) => void
+        toggleSidebar: () => void
+      }
+
+      export const useAppStore = create<AppState>()(
+        subscribeWithSelector((set) => ({
+          user:        null,
+          sidebarOpen: false,
+          setUser:     (user) => set({ user }),
+          toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+        }))
+      )
+
+      // Subskrypcja poza React — np. w pliku analytics.ts
+      const unsubscribe = useAppStore.subscribe(
+        (state) => state.user,           // selektor
+        (user, prevUser) => {            // listener (nowy, poprzedni)
+          if (user && !prevUser) {
+            analytics.track('user_logged_in', { id: user.id, role: user.role })
+          }
+          if (!user && prevUser) {
+            analytics.track('user_logged_out')
+          }
+        },
+        { equalityFn: (a, b) => a?.id === b?.id }  // własny comparator
+      )
+
+      // Pamiętaj o cleanup!
+      // unsubscribe() // wywołaj przy unmount lub cleanup
+    lang: typescript
+
+  - name: Custom equality function
+    desc: Trzeci argument useStore() to custom comparator — pełna kontrola nad tym kiedy komponent się re-renderuje. Przydatne dla głębokich struktur lub gdy chcesz ignorować część pól.
+    code: |
+      import { useProductStore } from '../store/productStore'
+
+      interface Product {
+        id:       string
+        name:     string
+        price:    number
+        category: string
+        stock:    number
+      }
+
+      // Re-render tylko gdy zmieni się id lub price — ignoruj name, category, stock
+      function ProductPriceTag({ productId }: { productId: string }) {
+        const product = useProductStore(
+          (s) => s.products.find((p) => p.id === productId),
+          // Custom comparator — tylko id i price mają znaczenie
+          (a, b) => a?.id === b?.id && a?.price === b?.price
+        )
+
+        if (!product) return null
+        return <span className="price">{product.price} PLN</span>
+      }
+
+      // Inny przykład — ignoruj timestamp, porównuj tylko dane
+      function DataPanel() {
+        const data = useDataStore(
+          (s) => ({ items: s.items, total: s.total }),
+          (prev, next) =>
+            prev.total === next.total &&
+            prev.items.length === next.items.length
+        )
+        return <div>{data.total} wyników ({data.items.length} na stronie)</div>
+      }
+    lang: typescript
+
+  - name: Selektor poza hookiem — reużywalność
+    desc: Wynieś selektory poza komponent — reużywasz je w wielu komponentach, testujesz jednostkowo bez montowania, a TypeScript sprawdza typy. Wzorzec dobry dla złożonych transformacji.
+    code: |
+      import { useOrderStore }   from '../store/orderStore'
+
+      // Selektory jako named functions — reużywalne i testowalne
+      const selectPendingOrders  = (s: ReturnType<typeof useOrderStore.getState>) =>
+        s.orders.filter((o) => o.status === 'pending')
+
+      const selectCompletedCount = (s: ReturnType<typeof useOrderStore.getState>) =>
+        s.orders.filter((o) => o.status === 'completed').length
+
+      const selectTotalRevenue   = (s: ReturnType<typeof useOrderStore.getState>) =>
+        s.orders
+          .filter((o) => o.status === 'completed')
+          .reduce((sum, o) => sum + o.total, 0)
+
+      // Użycie — czysty, czytelny komponent
+      function OrderDashboard() {
+        const pending   = useOrderStore(selectPendingOrders)
+        const completed = useOrderStore(selectCompletedCount)
+        const revenue   = useOrderStore(selectTotalRevenue)
+
+        return (
+          <div>
+            <p>Oczekujące: {pending.length}</p>
+            <p>Zrealizowane: {completed}</p>
+            <p>Przychód: {revenue.toFixed(2)} PLN</p>
+          </div>
+        )
+      }
+    lang: typescript

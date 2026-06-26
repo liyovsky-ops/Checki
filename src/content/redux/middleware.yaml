@@ -1,0 +1,239 @@
+labels:
+  main: Middleware i efekty uboczne
+  mainLang: typescript
+
+intro:
+  title: Middleware — przechwytywanie akcji
+  desc: >
+    Middleware w Redux to funkcja pośrednia między dispatchem akcji a reducerami.
+    Każda akcja przechodzi przez łańcuch middleware zanim dotrze do reducera.
+    Redux Toolkit zawiera wbudowany thunk middleware i konfigurację serialization check.
+    Własne middleware pozwala logować akcje, wysyłać metryki, obsługiwać side effecty
+    lub blokować akcje. createListenerMiddleware() to nowoczesny sposób na side effecty
+    — alternatywa dla redux-saga bez generatorów.
+
+items:
+  - title: Własne middleware — podstawy
+    desc: >
+      Middleware to funkcja wyższego rzędu: (store) => (next) => (action) => result.
+      store daje dostęp do getState i dispatch, next przekazuje akcję dalej w łańcuchu,
+      action to bieżąca akcja. Dodajesz middleware do configureStore przez getDefaultMiddleware().
+    code: |
+      import { configureStore, Middleware } from '@reduxjs/toolkit'
+
+      // Logger middleware — loguje każdą akcję
+      const loggerMiddleware: Middleware = (store) => (next) => (action) => {
+        console.group(`[Redux] ${(action as { type: string }).type}`)
+        console.log('Stan przed:', store.getState())
+        console.log('Akcja:', action)
+
+        const result = next(action)  // przekaż akcję do reducera
+
+        console.log('Stan po:', store.getState())
+        console.groupEnd()
+
+        return result
+      }
+
+      // Analytics middleware — wysyłaj metryki
+      const analyticsMiddleware: Middleware = (store) => (next) => (action) => {
+        const typedAction = action as { type: string; payload?: unknown }
+        if (typedAction.type.includes('user/')) {
+          // Wyślij do systemu analityki
+          analytics.track(typedAction.type, { payload: typedAction.payload })
+        }
+        return next(action)
+      }
+
+      // Auth guard middleware — blokuj akcje bez autoryzacji
+      const authMiddleware: Middleware = (store) => (next) => (action) => {
+        const typedAction = action as { type: string }
+        const protectedActions = ['admin/deleteUser', 'admin/resetData']
+        if (protectedActions.includes(typedAction.type)) {
+          const { auth } = store.getState() as RootState
+          if (!auth.isAdmin) {
+            console.warn('Brak uprawnień!')
+            return  // zablokuj akcję — nie wywołuj next()
+          }
+        }
+        return next(action)
+      }
+
+      export const store = configureStore({
+        reducer: { /* ... */ },
+        middleware: (getDefaultMiddleware) =>
+          getDefaultMiddleware()
+            .concat(loggerMiddleware)
+            .concat(analyticsMiddleware)
+            .concat(authMiddleware),
+      })
+    lang: typescript
+
+  - title: createListenerMiddleware — side effecty
+    desc: >
+      createListenerMiddleware() to nowoczesna alternatywa dla redux-saga i redux-observable.
+      Definiujesz listenery które reagują na akcje lub zmiany stanu — uruchamiają async kod
+      bez blokowania flow akcji. Pełne wsparcie dla TypeScript, cancel i lifecycle.
+    code: |
+      import {
+        createListenerMiddleware,
+        addListener,
+        isAnyOf,
+        type TypedStartListening,
+      } from '@reduxjs/toolkit'
+      import type { RootState, AppDispatch } from './store'
+
+      export const listenerMiddleware = createListenerMiddleware()
+
+      type AppStartListening = TypedStartListening<RootState, AppDispatch>
+      const startListening = listenerMiddleware.startListening as AppStartListening
+
+      // Listener 1 — zapis do localStorage gdy zmienia się koszyk
+      startListening({
+        predicate: (action, currentState, previousState) =>
+          currentState.cart.items !== previousState.cart.items,
+        effect: async (action, listenerApi) => {
+          const { cart } = listenerApi.getState()
+          localStorage.setItem('cart', JSON.stringify(cart.items))
+        },
+      })
+
+      // Listener 2 — reakcja na konkretne akcje (pattern matching)
+      startListening({
+        matcher: isAnyOf(userLoggedIn, userLoggedOut),
+        effect: async (action, listenerApi) => {
+          if (userLoggedIn.match(action)) {
+            // Po zalogowaniu pobierz dane użytkownika
+            await listenerApi.dispatch(fetchUserProfile(action.payload.userId))
+          } else {
+            // Po wylogowaniu wyczyść store
+            listenerApi.dispatch(clearUserData())
+          }
+        },
+      })
+
+      // Listener 3 — debounce zapisu wyszukiwarki
+      startListening({
+        actionCreator: searchQueryChanged,
+        effect: async (action, listenerApi) => {
+          // Anuluj poprzednie wywołanie (debounce)
+          listenerApi.cancelActiveListeners()
+
+          // Czekaj 300ms zanim wyślij request
+          await listenerApi.delay(300)
+
+          const { query } = listenerApi.getState().search
+          await listenerApi.dispatch(fetchSearchResults(query))
+        },
+      })
+
+      // Dodaj do store
+      export const store = configureStore({
+        reducer: { /* ... */ },
+        middleware: (getDefaultMiddleware) =>
+          getDefaultMiddleware().prepend(listenerMiddleware.middleware),
+      })
+    lang: typescript
+
+  - title: redux-logger — logowanie w development
+    desc: >
+      redux-logger to popularna biblioteka logująca akcje Redux w konsoli przeglądarki
+      z kolorowym formatowaniem. Dodawaj ją TYLKO w development — w produkcji wyklucz
+      przez warunek na NODE_ENV lub konfigurację Vite.
+    code: |
+      import { configureStore } from '@reduxjs/toolkit'
+      import logger from 'redux-logger'
+
+      export const store = configureStore({
+        reducer: { /* ... */ },
+        middleware: (getDefaultMiddleware) => {
+          const middleware = getDefaultMiddleware()
+
+          // Dodaj logger TYLKO w development
+          if (process.env.NODE_ENV === 'development') {
+            return middleware.concat(logger)
+          }
+          return middleware
+        },
+      })
+
+      // Alternatywnie — własny minimalistyczny logger
+      const devLogger: Middleware = (store) => (next) => (action) => {
+        if (process.env.NODE_ENV !== 'development') return next(action)
+
+        const typedAction = action as { type: string }
+        console.log(
+          `%c[Redux] ${typedAction.type}`,
+          'color: #764ABC; font-weight: bold'
+        )
+        return next(action)
+      }
+    lang: typescript
+
+  - title: Redux DevTools — konfiguracja i użycie
+    desc: >
+      configureStore() automatycznie integruje Redux DevTools w development.
+      Możesz dostosować konfigurację: maksymalna liczba akcji w historii, filtrowanie,
+      latency trace. DevTools dają time-travel debugging, diff stanu i eksport/import.
+    code: |
+      import { configureStore } from '@reduxjs/toolkit'
+
+      export const store = configureStore({
+        reducer: { /* ... */ },
+        devTools: process.env.NODE_ENV !== 'production'
+          ? {
+              name: 'Moja Aplikacja',   // nazwa w DevTools
+              maxAge: 50,               // max 50 akcji w historii
+              trace: true,              // śledź call stack akcji
+              traceLimit: 25,           // max 25 ramek stosu
+              // Filtruj akcje z historii (np. polling co sekundę)
+              actionsDenylist: ['api/executeQuery/pending'],
+            }
+          : false,  // wyłącz całkowicie w produkcji
+      })
+
+      // Time-travel debugging przez kod (zaawansowane)
+      // Dispatch specjalnej akcji do DevTools
+      store.dispatch({
+        type: '@@redux-devtools/DISPATCH',
+        payload: { type: 'JUMP_TO_ACTION', actionId: 5 },
+      })
+
+      // Eksport snapshot stanu do pliku JSON (przez UI DevTools)
+      // Import: Ctrl+S w panelu DevTools → wczytaj stan z pliku
+    lang: typescript
+
+  - title: Serializability check i niestandardowe wartości
+    desc: >
+      RTK domyślnie sprawdza czy akcje i stan są serializowalne (brak Date, Map, Set, funkcji).
+      Gdy potrzebujesz takich wartości, możesz wyłączyć check dla konkretnych ścieżek
+      lub dodać serializację. Najlepiej przechowywać daty jako string ISO lub timestamp.
+    code: |
+      import { configureStore, isPlain } from '@reduxjs/toolkit'
+
+      export const store = configureStore({
+        reducer: { /* ... */ },
+        middleware: (getDefaultMiddleware) =>
+          getDefaultMiddleware({
+            serializableCheck: {
+              // Ignoruj konkretne ścieżki w stanie (np. biblioteki zewnętrzne)
+              ignoredPaths: ['auth.expiresAt', 'upload.file'],
+              // Ignoruj konkretne akcje
+              ignoredActions: ['upload/setFile'],
+              // Lub własna funkcja sprawdzająca
+              isSerializable: (value: unknown) =>
+                value instanceof Date ? true : isPlain(value),
+            },
+            // Wyłącz immutability check jeśli powoduje problemy z wydajnością
+            immutabilityCheck: { warnAfter: 64 },
+          }),
+      })
+
+      // Przechowuj daty jako ISO string zamiast obiektów Date
+      // Złe:  createdAt: new Date()
+      // Dobre: createdAt: new Date().toISOString()
+
+      // Przechowuj pliki tylko przez URL lub ID — nie bezpośrednio w store
+      // Złe:  file: FileObject
+      // Dobre: fileUrl: '/uploads/abc123.pdf'
+    lang: typescript

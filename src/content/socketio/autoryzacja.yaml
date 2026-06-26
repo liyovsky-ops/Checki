@@ -1,0 +1,246 @@
+labels:
+  main: Autoryzacja w Socket.io
+  mainLang: javascript
+
+intro:
+  title: Middleware autoryzacji Socket.io
+  desc: >
+    Autoryzacja w Socket.io odbywa się przez middleware — funkcje wywołane przed
+    nawiązaniem połączenia. Token (JWT, session cookie) klient przekazuje przez
+    socket.handshake.auth lub jako query param. Middleware sprawdza token i albo
+    woła next() (akceptuje połączenie) albo next(new Error()) (odrzuca). Po
+    weryfikacji dane użytkownika możesz przechować w socket.data i mieć do nich
+    dostęp w każdym handlerze eventu. Połączenie jest w pełni bezstanowe —
+    sprawdzaj uprawnienia per event dla krytycznych operacji.
+
+items:
+  - name: Middleware JWT — weryfikacja tokenu
+    desc: >
+      Klient wysyła token JWT przez auth handshake. Serwer weryfikuje token
+      w middleware, dekoduje payload i zapisuje dane w socket.data.
+      Middleware działa raz przy połączeniu — nie przy każdym evencie.
+    code: |
+      // === SERWER — middleware JWT ===
+      import jwt from 'jsonwebtoken'
+
+      const JWT_SECRET = process.env.JWT_SECRET
+
+      io.use((socket, next) => {
+        const token = socket.handshake.auth.token
+
+        if (!token) {
+          return next(new Error('Brak tokenu — uwierzytelnianie wymagane'))
+        }
+
+        try {
+          const payload = jwt.verify(token, JWT_SECRET)
+          // Zapisz dane usera na sockecie
+          socket.data.userId   = payload.sub
+          socket.data.userName = payload.name
+          socket.data.rola     = payload.role
+          next()
+        } catch (err) {
+          next(new Error('Nieprawidłowy lub wygasły token'))
+        }
+      })
+
+      io.on('connection', (socket) => {
+        // Dane usera dostępne we wszystkich handlerach
+        console.log(`Połączono: ${socket.data.userName} (${socket.data.userId})`)
+
+        socket.on('akcja', (data) => {
+          console.log(`Akcja od: ${socket.data.userId}`)
+        })
+      })
+
+      // === KLIENT — wysyłanie tokenu ===
+      import { io } from 'socket.io-client'
+
+      const token = localStorage.getItem('accessToken')
+
+      const socket = io('http://localhost:3001', {
+        auth: { token },
+      })
+
+      // Obsługa błędu autoryzacji
+      socket.on('connect_error', (err) => {
+        if (err.message === 'Brak tokenu — uwierzytelnianie wymagane') {
+          window.location.href = '/login'
+        }
+      })
+    lang: javascript
+
+  - name: Odświeżanie tokenu — dynamiczny auth
+    desc: >
+      JWT wygasa — klient musi odświeżyć token i zaktualizować auth przed reconnect.
+      Socket.io pozwala aktualizować auth dynamicznie — socket.auth to funkcja
+      wywołana przy każdej próbie połączenia.
+    code: |
+      // Klient — dynamiczny token (odświeżany przed reconnect)
+      const socket = io('http://localhost:3001', {
+        // auth jako funkcja — wywoływana przy każdej próbie połączenia
+        auth: (cb) => {
+          const token = localStorage.getItem('accessToken')
+          cb({ token })
+        },
+      })
+
+      socket.on('connect_error', async (err) => {
+        if (err.message === 'Nieprawidłowy lub wygasły token') {
+          try {
+            // Odśwież token przez HTTP
+            const resp = await fetch('/api/auth/refresh', { method: 'POST' })
+            const { accessToken } = await resp.json()
+            localStorage.setItem('accessToken', accessToken)
+            // Socket automatycznie użyje nowego tokenu przy reconnect
+            socket.connect()
+          } catch {
+            window.location.href = '/login'
+          }
+        }
+      })
+    lang: javascript
+
+  - name: Autoryzacja per-room i per-event
+    desc: >
+      Middleware działa przy połączeniu, ale krytyczne operacje wymagają sprawdzenia
+      uprawnień przy każdym evencie. Implementuj guard wewnątrz handlerów.
+    code: |
+      // Helper — sprawdź uprawnienia
+      function wymagajRole(socket, wymaganaRola) {
+        if (socket.data.rola !== wymaganaRola) {
+          socket.emit('blad_uprawnien', {
+            komunikat: `Wymagana rola: ${wymaganaRola}`,
+          })
+          return false
+        }
+        return true
+      }
+
+      io.on('connection', (socket) => {
+
+        // Event wymagający roli admin
+        socket.on('usun_uzytkownika', (userId) => {
+          if (!wymagajRole(socket, 'admin')) return
+
+          // Usuń usera
+          db.users.delete(userId)
+          io.emit('uzytkownik_usuniety', { userId })
+        })
+
+        // Dołącz do prywatnego room — sprawdź dostęp
+        socket.on('dolacz_do_prywatnego', async (roomId) => {
+          const maDosteP = await db.rooms.checkAccess(roomId, socket.data.userId)
+
+          if (!maDosteP) {
+            socket.emit('brak_dostepu', { roomId })
+            return
+          }
+
+          socket.join(roomId)
+          socket.to(roomId).emit('uzytkownik_dolaczyl', {
+            userId:   socket.data.userId,
+            userName: socket.data.userName,
+          })
+        })
+      })
+    lang: javascript
+
+  - name: Middleware per-namespace
+    desc: >
+      Każdy namespace może mieć własne middleware — namespace /admin wymaga roli
+      admina, /chat tylko uwierzytelnienia. Middleware aplikujesz na namespace
+      przez adminNS.use().
+    code: |
+      // Wspólne middleware JWT
+      function middlewareJWT(socket, next) {
+        const token = socket.handshake.auth.token
+        if (!token) return next(new Error('Brak tokenu'))
+        try {
+          socket.data.user = jwt.verify(token, process.env.JWT_SECRET)
+          next()
+        } catch {
+          next(new Error('Nieważny token'))
+        }
+      }
+
+      // Middleware wymagający roli admin
+      function middlewareAdmin(socket, next) {
+        if (socket.data.user?.role !== 'admin') {
+          return next(new Error('Brak uprawnień admina'))
+        }
+        next()
+      }
+
+      // Aplikuj per-namespace
+      const chatNS  = io.of('/chat')
+      const adminNS = io.of('/admin')
+
+      chatNS.use(middlewareJWT)                       // Tylko auth
+      adminNS.use(middlewareJWT).use(middlewareAdmin) // Auth + rola admin
+
+      chatNS.on('connection', (socket) => {
+        console.log('Chat:', socket.data.user.name)
+      })
+
+      adminNS.on('connection', (socket) => {
+        console.log('Admin panel:', socket.data.user.name)
+        socket.emit('stats', getAdminStats())
+      })
+    lang: javascript
+
+  - name: Rate limiting — ochrona przed spamem
+    desc: >
+      Socket.io nie ma wbudowanego rate limitingu. Implementuj go przez middleware
+      lub bibliotekę socket.io-rate-limiter. Ochrona przed spamem eventami —
+      szczególnie ważna dla publicznych czatów.
+    code: |
+      // Prosty rate limiter w pamięci
+      const limitMap = new Map()
+
+      function rateLimiter(maxEventow, okienko) {
+        return (socket, next) => {
+          const teraz = Date.now()
+          const klucz = socket.handshake.address
+
+          if (!limitMap.has(klucz)) {
+            limitMap.set(klucz, { count: 0, start: teraz })
+          }
+
+          const dane = limitMap.get(klucz)
+
+          // Resetuj licznik po okienku
+          if (teraz - dane.start > okienko) {
+            dane.count = 0
+            dane.start = teraz
+          }
+
+          dane.count++
+
+          if (dane.count > maxEventow) {
+            return next(new Error('Zbyt wiele połączeń — spróbuj za chwilę'))
+          }
+
+          next()
+        }
+      }
+
+      // Zastosuj: max 10 połączeń na 60 sekund per IP
+      io.use(rateLimiter(10, 60_000))
+
+      // Per-event rate limit (prosty token bucket)
+      io.on('connection', (socket) => {
+        let ostatniEmit = 0
+        const COOLDOWN  = 500  // ms między wiadomościami
+
+        socket.on('wiadomosc', (msg) => {
+          const teraz = Date.now()
+          if (teraz - ostatniEmit < COOLDOWN) {
+            socket.emit('blad', { komunikat: 'Wysyłasz za szybko!' })
+            return
+          }
+          ostatniEmit = teraz
+          io.emit('wiadomosc', { ...msg, od: socket.data.userId })
+        })
+      })
+    lang: javascript

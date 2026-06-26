@@ -1,0 +1,102 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Vite?
+  firstComponent: Quickstart — nowy projekt Vite
+  firstComponentLang: bash
+
+intro:
+  title: Czym jest Vite?
+  desc: >
+    Vite to narzędzie do budowania frontendu nowej generacji stworzone przez Evana You (twórcę Vue).
+    W trybie dev serwuje pliki jako natywne ESM — przeglądarka importuje moduły bezpośrednio,
+    bez bundlowania. Dzięki temu cold start trwa sekundy zamiast minut. HMR jest błyskawiczny
+    bo aktualizuje tylko zmieniony moduł. Na produkcję Vite używa Rollup — zoptymalizowane
+    chunki, tree-shaking, code splitting. TypeScript, JSX, CSS Modules, PostCSS — wszystko
+    out-of-the-box, zero konfiguracji.
+
+concepts:
+  - title: ESM Dev Server
+    desc: >
+      W trybie dev Vite NIE bundluje kodu. Serwuje każdy plik jako natywny ES Module
+      bezpośrednio do przeglądarki. Przeglądarka sama rozwiązuje importy i żąda plików
+      z serwera. Cold start jest niemal natychmiastowy — niezależnie od rozmiaru projektu.
+      Bundlowanie następuje tylko na produkcję (Rollup).
+    icon: "🌐"
+  - title: esbuild — transpilacja
+    desc: >
+      Vite używa esbuild (napisanego w Go) do transpilacji TypeScript, JSX i nowoczesnego
+      JavaScript. esbuild jest 10-100× szybszy niż tsc lub Babel. Ważne: esbuild TYLKO
+      transpiluje — nie sprawdza typów. Type checking robisz oddzielnie przez tsc --noEmit.
+    icon: "⚡"
+  - title: Rollup — produkcja
+    desc: >
+      Na produkcję Vite używa Rollup do bundlowania. Rollup daje doskonały tree-shaking,
+      code splitting (dynamiczne importy), optymalizację CSS. Output: zoptymalizowane pliki
+      z hashami w nazwach (cache busting). Rollup plugins są w pełni kompatybilne z Vite.
+    icon: "📦"
+  - title: HMR — Hot Module Replacement
+    desc: >
+      Zmiana pliku → tylko ten moduł jest zastępowany w przeglądarce. Stan aplikacji
+      zostaje zachowany — nie ma pełnego reload. Aktualizacja CSS jest natychmiastowa
+      i nie resetuje stanu. HMR API dla frameworków (React Fast Refresh, Vue HMR)
+      jest wbudowane w odpowiednie pluginy.
+    icon: "🔥"
+  - title: import.meta.env
+    desc: >
+      Zmienne środowiskowe dostępne przez import.meta.env. Tylko zmienne z prefiksem
+      VITE_ są eksponowane do kodu klienta (bezpieczeństwo). import.meta.env.MODE
+      to "development" lub "production". import.meta.env.DEV i import.meta.env.PROD
+      to booleanowe skróty. Pliki .env, .env.local, .env.production.
+    icon: "🔐"
+  - title: TypeScript natywnie
+    desc: >
+      Vite importuje pliki .ts bez dodatkowej konfiguracji. Nie potrzebujesz ts-loader,
+      babel-preset-typescript ani żadnych transformerów. Plik vite.config.ts jest
+      automatycznie rozpoznawany. Alias paths z tsconfig.json → skonfiguruj w resolve.alias.
+    icon: "🔷"
+
+whenToUse:
+  - Nowy projekt React, Vue, Svelte, Solid, Lit, Qwik
+  - Aplikacje TypeScript — zero konfiguracji transpilera
+  - Gdy webpack cold start trwa > 30 sekund
+  - Biblioteki frontendowe (library mode)
+  - Projekty wymagające szybkiego HMR
+  - Zamiast Create React App (CRA) — Vite jest oficjalnym zastępcą
+
+firstComponent: |
+  # Stwórz nowy projekt Vite
+  npm create vite@latest my-app -- --template react-ts
+  cd my-app
+  npm install
+  npm run dev
+
+  # Dostępne szablony:
+  # vanilla, vanilla-ts
+  # vue, vue-ts
+  # react, react-ts, react-swc, react-swc-ts
+  # preact, preact-ts
+  # lit, lit-ts
+  # svelte, svelte-ts
+  # solid, solid-ts
+  # qwik, qwik-ts
+
+  # Struktura projektu:
+  # my-app/
+  # ├── public/          # pliki statyczne (kopiowane bez zmian)
+  # ├── src/
+  # │   ├── main.tsx     # entry point
+  # │   ├── App.tsx
+  # │   └── assets/
+  # ├── index.html       # root HTML (entry point Vite!)
+  # ├── vite.config.ts
+  # ├── tsconfig.json
+  # └── package.json
+
+  # package.json scripts:
+  {
+    "scripts": {
+      "dev":     "vite",          // serwer dev z HMR
+      "build":   "vite build",    // produkcyjny build
+      "preview": "vite preview"   // podgląd produkcyjnego build
+    }
+  }

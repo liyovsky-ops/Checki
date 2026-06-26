@@ -1,0 +1,230 @@
+labels:
+  main: Konfiguracja vite.config.ts
+  mainLang: typescript
+
+intro:
+  title: vite.config.ts — centrum sterowania
+  desc: >
+    Plik vite.config.ts to główne miejsce konfiguracji Vite. Eksportujesz z niego
+    obiekt konfiguracyjny opakowany w defineConfig() — daje to autouzupełnianie
+    i type-safety. Vite automatycznie wykrywa ten plik w katalogu projektu.
+    Konfiguracja jest podzielona na sekcje: server (dev server), build (produkcja),
+    resolve (aliasy, extensions), plugins, css, optimizeDeps.
+
+items:
+  - title: defineConfig — podstawa
+    desc: >
+      defineConfig() to helper dający TypeScript intellisense — nie jest wymagany,
+      ale zalecany. Możesz też eksportować zwykły obiekt lub funkcję zwracającą
+      obiekt (dla dynamicznej konfiguracji zależnej od mode/command).
+    code: |
+      import { defineConfig } from 'vite';
+      import react from '@vitejs/plugin-react';
+      import path from 'path';
+
+      // Podstawowa konfiguracja
+      export default defineConfig({
+        plugins: [react()],
+      });
+
+      // Dynamiczna konfiguracja (funkcja)
+      export default defineConfig(({ command, mode }) => {
+        // command: 'serve' (dev) | 'build' (produkcja)
+        // mode: 'development' | 'production' | custom
+        return {
+          plugins: [react()],
+          define: {
+            __IS_DEV__: command === 'serve',
+          },
+        };
+      });
+    lang: typescript
+
+  - title: resolve.alias — aliasy ścieżek
+    desc: >
+      Aliasy eliminują importy względne w stylu ../../../../components. Definiujesz
+      skrót (np. @) który wskazuje na katalog. Pamiętaj by zsynchronizować aliasy
+      z tsconfig.json (paths) — Vite i TypeScript działają niezależnie.
+    code: |
+      import { defineConfig } from 'vite';
+      import path from 'path';
+
+      export default defineConfig({
+        resolve: {
+          alias: {
+            '@': path.resolve(__dirname, './src'),
+            '@components': path.resolve(__dirname, './src/components'),
+            '@utils': path.resolve(__dirname, './src/utils'),
+            '@assets': path.resolve(__dirname, './src/assets'),
+            '@hooks': path.resolve(__dirname, './src/hooks'),
+          },
+          // Kolejność rozwiązywania extensions (nie musisz podawać ext w imporcie)
+          extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json'],
+        },
+      });
+
+      // tsconfig.json — zsynchronizuj aliasy!
+      {
+        "compilerOptions": {
+          "baseUrl": ".",
+          "paths": {
+            "@/*": ["src/*"],
+            "@components/*": ["src/components/*"]
+          }
+        }
+      }
+
+      // Teraz zamiast:
+      import Button from '../../../components/Button';
+      // Piszesz:
+      import Button from '@components/Button';
+    lang: typescript
+
+  - title: server — dev server
+    desc: >
+      Sekcja server konfiguruje lokalny serwer deweloperski: port, host (dostęp
+      z innych urządzeń w sieci), HTTPS, proxy do backendu (eliminuje CORS w dev),
+      auto-open w przeglądarce i hot module replacement.
+    code: |
+      import { defineConfig } from 'vite';
+
+      export default defineConfig({
+        server: {
+          port: 3000,              // domyślnie 5173
+          host: '0.0.0.0',         // dostęp z sieci LAN (tablet, telefon)
+          open: true,              // otwórz przeglądarkę automatycznie
+          strictPort: true,        // fail jeśli port zajęty (nie szukaj następnego)
+
+          // Proxy do backendu — eliminuje CORS problem w dev
+          proxy: {
+            '/api': {
+              target: 'http://localhost:8000',
+              changeOrigin: true,
+              rewrite: (path) => path.replace(/^\/api/, ''),
+            },
+            '/ws': {
+              target: 'ws://localhost:8000',
+              ws: true,            // WebSocket proxy
+            },
+          },
+
+          // HTTPS z własnym certyfikatem
+          https: {
+            key: './certs/key.pem',
+            cert: './certs/cert.pem',
+          },
+
+          // Nagłówki CORS dla dev
+          headers: {
+            'Cross-Origin-Embedder-Policy': 'require-corp',
+          },
+        },
+      });
+    lang: typescript
+
+  - title: build — konfiguracja produkcji
+    desc: >
+      Sekcja build kontroluje output produkcyjny: katalog wynikowy, sourcemaps,
+      target przeglądarek, chunking (podział kodu), minifikacja. Rollup options
+      dają pełną kontrolę nad sposobem bundlowania.
+    code: |
+      import { defineConfig } from 'vite';
+
+      export default defineConfig({
+        build: {
+          outDir: 'dist',           // katalog wynikowy (domyślnie 'dist')
+          assetsDir: 'assets',      // podkatalog na assets
+          sourcemap: true,          // sourcemaps dla debugowania (true/false/'inline'/'hidden')
+          minify: 'esbuild',        // 'esbuild' (szybki) | 'terser' (lepsza kompresja) | false
+          target: 'es2020',         // target przeglądarek
+
+          // Podział na chunki
+          rollupOptions: {
+            output: {
+              // Manualne chunki — kontrola nad podziałem kodu
+              manualChunks: {
+                vendor: ['react', 'react-dom'],
+                router: ['react-router-dom'],
+                ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
+              },
+              // Nazwy plików z hashem (cache busting)
+              chunkFileNames: 'assets/js/[name]-[hash].js',
+              entryFileNames: 'assets/js/[name]-[hash].js',
+              assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
+            },
+          },
+
+          // Limit rozmiaru chunku (warning gdy za duży)
+          chunkSizeWarningLimit: 500, // kB
+
+          // Biblioteka (patrz: Library Mode)
+          // lib: { entry: 'src/index.ts', name: 'MyLib', formats: ['es', 'cjs'] }
+        },
+      });
+    lang: typescript
+
+  - title: preview — podgląd buildu
+    desc: >
+      vite preview uruchamia lokalny serwer serwujący pliki z katalogu dist.
+      Pozwala przetestować produkcyjny build lokalnie przed deployem. Konfiguracja
+      analogiczna do server, ale dla serwera statycznego.
+    code: |
+      import { defineConfig } from 'vite';
+
+      export default defineConfig({
+        preview: {
+          port: 4173,           // domyślny port preview
+          host: true,
+          strictPort: true,
+          // Proxy działa też w preview
+          proxy: {
+            '/api': 'http://localhost:8000',
+          },
+        },
+      });
+
+      // Użycie:
+      // npm run build   → zbuduj do dist/
+      // vite preview    → serwuj dist/ lokalnie na port 4173
+      // Otwórz: http://localhost:4173
+    lang: typescript
+
+  - title: css — konfiguracja stylów
+    desc: >
+      Vite obsługuje CSS Modules, PostCSS, Sass/Less/Stylus out-of-the-box
+      (po instalacji preprocessora). Konfiguracja CSS Modules: nazwy klas,
+      lokalizacja, inject. PostCSS config przez postcss.config.js lub inline.
+    code: |
+      import { defineConfig } from 'vite';
+
+      export default defineConfig({
+        css: {
+          // CSS Modules
+          modules: {
+            localsConvention: 'camelCase',        // .my-class → myClass
+            generateScopedName: '[name]__[local]___[hash:base64:5]',
+          },
+
+          // PostCSS inline (lub przez postcss.config.js)
+          postcss: {
+            plugins: [
+              require('tailwindcss'),
+              require('autoprefixer'),
+            ],
+          },
+
+          // Preprocessor (Sass/Less/Stylus)
+          preprocessorOptions: {
+            scss: {
+              additionalData: `@import "@/styles/variables.scss";`,
+            },
+            less: {
+              modifyVars: { '@primary-color': '#646CFF' },
+            },
+          },
+
+          // DevSourcemap dla CSS
+          devSourcemap: true,
+        },
+      });
+    lang: typescript

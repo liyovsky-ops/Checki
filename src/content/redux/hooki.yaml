@@ -1,0 +1,208 @@
+labels:
+  main: Hooki Redux
+  mainLang: typescript
+
+intro:
+  title: useSelector, useDispatch i typowane hooki
+  desc: >
+    react-redux dostarcza dwa główne hooki: useSelector() do odczytu stanu ze store
+    i useDispatch() do wysyłania akcji. W TypeScript warto stworzyć typowane wersje
+    (useAppSelector, useAppDispatch) żeby uniknąć ręcznego podawania typów wszędzie.
+    reselect i createSelector pozwalają na memoizowane selektory — komponent renderuje się
+    tylko gdy wynik selektora faktycznie się zmienia, nie przy każdej zmianie store.
+
+items:
+  - title: useSelector — odczyt stanu
+    desc: >
+      useSelector() pobiera wartość ze store. Przyjmuje funkcję selektora która dostaje
+      cały stan i zwraca potrzebny fragment. React-redux porównuje poprzedni i nowy wynik
+      selektora — re-render tylko gdy wartość się zmieniła (porównanie przez ===).
+    code: |
+      import { useSelector } from 'react-redux'
+      import type { RootState } from '../store'
+
+      function UserProfile() {
+        // Prosty selektor — odczyt jednego pola
+        const userName = useSelector((state: RootState) => state.user.name)
+        const userAge  = useSelector((state: RootState) => state.user.age)
+
+        // Selektor z transformacją
+        const isAdult = useSelector((state: RootState) => state.user.age >= 18)
+
+        // Selektor listy — uwaga: nowy obiekt na każdy render (problem z wydajnością)
+        const completedTodos = useSelector(
+          (state: RootState) => state.todos.items.filter(t => t.completed)
+        )
+
+        return (
+          <div>
+            <p>{userName}, {userAge} lat {isAdult ? '(dorosły)' : '(niepełnoletni)'}</p>
+            <p>Ukończone zadania: {completedTodos.length}</p>
+          </div>
+        )
+      }
+    lang: typescript
+
+  - title: useDispatch — wysyłanie akcji
+    desc: >
+      useDispatch() zwraca funkcję dispatch store. Używasz jej do wysyłania action creators
+      z slicy lub thunków z createAsyncThunk. Każde dispatch trafia przez middleware
+      do reducerów, które aktualizują stan.
+    code: |
+      import { useDispatch } from 'react-redux'
+      import { increment, decrement, incrementByAmount } from '../store/counterSlice'
+      import { fetchPosts } from '../store/postsSlice'
+      import type { AppDispatch } from '../store'
+
+      function CounterControls() {
+        // Bez typowania — dispatch ma typ Dispatch<AnyAction>
+        const dispatch = useDispatch()
+
+        // Z typowaniem AppDispatch — obsługuje thunki!
+        const dispatch = useDispatch<AppDispatch>()
+
+        const handleLoad = async () => {
+          // Thunk zwraca promise — możesz await i sprawdzić wynik
+          const result = await dispatch(fetchPosts())
+          if (fetchPosts.fulfilled.match(result)) {
+            console.log('Pobrano posty:', result.payload)
+          }
+        }
+
+        return (
+          <div>
+            <button onClick={() => dispatch(decrement())}>-</button>
+            <button onClick={() => dispatch(increment())}>+</button>
+            <button onClick={() => dispatch(incrementByAmount(10))}>+10</button>
+            <button onClick={handleLoad}>Pobierz posty</button>
+          </div>
+        )
+      }
+    lang: typescript
+
+  - title: Typowane hooki — useAppSelector i useAppDispatch
+    desc: >
+      Zamiast przekazywać RootState i AppDispatch przy każdym wywołaniu,
+      stwórz raz typowane hooki i używaj ich wszędzie. To oficjalnie zalecany
+      pattern w dokumentacji Redux Toolkit — eliminuje powtarzanie typów.
+    code: |
+      // store/hooks.ts — stwórz raz, używaj wszędzie
+      import { useDispatch, useSelector, useStore } from 'react-redux'
+      import type { TypedUseSelectorHook } from 'react-redux'
+      import type { RootState, AppDispatch, AppStore } from './index'
+
+      // Typowany dispatch — obsługuje thunki bez ręcznego podawania AppDispatch
+      export const useAppDispatch: () => AppDispatch = useDispatch
+
+      // Typowany selector — RootState wbudowany, nie trzeba podawać
+      export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
+
+      // Typowany store (rzadziej potrzebny)
+      export const useAppStore: () => AppStore = useStore
+
+      // -----------------------------------------------
+      // Użycie w komponencie — BEZ ręcznego typowania
+      // -----------------------------------------------
+      import { useAppSelector, useAppDispatch } from '../store/hooks'
+      import { increment } from '../store/counterSlice'
+
+      function Counter() {
+        // Brak (state: RootState) — typ automatyczny
+        const count    = useAppSelector((state) => state.counter.value)
+        const dispatch = useAppDispatch()
+
+        return (
+          <button onClick={() => dispatch(increment())}>
+            Licznik: {count}
+          </button>
+        )
+      }
+    lang: typescript
+
+  - title: createSelector — memoizowane selektory (reselect)
+    desc: >
+      createSelector() z biblioteki reselect (wbudowanej w RTK) tworzy memoizowany selektor.
+      Oblicza wynik tylko gdy wejście (input selectors) się zmieniło. Kluczowe dla selektorów
+      zwracających nowe tablice/obiekty — bez memoizacji każdy re-render store wywołuje
+      re-render komponentu nawet gdy dane się nie zmieniły.
+    code: |
+      import { createSelector } from '@reduxjs/toolkit'
+      import type { RootState } from '../store'
+
+      // Proste selektory wejściowe (input selectors)
+      const selectTodos      = (state: RootState) => state.todos.items
+      const selectFilter     = (state: RootState) => state.todos.filter
+      const selectSearchText = (state: RootState) => state.todos.searchText
+
+      // Memoizowany selektor — oblicza tylko gdy todos lub filter się zmienią
+      export const selectFilteredTodos = createSelector(
+        [selectTodos, selectFilter, selectSearchText],
+        (todos, filter, searchText) => {
+          // Ta funkcja wywołuje się TYLKO gdy zmieniły się wejścia
+          const byFilter = filter === 'all'
+            ? todos
+            : todos.filter(t => t.completed === (filter === 'completed'))
+
+          return searchText
+            ? byFilter.filter(t => t.title.toLowerCase().includes(searchText.toLowerCase()))
+            : byFilter
+        }
+      )
+
+      // Selektor liczący pochodne wartości
+      export const selectTodoStats = createSelector(
+        [selectTodos],
+        (todos) => ({
+          total:     todos.length,
+          completed: todos.filter(t => t.completed).length,
+          pending:   todos.filter(t => !t.completed).length,
+        })
+      )
+
+      // W komponencie — re-render tylko gdy wynik się zmieni
+      function TodoList() {
+        const todos = useAppSelector(selectFilteredTodos)  // memoizowany
+        const stats = useAppSelector(selectTodoStats)      // memoizowany
+
+        return (
+          <div>
+            <p>{stats.completed}/{stats.total} ukończonych</p>
+            {todos.map(todo => <TodoItem key={todo.id} todo={todo} />)}
+          </div>
+        )
+      }
+    lang: typescript
+
+  - title: useSelector z shallow equal — optymalizacja
+    desc: >
+      Domyślnie useSelector porównuje wyniki przez === (referencja).
+      Gdy selektor zwraca nowy obiekt przy każdym wywołaniu, użyj shallowEqual
+      żeby porównać właściwości obiektu zamiast referencji. Alternatywnie:
+      createSelector lub osobne wywołania useSelector dla każdego pola.
+    code: |
+      import { useSelector, shallowEqual } from 'react-redux'
+      import type { RootState } from '../store'
+
+      function UserCard() {
+        // Problem: ten selektor zwraca nowy obiekt przy każdym wywołaniu
+        // → komponent re-renderuje się przy każdej zmianie store (nawet niezwiązanej)
+        const { name, email } = useSelector((state: RootState) => ({
+          name:  state.user.name,
+          email: state.user.email,
+        }))
+        // Rozwiązanie 1: shallowEqual — porównuje właściwości obiektu
+        const { name, email } = useSelector(
+          (state: RootState) => ({ name: state.user.name, email: state.user.email }),
+          shallowEqual  // drugi argument
+        )
+
+        // Rozwiązanie 2 (zalecane): osobne wywołania useSelector
+        const name  = useAppSelector((state) => state.user.name)
+        const email = useAppSelector((state) => state.user.email)
+
+        // Rozwiązanie 3 (najlepsze): createSelector z reselect
+        const userData = useAppSelector(selectUserData)  // memoizowany selektor
+
+        return <div>{name} — {email}</div>
+      }
+    lang: typescript

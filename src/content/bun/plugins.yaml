@@ -1,0 +1,242 @@
+title: Ekosystem Bun
+
+items:
+  - name: ElysiaJS
+    desc: >
+      Najszybszy framework webowy na Bun — zaprojektowany specjalnie pod Bun.serve().
+      TypeScript-first z automatyczną walidacją typów i generowaniem klienta API.
+      Benchmark: szybszy niż Fastify i Express.
+    icon: "🦊"
+    code: |
+      bun add elysia
+
+      import { Elysia, t } from "elysia";
+
+      const app = new Elysia()
+        .get("/", () => "Witaj z ElysiaJS!")
+        .get("/users/:id", ({ params }) => ({
+          id: params.id,
+          imie: "Łukasz",
+        }))
+        .post("/users", ({ body }) => ({
+          stworzono: true,
+          dane: body,
+        }), {
+          // Walidacja body — błąd 422 jeśli nie pasuje
+          body: t.Object({
+            imie: t.String(),
+            email: t.String({ format: "email" }),
+          }),
+        })
+        .listen(3000);
+
+      console.log(`ElysiaJS działa na ${app.server?.url}`);
+
+  - name: Hono
+    desc: >
+      Ultraszybki, lekki framework webowy działający na Bun, Deno, Cloudflare Workers i Node.js.
+      Idealny gdy potrzebujesz przenośności — ten sam kod działa na edge i na serwerze.
+    icon: "🔥"
+    code: |
+      bun add hono
+
+      import { Hono } from "hono";
+      import { cors } from "hono/cors";
+      import { logger } from "hono/logger";
+      import { zValidator } from "@hono/zod-validator";
+      import { z } from "zod";
+
+      const app = new Hono();
+
+      // Middleware
+      app.use("*", logger());
+      app.use("/api/*", cors());
+
+      // Routing
+      app.get("/", (c) => c.text("Witaj z Hono na Bun!"));
+      app.get("/users/:id", (c) => {
+        const id = c.req.param("id");
+        return c.json({ id, imie: "Łukasz" });
+      });
+
+      // Walidacja z Zod
+      app.post(
+        "/users",
+        zValidator("json", z.object({
+          imie: z.string(),
+          email: z.string().email(),
+        })),
+        (c) => {
+          const body = c.req.valid("json");
+          return c.json({ stworzono: true, ...body }, 201);
+        }
+      );
+
+      export default {
+        port: 3000,
+        fetch: app.fetch,
+      };
+
+  - name: Kompatybilność z Node.js
+    desc: >
+      Bun implementuje Node.js API — możesz uruchomić większość aplikacji Express, Fastify
+      lub Koa bezpośrednio z bun zamiast node. Żadnych zmian w kodzie dla popularnych paczek.
+    icon: "🔁"
+    code: |
+      # Migracja istniejącej aplikacji Express:
+      # 1. Zmień "node index.js" na "bun index.js"
+      # 2. Usuń "require('dotenv').config()" — Bun ładuje .env automatycznie
+      # 3. Opcjonalnie: zmień require() na import (ESM)
+
+      // express-app.ts — działa z bun bez modyfikacji!
+      import express from "express";
+
+      const app = express();
+      app.use(express.json());
+
+      app.get("/api/hello", (req, res) => {
+        res.json({ message: "Express na Bun działa!" });
+      });
+
+      app.listen(3000, () => {
+        console.log("Express na Bun — port 3000");
+      });
+
+      # Uruchomienie:
+      # node index.js  →  bun index.js  (zero zmian!)
+
+  - name: Bun Macros
+    desc: >
+      Makra Bun to funkcje wykonywane w czasie budowania (build-time) — nie w runtime.
+      Pozwalają na inlining danych, generowanie kodu i optymalizacje niedostępne w runtime.
+    icon: "🔮"
+    code: |
+      // macros/getData.ts — ta funkcja WYKONA SIĘ podczas bun build
+      export function pobierzWersje() {
+        // Kod tutaj działa w czasie budowania (build time)
+        return process.env.npm_package_version ?? "0.0.0";
+      }
+
+      // Użycie w kodzie aplikacji
+      import { pobierzWersje } from "./macros/getData.ts" with { type: "macro" };
+
+      // Po bundlowaniu ta linia staje się np:
+      // const wersja = "1.2.3";  ← wkompilowana na stałe
+      const wersja = pobierzWersje();
+      console.log(`Wersja aplikacji: ${wersja}`);
+
+      // Inny przykład — wczytaj JSON z API podczas buildu
+      export async function pobierzKonfiguracje() {
+        const resp = await fetch("https://api.example.com/config");
+        return resp.json(); // wynik wkompilowany w bundle
+      }
+
+  - name: Plugins API
+    desc: >
+      Bun Build Plugins pozwalają na transformację plików podczas bundlowania.
+      Możesz obsługiwać niestandardowe rozszerzenia, generować kod lub transformować assets.
+    icon: "🧩"
+    code: |
+      // build-with-plugin.ts
+      import type { BunPlugin } from "bun";
+
+      // Plugin transformujący pliki .txt → moduł JS
+      const tekstPlugin: BunPlugin = {
+        name: "TekstPlugin",
+        setup(build) {
+          // Przechwytuj importy plików .txt
+          build.onLoad({ filter: /\.txt$/ }, async ({ path }) => {
+            const tekst = await Bun.file(path).text();
+            return {
+              contents: `export default ${JSON.stringify(tekst)};`,
+              loader: "js",
+            };
+          });
+        },
+      };
+
+      // Plugin YAML → JSON
+      const yamlPlugin: BunPlugin = {
+        name: "YAMLPlugin",
+        setup(build) {
+          build.onLoad({ filter: /\.ya?ml$/ }, async ({ path }) => {
+            const { parse } = await import("yaml"); // zewnętrzna biblioteka
+            const tekst = await Bun.file(path).text();
+            const dane = parse(tekst);
+            return {
+              contents: `export default ${JSON.stringify(dane)};`,
+              loader: "js",
+            };
+          });
+        },
+      };
+
+      await Bun.build({
+        entrypoints: ["./src/index.ts"],
+        outdir: "./dist",
+        plugins: [tekstPlugin, yamlPlugin],
+      });
+
+  - name: Railway — hosting Bun
+    desc: >
+      Railway to jeden z najprostszych sposobów hostowania aplikacji Bun.
+      Automatycznie wykrywa Bun i uruchamia poprawny start command. Bezpłatny tier dostępny.
+    icon: "🚂"
+    code: |
+      # railway.toml (opcjonalny — Railway wykrywa Bun automatycznie)
+      [build]
+      builder = "nixpacks"
+
+      [deploy]
+      startCommand = "bun run src/index.ts"
+      healthcheckPath = "/health"
+      healthcheckTimeout = 10
+
+      # .railwayignore
+      # node_modules/
+      # .env
+      # dist/
+
+      # Deployment:
+      # 1. npm i -g @railway/cli
+      # 2. railway login
+      # 3. railway init
+      # 4. railway up
+
+      # Lub przez GitHub: połącz repo i Railway deploy automatycznie
+
+  - name: Fly.io — hosting Bun
+    desc: >
+      Fly.io oferuje deployment Bun przez Docker — pełna kontrola nad środowiskiem.
+      Globalny edge deployment w wielu regionach, dobre dla niskich latencji.
+    icon: "🦋"
+    code: |
+      # Dockerfile dla aplikacji Bun
+      FROM oven/bun:1 AS base
+      WORKDIR /app
+
+      # Instalacja zależności (cached layer)
+      COPY package.json bun.lockb ./
+      RUN bun install --frozen-lockfile --production
+
+      # Kopiowanie kodu
+      COPY src/ ./src/
+
+      # Uruchomienie
+      EXPOSE 3000
+      CMD ["bun", "run", "src/index.ts"]
+
+      # fly.toml
+      # app = "moja-aplikacja-bun"
+      # primary_region = "waw"  # Warsaw!
+      #
+      # [http_service]
+      #   internal_port = 3000
+      #   force_https = true
+      #
+      # [env]
+      #   PORT = "3000"
+
+      # Deployment:
+      # flyctl launch
+      # flyctl deploy

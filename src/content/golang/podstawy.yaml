@@ -1,0 +1,305 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Go?
+  firstComponent: Quickstart
+  firstComponentLang: go
+
+intro:
+  title: Czym jest Go?
+  desc: >
+    Go (Golang) to statycznie typowany, kompilowany język stworzony przez Google w 2009 roku.
+    Zaprojektowany z myślą o prostocie — mały zestaw słów kluczowych, brak dziedziczenia klas, brak wyjątków.
+    Kompiluje się do pojedynczego binarki bez zewnętrznych zależności.
+    Wbudowana współbieżność przez goroutines i channels — miliony goroutines w jednym procesie.
+    Używany przez Docker, Kubernetes, Terraform, Prometheus, CockroachDB.
+
+concepts:
+  - title: Prostota ponad wszystko
+    desc: >
+      Go ma 25 słów kluczowych (Python ma 35, Java ponad 50).
+      Jeden sposób formatowania kodu (gofmt), jedna konwencja nazewnictwa.
+      Jeśli coś da się zrobić prosto — nie ma skomplikowanej alternatywy.
+    icon: "✂️"
+  - title: Goroutines — tania współbieżność
+    desc: >
+      Goroutine to lekki wątek zarządzany przez runtime Go — nie przez OS.
+      Można uruchomić milion goroutines zużywając kilka MB RAM.
+      Komunikacja przez channels zamiast shared memory i locków.
+    icon: "⚡"
+  - title: Interfaces — duck typing
+    desc: >
+      Interfejsy w Go są implicit — typ implementuje interfejs jeśli ma odpowiednie metody.
+      Nie deklarujesz "implements". Zero coupling — biblioteka nie zna twoich interfejsów.
+      Podstawa kompozycji zamiast dziedziczenia.
+    icon: "🦆"
+  - title: Błędy jako wartości
+    desc: >
+      Go nie ma wyjątków. Funkcje zwracają (wartość, error).
+      Zmusza do jawnej obsługi błędów przy każdym wywołaniu.
+      Kod jest bardziej przewidywalny i łatwiejszy do debugowania.
+    icon: "🔍"
+
+whenToUse:
+  - Mikroserwisy i API o wysokiej przepustowości
+  - Narzędzia CLI i DevOps (jak kubectl, terraform, docker)
+  - Pipeliny danych i serwisy strumieniowe
+  - Systemy wymagające małego zużycia pamięci i niskich opóźnień
+  - "Gdy Python/Node.js za wolne, a Rust zbyt skomplikowany"
+
+firstComponent: |
+  // Plik: main.go
+  package main
+
+  import (
+      "fmt"
+      "net/http"
+  )
+
+  // Zwracanie wielu wartości
+  func divide(a, b float64) (float64, error) {
+      if b == 0 {
+          return 0, fmt.Errorf("nie można dzielić przez zero")
+      }
+      return a / b, nil
+  }
+
+  func main() {
+      // Deklaracja zmiennych
+      name := "Go"          // krótka deklaracja (wnioskowanie typu)
+      var version int = 1   // jawna deklaracja
+      const pi = 3.14159    // stała
+
+      fmt.Printf("Witaj, %s %d! Pi = %.2f\n", name, version, pi)
+
+      // Obsługa błędu — wzorzec Go
+      result, err := divide(10, 3)
+      if err != nil {
+          fmt.Println("Błąd:", err)
+          return
+      }
+      fmt.Printf("10 / 3 = %.4f\n", result)
+
+      // Prosty HTTP serwer
+      http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+          fmt.Fprintf(w, "Hello, World!")
+      })
+      fmt.Println("Serwer na :8080")
+      http.ListenAndServe(":8080", nil)
+  }
+
+  // Uruchom: go run main.go
+  // Skompiluj: go build -o server main.go
+
+items:
+  - title: package i import
+    desc: >
+      Każdy plik Go należy do pakietu. Pakiet main + funkcja main() = punkt wejścia programu.
+      Import grup w nawiasach — stdlib, potem zewnętrzne. goimports automatycznie zarządza importami.
+    code: |
+      package main
+
+      import (
+          "fmt"       // standardowa biblioteka — I/O
+          "math"      // stdlib — matematyka
+          "strings"   // stdlib — operacje na stringach
+          "time"      // stdlib — czas
+
+          "github.com/gin-gonic/gin"  // zewnętrzna zależność
+      )
+
+      func main() {
+          fmt.Println("Teraz:", time.Now().Format("2006-01-02"))
+          fmt.Println(strings.ToUpper("go jest świetny"))
+          fmt.Println(math.Sqrt(144))
+      }
+    lang: go
+
+  - title: Zmienne i stałe
+    desc: >
+      Go ma dwa sposoby deklaracji: var (jawna) i := (krótka, tylko wewnątrz funkcji).
+      Zero values — każda zmienna ma domyślną wartość: 0 dla liczb, "" dla stringów, nil dla wskaźników.
+      Nieużywane zmienne to błąd kompilacji — Go wymusza czysty kod.
+    code: |
+      package main
+
+      import "fmt"
+
+      // Stałe — wartości kompilacji
+      const (
+          MaxSize = 1000
+          AppName = "MyService"
+          Pi      = 3.14159
+      )
+
+      func main() {
+          // Krótka deklaracja z wnioskaniem typu
+          name := "Alice"        // string
+          age  := 30             // int
+          score := 9.8           // float64
+          active := true         // bool
+
+          // Jawna deklaracja
+          var count int          // zero value = 0
+          var msg string         // zero value = ""
+          var ptr *int           // zero value = nil
+
+          fmt.Println(name, age, score, active)
+          fmt.Println(count, msg, ptr) // 0  <nil>
+
+          // Wielokrotne przypisanie
+          x, y := 10, 20
+          x, y = y, x  // swap bez temp!
+          fmt.Println(x, y) // 20 10
+      }
+    lang: go
+
+  - title: Funkcje i wielokrotne zwracane wartości
+    desc: >
+      Funkcje w Go mogą zwracać wiele wartości — najczęściej (wynik, error).
+      Named return values — możesz nazwać zwracane wartości i użyć gołego return.
+      Defer odracza wywołanie funkcji do końca bieżącej funkcji — świetne do zamykania zasobów.
+    code: |
+      package main
+
+      import (
+          "errors"
+          "fmt"
+      )
+
+      // Funkcja z wieloma zwracanymi wartościami
+      func minMax(nums []int) (int, int) {
+          min, max := nums[0], nums[0]
+          for _, n := range nums {
+              if n < min { min = n }
+              if n > max { max = n }
+          }
+          return min, max
+      }
+
+      // Named return values
+      func split(sum int) (x, y int) {
+          x = sum * 4 / 9
+          y = sum - x
+          return // naked return — zwraca x i y
+      }
+
+      // Defer — wykonuje się na końcu funkcji (LIFO)
+      func readFile(path string) error {
+          fmt.Println("Otwieramy plik:", path)
+          defer fmt.Println("Zamykamy plik:", path) // wykona się ostatnie
+
+          // ... operacje na pliku
+          return nil
+      }
+
+      func main() {
+          nums := []int{5, 2, 8, 1, 9, 3}
+          min, max := minMax(nums)
+          fmt.Printf("Min: %d, Max: %d\n", min, max)
+
+          x, y := split(17)
+          fmt.Println(x, y) // 7 10
+
+          readFile("data.txt")
+          // Output: Otwieramy plik: data.txt
+          //         Zamykamy plik: data.txt
+      }
+    lang: go
+
+  - title: Pętle i range
+    desc: >
+      Go ma TYLKO pętlę for — zastępuje while, do-while i foreach.
+      range iteruje po slice, map, channel, string.
+      _ (blank identifier) ignoruje wartość — Go wymaga użycia każdej zmiennej.
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          // Klasyczna pętla
+          for i := 0; i < 3; i++ {
+              fmt.Println(i)
+          }
+
+          // Pętla "while"
+          n := 1
+          for n < 100 {
+              n *= 2
+          }
+          fmt.Println(n) // 128
+
+          // range po slice
+          fruits := []string{"jabłko", "gruszka", "śliwka"}
+          for i, fruit := range fruits {
+              fmt.Printf("%d: %s\n", i, fruit)
+          }
+
+          // range po mapie
+          scores := map[string]int{"Alice": 95, "Bob": 87}
+          for name, score := range scores {
+              fmt.Printf("%s: %d\n", name, score)
+          }
+
+          // Ignorowanie indeksu
+          for _, fruit := range fruits {
+              fmt.Println(fruit)
+          }
+      }
+    lang: go
+
+  - title: Interfejsy i duck typing
+    desc: >
+      Interfejs w Go definiuje zestaw metod. Typ automatycznie implementuje interfejs jeśli ma te metody.
+      Nie piszesz "implements" — to Go sam sprawdza.
+      Interfejsy pozwalają pisać kod niezależny od konkretnych typów.
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "math"
+      )
+
+      // Definicja interfejsu
+      type Shape interface {
+          Area() float64
+          Perimeter() float64
+      }
+
+      // Circle implementuje Shape automatycznie
+      type Circle struct {
+          Radius float64
+      }
+
+      func (c Circle) Area() float64 {
+          return math.Pi * c.Radius * c.Radius
+      }
+
+      func (c Circle) Perimeter() float64 {
+          return 2 * math.Pi * c.Radius
+      }
+
+      // Rectangle też implementuje Shape
+      type Rectangle struct {
+          Width, Height float64
+      }
+
+      func (r Rectangle) Area() float64      { return r.Width * r.Height }
+      func (r Rectangle) Perimeter() float64 { return 2 * (r.Width + r.Height) }
+
+      // Funkcja przyjmuje interfejs — działa z każdym typem
+      func printShapeInfo(s Shape) {
+          fmt.Printf("Pole: %.2f, Obwód: %.2f\n", s.Area(), s.Perimeter())
+      }
+
+      func main() {
+          shapes := []Shape{
+              Circle{Radius: 5},
+              Rectangle{Width: 4, Height: 6},
+          }
+          for _, s := range shapes {
+              printShapeInfo(s)
+          }
+      }
+    lang: go

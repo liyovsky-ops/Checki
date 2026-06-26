@@ -1,0 +1,175 @@
+title: Komendy Rust / Cargo
+
+groups:
+  - name: Instalacja i zarządzanie toolchainem
+    icon: "🔧"
+    commands:
+      - cmd: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+        desc: Zainstaluj Rust przez rustup (Linux/macOS)
+        detail:
+          what: Instaluje rustup — menedżer toolchainu Rust — oraz domyślny stable toolchain.
+          how: rustup zarządza wersjami Rusta (stable/beta/nightly) i komponentami (clippy, rustfmt, rust-analyzer).
+          tips:
+            - 'source ~/.cargo/env — załaduj PATH po instalacji'
+            - 'rustup update — zaktualizuj do najnowszej wersji stable'
+      - cmd: rustup update
+        desc: Zaktualizuj Rust do najnowszej wersji
+        detail:
+          what: Pobiera najnowszy stable Rust i aktualizuje wszystkie zainstalowane toolchainy.
+          how: rustup sprawdza nowe wersje na static.rust-lang.org i pobiera tylko różnice.
+          tips:
+            - 'rustup show — pokaż aktywny toolchain i zainstalowane wersje'
+            - 'rustup toolchain install nightly — zainstaluj nightly dla eksperymentów'
+      - cmd: rustup component add clippy rustfmt rust-analyzer
+        desc: Dodaj kluczowe komponenty (linter, formatter, LSP)
+        detail:
+          what: Instaluje clippy (linter), rustfmt (formatter) i rust-analyzer (LSP dla edytorów).
+          how: Komponenty są częścią toolchainu — pobierane z rustup.rs, zawsze kompatybilne z Twoją wersją Rusta.
+          tips:
+            - 'rust-analyzer to serwer LSP — VS Code z rozszerzeniem rust-analyzer używa go automatycznie'
+            - 'rustup target add wasm32-unknown-unknown — dodaj cel kompilacji WASM'
+
+  - name: Tworzenie projektu
+    icon: "🚀"
+    commands:
+      - cmd: cargo new moj-projekt
+        desc: Utwórz nowy projekt binarny (aplikację)
+        detail:
+          what: Tworzy nowy katalog z projektem Cargo — Cargo.toml, src/main.rs i inicjalizuje git.
+          how: Projekt binarny ma src/main.rs z funkcją main(). Cargo.toml opisuje nazwę, wersję i zależności.
+          tips:
+            - 'cargo new --lib moja-lib — utwórz bibliotekę (src/lib.rs zamiast main.rs)'
+            - 'cargo new --vcs none — bez inicjalizacji git'
+      - cmd: cargo init
+        desc: Zainicjuj projekt Cargo w istniejącym katalogu
+        detail:
+          what: Jak cargo new ale w bieżącym katalogu — przydatne gdy katalog już istnieje.
+          how: Tworzy Cargo.toml i src/main.rs (jeśli nie istnieją). Nie nadpisuje istniejących plików.
+          tips:
+            - 'cargo init --lib — zainicjuj jako bibliotekę'
+            - 'Dodaj do istniejącego repo: cargo init w folderze projektu'
+
+  - name: Budowanie i uruchamianie
+    icon: "⚙️"
+    commands:
+      - cmd: cargo run
+        desc: Skompiluj i uruchom projekt (tryb debug)
+        detail:
+          what: Kompiluje projekt w trybie debug i natychmiast uruchamia wynikowy binarny.
+          how: Debug build jest szybszy w kompilacji ale wolniejszy w wykonaniu — brak optymalizacji.
+          tips:
+            - 'cargo run --release — z pełnymi optymalizacjami (wolniejsza kompilacja, szybszy binarny)'
+            - 'cargo run -- --arg1 wartość — przekaż argumenty do programu'
+      - cmd: cargo build
+        desc: Skompiluj projekt (bez uruchamiania)
+        detail:
+          what: Kompiluje projekt i zapisuje binarny w target/debug/ (lub target/release/ z --release).
+          how: Cargo śledzi zmiany — kompiluje tylko zmienione crates. Pierwsza kompilacja długa, kolejne szybkie.
+          tips:
+            - 'cargo build --release — build produkcyjny z optymalizacjami O3'
+            - 'ls -lh target/release/moj-projekt — sprawdź rozmiar binarnego'
+      - cmd: cargo build --release
+        desc: Build produkcyjny z pełnymi optymalizacjami
+        detail:
+          what: Kompiluje z pełnymi optymalizacjami (odpowiednik -O3). Wynikowy binarny jest 2-10x szybszy.
+          how: Kompilacja trwa dłużej (wszystkie optymalizacje LLVM). Wynik w target/release/.
+          tips:
+            - 'strip target/release/moj-projekt — zmniejsz rozmiar binarnego (usuń debug symbols)'
+            - 'cross build --release --target x86_64-unknown-linux-musl — statyczny binarny Linux'
+
+  - name: Testy
+    icon: "🧪"
+    commands:
+      - cmd: cargo test
+        desc: Uruchom wszystkie testy
+        detail:
+          what: Kompiluje i uruchamia testy jednostkowe, integracyjne i doc testy.
+          how: Testy w #[cfg(test)] module i pliki w tests/. Domyślnie uruchamia równolegle.
+          tips:
+            - 'cargo test moja_funkcja — uruchom tylko testy z podaną nazwą'
+            - 'cargo test -- --nocapture — pokaż println! w testach'
+      - cmd: cargo test -- --nocapture
+        desc: Uruchom testy z widocznym output (println!)
+        detail:
+          what: Domyślnie cargo test przechwytuje stdout. --nocapture wyłącza tę funkcję.
+          how: Flagi po -- są przekazywane do test binarnego, nie do cargo.
+          tips:
+            - 'cargo test -- --test-threads=1 — uruchom sekwencyjnie (dla testów z shared state)'
+            - 'cargo nextest run — szybszy test runner (nextest crate)'
+
+  - name: Zarządzanie zależnościami
+    icon: "📦"
+    commands:
+      - cmd: cargo add nazwa-paczki
+        desc: Dodaj zależność do Cargo.toml
+        detail:
+          what: Dodaje najnowszą wersję paczki do [dependencies] w Cargo.toml.
+          how: Cargo sprawdza crates.io, pobiera najnowszą stable wersję i dodaje do Cargo.toml.
+          tips:
+            - 'cargo add tokio --features full — dodaj z feature flags'
+            - 'cargo add serde --features derive -F derive — krótka forma --features'
+            - 'cargo add nazwa-paczki --dev — dodaj do [dev-dependencies] (tylko testy)'
+      - cmd: cargo add tokio --features full
+        desc: Dodaj Tokio z pełnymi feature flags
+        detail:
+          what: Instaluje Tokio z wszystkimi feature'ami — async I/O, timery, sync primitives, macros.
+          how: Rust używa feature flags do conditional compilation — płacisz tylko za to czego używasz.
+          tips:
+            - 'Produkcja: tokio = { version = "1", features = ["rt-multi-thread", "net", "time"] }'
+            - 'cargo tree — pokaż drzewo zależności'
+      - cmd: cargo update
+        desc: Zaktualizuj zależności do najnowszych kompatybilnych wersji
+        detail:
+          what: Aktualizuje Cargo.lock do najnowszych wersji spełniających SemVer z Cargo.toml.
+          how: Nie zmienia Cargo.toml — tylko Cargo.lock. Bezpieczna aktualizacja patch/minor.
+          tips:
+            - 'cargo update -p nazwa-paczki — zaktualizuj tylko jedną paczkę'
+            - 'cargo outdated — sprawdź które paczki mają nowsze major wersje (wymaga cargo-outdated)'
+
+  - name: Jakość kodu
+    icon: "✨"
+    commands:
+      - cmd: cargo fmt
+        desc: Sformatuj kod według standardu Rust (rustfmt)
+        detail:
+          what: Formatuje wszystkie pliki .rs zgodnie z oficjalnym style guide Rusta.
+          how: rustfmt to deterministyczny formatter — każdy projekt Rust wygląda identycznie.
+          tips:
+            - 'cargo fmt --check — sprawdź bez modyfikowania (dla CI)'
+            - 'rustfmt.toml — konfiguracja (max_width, edition, itp.)'
+      - cmd: cargo clippy
+        desc: Uruchom linter Clippy — zaawansowane ostrzeżenia
+        detail:
+          what: Clippy to linter Rusta z setkami reguł — idiomy, wydajność, poprawność, styl.
+          how: Kompiluje projekt z dodatkowym analizatorem statycznym. Wskazuje kod do poprawy z wyjaśnieniem.
+          tips:
+            - 'cargo clippy -- -D warnings — traktuj ostrzeżenia jako błędy (CI)'
+            - 'cargo clippy --fix — automatycznie napraw co się da'
+      - cmd: cargo doc --open
+        desc: Generuj i otwórz dokumentację projektu
+        detail:
+          what: Generuje dokumentację HTML z komentarzy /// w kodzie i otwiera w przeglądarce.
+          how: rustdoc generuje piękne API docs. /// komentarze to dokumentacja publiczna. //! to opis modułu.
+          tips:
+            - 'cargo doc --no-deps --open — tylko Twój projekt, bez dokumentacji zależności'
+            - '```rust w komentarzu /// to przykład który cargo test sprawdza (doctest)'
+
+  - name: Inspekcja i diagnostyka
+    icon: "🔍"
+    commands:
+      - cmd: cargo tree
+        desc: Pokaż drzewo zależności projektu
+        detail:
+          what: Wyświetla wszystkie crates od których zależy projekt wraz z wersjami — drzewiasto.
+          how: Przydatne do wykrywania duplikatów wersji, dużych zależności i śledzenia skąd pochodzi paczka.
+          tips:
+            - 'cargo tree -d — pokaż zduplikowane crates (różne wersje tej samej paczki)'
+            - 'cargo tree -p nazwa — pokaż tylko podgałąź dla danej paczki'
+      - cmd: cargo check
+        desc: Sprawdź błędy kompilacji bez generowania kodu
+        detail:
+          what: Analizuje kod i raportuje błędy ale nie generuje binarnego. Znacznie szybszy niż cargo build.
+          how: Używaj podczas pisania kodu — szybka pętla zwrotna o błędach typów i borrow checker.
+          tips:
+            - 'cargo check jest podstawą rust-analyzer — LSP używa go do podświetlania błędów w edytorze'
+            - 'Skonfiguruj edytor na cargo check przy zapisie — natychmiastowy feedback'

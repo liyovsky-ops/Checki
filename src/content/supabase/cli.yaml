@@ -1,0 +1,175 @@
+title: Komendy Supabase CLI
+
+groups:
+  - name: Instalacja i inicjalizacja
+    icon: "🚀"
+    commands:
+      - cmd: npm install -g supabase
+        desc: Zainstaluj Supabase CLI globalnie
+        detail:
+          what: Instaluje globalnie narzędzie CLI Supabase — wymagane do pracy lokalnej i deployów.
+          how: Alternatywnie możesz używać npx supabase bez instalacji globalnej.
+          tips:
+            - 'supabase --version — sprawdź zainstalowaną wersję'
+            - 'Aktualizacja: npm update -g supabase'
+      - cmd: supabase init
+        desc: Zainicjalizuj projekt Supabase w bieżącym katalogu
+        detail:
+          what: Tworzy folder supabase/ z plikami konfiguracyjnymi — supabase/config.toml i structurę migracji.
+          how: Uruchom raz w katalogu projektu. Commituj folder supabase/ do repozytorium.
+          tips:
+            - 'supabase/config.toml — konfiguracja lokalnego stosu (porty, rozszerzenia)'
+            - 'supabase/migrations/ — folder na migracje SQL'
+      - cmd: supabase login
+        desc: Zaloguj się do konta Supabase
+        detail:
+          what: Otwiera przeglądarkę i loguje do konta Supabase — wymagane do operacji na zdalnych projektach.
+          how: Token zapisany lokalnie w ~/.supabase/. Potrzebne do push, pull, deploy.
+          tips:
+            - 'supabase logout — wyloguj się'
+            - 'CI/CD: użyj SUPABASE_ACCESS_TOKEN zamiast logowania interaktywnego'
+
+  - name: Lokalny development
+    icon: "💻"
+    commands:
+      - cmd: supabase start
+        desc: Uruchom lokalny stos Supabase (wymaga Docker)
+        detail:
+          what: >
+            Startuje pełny stos Supabase lokalnie przez Docker — PostgreSQL, GoTrue (Auth),
+            PostgREST (API), Realtime, Storage, Studio i Inbucket (lokalny email).
+          how: >
+            Przy pierwszym uruchomieniu pobiera obrazy Docker (~2-3 GB).
+            Zwraca lokalne URL i klucze API.
+          tips:
+            - 'Studio dostępne na http://localhost:54323'
+            - 'API na http://localhost:54321'
+            - 'Inbucket (maile testowe) na http://localhost:54324'
+            - 'Klucz anon i service_role wyświetlone po starcie — wklej do .env.local'
+      - cmd: supabase stop
+        desc: Zatrzymaj lokalny stos
+        detail:
+          what: Zatrzymuje wszystkie kontenery Docker Supabase — zwalnia porty i zasoby.
+          how: Dane PostgreSQL są zachowane w wolumenie Docker między restartami.
+          tips:
+            - 'supabase stop --no-backup — zatrzymaj bez backupu (szybciej)'
+            - 'supabase start po stop — dane są nadal tam'
+      - cmd: supabase status
+        desc: Pokaż status lokalnego stosu i URL/klucze
+        detail:
+          what: Wyświetla URL i klucze API lokalnego projektu Supabase — przydatne gdy zapomnisz kluczy.
+          how: Pokazuje API URL, anon key, service_role key, DB URL, Studio URL.
+          tips:
+            - 'Skopiuj klucze do .env.local po supabase start'
+
+  - name: Migracje bazy danych
+    icon: "🗄️"
+    commands:
+      - cmd: supabase migration new create_posts_table
+        desc: Utwórz nowy plik migracji
+        detail:
+          what: Tworzy nowy plik SQL w supabase/migrations/ z timestampem w nazwie.
+          how: Nazwy migracji używają formatu YYYYMMDDHHMMSS_nazwa.sql. Pisz w nim SQL do wykonania.
+          tips:
+            - 'Jedna migracja = jeden logiczny zestaw zmian (np. nowa tabela)'
+            - 'Nie modyfikuj istniejących migracji po ich wykonaniu na produkcji'
+      - cmd: supabase db push
+        desc: Wypchnij lokalne migracje do zdalnego projektu
+        detail:
+          what: Wykonuje wszystkie niezastosowane jeszcze migracje na zdalnym projekcie Supabase.
+          how: >
+            Supabase śledzi które migracje zostały wykonane w tabeli supabase_migrations.
+            Wykonuje tylko nowe (jeszcze niewykonane) migracje.
+          tips:
+            - 'supabase db push --dry-run — sprawdź co zostanie wykonane bez wykonywania'
+            - 'Zawsze rób backup przed push na produkcji'
+            - 'Połącz z projektem: supabase link --project-ref twoj-project-ref'
+      - cmd: supabase db pull
+        desc: Pobierz schemat bazy z zdalnego projektu
+        detail:
+          what: Generuje plik migracji z aktualnym schematem zdalnej bazy — synchronizuje lokalną konfigurację.
+          how: Tworzy plik migracji reprezentujący bieżący stan zdalnej bazy. Przydatne gdy baza zmieniała się przez dashboard.
+          tips:
+            - 'Uruchom po zmianach przez Studio zamiast ręcznego migrowania'
+            - 'supabase db diff — pokaż różnice między lokalną a zdalną bazą'
+      - cmd: supabase db reset
+        desc: Zresetuj lokalną bazę i zastosuj migracje od zera
+        detail:
+          what: Czyści lokalną bazę danych i uruchamia wszystkie migracje od początku + seed.sql.
+          how: Idealne do testów — masz pewność że migracje działają od czystego stanu.
+          tips:
+            - 'supabase/seed.sql — plik z danymi testowymi, uruchamiany po reset'
+            - 'UWAGA: działa tylko na lokalnej bazie — nie na produkcji!'
+
+  - name: Generowanie typów TypeScript
+    icon: "🔷"
+    commands:
+      - cmd: supabase gen types typescript --project-id <ref> > src/database.types.ts
+        desc: Generuj typy TypeScript ze schematu bazy
+        detail:
+          what: >
+            Generuje pliki TypeScript z pełnymi typami dla każdej tabeli, widoku i funkcji w bazie.
+            Daje type safety dla wszystkich zapytań Supabase — autocompletion i błędy w IDE.
+          how: >
+            Uruchom po każdej zmianie schematu. Project ref znajdziesz w dashboardzie Supabase
+            (Settings > General > Reference ID).
+          tips:
+            - 'Project ref: 20-znakowy string np. "abcdefghijklmnopqrst"'
+            - 'Dodaj do package.json scripts: "gen:types": "supabase gen types ..."'
+            - 'Używaj: createClient<Database>(url, key) dla pełnych typów'
+      - cmd: supabase gen types typescript --local > src/database.types.ts
+        desc: Generuj typy z lokalnej bazy (po supabase start)
+        detail:
+          what: Generuje typy TypeScript z lokalnej bazy zamiast zdalnej — szybsze w development.
+          how: Wymaga uruchomionego supabase start. Używaj do local dev, --project-id do CI/CD.
+          tips:
+            - 'Dodaj do skryptu dev: supabase gen types --local > database.types.ts && npm run dev'
+
+  - name: Edge Functions
+    icon: "⚡"
+    commands:
+      - cmd: supabase functions new <nazwa>
+        desc: Utwórz nową Edge Function
+        detail:
+          what: Tworzy plik supabase/functions/<nazwa>/index.ts z szablonem Deno funkcji.
+          how: Funkcje uruchamiane są na Deno runtime — możesz używać wszystkich API Web i Deno.
+          tips:
+            - 'Import zależności przez URL: import OpenAI from "npm:openai"'
+            - 'Sekrety: supabase secrets set KEY=value'
+      - cmd: supabase functions serve
+        desc: Uruchom Edge Functions lokalnie
+        detail:
+          what: Uruchamia lokalny serwer Edge Functions — możesz testować bez deployowania.
+          how: Dostępne na http://localhost:54321/functions/v1/<nazwa>. Live reload przy zmianach.
+          tips:
+            - 'supabase functions serve --env-file .env.local — załaduj zmienne środowiskowe'
+            - 'curl http://localhost:54321/functions/v1/moja-funkcja — testuj przez curl'
+      - cmd: supabase functions deploy <nazwa>
+        desc: Zadeploy Edge Function na chmurę
+        detail:
+          what: Wysyła funkcję na infrastrukturę Supabase Edge — dostępna globalnie w sekundach.
+          how: Deno kompiluje i deployuje funkcję. Zmienne środowiskowe ustaw przez supabase secrets set.
+          tips:
+            - 'supabase secrets set RESEND_API_KEY=re_... — ustaw sekret'
+            - 'supabase functions deploy --no-verify-jwt <nazwa> — bez weryfikacji JWT (publiczna)'
+
+  - name: Linking i projekty zdalne
+    icon: "🔗"
+    commands:
+      - cmd: supabase link --project-ref <project-ref>
+        desc: Połącz lokalny projekt ze zdalnym Supabase
+        detail:
+          what: Wiąże lokalny katalog supabase/ z konkretnym projektem w chmurze Supabase.
+          how: >
+            Project ref znajdziesz w Settings > General > Reference ID w dashboardzie.
+            Wymagane do push/pull/deploy.
+          tips:
+            - 'supabase link --project-ref abcdef1234567890 --password <db-password>'
+            - 'Jeden katalog = jeden projekt (jeden link na raz)'
+      - cmd: supabase projects list
+        desc: Lista twoich projektów Supabase
+        detail:
+          what: Wyświetla wszystkie projekty Supabase na koncie z ich nazwami i referencjami.
+          how: Wymaga zalogowania przez supabase login.
+          tips:
+            - 'Użyj ref z tej listy do supabase link --project-ref'

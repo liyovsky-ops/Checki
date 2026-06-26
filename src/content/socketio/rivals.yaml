@@ -1,0 +1,66 @@
+title: Socket.io vs alternatywy
+
+items:
+  - name: ws (raw WebSocket)
+    icon: "🔗"
+    color: "#3B82F6"
+    tagline: Minimalistyczna implementacja WebSocket — zero abstrakcji, maksymalna kontrola
+    pros:
+      - Ekstremalnie lekki — 0 zależności, ~30KB
+      - Pełna kontrola nad protokołem i formatem danych
+      - Niższe opóźnienie — brak warstwy abstrakcji Socket.io
+      - Idealny gdy wiesz dokładnie co robisz
+    cons:
+      - Brak fallback na long-polling
+      - Brak rooms, namespaces, acknowledgements — budujesz sam
+      - Brak automatycznego reconnect
+      - Brak broadcast helpers — pętla po klientach ręcznie
+    vs: ws gdy budujesz własny protokół lub mikroserwis real-time z pełną kontrolą. Socket.io gdy potrzebujesz rooms, broadcast, reconnect i fallback out of the box.
+
+  - name: Ably
+    icon: "⚡"
+    color: "#FF5416"
+    tagline: Managed WebSocket as a Service — globalny CDN, gwarancja dostarczenia
+    pros:
+      - Infrastruktura zarządzana — nie musisz martwić się o skalowanie
+      - Globalna sieć CDN — niskie latency na całym świecie
+      - Gwarancja dostarczenia, historia wiadomości
+      - Obecność (presence) i historia kanałów wbudowana
+    cons:
+      - Płatne po przekroczeniu limitu (100 połączeń/mies. za darmo)
+      - Vendor lock-in — trudna migracja
+      - Brak self-hosted opcji
+      - Wyższe koszty przy dużej skali
+    vs: Ably gdy nie chcesz zarządzać infrastrukturą i priorytetem jest niezawodność. Socket.io + self-hosted gdy masz DevOps i chcesz kontrolę nad kosztami.
+
+  - name: Pusher Channels
+    icon: "📨"
+    color: "#300D4F"
+    tagline: Hosted pub/sub real-time — prosty setup, sdki dla 30+ platform
+    pros:
+      - Prostota wdrożenia — minuty do działającego prototype
+      - SDKi dla 30+ platform (iOS, Android, React Native, web)
+      - Wbudowany dashboard z metrykami połączeń
+      - Dobra dokumentacja i support
+    cons:
+      - Drogi przy skali — cena rośnie nieliniowo z połączeniami
+      - Limit 100 połączeń jednoczesnych na planie Sandbox
+      - Vendor lock-in — API nieprzenoszone
+      - Brak self-hosted (Soketi jako open-source alternatywa)
+    vs: Pusher gdy robisz MVP lub masz mały ruch. Socket.io gdy planujesz skalę lub masz budżet infrastruktury zamiast SaaS.
+
+  - name: SSE (Server-Sent Events)
+    icon: "📡"
+    color: "#10B981"
+    tagline: Jednostronne push z serwera — natywny HTTP, zero bibliotek
+    pros:
+      - Natywny HTTP — działa przez każde proxy, bez specjalnego protokołu
+      - Wbudowane w przeglądarkę (EventSource API) — zero zależności
+      - Automatyczny reconnect w przeglądarce
+      - Idealne do prostych powiadomień i live feeds
+    cons:
+      - Tylko serwer → klient (unidirectional) — brak klienta → serwer przez SSE
+      - Limit połączeń per domena w starszych przeglądarkach (max 6)
+      - Brak rooms, namespaces, broadcast
+      - HTTP/1.1 — jeden stream per połączenie
+    vs: SSE gdy potrzebujesz tylko push z serwera (notyfikacje, live feed, progress bar). Socket.io gdy potrzebujesz dwukierunkowej komunikacji.

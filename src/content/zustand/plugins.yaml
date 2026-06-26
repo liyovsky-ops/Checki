@@ -1,0 +1,33 @@
+title: Ekosystem Zustand
+
+items:
+  - name: "zustand/middleware — immer"
+    desc: Wbudowany middleware. Zamienia set() w mutowalny draft (Immer pod spodem). Piszesz state.items.push(x) zamiast spread hell. Niezbędny przy głęboko zagnieżdżonych strukturach.
+    icon: "✏️"
+  - name: "zustand/middleware — persist"
+    desc: Wbudowany middleware. Automatycznie persystuje stan do localStorage/sessionStorage/custom storage. partialize() filtruje pola, onRehydrateStorage() daje callback po wczytaniu. Obsługuje SSR.
+    icon: "💾"
+  - name: "zustand/middleware — devtools"
+    desc: "Wbudowany middleware. Podłącza Redux DevTools Extension (Chrome/Firefox). Time travel debugging, action log z nazwami, inspekcja różnic stanu. Wyłącz w produkcji przez enabled: false."
+    icon: "🔍"
+  - name: "zustand/middleware — subscribeWithSelector"
+    desc: Wbudowany middleware. Rozszerza subscribe() o selektor i equalityFn. Subskrybuj zmiany konkretnego pola poza React — analytics, synchronizacja z backendem, side effecty.
+    icon: "📡"
+  - name: "zustand/middleware — combine"
+    desc: Wbudowany helper. Dzieli store na dwie funkcje — initialState (obiekt) i actions (set/get). Upraszcza TypeScript — nie musisz pisać interface dla całości.
+    icon: "🔗"
+  - name: zustand-persist-migrate
+    desc: Zarządzanie migracją wersji persist. Gdy zmienisz kształt stanu, stary localStorage spowoduje błąd. version + migrate w persist config — Zustand automatycznie uruchamia migrację.
+    icon: "🔄"
+  - name: zustand-computed
+    desc: Middleware społeczności do computed/derived values z automatycznym memoizowaniem. Alternatywa dla ręcznego liczenia w selektorach — definiujesz computed raz w store.
+    icon: "🧮"
+  - name: zustand-forms
+    desc: Integracja Zustand z zarządzaniem formularzami. Alternatywa dla react-hook-form gdy formularz musi dzielić stan z resztą store'a.
+    icon: "📝"
+  - name: "@tanstack/react-query + Zustand"
+    desc: Najpopularniejsza kombinacja. TanStack Query zarządza cache API (serwer state), Zustand zarządza stanem UI (klient state). Nie mieszaj — jeden robi jedno, drugi drugie.
+    icon: "🤝"
+  - name: Zustand + Immer + TypeScript
+    desc: Standardowy produkcyjny setup. create<State>()( immer(...) ) — mutowalny draft + pełne typy. Najpopularniejsza kombinacja w projektach React TS bez Redux.
+    icon: "🏆"

@@ -1,0 +1,186 @@
+title: Ekosystem Redux Toolkit
+
+items:
+  - name: Redux DevTools Extension
+    desc: >
+      Rozszerzenie przeglądarki (Chrome/Firefox) do debugowania Redux. Pokazuje historię
+      akcji, diff stanu przed/po, time-travel (cofanie i przewijanie akcji), eksport/import
+      snapshotu stanu. configureStore() włącza integrację automatycznie w development.
+    icon: "🔍"
+    code: |
+      // Instalacja: rozszerzenie przeglądarki
+      // Chrome: Redux DevTools Extension
+      // Firefox: Redux DevTools
+
+      // Włączone automatycznie przez configureStore()
+      export const store = configureStore({
+        reducer: rootReducer,
+        devTools: process.env.NODE_ENV !== 'production',
+      })
+
+      // Ręczna integracja (bez configureStore):
+      // npm install @redux-devtools/extension
+      import { composeWithDevTools } from '@redux-devtools/extension'
+
+  - name: Redux Persist
+    desc: >
+      Zapisuje wybrane fragmenty store do localStorage/sessionStorage/AsyncStorage.
+      Po odświeżeniu strony stan jest przywracany automatycznie. Konfigurujesz
+      które klucze persistować (whitelist) lub ignorować (blacklist).
+    icon: "💾"
+    code: |
+      npm install redux-persist
+
+      import { persistStore, persistReducer } from 'redux-persist'
+      import storage from 'redux-persist/lib/storage'  // localStorage
+
+      const persistConfig = {
+        key:       'root',
+        storage,
+        whitelist: ['auth', 'cart'],  // tylko te klucze do localStorage
+        // blacklist: ['ui'],         // lub wyklucz konkretne
+      }
+
+      const persistedReducer = persistReducer(persistConfig, rootReducer)
+
+      export const store = configureStore({
+        reducer: persistedReducer,
+        middleware: (getDefaultMiddleware) =>
+          getDefaultMiddleware({ serializableCheck: false }),
+      })
+
+      export const persistor = persistStore(store)
+
+      // main.tsx
+      import { PersistGate } from 'redux-persist/integration/react'
+
+      <Provider store={store}>
+        <PersistGate loading={<Spinner />} persistor={persistor}>
+          <App />
+        </PersistGate>
+      </Provider>
+
+  - name: react-redux
+    desc: >
+      Oficjalna biblioteka integrująca Redux z React. Dostarcza Provider (kontekst store),
+      useSelector (odczyt stanu) i useDispatch (wysyłanie akcji). RTK Query wymaga
+      react-redux — instalujesz je razem z @reduxjs/toolkit.
+    icon: "⚛️"
+    code: |
+      npm install @reduxjs/toolkit react-redux
+
+      // Provider — owijasz całą aplikację
+      import { Provider } from 'react-redux'
+      import { store } from './store'
+
+      <Provider store={store}>
+        <App />
+      </Provider>
+
+      // Hooki w komponencie
+      import { useSelector, useDispatch } from 'react-redux'
+
+      const value    = useSelector((state: RootState) => state.counter.value)
+      const dispatch = useDispatch<AppDispatch>()
+
+  - name: Immer
+    desc: >
+      Biblioteka do niemutatywnych aktualizacji przez "mutowalny" kod.
+      Wbudowana w Redux Toolkit — działa automatycznie w reducerach createSlice.
+      Można też używać samodzielnie przez produce() dla złożonych transformacji danych.
+    icon: "🧊"
+    code: |
+      // Wbudowany w RTK — używasz automatycznie w reducerach
+      const slice = createSlice({
+        reducers: {
+          // Immer pozwala pisać jak mutację — RTK tworzy nowy obiekt
+          addItem: (state, action) => {
+            state.items.push(action.payload)  // wygląda jak mutacja
+            state.total += action.payload.price
+          },
+        },
+      })
+
+      // Samodzielne użycie Immer poza RTK
+      import { produce } from 'immer'
+
+      const nextState = produce(currentState, (draft) => {
+        draft.nested.deeply.value = 42
+        draft.items.splice(2, 1)
+        draft.map['key'] = 'value'
+      })
+
+  - name: next-redux-wrapper
+    desc: >
+      Integracja Redux z Next.js — synchronizuje store między serwerem (SSR/SSG)
+      a klientem. Automatycznie hydratuje store po stronie klienta ze stanem
+      wygenerowanym na serwerze. Obsługuje App Router i Pages Router.
+    icon: "▲"
+    code: |
+      npm install next-redux-wrapper
+
+      import { createWrapper } from 'next-redux-wrapper'
+      import { store } from './store'
+
+      const makeStore = () => store
+      export const wrapper = createWrapper(makeStore)
+
+      // pages/_app.tsx (Pages Router)
+      export default wrapper.withRedux(MyApp)
+
+      // Pobierz dane SSR i zapisz do store
+      export const getServerSideProps = wrapper.getServerSideProps(
+        (store) => async (context) => {
+          await store.dispatch(fetchUsers())
+          return { props: {} }
+        }
+      )
+
+  - name: reselect
+    desc: >
+      Biblioteka do memoizowanych selektorów — wbudowana w RTK jako createSelector.
+      Oblicza wynik tylko gdy dane wejściowe się zmieniły. Zapobiega zbędnym
+      re-renderom komponentów przy złożonych obliczeniach na danych ze store.
+    icon: "🎯"
+    code: |
+      // Wbudowane w RTK — importujesz z @reduxjs/toolkit
+      import { createSelector } from '@reduxjs/toolkit'
+
+      const selectUsers   = (state: RootState) => state.users.items
+      const selectFilter  = (state: RootState) => state.users.filter
+
+      export const selectActiveUsers = createSelector(
+        [selectUsers, selectFilter],
+        (users, filter) => users.filter(u => u.status === filter)
+        //                  ^ wywołuje się tylko gdy users lub filter się zmienią
+      )
+
+      // createSelectorCreator dla własnego porównania
+      import { createSelectorCreator, lruMemoize } from 'reselect'
+
+      const createLruSelector = createSelectorCreator(lruMemoize, 10) // cache 10 wyników
+
+  - name: RTK Query Codegen
+    desc: >
+      Generuje typowany RTK Query API slice z definicji OpenAPI (Swagger) lub GraphQL.
+      Zamiast ręcznie pisać endpointy, generujesz je automatycznie z API dokumentacji.
+      Ideal dla projektów z dobrym API schema.
+    icon: "⚙️"
+    code: |
+      npm install @rtk-query/codegen-openapi
+
+      // openapi-config.ts
+      import type { ConfigFile } from '@rtk-query/codegen-openapi'
+
+      const config: ConfigFile = {
+        schemaFile: 'https://api.example.com/openapi.json',
+        apiFile:    './src/store/emptyApi.ts',
+        apiImport:  'emptySplitApi',
+        outputFile: './src/store/generatedApi.ts',
+        exportName: 'generatedApi',
+        hooks:      true,  // generuj hooki React
+      }
+      export default config
+
+      // Generowanie
+      npx @rtk-query/codegen-openapi openapi-config.ts

@@ -1,0 +1,45 @@
+title: Ekosystem Drizzle
+
+items:
+  - name: postgres.js
+    desc: Najszybszy PostgreSQL driver dla Node.js i Deno. Zalecany adapter dla Drizzle + PostgreSQL. Pipelining, connection pooling, prepared statements. import postgres from 'postgres'.
+    icon: "🐘"
+  - name: node-postgres (pg)
+    desc: Klasyczny PostgreSQL driver. Stabilny, dojrzały, ogromna społeczność. Drizzle wspiera go przez drizzle-orm/node-postgres. Dobry wybór dla istniejących projektów.
+    icon: "🔗"
+  - name: better-sqlite3
+    desc: Synchroniczny SQLite driver dla Node.js. Drizzle + better-sqlite3 = idealny stack dla lokalnych narzędzi, CLI, Electron apps i testów. Nie wymaga serwera bazy danych.
+    icon: "📦"
+  - name: mysql2
+    desc: MySQL/MariaDB driver z pełnym wsparciem prepared statements i connection pool. Drizzle używa go przez drizzle-orm/mysql2. Wspiera też PlanetScale przez HTTP.
+    icon: "🐬"
+  - name: Neon (serverless PostgreSQL)
+    desc: Serverless PostgreSQL w chmurze z HTTP branching. Drizzle integruje przez drizzle-orm/neon-http (bez WebSocket) i drizzle-orm/neon-serverless. Zero cold start na edge.
+    icon: "⚡"
+  - name: Turso (libSQL)
+    desc: Distributed SQLite — SQLite na edge ze synchronizacją. Drizzle + Turso przez drizzle-orm/libsql. Idealne dla globalnych aplikacji z lokalnym latency bez kosztów PostgreSQL.
+    icon: "🌍"
+  - name: Cloudflare D1
+    desc: SQLite-compatible baza danych w Cloudflare Workers. Drizzle ma natywny adapter drizzle-orm/d1. Baza edge-native — query w tym samym datacenter co Worker.
+    icon: "☁️"
+  - name: Vercel Postgres
+    desc: PostgreSQL zarządzany przez Vercel, oparty na Neon. Drizzle integruje przez @vercel/postgres + drizzle-orm/vercel-postgres. Zero config w projektach Vercel + Next.js.
+    icon: "▲"
+  - name: PlanetScale (MySQL)
+    desc: Serverless MySQL z branching i deploy requests. Drizzle wspiera PlanetScale przez mysql2 lub przez HTTP (drizzle-orm/planetscale-serverless) — bez TCP, działa na edge.
+    icon: "🌿"
+  - name: Bun SQLite
+    desc: Wbudowany SQLite w runtime Bun — najszybszy SQLite w ekosystemie JS. Drizzle + Bun SQLite przez drizzle-orm/bun-sqlite. Zero dependencji zewnętrznych.
+    icon: "🫙"
+  - name: Drizzle Studio
+    desc: GUI webowe do przeglądania i edytowania danych. Uruchamiane przez npx drizzle-kit studio. Dostępne online na local.drizzle.studio. Alternatywa dla Prisma Studio.
+    icon: "🖥️"
+  - name: Drizzle Kit
+    desc: CLI do zarządzania migracjami. generate (twórz pliki SQL), migrate (aplikuj), push (schema-first), pull (introspection), studio (GUI). Serce workflow z Drizzle ORM.
+    icon: "🔧"
+  - name: drizzle-zod
+    desc: Automatyczne generowanie schematów Zod z tabel Drizzle. createInsertSchema(users) i createSelectSchema(users) — type-safe walidacja danych wejściowych z auto-generated schematami.
+    icon: "✅"
+  - name: drizzle-valibot
+    desc: Integracja z Valibot (lżejsza alternatywa Zod). createInsertSchema i createSelectSchema — identyczny API co drizzle-zod ale mniejszy bundle dla edge deploymentów.
+    icon: "🛡️"

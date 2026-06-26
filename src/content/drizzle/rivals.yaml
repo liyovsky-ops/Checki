@@ -1,0 +1,66 @@
+title: Drizzle vs alternatywy ORM
+
+items:
+  - name: Prisma
+    icon: "◈"
+    color: "#5a67d8"
+    tagline: Type-safe ORM nowej generacji — schema-first, auto-generated client, Prisma Studio
+    pros:
+      - Najlepszy DX — auto-complete, type safety, Studio GUI do bazy
+      - Schema w osobnym pliku .prisma — czytelna, deklaratywna
+      - Dojrzałe migracje z historią i rollback (Prisma Migrate)
+      - Ogromna społeczność, dokumentacja, ekosystem (Accelerate, Pulse)
+    cons:
+      - Ciężki — osobny query engine (binary), duży cold start
+      - Nie działa na edge runtimes (Cloudflare Workers) bez Accelerate
+      - ActiveRecord-style — ukrywa SQL, trudniej debugować
+      - Wolniejszy od Drizzle na prostych queries (overhead abstrakcji)
+    vs: Prisma dla projektów Next.js/NestJS gdzie DX jest priorytetem i nie zależy Ci na edge. Drizzle gdy piszesz na Cloudflare Workers, Vercel Edge lub gdy chcesz być bliżej SQL i mieć mniejszy bundle.
+
+  - name: TypeORM
+    icon: "🔷"
+    color: "#e83524"
+    tagline: Decorator-based ORM — Active Record i Data Mapper, popularny w NestJS
+    pros:
+      - Dekoratory TypeScript — deklaratywny kod bliski domenowemu modelowi
+      - Active Record i Data Mapper — wybierasz styl
+      - Głęboka integracja z NestJS (TypeOrmModule)
+      - Długa historia — wiele zasobów i rozwiązań online
+    cons:
+      - Bugs i niestabilne release'y — community narzeka od lat
+      - Type safety słaba — wiele place'y zwraca any
+      - Wolny development — PR latami czekają na merge
+      - Nie działa dobrze na edge — ciężki bundle
+    vs: TypeORM dla istniejących projektów NestJS z dekoratorami. Drizzle dla nowych projektów — lepsza type safety, aktywny development, edge-ready, bardziej przewidywalne zachowanie.
+
+  - name: Kysely
+    icon: "🏗️"
+    color: "#2d5de0"
+    tagline: Type-safe SQL query builder — nie ORM, bliżej raw SQL niż Drizzle
+    pros:
+      - Ekstremalna type safety — nawet aliasy i computed fields są type-safe
+      - SQL-like API bardziej niż Drizzle — niemal 1:1 z SQL
+      - Lekki — zero abstrakcji ponad query building
+      - Plugin system — dialekty, middleware
+    cons:
+      - Nie jest ORM — brak schema definition, brak relacji, brak migracji
+      - Musisz sám zarządzać typami tabel (ręcznie lub przez generowanie)
+      - Brak GUI, brak Studio, brak ekosystemu
+      - Więcej boilerplate niż Drizzle dla typowego użycia
+    vs: Kysely gdy chcesz query builder z pełną type safety bez żadnej ORM abstrakcji. Drizzle gdy chcesz też schema definition, relacje, migracje i ekosystem — ale nadal blisko SQL.
+
+  - name: Raw SQL (pg / mysql2 / better-sqlite3)
+    icon: "🗃️"
+    color: "#336791"
+    tagline: Bezpośrednie query do bazy — pełna kontrola, zero abstrakcji
+    pros:
+      - Pełna kontrola — piszesz dokładnie to co chcesz
+      - Żaden overhead — co napiszesz, to wykona się
+      - Brak dependencji — tylko driver bazy danych
+      - Znasz SQL? Znasz to narzędzie.
+    cons:
+      - Zero type safety na wynikach — any[], ręczne rzutowanie typów
+      - SQL injection ryzyko gdy nie parametryzujesz
+      - Boilerplate — każdy query od zera
+      - Brak migracji, brak relacji, brak narzędzi
+    vs: Raw SQL dla jednorazowych skryptów, ETL, bardzo specyficznych queries. Drizzle gdy budujesz aplikację — dajesz sobie type safety i narzędzia przy minimalnym koszcie abstrakcji.

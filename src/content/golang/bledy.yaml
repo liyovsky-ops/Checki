@@ -1,0 +1,329 @@
+labels:
+  main: Obsługa błędów i testowanie
+  mainLang: go
+
+intro:
+  title: Błędy jako wartości
+  desc: >
+    Go nie ma wyjątków — błędy to zwykłe wartości zwracane przez funkcje.
+    Konwencja: funkcja zwraca (wynik, error). Jeśli error != nil — coś poszło nie tak.
+    To podejście wymusza jawną obsługę każdego błędu — mniej niespodzianek w produkcji.
+    Pakiet testing wbudowany w stdlib — testy, benchmarki, przykłady bez zewnętrznych narzędzi.
+
+items:
+  - title: Błędy jako wartości — podstawy
+    desc: >
+      error to interfejs z jedną metodą: Error() string.
+      errors.New() i fmt.Errorf() tworzą proste błędy.
+      Jawne sprawdzanie if err != nil to idiom Go — nie ignoruj błędów!
+    code: |
+      package main
+
+      import (
+          "errors"
+          "fmt"
+      )
+
+      // Sentinel errors — znane błędy do porównania
+      var (
+          ErrNotFound    = errors.New("nie znaleziono")
+          ErrUnauthorized = errors.New("brak autoryzacji")
+          ErrInvalidInput = errors.New("nieprawidłowe dane wejściowe")
+      )
+
+      func findUser(id int) (string, error) {
+          users := map[int]string{1: "Alice", 2: "Bob"}
+          user, ok := users[id]
+          if !ok {
+              return "", fmt.Errorf("findUser: id=%d: %w", id, ErrNotFound)
+          }
+          return user, nil
+      }
+
+      func main() {
+          // Jawna obsługa błędu
+          user, err := findUser(99)
+          if err != nil {
+              fmt.Println("Błąd:", err)
+
+              // errors.Is — sprawdź typ błędu (przez łańcuch Unwrap)
+              if errors.Is(err, ErrNotFound) {
+                  fmt.Println("Użytkownik nie istnieje")
+              }
+              return
+          }
+          fmt.Println("Znaleziono:", user)
+
+          // Poprawne wywołanie
+          user, err = findUser(1)
+          if err != nil {
+              fmt.Println("Błąd:", err)
+              return
+          }
+          fmt.Println("Użytkownik:", user)
+      }
+    lang: go
+
+  - title: Custom errors — własne typy błędów
+    desc: >
+      Własny typ błędu pozwala przekazać więcej kontekstu niż tylko string.
+      Zaimplementuj interfejs error przez metodę Error() string.
+      errors.As wydobywa konkretny typ błędu z łańcucha — lepsze niż type assertion.
+    code: |
+      package main
+
+      import (
+          "errors"
+          "fmt"
+      )
+
+      // Własny typ błędu z kontekstem
+      type ValidationError struct {
+          Field   string
+          Message string
+          Value   any
+      }
+
+      func (e *ValidationError) Error() string {
+          return fmt.Sprintf("walidacja %s: %s (wartość: %v)", e.Field, e.Message, e.Value)
+      }
+
+      type DatabaseError struct {
+          Op  string
+          Err error
+      }
+
+      func (e *DatabaseError) Error() string {
+          return fmt.Sprintf("baza danych [%s]: %v", e.Op, e.Err)
+      }
+
+      func (e *DatabaseError) Unwrap() error {
+          return e.Err // umożliwia errors.Is przez łańcuch
+      }
+
+      func validateAge(age int) error {
+          if age < 0 || age > 150 {
+              return &ValidationError{
+                  Field:   "age",
+                  Message: "musi być między 0 a 150",
+                  Value:   age,
+              }
+          }
+          return nil
+      }
+
+      func saveUser(name string, age int) error {
+          if err := validateAge(age); err != nil {
+              return fmt.Errorf("saveUser: %w", err)
+          }
+          // symulacja błędu DB
+          return &DatabaseError{Op: "INSERT", Err: fmt.Errorf("connection refused")}
+      }
+
+      func main() {
+          err := saveUser("Alice", -5)
+          if err != nil {
+              fmt.Println("Błąd:", err)
+
+              // errors.As — wydobądź konkretny typ
+              var valErr *ValidationError
+              if errors.As(err, &valErr) {
+                  fmt.Printf("Problem z polem '%s': %s\n", valErr.Field, valErr.Message)
+              }
+          }
+
+          err = saveUser("Bob", 25)
+          if err != nil {
+              var dbErr *DatabaseError
+              if errors.As(err, &dbErr) {
+                  fmt.Printf("Błąd DB przy operacji '%s'\n", dbErr.Op)
+              }
+          }
+      }
+    lang: go
+
+  - title: Testowanie — pakiet testing
+    desc: >
+      Testy w Go: pliki _test.go, funkcje TestXxx(t *testing.T).
+      t.Fatal() kończy test; t.Error() kontynuuje.
+      go test ./... uruchamia wszystkie testy w projekcie.
+      Brak zewnętrznych bibliotek — testing wbudowany w stdlib.
+    code: |
+      // Plik: math_test.go
+      package math
+
+      import "testing"
+
+      // Testowana funkcja (w math.go)
+      // func Add(a, b int) int { return a + b }
+      // func Divide(a, b float64) (float64, error) { ... }
+
+      // Podstawowy test
+      func TestAdd(t *testing.T) {
+          result := Add(2, 3)
+          if result != 5 {
+              t.Errorf("Add(2, 3) = %d; oczekiwano 5", result)
+          }
+      }
+
+      // Table-driven tests — idiom Go
+      func TestAddTableDriven(t *testing.T) {
+          tests := []struct {
+              name     string
+              a, b     int
+              expected int
+          }{
+              {"dodatnie", 2, 3, 5},
+              {"ujemne", -1, -2, -3},
+              {"zero", 0, 5, 5},
+              {"duże liczby", 1000000, 2000000, 3000000},
+          }
+
+          for _, tt := range tests {
+              t.Run(tt.name, func(t *testing.T) {
+                  result := Add(tt.a, tt.b)
+                  if result != tt.expected {
+                      t.Errorf("Add(%d, %d) = %d; oczekiwano %d",
+                          tt.a, tt.b, result, tt.expected)
+                  }
+              })
+          }
+      }
+
+      func TestDivide(t *testing.T) {
+          t.Run("poprawne dzielenie", func(t *testing.T) {
+              result, err := Divide(10, 2)
+              if err != nil {
+                  t.Fatalf("nieoczekiwany błąd: %v", err)
+              }
+              if result != 5.0 {
+                  t.Errorf("oczekiwano 5.0, otrzymano %f", result)
+              }
+          })
+
+          t.Run("dzielenie przez zero", func(t *testing.T) {
+              _, err := Divide(10, 0)
+              if err == nil {
+                  t.Error("oczekiwano błędu przy dzieleniu przez zero")
+              }
+          })
+      }
+
+      // go test ./...          — wszystkie testy
+      // go test -v ./...       — verbose
+      // go test -run TestAdd   — konkretny test
+      // go test -count=1 ./... — wymuś bez cache
+    lang: go
+
+  - title: Benchmarki i pokrycie kodu
+    desc: >
+      BenchmarkXxx(b *testing.B) mierzy wydajność — go test -bench=.
+      b.N to liczba iteracji — runtime automatycznie dostosowuje.
+      go test -cover pokazuje % pokrycia; -coverprofile generuje szczegółowy raport.
+    code: |
+      // Plik: math_test.go
+      package math
+
+      import (
+          "testing"
+      )
+
+      // Benchmark — mierzy wydajność
+      func BenchmarkAdd(b *testing.B) {
+          for i := 0; i < b.N; i++ {
+              Add(1000, 2000)
+          }
+      }
+
+      // Benchmark z setup
+      func BenchmarkSort(b *testing.B) {
+          // Setup — nie mierzony
+          data := make([]int, 1000)
+          for i := range data {
+              data[i] = 1000 - i
+          }
+
+          b.ResetTimer() // zacznij mierzyć od tu
+
+          for i := 0; i < b.N; i++ {
+              b.StopTimer()
+              // Przygotuj świeżą kopię dla każdej iteracji
+              input := make([]int, len(data))
+              copy(input, data)
+              b.StartTimer()
+
+              // Sort(input)  // testowana funkcja
+          }
+      }
+
+      // Przykład — pojawia się w dokumentacji i jest testowany
+      func ExampleAdd() {
+          result := Add(2, 3)
+          _ = result
+          // Output:
+          // 5  <- go test sprawdza ten output!
+      }
+
+      // Uruchamianie:
+      // go test -bench=.                     — wszystkie benchmarki
+      // go test -bench=BenchmarkAdd -count=3  — konkretny, 3 razy
+      // go test -bench=. -benchmem            — z alokacjami pamięci
+      // go test -cover                        — pokrycie kodu
+      // go test -coverprofile=cover.out && go tool cover -html=cover.out
+    lang: go
+
+  - title: Testify — asercje i mocki
+    desc: >
+      testify/assert i testify/require to najpopularniejsze biblioteki testowe w Go.
+      assert kontynuuje po błędzie; require zatrzymuje test.
+      testify/mock generuje mocki do testowania z zewnętrznymi zależnościami.
+    code: |
+      // go get github.com/stretchr/testify
+      package service_test
+
+      import (
+          "testing"
+          "github.com/stretchr/testify/assert"
+          "github.com/stretchr/testify/require"
+          "github.com/stretchr/testify/mock"
+      )
+
+      // Interfejs do mockowania
+      type UserRepository interface {
+          FindByID(id int) (*User, error)
+          Save(user *User) error
+      }
+
+      // Mock implementacja
+      type MockUserRepo struct {
+          mock.Mock
+      }
+
+      func (m *MockUserRepo) FindByID(id int) (*User, error) {
+          args := m.Called(id)
+          return args.Get(0).(*User), args.Error(1)
+      }
+
+      func (m *MockUserRepo) Save(user *User) error {
+          args := m.Called(user)
+          return args.Error(0)
+      }
+
+      func TestUserService_GetUser(t *testing.T) {
+          // Arrange
+          mockRepo := new(MockUserRepo)
+          expectedUser := &User{ID: 1, Name: "Alice"}
+          mockRepo.On("FindByID", 1).Return(expectedUser, nil)
+
+          service := NewUserService(mockRepo)
+
+          // Act
+          user, err := service.GetUser(1)
+
+          // Assert
+          require.NoError(t, err)        // zatrzymaj jeśli błąd
+          assert.Equal(t, "Alice", user.Name)
+          assert.Equal(t, 1, user.ID)
+          mockRepo.AssertExpectations(t) // sprawdź że mock był wywołany
+      }
+    lang: go

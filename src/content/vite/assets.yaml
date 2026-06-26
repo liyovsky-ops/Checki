@@ -1,0 +1,205 @@
+labels:
+  main: Import plików, Assets i Zmienne środowiskowe
+  mainLang: typescript
+
+intro:
+  title: Import & Assets — co Vite potrafi importować
+  desc: >
+    Vite rozszerza możliwości importu ES Modules o obsługę różnych typów plików.
+    Możesz importować CSS, JSON, SVG, obrazy, fonty i dowolne pliki binarne bezpośrednio
+    w kodzie JS/TS. Specjalne sufiksy ?url i ?raw zmieniają sposób importu. import.meta.glob
+    pozwala importować wiele plików naraz wzorcem glob. Zmienne środowiskowe dostępne
+    są przez import.meta.env — tylko z prefiksem VITE_ trafiają do kodu klienta.
+
+items:
+  - title: Import CSS i CSS Modules
+    desc: >
+      Import CSS w JS automatycznie wstrzykuje style do strony przez tag <style>.
+      CSS Modules (plik .module.css) dają lokalny scope — klasy są hashowane.
+      CSS Modules zwracają obiekt z mapowaniem oryginalnych nazw na hashowane.
+    code: |
+      // Import globalny CSS — wstrzykuje do <head>
+      import './styles/global.css';
+
+      // CSS Modules — lokalny scope
+      import styles from './Button.module.css';
+
+      function Button({ children }: { children: React.ReactNode }) {
+        return (
+          // styles.btn to np. "Button_btn__3xKa9" — hashowana nazwa
+          <button className={styles.btn}>
+            {children}
+          </button>
+        );
+      }
+
+      // Button.module.css:
+      // .btn { background: #646CFF; color: white; padding: 8px 16px; }
+
+      // Import Sass (wymaga: npm install -D sass)
+      import './styles/main.scss';
+
+      // Import CSS jako string (nie wstrzykuje)
+      import cssString from './Button.css?inline';
+      console.log(cssString); // ".btn { background: ... }"
+    lang: typescript
+
+  - title: Import JSON
+    desc: >
+      JSON jest importowany i automatycznie parsowany do obiektu JS. Vite obsługuje
+      named imports z JSON — tree-shaking usunie nieużywane klucze. To działa też
+      z JSON5 (po instalacji pluginu).
+    code: |
+      // Import całego JSON
+      import config from './config.json';
+      console.log(config.apiUrl); // string
+
+      // Named import z JSON (tree-shaking)
+      import { version, name } from '../package.json';
+      console.log(`${name} v${version}`);
+
+      // Import dynamiczny JSON
+      const data = await import('./data/users.json');
+      console.log(data.default); // tablica userów
+
+      // Przykład config.json:
+      // { "apiUrl": "https://api.example.com", "timeout": 5000 }
+    lang: typescript
+
+  - title: Import obrazów i plików statycznych
+    desc: >
+      Pliki obrazów importowane w JS zwracają URL do pliku (string). Małe pliki
+      (< assetsInlineLimit, domyślnie 4KB) są inlinowane jako base64. Duże pliki
+      kopiowane do dist/assets z hashem w nazwie. Sufiks ?url wymusza URL.
+    code: |
+      // Import obrazu — zwraca URL string
+      import logoUrl from './assets/logo.png';
+      // logoUrl = "/assets/logo-3xKa9.png" (w prod z hashem)
+
+      // Użycie w React
+      function Logo() {
+        return <img src={logoUrl} alt="Logo" />;
+      }
+
+      // Import SVG jako URL
+      import iconUrl from './icons/arrow.svg';
+
+      // Import SVG jako komponent React (wymaga pluginu vite-plugin-svgr)
+      import { ReactComponent as Arrow } from './icons/arrow.svg?react';
+
+      // Import jako raw string (treść pliku)
+      import svgContent from './icons/arrow.svg?raw';
+      // svgContent = '<svg viewBox="..."...'
+
+      // Import jako URL (jawny)
+      import workerUrl from './worker.js?url';
+      const worker = new Worker(workerUrl);
+
+      // Public folder — pliki serwowane bez przetwarzania
+      // public/favicon.ico → /favicon.ico (bez hasha!)
+      <link rel="icon" href="/favicon.ico" />
+    lang: typescript
+
+  - title: import.meta.glob — import wielu plików
+    desc: >
+      import.meta.glob pozwala importować wiele plików naraz używając wzorca glob.
+      Domyślnie lazy (dynamic import) — pliki ładowane na żądanie. Dodaj eager: true
+      dla natychmiastowego importu wszystkich. Używany do automatycznego ładowania
+      routów, komponentów, modułów i18n.
+    code: |
+      // Lazy glob (dynamic import) — zwraca Record<string, () => Promise<module>>
+      const modules = import.meta.glob('./routes/*.tsx');
+      // { './routes/home.tsx': () => import(...), './routes/about.tsx': ... }
+
+      // Eager glob — importuje wszystko od razu
+      const pages = import.meta.glob('./pages/*.tsx', { eager: true });
+      // { './pages/home.tsx': { default: HomeComponent }, ... }
+
+      // Import tylko default export
+      const components = import.meta.glob('./components/*.tsx', {
+        import: 'default',
+        eager: true,
+      });
+
+      // Praktyczny przykład — auto-routing
+      const routeFiles = import.meta.glob('./pages/*.tsx', { eager: true });
+      const routes = Object.entries(routeFiles).map(([path, module]) => ({
+        path: path.replace('./pages/', '/').replace('.tsx', ''),
+        component: (module as any).default,
+      }));
+
+      // Import plików z query string
+      const rawFiles = import.meta.glob('./templates/*.html', {
+        query: '?raw',
+        import: 'default',
+        eager: true,
+      });
+    lang: typescript
+
+  - title: import.meta.env — zmienne środowiskowe
+    desc: >
+      Vite eksponuje zmienne środowiskowe przez import.meta.env. Tylko zmienne
+      z prefiksem VITE_ trafiają do kodu klienta — reszta jest ukryta (bezpieczeństwo).
+      Zmienne są statycznie zastępowane w build time (nie są dynamiczne w runtime).
+    code: |
+      // Wbudowane zmienne:
+      import.meta.env.MODE      // 'development' | 'production' | 'staging'
+      import.meta.env.DEV       // true w trybie dev
+      import.meta.env.PROD      // true w produkcji
+      import.meta.env.SSR       // true podczas SSR
+      import.meta.env.BASE_URL  // base URL z config.base
+
+      // Własne zmienne — MUSZĄ mieć prefiks VITE_
+      // .env:
+      // VITE_API_URL=https://api.example.com
+      // VITE_APP_TITLE=Moja Aplikacja
+      // SECRET_KEY=nikt_tego_nie_zobaczy  ← nie trafi do klienta!
+
+      const apiUrl = import.meta.env.VITE_API_URL;
+      const title = import.meta.env.VITE_APP_TITLE;
+
+      // TypeScript — dodaj typy w env.d.ts:
+      interface ImportMetaEnv {
+        readonly VITE_API_URL: string;
+        readonly VITE_APP_TITLE: string;
+        readonly VITE_FEATURE_FLAG: 'true' | 'false';
+      }
+
+      interface ImportMeta {
+        readonly env: ImportMetaEnv;
+      }
+    lang: typescript
+
+  - title: Pliki .env — środowiska
+    desc: >
+      Vite ładuje pliki .env w określonej kolejności. Pliki .local są ignorowane
+      przez git (secrets). Pliki specyficzne dla mode nadpisują bazowe.
+      Zmienne z .env.production zastąpią .env podczas vite build.
+    code: |
+      # Kolejność ładowania (późniejsze nadpisują wcześniejsze):
+      # .env                  ← zawsze ładowany
+      # .env.local            ← zawsze ładowany, gitignored
+      # .env.[mode]           ← tylko dla danego mode
+      # .env.[mode].local     ← tylko dla danego mode, gitignored
+
+      # .env (bazowe — commituj)
+      VITE_APP_TITLE=MojaAplikacja
+      VITE_API_URL=https://api.example.com
+
+      # .env.development (tylko dev — możesz commitować)
+      VITE_API_URL=http://localhost:8000
+      VITE_DEBUG=true
+
+      # .env.production (produkcja — commituj bez sekretów)
+      VITE_API_URL=https://api.production.com
+
+      # .env.local (lokalne sekrety — NIE commituj!)
+      VITE_API_KEY=super_tajny_klucz
+
+      # Custom mode:
+      # vite build --mode staging → ładuje .env.staging
+
+      # .gitignore:
+      # .env.local
+      # .env.*.local
+    lang: bash

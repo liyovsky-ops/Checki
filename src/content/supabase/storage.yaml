@@ -1,0 +1,251 @@
+labels:
+  main: Przechowywanie plików
+  mainLang: typescript
+
+intro:
+  title: Storage — S3-kompatybilne przechowywanie plików
+  desc: >
+    Supabase Storage to S3-kompatybilne repozytorium plików zintegrowane z Auth i RLS.
+    Organizujesz pliki w bucketach (jak foldery najwyższego poziomu). Każdy bucket
+    może być publiczny (pliki dostępne przez URL bez autoryzacji) lub prywatny
+    (wymagany podpisany URL lub token). Polityki Storage działają jak RLS —
+    definiujesz kto może upload/download/delete w SQL.
+
+items:
+  - name: Konfiguracja bucketów
+    desc: >
+      Bucket to kontener na pliki. Tworzysz go w dashboardzie Supabase (Storage > New bucket)
+      lub programatycznie. Ustaw public = true dla zasobów dostępnych publicznie (avatary, obrazki produktów).
+    icon: "🪣"
+    code: |
+      // Tworzenie bucketu programatycznie (np. w seed/setup skrypcie)
+      const { data, error } = await supabase.storage.createBucket('avatars', {
+        public: true,           // Publiczny dostęp przez URL
+        fileSizeLimit: '5MB',   // Max rozmiar pliku
+        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+      });
+
+      // Bucket prywatny (dokumenty użytkownika)
+      const { data } = await supabase.storage.createBucket('user-documents', {
+        public: false,
+        fileSizeLimit: '50MB',
+      });
+
+      // Lista bucketów
+      const { data: buckets } = await supabase.storage.listBuckets();
+
+  - name: upload — wgrywanie pliku
+    desc: >
+      Wgrywanie pliku do bucketu. Ścieżka to ID w buckecie, może zawierać podkatalogi.
+      Używaj ID użytkownika w ścieżce (np. userId/filename) — ułatwia RLS.
+      upsert: true nadpisuje plik jeśli istnieje.
+    icon: "⬆️"
+    code: |
+      // Upload z inputa HTML (przeglądarka)
+      async function uploadAvatar(file: File, userId: string) {
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${userId}/avatar.${fileExt}`;
+
+        const { data, error } = await supabase.storage
+          .from('avatars')
+          .upload(filePath, file, {
+            contentType: file.type,
+            upsert: true,   // Nadpisz jeśli istnieje
+          });
+
+        if (error) throw error;
+        return data.path; // np. "abc123/avatar.jpg"
+      }
+
+      // Użycie w komponencie React
+      function AvatarUpload({ userId }: { userId: string }) {
+        const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+
+          try {
+            const path = await uploadAvatar(file, userId);
+            console.log('Wgrano:', path);
+          } catch (err) {
+            console.error('Błąd uploadu:', err);
+          }
+        };
+
+        return <input type="file" accept="image/*" onChange={handleFileChange} />;
+      }
+
+  - name: getPublicUrl — publiczny URL
+    desc: >
+      Dla publicznych bucketów getPublicUrl() zwraca stały URL do pliku —
+      bez wygasania, bez tokenu. Idealny do avatarów, zdjęć produktów, zasobów statycznych.
+    icon: "🔗"
+    code: |
+      // Pobierz publiczny URL (nie wymaga await — synchroniczne!)
+      const { data } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(`${userId}/avatar.jpg`);
+
+      const publicUrl = data.publicUrl;
+      // np. "https://xyz.supabase.co/storage/v1/object/public/avatars/abc123/avatar.jpg"
+
+      // Użycie w komponencie
+      function UserAvatar({ userId }: { userId: string }) {
+        const { data } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(`${userId}/avatar.jpg`);
+
+        return (
+          <img
+            src={data.publicUrl}
+            alt="Avatar"
+            width={64}
+            height={64}
+          />
+        );
+      }
+
+      // Z transformacjami (resize, format) — Supabase Image Transformation
+      const { data } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(`${userId}/avatar.jpg`, {
+          transform: {
+            width: 100,
+            height: 100,
+            resize: 'cover',
+            format: 'webp',
+          },
+        });
+
+  - name: createSignedUrl — prywatny URL z wygasaniem
+    desc: >
+      Dla prywatnych bucketów generujesz podpisane URL z limitem czasowym.
+      Użytkownik może pobrać plik przez ten URL bez autoryzacji, ale URL wygaśnie.
+      Idealne do dokumentów, faktur, plików użytkownika.
+    icon: "⏱️"
+    code: |
+      // Podpisany URL ważny 60 sekund
+      const { data, error } = await supabase.storage
+        .from('user-documents')
+        .createSignedUrl(`${userId}/invoice-2024.pdf`, 60);
+
+      if (data) {
+        window.open(data.signedUrl, '_blank');
+      }
+
+      // Podpisane URL dla wielu plików naraz
+      const { data: signedUrls } = await supabase.storage
+        .from('user-documents')
+        .createSignedUrls([
+          `${userId}/doc1.pdf`,
+          `${userId}/doc2.pdf`,
+        ], 3600); // 1 godzina
+
+  - name: download — pobieranie pliku
+    desc: >
+      Pobieranie zawartości pliku jako Blob. Przydatne gdy chcesz odczytać plik w JS
+      zamiast otwierać URL — np. do odczytu CSV, JSON, edycji obrazka.
+    icon: "⬇️"
+    code: |
+      // Pobierz plik jako Blob
+      const { data, error } = await supabase.storage
+        .from('user-documents')
+        .download(`${userId}/data.json`);
+
+      if (data) {
+        // Odczytaj jako tekst
+        const text = await data.text();
+        const json = JSON.parse(text);
+
+        // Lub uruchom pobieranie w przeglądarce
+        const url = URL.createObjectURL(data);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'data.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+  - name: list — lista plików
+    desc: >
+      Wylistowanie plików w buckecie lub podkatalogu. Obsługuje paginację i sortowanie.
+      Przydatne do budowania galerii, menedżera plików.
+    icon: "📂"
+    code: |
+      // Lista plików użytkownika
+      const { data: files, error } = await supabase.storage
+        .from('avatars')
+        .list(userId, {
+          limit: 20,
+          offset: 0,
+          sortBy: { column: 'created_at', order: 'desc' },
+        });
+
+      // files[0].name, files[0].metadata.size, files[0].created_at
+
+      // Lista z wyszukiwaniem
+      const { data: searchResults } = await supabase.storage
+        .from('user-documents')
+        .list(userId, {
+          search: 'faktura',
+        });
+
+  - name: remove — usuwanie plików
+    desc: >
+      Usuwanie jednego lub wielu plików. Zawsze przekazuj tablicę ścieżek.
+      Pamiętaj że usunięcie użytkownika NIE usuwa automatycznie jego plików —
+      musisz to obsłużyć przez trigger lub Edge Function.
+    icon: "🗑️"
+    code: |
+      // Usuń jeden plik
+      const { error } = await supabase.storage
+        .from('avatars')
+        .remove([`${userId}/avatar.jpg`]);
+
+      // Usuń wiele plików naraz
+      const { data, error } = await supabase.storage
+        .from('user-documents')
+        .remove([
+          `${userId}/doc1.pdf`,
+          `${userId}/doc2.pdf`,
+          `${userId}/old-invoice.pdf`,
+        ]);
+
+      // Usuń cały "katalog" użytkownika (lista + remove)
+      async function deleteUserFiles(userId: string) {
+        const { data: files } = await supabase.storage
+          .from('avatars')
+          .list(userId);
+
+        if (!files?.length) return;
+
+        const paths = files.map(f => `${userId}/${f.name}`);
+        await supabase.storage.from('avatars').remove(paths);
+      }
+
+  - name: Polityki Storage (RLS)
+    desc: >
+      Storage używa takiego samego mechanizmu RLS jak baza danych.
+      Polityki definiujesz w SQL — dotyczą tabeli storage.objects.
+      Użyj auth.uid() i sprawdź ścieżkę pliku żeby izolować dane użytkowników.
+    icon: "🛡️"
+    code: |
+      -- Polityka: zalogowany użytkownik uploaduje pliki do swojego "folderu"
+      CREATE POLICY "Użytkownik uploaduje własne pliki"
+        ON storage.objects FOR INSERT
+        WITH CHECK (
+          bucket_id = 'avatars'
+          AND auth.uid()::text = (storage.foldername(name))[1]
+        );
+
+      -- Polityka: właściciel usuwa swoje pliki
+      CREATE POLICY "Właściciel usuwa pliki"
+        ON storage.objects FOR DELETE
+        USING (
+          bucket_id = 'avatars'
+          AND auth.uid()::text = (storage.foldername(name))[1]
+        );
+
+      -- Polityka: publiczny odczyt (dla publicznego bucketu)
+      CREATE POLICY "Publiczny odczyt avatarów"
+        ON storage.objects FOR SELECT
+        USING (bucket_id = 'avatars');

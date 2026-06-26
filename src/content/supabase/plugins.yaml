@@ -1,0 +1,215 @@
+title: Ekosystem Supabase
+
+items:
+  - name: supabase-js (JavaScript / TypeScript)
+    desc: >
+      Oficjalny klient JavaScript/TypeScript — główna biblioteka do pracy z Supabase.
+      Obsługuje Database, Auth, Storage, Realtime i Edge Functions. Działa w przeglądarce,
+      Node.js i edge runtime (Vercel Edge, Cloudflare Workers, Deno).
+    icon: "📦"
+    code: |
+      npm install @supabase/supabase-js
+
+      import { createClient } from '@supabase/supabase-js';
+      import type { Database } from './database.types'; // Wygenerowane typy
+
+      const supabase = createClient<Database>(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+  - name: supabase-py (Python)
+    desc: >
+      Oficjalny klient Python — pełne wsparcie dla Database, Auth i Storage.
+      Asynchroniczny (async/await). Idealny do skryptów ETL, FastAPI backendu
+      i pipeline ML/AI z pgvector.
+    icon: "🐍"
+    code: |
+      pip install supabase
+
+      import asyncio
+      from supabase import create_async_client
+
+      async def main():
+          supabase = await create_async_client(
+              "https://xyz.supabase.co",
+              "your-anon-key"
+          )
+
+          data = await supabase.table('posts').select('*').execute()
+          print(data.data)
+
+      asyncio.run(main())
+
+  - name: supabase-dart (Flutter / Dart)
+    desc: >
+      Oficjalny klient Flutter/Dart — pełne wsparcie dla mobilnych i desktopowych aplikacji.
+      Obsługuje offline auth, Storage upload na mobile, Realtime przez WebSocket.
+    icon: "🎯"
+    code: |
+      # pubspec.yaml
+      dependencies:
+        supabase_flutter: ^2.0.0
+
+      // Inicjalizacja w main.dart
+      await Supabase.initialize(
+        url: 'https://xyz.supabase.co',
+        anonKey: 'your-anon-key',
+      );
+
+      final supabase = Supabase.instance.client;
+
+      // Query
+      final List data = await supabase.from('posts').select();
+
+  - name: Supabase CLI
+    desc: >
+      Narzędzie wiersza poleceń do zarządzania projektami Supabase lokalnie i zdalnie.
+      Uruchamia pełny stos Supabase lokalnie przez Docker, zarządza migracjami,
+      generuje TypeScript typy z schematu bazy.
+    icon: "⌨️"
+    code: |
+      npm install -g supabase
+
+      # Inicjalizacja projektu
+      supabase init
+
+      # Start lokalny (wymaga Docker)
+      supabase start
+
+      # Zatrzymaj lokalny stos
+      supabase stop
+
+      # Generuj typy TypeScript
+      supabase gen types typescript --project-id xyz > database.types.ts
+
+      # Migracje
+      supabase db push         # Wyślij lokalne migracje do chmury
+      supabase db pull         # Pobierz zmiany z chmury
+      supabase migration new   # Nowa migracja
+
+  - name: Supabase Studio
+    desc: >
+      Wbudowany panel administracyjny Supabase — przeglądarka tabel, edytor SQL,
+      zarządzanie Auth/Storage/Realtime, logi, metryki. Dostępny w chmurze
+      na dashboard.supabase.com i lokalnie po supabase start na localhost:54323.
+    icon: "🎛️"
+    code: |
+      # Po supabase start — Studio dostępne lokalnie
+      # http://localhost:54323
+
+      # Studio zawiera:
+      # - Table Editor — przeglądaj i edytuj dane graficznie
+      # - SQL Editor — pisz i uruchamiaj zapytania SQL
+      # - Auth — zarządzaj użytkownikami, providerami, ustawieniami JWT
+      # - Storage — przeglądaj buckety i pliki
+      # - Realtime — podgląd aktywnych subskrypcji
+      # - Logs — logi API, bazy, Edge Functions
+      # - API Docs — automatyczna dokumentacja twojego API
+
+  - name: Supabase MCP (Model Context Protocol)
+    desc: >
+      Serwer MCP dla Supabase — pozwala AI asystentom (Claude, Cursor, Windsurf)
+      bezpośrednio zarządzać projektem Supabase: czytać schemat, tworzyć tabele,
+      pisać migracje przez naturalny język.
+    icon: "🤖"
+    code: |
+      # Instalacja serwera MCP Supabase
+      npx @supabase/mcp-server-supabase@latest
+
+      # Konfiguracja w .claude/mcp.json (Claude Code)
+      {
+        "mcpServers": {
+          "supabase": {
+            "command": "npx",
+            "args": ["-y", "@supabase/mcp-server-supabase@latest"],
+            "env": {
+              "SUPABASE_ACCESS_TOKEN": "sbp_..."
+            }
+          }
+        }
+      }
+
+      # Po konfiguracji możesz pisać do Claude:
+      # "Stwórz tabelę products z kolumnami name, price, stock"
+      # "Dodaj RLS policy do tabeli orders"
+
+  - name: Edge Functions
+    desc: >
+      Serverless functions uruchamiane przy krawędzi sieci (Deno runtime) — blisko użytkownika.
+      Używaj do webhooków, stripe payment procesing, wysyłania emaili, AI integracji.
+      Lokalnie testowane przez supabase functions serve.
+    icon: "⚡"
+    code: |
+      # Nowa Edge Function
+      supabase functions new send-email
+
+      // supabase/functions/send-email/index.ts
+      import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+
+      serve(async (req) => {
+        const { email, message } = await req.json();
+
+        // Wyślij email przez Resend
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get('RESEND_API_KEY')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: 'noreply@example.com',
+            to: email,
+            subject: 'Wiadomość z aplikacji',
+            html: `<p>${message}</p>`,
+          }),
+        });
+
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      });
+
+      # Deploy
+      supabase functions deploy send-email
+
+  - name: pgvector — AI i wyszukiwanie semantyczne
+    desc: >
+      Rozszerzenie PostgreSQL do przechowywania i wyszukiwania wektorów embeddings.
+      Supabase ma pgvector wbudowany — możesz budować wyszukiwanie semantyczne, RAG
+      i rekomendacje bez osobnej bazy wektorowej.
+    icon: "🧠"
+    code: |
+      -- Włącz rozszerzenie pgvector
+      CREATE EXTENSION IF NOT EXISTS vector;
+
+      -- Tabela z embeddingami (1536 wymiarów dla text-embedding-3-small)
+      CREATE TABLE documents (
+        id BIGSERIAL PRIMARY KEY,
+        content TEXT,
+        embedding VECTOR(1536)
+      );
+
+      -- Indeks dla szybkiego wyszukiwania (HNSW)
+      CREATE INDEX ON documents
+        USING hnsw (embedding vector_cosine_ops);
+
+      -- W TypeScript — zapisz embedding i szukaj podobnych
+      import OpenAI from 'openai';
+
+      const openai = new OpenAI();
+
+      // Generuj embedding
+      const { data } = await openai.embeddings.create({
+        input: 'Jak działa Supabase Realtime?',
+        model: 'text-embedding-3-small',
+      });
+
+      const embedding = data[0].embedding;
+
+      // Wyszukaj podobne dokumenty
+      const { data: results } = await supabase.rpc('match_documents', {
+        query_embedding: embedding,
+        match_threshold: 0.8,
+        match_count: 5,
+      });

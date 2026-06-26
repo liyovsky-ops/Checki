@@ -1,0 +1,86 @@
+title: Zustand vs alternatywy
+
+items:
+  - name: Redux Toolkit
+    icon: "🟣"
+    color: "#764ABC"
+    tagline: Przemysłowy state management — skaluje się do ogromnych aplikacji
+    pros:
+      - Opinionated — jeden sposób robienia rzeczy (slice, createAsyncThunk)
+      - Redux DevTools w pełni — time travel, action log, state diff
+      - Sprawdzony w dużych zespołach (Airbnb, Instagram, Twitter)
+      - Duży ekosystem — RTK Query, createEntityAdapter, Immer wbudowany
+      - Testy jednostkowe reducerów są trywialne — czyste funkcje
+    cons:
+      - Boilerplate mimo RTK — slice, selektory, hooki, Provider
+      - Krzywa uczenia wyższa — reducery, thunki, selector memoizacja
+      - Nadmiarowy dla małych/średnich aplikacji
+      - Provider w drzewie React wymagany
+    vs: Redux Toolkit gdy masz duży team, złożone aktualizacje stanu i potrzebujesz RTK Query do API. Zustand gdy chcesz działać szybko bez ceremonii.
+
+  - name: Jotai
+    icon: "⚛️"
+    color: "#3B82F6"
+    tagline: Atomowy state management — jak useState, ale globalny
+    pros:
+      - Atomowy model — każdy atom to osobny kawałek stanu
+      - Automatyczna memoizacja — re-render tylko zależnych komponentów
+      - Doskonała integracja z React Suspense i Concurrent Mode
+      - Brak selektorów — atom IS selektor
+      - Mały bundle (~3kB)
+    cons:
+      - Model mentalny inny niż Zustand/Redux — przestawienie
+      - Trudniejsza organizacja dla dużych store'ów
+      - Debugowanie atomów mniej intuicyjne niż Zustand
+      - Mniej popularny niż Zustand (mniejsza społeczność)
+    vs: Jotai gdy masz wiele drobnych, niezależnych fragmentów stanu (formularze, UI flags). Zustand gdy preferujesz jeden zorganizowany store z akcjami.
+
+  - name: Recoil
+    icon: "🔵"
+    color: "#0077CC"
+    tagline: Atomowy state od Facebooka — atoms i selectors
+    pros:
+      - Atomowy model — atoms (stan) + selectors (pochodny)
+      - Asynchroniczne selectors z Suspense out of the box
+      - Dobra integracja z React Concurrent Mode
+      - Graph-based — automatyczne śledzenie zależności
+    cons:
+      - Eksperymentalny przez lata — niestabilne API
+      - Facebook przestał aktywnie rozwijać (ostatni release 2023)
+      - RecoilRoot (Provider) wymagany
+      - Mniejsza społeczność i słabsze dokumentacja vs Zustand
+      - Duży bundle vs Zustand/Jotai
+    vs: Recoil nie polecany do nowych projektów — nieaktywnie rozwijany. Wybierz Jotai (atomowy) lub Zustand (store-based) zamiast.
+
+  - name: Context API + useReducer
+    icon: "⚛️"
+    color: "#61DAFB"
+    tagline: Wbudowane w React — zero zależności
+    pros:
+      - Zero dodatkowych zależności — czysty React
+      - Wystarczający dla prostego stanu komponentowego
+      - Dobry dla stanu scope'owanego do drzewa komponentów
+      - Łatwe testy — mockuj Context zamiast store
+    cons:
+      - Re-render całego drzewa pod Providerem przy każdej zmianie
+      - Brak selektorów — brak optymalizacji re-renderów
+      - Boilerplate rośnie wraz ze złożonością stanu
+      - Provider hell przy wielu kontekstach
+      - Brak devtools, persist, middleware
+    vs: Context API dla stanu lokalnego scope (tema, auth) lub gdy aplikacja jest mała. Zustand gdy masz globalny stan dostępny z wielu miejsc lub problemy z re-renderami.
+
+  - name: Valtio
+    icon: "🔄"
+    color: "#FF4785"
+    tagline: Proxy-based state — mutuj bezpośrednio, React reaguje
+    pros:
+      - Najprostszy API — po prostu mutuj obiekt (proxy)
+      - Automatyczne śledzenie zmian przez Proxy
+      - Intuicyjny dla osób z Vue/MobX tłem
+      - Dobrze z react-three-fiber (ten sam autor co Zustand)
+    cons:
+      - Proxy-based — debugging trudniejszy (proxy ukrywa oryginał)
+      - Mniej popularny niż Zustand
+      - TypeScript support słabszy przez proxy magic
+      - Mutowanie stanu globalnego może być pułapką w dużych projektach
+    vs: Valtio gdy chcesz najprostszego możliwego API (state.count++). Zustand gdy chcesz jawnych akcji i lepszego TypeScript.

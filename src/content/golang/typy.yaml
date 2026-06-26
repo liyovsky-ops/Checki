@@ -1,0 +1,366 @@
+labels:
+  main: Typy, struktury i interfejsy
+  mainLang: go
+
+intro:
+  title: System typów Go
+  desc: >
+    Go ma statyczny, silny system typów z wnioskowanie typów przez :=.
+    Struktury (struct) zamiast klas — kompozycja zamiast dziedziczenia.
+    Wskaźniki (pointers) dają kontrolę nad pamięcią bez ręcznego zarządzania.
+    Generics od Go 1.18 — piszesz kod dla wielu typów bez powtarzania.
+
+items:
+  - title: Struct — struktury danych
+    desc: >
+      Struct to zestaw nazwanych pól. Odpowiednik klasy bez dziedziczenia.
+      Pola z dużą literą są eksportowane (publiczne), z małą — prywatne do pakietu.
+      Struct tags pozwalają kontrolować serializację JSON i inne.
+    code: |
+      package main
+
+      import (
+          "encoding/json"
+          "fmt"
+      )
+
+      // Definicja struktury — pola eksportowane (wielka litera)
+      type User struct {
+          ID       int    `json:"id"`
+          Name     string `json:"name"`
+          Email    string `json:"email"`
+          Password string `json:"-"` // "-" = pomij w JSON
+          active   bool   // prywatne — dostępne tylko w pakiecie
+      }
+
+      // Konstruktor (konwencja — funkcja New...)
+      func NewUser(id int, name, email string) *User {
+          return &User{
+              ID:     id,
+              Name:   name,
+              Email:  email,
+              active: true,
+          }
+      }
+
+      func main() {
+          u := NewUser(1, "Alice", "alice@example.com")
+
+          // Dostęp do pól
+          fmt.Println(u.Name, u.Email)
+
+          // Serializacja do JSON
+          data, _ := json.Marshal(u)
+          fmt.Println(string(data))
+          // {"id":1,"name":"Alice","email":"alice@example.com"}
+          // Password i active są pomijane
+
+          // Literał struktury
+          u2 := User{ID: 2, Name: "Bob", Email: "bob@example.com"}
+          fmt.Println(u2)
+      }
+    lang: go
+
+  - title: Metody i pointer receivers
+    desc: >
+      Metody w Go to funkcje z "receiver" — wskazują na jaki typ działają.
+      Value receiver (t Type) — kopia; Pointer receiver (*Type) — oryginał.
+      Używaj pointer receiver gdy metoda modyfikuje strukturę lub gdy struct jest duże.
+    code: |
+      package main
+
+      import "fmt"
+
+      type Counter struct {
+          value int
+          step  int
+      }
+
+      // Value receiver — nie modyfikuje oryginału
+      func (c Counter) Value() int {
+          return c.value
+      }
+
+      // Pointer receiver — modyfikuje oryginał
+      func (c *Counter) Increment() {
+          c.value += c.step
+      }
+
+      func (c *Counter) Reset() {
+          c.value = 0
+      }
+
+      func (c *Counter) SetStep(step int) {
+          c.step = step
+      }
+
+      // Metoda z return — tworzy łańcuch metod
+      func (c *Counter) Add(n int) *Counter {
+          c.value += n
+          return c
+      }
+
+      func main() {
+          c := &Counter{step: 1}
+
+          c.Increment()
+          c.Increment()
+          c.Increment()
+          fmt.Println(c.Value()) // 3
+
+          c.SetStep(5)
+          c.Increment()
+          fmt.Println(c.Value()) // 8
+
+          c.Reset()
+          fmt.Println(c.Value()) // 0
+
+          // Łańcuchowanie
+          c.Add(10).Add(20).Add(30)
+          fmt.Println(c.Value()) // 60
+      }
+    lang: go
+
+  - title: Embedding — kompozycja zamiast dziedziczenia
+    desc: >
+      Go nie ma dziedziczenia klas. Zamiast tego — embedding struct.
+      Zagnieżdżony typ udostępnia wszystkie swoje metody bezpośrednio w zewnętrznym typie.
+      Możesz "nadpisać" metodę definiując własną o tej samej nazwie.
+    code: |
+      package main
+
+      import "fmt"
+
+      // Bazowa struktura
+      type Animal struct {
+          Name string
+      }
+
+      func (a Animal) Speak() string {
+          return a.Name + " wydaje dźwięk"
+      }
+
+      func (a Animal) String() string {
+          return fmt.Sprintf("Animal(%s)", a.Name)
+      }
+
+      // Dog embeds Animal — dostaje wszystkie metody
+      type Dog struct {
+          Animal        // embedding — nie ma nazwy pola!
+          Breed string
+      }
+
+      // Nadpisanie metody
+      func (d Dog) Speak() string {
+          return d.Name + " szczeka!"
+      }
+
+      // Cat embeds Animal
+      type Cat struct {
+          Animal
+      }
+
+      func (c Cat) Speak() string {
+          return c.Name + " miauczy!"
+      }
+
+      func main() {
+          dog := Dog{
+              Animal: Animal{Name: "Rex"},
+              Breed:  "Labrador",
+          }
+          cat := Cat{Animal: Animal{Name: "Whiskers"}}
+
+          // Dostęp do pól zagnieżdżonego typu
+          fmt.Println(dog.Name)  // Rex (przez embedding)
+          fmt.Println(dog.Breed) // Labrador
+
+          // Polimorfizm przez interfejs
+          animals := []interface{ Speak() string }{dog, cat}
+          for _, a := range animals {
+              fmt.Println(a.Speak())
+          }
+      }
+    lang: go
+
+  - title: Type assertion i type switch
+    desc: >
+      Type assertion wydobywa konkretny typ z interfejsu: value.(Type).
+      Dwuwartościowa forma: v, ok := i.(Type) — bezpieczna, nie panikuje.
+      Type switch — elegancki sposób obsługi wielu możliwych typów.
+    code: |
+      package main
+
+      import "fmt"
+
+      type Animal interface {
+          Sound() string
+      }
+
+      type Dog struct{ Name string }
+      type Cat struct{ Name string }
+      type Bird struct{ Name string }
+
+      func (d Dog) Sound() string  { return "hau" }
+      func (c Cat) Sound() string  { return "miau" }
+      func (b Bird) Sound() string { return "ćwir" }
+
+      func describe(a Animal) {
+          // Type switch
+          switch v := a.(type) {
+          case Dog:
+              fmt.Printf("Pies %s mówi: %s\n", v.Name, v.Sound())
+          case Cat:
+              fmt.Printf("Kot %s mówi: %s\n", v.Name, v.Sound())
+          case Bird:
+              fmt.Printf("Ptak %s mówi: %s\n", v.Name, v.Sound())
+          default:
+              fmt.Println("Nieznane zwierzę")
+          }
+      }
+
+      func main() {
+          animals := []Animal{
+              Dog{Name: "Rex"},
+              Cat{Name: "Luna"},
+              Bird{Name: "Tweety"},
+          }
+          for _, a := range animals {
+              describe(a)
+          }
+
+          // Bezpieczna type assertion
+          var a Animal = Dog{Name: "Burek"}
+          if dog, ok := a.(Dog); ok {
+              fmt.Println("To pies:", dog.Name)
+          }
+      }
+    lang: go
+
+  - title: Generics (Go 1.18+)
+    desc: >
+      Generics pozwalają pisać kod działający z wieloma typami bez duplikacji.
+      Type parameters w nawiasach kwadratowych: [T any] lub [T int | float64].
+      Constraints (ograniczenia) definiują jakie typy są dopuszczalne.
+    code: |
+      package main
+
+      import (
+          "cmp"
+          "fmt"
+      )
+
+      // Generyczna funkcja — działa z każdym porównywalnym typem
+      func Min[T cmp.Ordered](a, b T) T {
+          if a < b {
+              return a
+          }
+          return b
+      }
+
+      // Generyczny stos
+      type Stack[T any] struct {
+          items []T
+      }
+
+      func (s *Stack[T]) Push(item T) {
+          s.items = append(s.items, item)
+      }
+
+      func (s *Stack[T]) Pop() (T, bool) {
+          if len(s.items) == 0 {
+              var zero T
+              return zero, false
+          }
+          item := s.items[len(s.items)-1]
+          s.items = s.items[:len(s.items)-1]
+          return item, true
+      }
+
+      func (s *Stack[T]) Len() int {
+          return len(s.items)
+      }
+
+      // Generyczna funkcja Map
+      func Map[T, U any](slice []T, fn func(T) U) []U {
+          result := make([]U, len(slice))
+          for i, v := range slice {
+              result[i] = fn(v)
+          }
+          return result
+      }
+
+      func main() {
+          fmt.Println(Min(3, 5))     // 3
+          fmt.Println(Min(3.14, 2.71)) // 2.71
+          fmt.Println(Min("abc", "xyz")) // abc
+
+          // Stos stringów
+          s := &Stack[string]{}
+          s.Push("pierwszy")
+          s.Push("drugi")
+          s.Push("trzeci")
+          for s.Len() > 0 {
+              v, _ := s.Pop()
+              fmt.Println(v)
+          }
+
+          // Map — podwój każdy element
+          nums := []int{1, 2, 3, 4, 5}
+          doubled := Map(nums, func(n int) int { return n * 2 })
+          fmt.Println(doubled) // [2 4 6 8 10]
+      }
+    lang: go
+
+  - title: Slices i Maps
+    desc: >
+      Slice to dynamiczna tablica — ma długość i pojemność.
+      make([]T, len, cap) tworzy slice z pre-alokacją.
+      Map to słownik hash — klucze muszą być porównywalne (nie slice, nie map).
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "slices"
+      )
+
+      func main() {
+          // Slice — deklaracja i operacje
+          nums := []int{5, 2, 8, 1, 9, 3}
+          nums = append(nums, 7)          // dodaj element
+          sub := nums[1:4]               // slice 2:4 (indeksy 1,2,3)
+          fmt.Println(nums, sub)
+
+          // Sortowanie (Go 1.21+)
+          slices.Sort(nums)
+          fmt.Println(nums) // [1 2 3 5 7 8 9]
+
+          // make — pre-alokacja (wydajność)
+          s := make([]string, 0, 100) // długość 0, pojemność 100
+          for i := 0; i < 5; i++ {
+              s = append(s, fmt.Sprintf("item-%d", i))
+          }
+          fmt.Println(s)
+
+          // Map — tworzenie i operacje
+          scores := map[string]int{
+              "Alice": 95,
+              "Bob":   87,
+              "Carol": 92,
+          }
+
+          // Sprawdź czy klucz istnieje
+          if score, ok := scores["Bob"]; ok {
+              fmt.Println("Bob:", score)
+          }
+
+          // Usuń klucz
+          delete(scores, "Bob")
+
+          // Iteracja (kolejność nieustalona!)
+          for name, score := range scores {
+              fmt.Printf("%s: %d\n", name, score)
+          }
+      }
+    lang: go

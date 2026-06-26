@@ -1,0 +1,74 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Supabase?
+  firstComponent: Twój pierwszy zapytanie
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Supabase?
+  desc: >
+    Supabase to open-source'owa alternatywa dla Firebase zbudowana na PostgreSQL.
+    Zamiast własnej bazy NoSQL dostajasz pełnoprawny PostgreSQL — relacyjny, typowany,
+    z transakcjami, widokami, triggerami i rozszerzeniami (np. pgvector do AI).
+    Supabase dokłada do tego Auth, Storage, Realtime i Edge Functions —
+    wszystko jako serwis zarządzany lub self-hosted. Założony w 2020,
+    dziś obsługuje setki tysięcy projektów, w tym duże aplikacje produkcyjne.
+
+concepts:
+  - title: PostgreSQL underneath
+    desc: >
+      Serce Supabase to prawdziwy PostgreSQL — nie uproszczona baza, nie dokument NoSQL.
+      Masz JOINy, transakcje ACID, indeksy, procedury składowane, widoki materialized,
+      rozszerzenia (PostGIS, pgvector, pg_cron). To oznacza pełną moc relacyjnej bazy
+      zamiast limitów Firebase Firestore.
+    icon: "🐘"
+  - title: Row Level Security (RLS)
+    desc: >
+      RLS to mechanizm PostgreSQL który ogranicza dostęp do wierszy na poziomie bazy —
+      nie w kodzie aplikacji. Definiujesz polityki SQL które sprawdzają czy użytkownik
+      ma prawo czytać lub modyfikować konkretny wiersz.
+      Supabase integruje RLS z Auth — auth.uid() to ID zalogowanego użytkownika.
+    icon: "🔒"
+  - title: supabaseClient
+    desc: >
+      Główny punkt wejścia do Supabase w TypeScript to createClient().
+      Zwraca obiekt z dostępem do bazy (.from()), auth (.auth), storage (.storage)
+      i realtime (.channel()). Klient jest bezpieczny do użycia po stronie klienta
+      (przeglądarka) — klucz anon jest publiczny i kontrolowany przez RLS.
+    icon: "🔑"
+  - title: Projekty i środowiska
+    desc: >
+      Każdy projekt Supabase to oddzielna instancja PostgreSQL z własnym URL i kluczami API.
+      Możesz mieć projekt dev, staging i prod. Lokalnie używasz supabase CLI
+      który uruchamia Docker z pełnym stackiem Supabase na localhost.
+    icon: "🏗️"
+
+whenToUse:
+  - Aplikacje wymagające relacyjnej bazy z JOINami i transakcjami
+  - SaaS z wieloma użytkownikami i izolacją danych (RLS)
+  - Aplikacje real-time (chat, kolaboracja, powiadomienia live)
+  - Projekty gdzie chcesz uniknąć vendor lock-in (self-hosting możliwy)
+  - Startupy i MVP — szybki start, bezpłatny tier hojny
+  - Projekty AI wymagające pgvector do wyszukiwania semantycznego
+
+firstComponent: |
+  import { createClient } from '@supabase/supabase-js';
+
+  // Inicjalizacja klienta
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  // Pierwszy SELECT — pobranie listy postów
+  const { data, error } = await supabase
+    .from('posts')
+    .select('id, title, created_at')
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (error) {
+    console.error('Błąd:', error.message);
+  } else {
+    console.log('Posty:', data);
+  }

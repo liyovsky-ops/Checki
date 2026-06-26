@@ -1,0 +1,66 @@
+title: Rust vs inne języki systemowe i nie tylko
+
+items:
+  - name: C++
+    icon: "⚙️"
+    color: "#004482"
+    tagline: Klasyk systemowy — pełna kontrola, ale bez siatki bezpieczeństwa
+    pros:
+      - Ogromny ekosystem bibliotek (30+ lat)
+      - Pełna kontrola nad pamięcią i sprzętem
+      - Interoperacyjność ze wszystkim (C ABI)
+      - Wiele platform i toolchainów
+    cons:
+      - Undefined behavior jest normą — buffer overflow, use-after-free
+      - Zarządzanie pamięcią ręczne — notorycznie błędogenne
+      - Brak nowoczesnego systemu paczek (brak cargo)
+      - Komplikowany model obiektowy (wielokrotne dziedziczenie, vtable)
+    vs: Rust ma te same możliwości co C++ ale kompilator gwarantuje brak memory bugs. Nowe projekty wymagające bezpieczeństwa (automotive, embedded, systemy krytyczne) przechodzą na Rust. C++ wygrywa samym rozmiarem ekosystemu i istniejącą bazą kodu.
+
+  - name: Go
+    icon: "🐹"
+    color: "#00ACD7"
+    tagline: Prosty język od Google — szybki start, garbage collector
+    pros:
+      - Bardzo prosta składnia — szybka nauka
+      - Wbudowane goroutiny i channels (concurrency z pudełka)
+      - Bardzo szybka kompilacja
+      - Gotowe narzędzia (fmt, vet, test) w standardzie
+    cons:
+      - Garbage collector — latency spikes w zastosowaniach real-time
+      - Brak generyków do wersji 1.18 (2022) — teraz są, ale ograniczone
+      - Brak wyrażeniowości Rusta (no ADTs, ograniczone pattern matching)
+      - Interfejsy implicite — trudniejsze śledzenie implementacji
+    vs: Go prostszy na start, Rust lepszy gdy liczy się latency i brak GC. Dla mikroserwisów — Go. Dla systemów wbudowanych i krytycznych — Rust. Oba są bezpieczniejsze niż C++.
+
+  - name: Python
+    icon: "🐍"
+    color: "#3776AB"
+    tagline: Czytelność i szybkość prototypowania — interpreter, GIL
+    pros:
+      - Najszybsze prototypowanie
+      - Ogromny ekosystem (ML, data science, scripting)
+      - Czytelna składnia, łatwa nauka
+      - REPL do interaktywnego eksperymentowania
+    cons:
+      - 10-100x wolniejszy od Rusta
+      - GIL blokuje prawdziwą równoległość CPU
+      - Brak type safety w runtime bez dodatkowych narzędzi
+      - Słabe dla zastosowań systemowych i embedded
+    vs: Rust i Python się uzupełniają. Python = prototypy, skrypty, ML. Rust = produkcyjne CLI, biblioteki C extension dla Pythona (PyO3), WASM. Wiele projektów Python ma krytyczne fragmenty przepisane w Rust dla wydajności.
+
+  - name: C
+    icon: "🔧"
+    color: "#555555"
+    tagline: Język systemowy — minimalny, wszędzie, niebezpieczny
+    pros:
+      - Absolutna kontrola nad sprzętem
+      - Kompiluje się wszędzie (każdy mikrokontroler)
+      - Minimalny runtime — dosłownie zero narzutu
+      - Stabilne ABI — interop z każdym językiem
+    cons:
+      - Brak typów algebraicznych, brak generyków
+      - Ręczne zarządzanie pamięcią bez pomocy kompilatora
+      - Undefined behavior jest codziennością
+      - Brak systemu modułów i package managera
+    vs: Rust zaprojektowano jako bezpieczny następca C. Rust FFI bezpośrednio wywołuje C biblioteki. Kernel Linux (od 2022) i Android przyjęły Rust obok C. Nowy kod systemowy powinien być w Rust — stary C kod wymaga przepisania dopiero gdy ma krytyczne bugi.

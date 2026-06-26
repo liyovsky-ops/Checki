@@ -1,0 +1,57 @@
+title: Ekosystem Vite — pluginy i metaframeworki
+
+items:
+  - name: "@vitejs/plugin-react"
+    desc: Oficjalny plugin React — Babel Fast Refresh (HMR stanu), JSX transform, React DevTools integracja. Standardowy wybór dla projektów React + Vite.
+    icon: "⚛️"
+  - name: "@vitejs/plugin-react-swc"
+    desc: Plugin React z SWC zamiast Babel — 20× szybszy cold start i HMR. Drop-in replacement dla @vitejs/plugin-react. Zalecany dla dużych projektów React.
+    icon: "🦀"
+  - name: "@vitejs/plugin-vue"
+    desc: Oficjalny plugin Vue 3 — obsługa Single File Components (.vue), JSX, Template Refs. Wymagany dla każdego projektu Vue 3 + Vite.
+    icon: "💚"
+  - name: "@vitejs/plugin-svelte"
+    desc: Oficjalny plugin Svelte — kompilacja komponentów .svelte, HMR. Używany przez SvelteKit (SvelteKit używa Vite pod spodem).
+    icon: "🧡"
+  - name: "vite-plugin-pwa"
+    desc: Progressive Web App — automatyczny Service Worker, Web Manifest, offline caching, push notifications. Zero-config PWA dla projektów Vite.
+    icon: "📱"
+  - name: "vite-imagetools"
+    desc: Import i transformacja obrazów — resize, format conversion (WebP, AVIF), blur, optymalizacja. Wszystko przez query string w imporcie (image.png?w=200&format=webp).
+    icon: "🖼️"
+  - name: "vite-plugin-svgr"
+    desc: Import SVG jako React komponenty — import { ReactComponent as Logo } from './logo.svg'. Automatyczna konwersja SVG → React component z pełnym TypeScript support.
+    icon: "🎨"
+  - name: "unplugin-auto-import"
+    desc: Auto-import API — eliminuje ręczne importy React hooks, Vue refs, utility functions. Generuje automatycznie import { useState, useEffect } from 'react' w tle.
+    icon: "🤖"
+  - name: "unplugin-icons"
+    desc: Import ikon z 100+ zestawów (Iconify) na żądanie — tylko używane ikony trafiają do bundle. import ArrowRight from '~icons/heroicons/arrow-right'.
+    icon: "✨"
+  - name: "vite-plugin-checker"
+    desc: TypeScript, ESLint i inne checkery uruchamiane w osobnym wątku podczas dev — błędy w terminalu i w przeglądarce bez spowalniania HMR.
+    icon: "🔍"
+  - name: "vite-plugin-mock"
+    desc: Mock API endpoints dla dev — zdefiniuj handlery w plikach mock/, serwer dev odpowiada fake danymi. Przydatne przy pracy bez backendu.
+    icon: "🎭"
+  - name: "rollup-plugin-visualizer"
+    desc: Interaktywna mapa bundle — treemap/sunburst HTML pokazujący z czego składa się bundle. Wykrywaj zbyt duże biblioteki i duplikacje. Otwiera po vite build.
+    icon: "📊"
+  - name: "Next.js"
+    desc: React metaframework od Vercel — SSR, SSG, ISR, API routes, App Router. Od Next.js 12 używa Vite opcjonalnie, od Next.js 13 Turbopack. Domyślny ekosystem dla React production apps.
+    icon: "▲"
+  - name: "Nuxt"
+    desc: Vue metaframework — SSR, SSG, auto-routing, auto-imports, hybrid rendering. Nuxt 3 używa Vite (lub Nitro) jako dev serwera. Pełny stack Vue.
+    icon: "💚"
+  - name: "SvelteKit"
+    desc: Svelte metaframework — SSR, SSG, file-based routing, adapters (Vercel, Netlify, Node). Używa Vite jako dev server i bundler. Najszybszy DX w ekosystemie.
+    icon: "🧡"
+  - name: "Remix"
+    desc: React metaframework od Shopify — progressive enhancement, web standards (fetch, FormData), SSR. Od wersji 2 Vite jest oficjalnym pluginem (vite-plugin-remix).
+    icon: "💿"
+  - name: "Astro"
+    desc: Framework do stron statycznych — Islands Architecture (hydratuj tylko interaktywne części), multi-framework (React/Vue/Svelte w jednym projekcie). Używa Vite wewnętrznie.
+    icon: "🚀"
+  - name: "Qwik"
+    desc: O(1) JS framework — Resumability zamiast hydratacji, streaming, edge-first. Oficjalny starter używa Vite. Ekstremalnie szybki Time to Interactive.
+    icon: "⚡"

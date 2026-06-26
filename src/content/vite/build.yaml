@@ -1,0 +1,238 @@
+labels:
+  main: Build & Deploy — produkcja i optymalizacja
+  mainLang: typescript
+
+intro:
+  title: Vite Build — produkcyjny output
+  desc: >
+    vite build tworzy zoptymalizowany build produkcyjny używając Rollup pod spodem.
+    Automatycznie: tree-shaking (usuwa nieużywany kod), code splitting (dynamiczne importy),
+    minifikacja JS (esbuild) i CSS, optymalizacja assets (hash nazw dla cache busting).
+    Library mode pozwala budować biblioteki NPM. vite preview serwuje gotowy build lokalnie.
+
+items:
+  - title: vite build — podstawowy build
+    desc: >
+      Domyślny build tworzy katalog dist/ z zoptymalizowanymi plikami. Każdy dynamiczny
+      import staje się osobnym chunkiem (code splitting). Rollup automatycznie robi
+      tree-shaking — nieużywany kod jest usuwany z output.
+    code: |
+      # Uruchomienie
+      npm run build        # vite build
+      vite build           # bezpośrednio
+
+      # Output dist/:
+      # dist/
+      # ├── index.html
+      # └── assets/
+      #     ├── index-Bx3kYhAt.js     (main chunk)
+      #     ├── vendor-CKf3n0gj.js    (vendor chunk — jeśli manualChunks)
+      #     ├── index-CKf3n0gj.css    (bundle CSS)
+      #     └── logo-BrN4gB4P.png     (asset z hashem)
+
+      # Analiza rozmiaru output:
+      vite build 2>&1 | grep "dist/"
+      # Rozmiary chunków z gzip estimation
+
+      # Build z custom config:
+      vite build --config vite.prod.config.ts
+
+      # Build dla innego mode:
+      vite build --mode staging    # ładuje .env.staging
+    lang: bash
+
+  - title: rollupOptions.manualChunks — podział kodu
+    desc: >
+      manualChunks pozwala ręcznie określić podział kodu na chunki. Vendor chunk
+      (React, lodash) będzie cachowany przez przeglądarkę niezależnie od zmian
+      w kodzie aplikacji. Funkcja jako manualChunks daje pełną kontrolę nad podziałem.
+    code: |
+      import { defineConfig } from 'vite';
+
+      export default defineConfig({
+        build: {
+          rollupOptions: {
+            output: {
+              // Obiektowa forma — statyczny podział
+              manualChunks: {
+                // Chunk 'vendor' — biblioteki rzadko zmieniające się
+                vendor: ['react', 'react-dom', 'react-router-dom'],
+                // Chunk 'ui' — komponenty UI
+                ui: ['@radix-ui/react-dialog', 'lucide-react'],
+                // Chunk 'utils' — narzędzia
+                utils: ['date-fns', 'zod', 'axios'],
+              },
+
+              // Funkcja — dynamiczny podział
+              // manualChunks(id) {
+              //   if (id.includes('node_modules')) {
+              //     // Każda biblioteka w osobnym chunku
+              //     return id.toString().split('node_modules/')[1].split('/')[0];
+              //   }
+              // },
+            },
+          },
+        },
+      });
+
+      // Dynamiczny import = automatyczny chunk:
+      // const LazyPage = lazy(() => import('./pages/Dashboard'));
+      // → dist/assets/Dashboard-AbCdEfGh.js (osobny chunk)
+    lang: typescript
+
+  - title: rollup-plugin-visualizer — analiza bundle
+    desc: >
+      rollup-plugin-visualizer generuje interaktywny raport HTML pokazujący z czego
+      składa się bundle. Bezcenny do wykrywania zbyt dużych bibliotek, duplikacji
+      i optymalizacji podziału kodu.
+    code: |
+      # Instalacja
+      npm install -D rollup-plugin-visualizer
+
+      import { defineConfig } from 'vite';
+      import { visualizer } from 'rollup-plugin-visualizer';
+
+      export default defineConfig({
+        plugins: [
+          visualizer({
+            filename: 'dist/stats.html',   // gdzie zapisać raport
+            open: true,                     // otwórz w przeglądarce po build
+            gzipSize: true,                 // pokaż rozmiary po gzip
+            brotliSize: true,               // pokaż rozmiary po brotli
+            template: 'treemap',            // 'treemap' | 'sunburst' | 'network'
+          }),
+        ],
+      });
+
+      # Po vite build otwiera się stats.html z mapą bundle'a:
+      # - każdy prostokąt = moduł (rozmiar = wielkość)
+      # - klikaj żeby zoom
+      # - szukaj dużych niespodzianek (moment.js, lodash całe)
+    lang: typescript
+
+  - title: vite preview — serwer podglądu
+    desc: >
+      vite preview uruchamia lokalny serwer statyczny serwujący zawartość dist/.
+      Pozwala przetestować produkcyjny build przed deployem — upewnić się że routing,
+      assets, zmienne środowiskowe działają poprawnie. NIE jest to serwer produkcyjny.
+    code: |
+      # Workflow testowania produkcyjnego build:
+      npm run build      # zbuduj do dist/
+      npm run preview    # serwuj dist/ na localhost:4173
+
+      # package.json:
+      {
+        "scripts": {
+          "dev":     "vite",
+          "build":   "tsc && vite build",
+          "preview": "vite preview"
+        }
+      }
+
+      # Opcje preview:
+      vite preview --port 8080          # inny port
+      vite preview --host               # dostęp z sieci
+      vite preview --open               # otwórz przeglądarkę
+
+      # Konfiguracja w vite.config.ts:
+      export default defineConfig({
+        preview: {
+          port: 4173,
+          headers: {
+            'Cache-Control': 'no-store',  // testuj bez cache
+          },
+        },
+      });
+    lang: bash
+
+  - title: Library Mode — budowanie bibliotek
+    desc: >
+      Library mode służy do budowania bibliotek NPM. Output to pakiet ES Module
+      i/lub CommonJS zamiast aplikacji. Możesz eksportować wiele entry points.
+      Zewnętrzne zależności (peer deps) są excludowane z bundle.
+    code: |
+      import { defineConfig } from 'vite';
+      import react from '@vitejs/plugin-react';
+      import { resolve } from 'path';
+      import dts from 'vite-plugin-dts';  // generuje .d.ts pliki
+
+      export default defineConfig({
+        plugins: [
+          react(),
+          dts({ include: ['lib'] }),  // TypeScript declarations
+        ],
+        build: {
+          // Library mode
+          lib: {
+            entry: resolve(__dirname, 'lib/index.ts'),  // entry point
+            name: 'MyUILib',                             // global name (UMD)
+            formats: ['es', 'cjs'],                      // ES Module + CommonJS
+            fileName: (format) => `my-ui-lib.${format}.js`,
+          },
+          rollupOptions: {
+            // Excluduj peer dependencies z bundle
+            external: ['react', 'react-dom'],
+            output: {
+              globals: {
+                react: 'React',
+                'react-dom': 'ReactDOM',
+              },
+            },
+          },
+        },
+      });
+
+      // package.json biblioteki:
+      {
+        "main": "./dist/my-ui-lib.cjs.js",
+        "module": "./dist/my-ui-lib.es.js",
+        "types": "./dist/index.d.ts",
+        "exports": {
+          ".": {
+            "import": "./dist/my-ui-lib.es.js",
+            "require": "./dist/my-ui-lib.cjs.js"
+          }
+        }
+      }
+    lang: typescript
+
+  - title: Optymalizacje produkcyjne
+    desc: >
+      Vite automatycznie optymalizuje wiele aspektów, ale można to kontrolować ręcznie.
+      Minifier esbuild (domyślny) jest szybszy, Terser daje lepszą kompresję. Target
+      określa kompatybilność przeglądarek — es2020 jest bezpiecznym wyborem dla 2024+.
+    code: |
+      import { defineConfig } from 'vite';
+
+      export default defineConfig({
+        build: {
+          // Minifier
+          minify: 'esbuild',        // szybszy (domyślny)
+          // minify: 'terser',      // lepsza kompresja (~5-10%)
+          // minify: false,         // dev debugging
+
+          // Terser opcje (jeśli używasz terser)
+          terserOptions: {
+            compress: {
+              drop_console: true,   // usuń console.log z produkcji
+              drop_debugger: true,
+            },
+          },
+
+          // Target przeglądarek
+          target: 'es2020',         // Chrome 80+, Firefox 78+, Safari 14+
+          // target: 'esnext',      // najnowsze przeglądarki
+          // target: ['chrome87', 'firefox78', 'safari14'],
+
+          // Sourcemaps
+          sourcemap: false,         // produkcja bez sourcemap (szybszy build)
+          // sourcemap: 'hidden',   // generuj ale nie linkuj w output (dla Sentry)
+
+          // Reportowanie rozmiaru
+          reportCompressedSize: true,  // pokaż gzip rozmiary
+
+          // Chunkowanie CSS
+          cssCodeSplit: true,       // osobny CSS per chunk (domyślnie true)
+        },
+      });
+    lang: typescript

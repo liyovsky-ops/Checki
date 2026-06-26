@@ -1,0 +1,187 @@
+title: Komendy Go
+
+groups:
+  - name: Instalacja i setup
+    icon: "📦"
+    commands:
+      - cmd: go version
+        desc: Sprawdź wersję Go
+        detail:
+          what: Wyświetla zainstalowaną wersję Go oraz platformę (OS/arch).
+          how: Upewnij się że masz Go 1.21+ — wiele nowoczesnych funkcji (slices, maps packages, slog) wymaga Go 1.21.
+          tips:
+            - "Aktualizacja: pobierz z https://go.dev/dl/ lub użyj goenv/asdf"
+            - "go env GOPATH — sprawdź gdzie Go trzyma pakiety"
+      - cmd: go env
+        desc: Wyświetl zmienne środowiskowe Go
+        detail:
+          what: Pokazuje wszystkie zmienne środowiskowe Go — GOPATH, GOROOT, GOMODCACHE, GOPROXY.
+          how: Przydatne przy debugowaniu problemów z modułami i proxy.
+          tips:
+            - "go env GOPATH — tylko jedna zmienna"
+            - "go env -w GONOSUMCHECK=* — ustaw zmienną trwale"
+
+  - name: Moduły (go mod)
+    icon: "📋"
+    commands:
+      - cmd: go mod init github.com/user/myapp
+        desc: Zainicjuj nowy moduł Go
+        detail:
+          what: Tworzy plik go.mod definiujący nazwę modułu i wersję Go. Punkt startowy każdego projektu.
+          how: Nazwa modułu to zazwyczaj ścieżka GitHub repo. Możesz też użyć dowolnej nazwy np. myapp.
+          tips:
+            - "Plik go.mod commituj do gita — to jak package.json w Node.js"
+            - "go.sum to lock file — też commituj"
+      - cmd: go mod tidy
+        desc: Synchronizuj zależności — dodaj brakujące, usuń nieużywane
+        detail:
+          what: Skanuje kod, dodaje brakujące importy do go.mod/go.sum i usuwa nieużywane zależności.
+          how: Uruchamiaj po dodaniu/usunięciu importów w kodzie lub po ręcznej edycji go.mod.
+          tips:
+            - "Uruchom przed każdym commitem — go mod tidy jest idempotentny"
+            - "go mod tidy -v — verbose output (co dodano/usunięto)"
+      - cmd: go get github.com/gin-gonic/gin@latest
+        desc: Dodaj lub zaktualizuj zależność
+        detail:
+          what: "Pobiera pakiet i dodaje do go.mod. @latest = najnowsza wersja. Możesz podać konkretną: @v1.9.0."
+          how: Modyfikuje go.mod i go.sum automatycznie.
+          tips:
+            - "go get github.com/pkg@v1.2.3 — konkretna wersja"
+            - "go get github.com/pkg@none — usuń zależność"
+      - cmd: go mod download
+        desc: Pobierz wszystkie zależności z go.mod do cache
+        detail:
+          what: Pobiera i cache'uje wszystkie zależności bez kompilacji. Przydatne w Dockerfile przed kopiowaniem kodu.
+          how: Moduły trafiają do GOMODCACHE (~/.cache/go/mod lub GOPATH/pkg/mod).
+          tips:
+            - "W Dockerfile: najpierw COPY go.mod go.sum, RUN go mod download, potem COPY . . — lepszy cache warstw"
+            - "go mod verify — sprawdź integralność pobranych modułów"
+
+  - name: Uruchamianie i kompilacja
+    icon: "▶️"
+    commands:
+      - cmd: go run main.go
+        desc: Skompiluj i uruchom bez tworzenia pliku binarnego
+        detail:
+          what: Kompiluje i uruchamia program w jednym kroku. Tworzy tymczasowy plik binarny (w /tmp).
+          how: Idealne do szybkiego testowania. Nie nadaje się do produkcji — kompiluje przy każdym uruchomieniu.
+          tips:
+            - "go run . — uruchom pakiet w bieżącym katalogu (szuka main.go lub func main)"
+            - "go run ./cmd/server — uruchom konkretny pakiet"
+      - cmd: go build -o bin/server ./cmd/server
+        desc: Skompiluj do pliku binarnego
+        detail:
+          what: Kompiluje program do pliku binarnego. -o ustawia nazwę/ścieżkę wyjściową.
+          how: Produkuje statycznie linkowany binarny — działa bez żadnych zależności na docelowej maszynie.
+          tips:
+            - "go build . — binarny w bieżącym katalogu (nazwa = nazwa katalogu)"
+            - "Dla Linuxa na Mac: GOOS=linux GOARCH=amd64 go build -o server-linux ."
+      - cmd: "GOOS=linux GOARCH=amd64 go build -o server ."
+        desc: Cross-kompilacja (np. na Linuxa z Mac/Windows)
+        detail:
+          what: Kompiluje program dla innego systemu operacyjnego lub architektury. Zero dodatkowych narzędzi.
+          how: GOOS = OS docelowy (linux/windows/darwin). GOARCH = architektura (amd64/arm64/386).
+          tips:
+            - "GOOS=linux GOARCH=arm64 — dla ARM (np. AWS Graviton, Raspberry Pi)"
+            - "go tool dist list — lista wszystkich obsługiwanych GOOS/GOARCH kombinacji"
+      - cmd: go install ./...
+        desc: Zainstaluj wszystkie pliki binarne z projektu do GOPATH/bin
+        detail:
+          what: Kompiluje i instaluje pliki binarne — dostępne globalnie jeśli GOPATH/bin jest w PATH.
+          how: Używane do instalacji narzędzi Go (np. go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest).
+          tips:
+            - "Dodaj do PATH: export PATH=$PATH:$(go env GOPATH)/bin"
+            - "go install narzędzie@latest — instaluj zewnętrzne narzędzia Go"
+
+  - name: Testowanie
+    icon: "🧪"
+    commands:
+      - cmd: go test ./...
+        desc: Uruchom wszystkie testy w projekcie
+        detail:
+          what: Kompiluje i uruchamia testy we wszystkich pakietach projektu. ./... to glob dla wszystkich podkatalogów.
+          how: Pliki _test.go są kompilowane tylko przy go test. Funkcje TestXxx(t *testing.T) to testy.
+          tips:
+            - "go test ./... -v — verbose (pokazuje nazwy każdego testu)"
+            - "go test ./... -count=1 — wymusza pominięcie cache (zawsze uruchamia testy)"
+      - cmd: go test -run TestUserService ./...
+        desc: Uruchom konkretny test lub grupę testów
+        detail:
+          what: -run przyjmuje wyrażenie regularne dopasowujące nazwy testów.
+          how: TestUserService dopasuje TestUserService, TestUserServiceCreate, TestUserServiceDelete itd.
+          tips:
+            - "go test -run 'TestUser/sukces' — konkretny subtest z t.Run()"
+            - "go test -run TestCreate ./pkg/users — tylko w pakiecie users"
+      - cmd: go test -bench=. -benchmem ./...
+        desc: Uruchom benchmarki z pomiarem pamięci
+        detail:
+          what: Uruchamia funkcje BenchmarkXxx. -benchmem pokazuje alokacje pamięci na operację.
+          how: runtime automatycznie ustala liczbę iteracji (b.N) dla statystycznie wiarygodnych wyników.
+          tips:
+            - "go test -bench=BenchmarkSort -benchtime=10s — dłuższe benchmarki"
+            - "go test -bench=. -cpuprofile=cpu.prof — profil CPU do pprof"
+      - cmd: go test -cover ./...
+        desc: Pokrycie kodu testami
+        detail:
+          what: Kompiluje instrumentowany kod i mierzy które linie/gałęzie są wykonywane przez testy.
+          how: Wyświetla % pokrycia per pakiet. Nie mówi o jakości testów — tylko ile linii jest wykonywanych.
+          tips:
+            - "go test -coverprofile=cover.out ./... && go tool cover -html=cover.out — raport HTML"
+            - "Cel: 80%+ pokrycia dla kodu produkcyjnego"
+
+  - name: Formatowanie i analiza
+    icon: "🔧"
+    commands:
+      - cmd: go fmt ./...
+        desc: Sformatuj cały kod zgodnie ze standardem Go
+        detail:
+          what: Formatuje pliki .go według jedynego oficjalnego stylu Go. Zero konfiguracji, zero dyskusji o stylu.
+          how: Modyfikuje pliki in-place. Wszyscy piszą tak samo — Go wymaga ujednoliconego formatowania.
+          tips:
+            - "Zintegruj z IDE — formatowanie przy zapisie (gofmt lub goimports)"
+            - "goimports ./... — jak gofmt ale też zarządza importami (go get golang.org/x/tools)"
+      - cmd: go vet ./...
+        desc: Statyczna analiza kodu — znajdź podejrzane wzorce
+        detail:
+          what: Analizuje kod bez uruchamiania — wykrywa typowe błędy jak przekazanie sync.Mutex przez wartość, błędny format printf, unreachable code.
+          how: Szybszy i lżejszy niż golangci-lint. Powinien być zawsze zielony.
+          tips:
+            - "Uruchamiaj w CI zanim go test — go vet wykryje błędy które testy mogą przeoczyć"
+            - "go build zawiera część sprawdzeń vet — ale go vet jest dokładniejszy"
+      - cmd: golangci-lint run ./...
+        desc: Kompleksowy linter — zbiór ~100 linterów w jednym
+        detail:
+          what: Uruchamia wiele linterów jednocześnie (staticcheck, errcheck, gosec, revive i inne). Standard w CI Go projektów.
+          how: "Wymaga instalacji: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
+          tips:
+            - "Konfiguruj przez .golangci.yaml w rootu projektu"
+            - "golangci-lint run --fix — automatyczne poprawki tam gdzie możliwe"
+            - "golangci-lint run --timeout=5m — przy dużych projektach"
+
+  - name: Narzędzia diagnostyczne
+    icon: "🔍"
+    commands:
+      - cmd: go doc net/http.Handler
+        desc: Dokumentacja pakietu lub symbolu
+        detail:
+          what: Wyświetla dokumentację bezpośrednio w terminalu. Działa dla stdlib i zainstalowanych modułów.
+          how: Nie wymaga internetu — dokumentacja jest wbudowana w kod źródłowy jako komentarze.
+          tips:
+            - "go doc fmt.Println — konkretna funkcja"
+            - "go doc -all net/http — pełna dokumentacja pakietu"
+      - cmd: go tool pprof cpu.prof
+        desc: Profilowanie wydajności CPU/pamięci
+        detail:
+          what: Interaktywny profiler — analizuje plik profilu wygenerowany przez go test -cpuprofile lub runtime/pprof.
+          how: "W interaktywnej konsoli: top (najdroższe funkcje), web (drzewo wywołań w przeglądarce), list FuncName."
+          tips:
+            - "go tool pprof -http=:8080 cpu.prof — interaktywna przeglądarka flamegraph"
+            - "Dodaj net/http/pprof do HTTP serwera żeby profilować live aplikację"
+      - cmd: go list -m all
+        desc: Lista wszystkich zależności projektu
+        detail:
+          what: Wyświetla wszystkie moduły (bezpośrednie i pośrednie) z wersjami.
+          how: Przydatne do audytu zależności i sprawdzania aktualnych wersji.
+          tips:
+            - "go list -m -u all — pokaż dostępne aktualizacje"
+            - "go list ./... — lista wszystkich pakietów w projekcie"

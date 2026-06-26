@@ -1,0 +1,190 @@
+title: Drizzle Kit — migracje i narzędzia
+
+items:
+  - name: Konfiguracja — drizzle.config.ts
+    desc: >
+      Drizzle Kit wymaga pliku konfiguracyjnego drizzle.config.ts w katalogu projektu.
+      Definiujesz w nim ścieżkę do schema, folder na migracje, dialect (postgresql/mysql/sqlite)
+      i credentials do bazy. Bez tego pliku żadna komenda drizzle-kit nie zadziała.
+    code: |
+      // drizzle.config.ts
+      import { defineConfig } from 'drizzle-kit'
+
+      export default defineConfig({
+        schema:    './src/db/schema.ts',      // lub tablica ['./src/db/*.ts']
+        out:       './drizzle',               // folder na pliki migracji
+        dialect:   'postgresql',              // 'postgresql' | 'mysql' | 'sqlite'
+        dbCredentials: {
+          url: process.env.DATABASE_URL!,
+        },
+        verbose: true,    // pokaż wygenerowany SQL
+        strict:  true,    // pytaj przed destructive operations
+      })
+
+      // drizzle.config.ts dla SQLite (np. Cloudflare D1)
+      export default defineConfig({
+        schema:  './src/db/schema.ts',
+        out:     './drizzle',
+        dialect: 'sqlite',
+        dbCredentials: {
+          url: './local.db',
+        },
+      })
+    lang: typescript
+
+  - name: generate — generuj pliki migracji
+    desc: >
+      drizzle-kit generate porównuje aktualną schema z poprzednimi migracjami
+      i generuje plik SQL z różnicą. NIE wykonuje SQL — tylko tworzy plik.
+      Pliki migracji commituj do gita — są source of truth historii schema.
+    code: |
+      # Wygeneruj migrację (diff schema vs poprzednia migracja)
+      npx drizzle-kit generate
+
+      # Drizzle tworzy np.: drizzle/0001_add_phone_to_users.sql
+      # Zawartość pliku:
+      # ALTER TABLE "users" ADD COLUMN "phone" text;
+
+      # Kolejne migracje mają rosnące numery:
+      # drizzle/0000_init.sql
+      # drizzle/0001_add_phone.sql
+      # drizzle/0002_add_posts_table.sql
+
+      # Możesz edytować wygenerowany SQL przed migrate!
+      # Przydatne do: data backfill, custom constraints, triggerów
+    lang: bash
+
+  - name: migrate — zastosuj migracje
+    desc: >
+      drizzle-kit migrate wykonuje wszystkie pending pliki SQL z folderu migracji.
+      Śledzi zastosowane migracje w tabeli __drizzle_migrations w bazie.
+      Na produkcji używaj tej komendy w CI/CD zamiast push.
+    code: |
+      # Zastosuj wszystkie pending migracje
+      npx drizzle-kit migrate
+
+      # Można też wywołać migracje programowo (w kodzie)
+      import { migrate } from 'drizzle-orm/postgres-js/migrator'
+      import { drizzle } from 'drizzle-orm/postgres-js'
+      import postgres from 'postgres'
+
+      const migrationClient = postgres(process.env.DATABASE_URL!, { max: 1 })
+      const db = drizzle(migrationClient)
+
+      await migrate(db, { migrationsFolder: './drizzle' })
+      await migrationClient.end()
+
+      // Typowy skrypt deploy:
+      // 1. npm run db:migrate  ← uruchom migracje
+      // 2. npm run start       ← uruchom aplikację
+
+      // package.json scripts:
+      // "db:migrate": "drizzle-kit migrate"
+    lang: typescript
+
+  - name: push — schema-first bez plików migracji
+    desc: >
+      drizzle-kit push aplikuje schema bezpośrednio do bazy bez generowania plików SQL.
+      TYLKO do prototypowania i development — brak historii migracji, ryzyko utraty danych.
+      Przydatne gdy szybko eksperymentujesz i nie chcesz zarządzać plikami migracji.
+    code: |
+      # Pushuj schema do bazy (development only!)
+      npx drizzle-kit push
+
+      # Drizzle zapyta o destructive operations:
+      # ⚠ Found changes that require dropping table "users"
+      # Are you sure you want to continue? [y/n]
+
+      # Aby nie pytać (CI / skrypty):
+      npx drizzle-kit push --force
+
+      # Push dla SQLite (np. Turso):
+      # drizzle.config.ts: dialect: 'sqlite', dbCredentials: { url: process.env.TURSO_URL }
+      npx drizzle-kit push
+
+      # UWAGA: push może usunąć dane przy zmianie struktury tabel
+      # Na produkcji zawsze używaj generate + migrate!
+    lang: bash
+
+  - name: pull — introspection bazy
+    desc: >
+      drizzle-kit pull (dawniej introspect) generuje schema TypeScript na podstawie
+      istniejącej bazy danych. Przydatne gdy zaczynasz używać Drizzle z istniejącą bazą
+      lub gdy baza jest zarządzana przez inny system.
+    code: |
+      # Wygeneruj schema z istniejącej bazy
+      npx drizzle-kit pull
+
+      # Drizzle tworzy: drizzle/schema.ts z definicjami tabel
+      # Przykład wygenerowanej schema:
+      # export const users = pgTable('users', {
+      #   id:    serial('id').primaryKey(),
+      #   email: text('email').notNull(),
+      # })
+
+      # Po pull: przejrzyj i dostosuj wygenerowany plik
+      # Drizzle może nie idealnie odwzorować wszystkich constraints
+      # Dodaj relations() ręcznie — pull ich nie generuje
+    lang: bash
+
+  - name: studio — GUI do bazy
+    desc: >
+      drizzle-kit studio uruchamia interfejs webowy do przeglądania i edytowania danych.
+      Podgląd tabel, filtrowanie, dodawanie/usuwanie rekordów. Działa z każdym adapterem
+      skonfigurowanym w drizzle.config.ts.
+    code: |
+      # Uruchom Drizzle Studio
+      npx drizzle-kit studio
+
+      # Domyślnie: https://local.drizzle.studio (port 4983)
+      # Otwiera się automatycznie w przeglądarce
+
+      # Z custom portem:
+      npx drizzle-kit studio --port 8080
+
+      # Studio łączy się przez konfigurację z drizzle.config.ts
+      # Obsługuje wszystkie adaptery: PostgreSQL, MySQL, SQLite, Turso, Neon, itp.
+    lang: bash
+
+  - name: Seed — wypełnianie danymi testowymi
+    desc: >
+      Drizzle nie ma wbudowanego seed systemu jak Prisma. Tworzysz skrypt TypeScript
+      który używa normalnego db.insert(). Uruchamiasz go ręcznie lub przez package.json scripts.
+      Możesz użyć faker.js do generowania realistycznych danych.
+    code: |
+      // scripts/seed.ts
+      import { db } from '../src/db'
+      import { users, posts, categories } from '../src/db/schema'
+
+      async function seed() {
+        console.log('Seeding database...')
+
+        // Wyczyść dane (opcjonalnie)
+        await db.delete(posts)
+        await db.delete(users)
+
+        // Wstaw użytkowników
+        const [admin, user1] = await db.insert(users)
+          .values([
+            { email: 'admin@firma.pl', name: 'Admin',   role: 'admin' },
+            { email: 'jan@firma.pl',   name: 'Jan K.',  role: 'user'  },
+            { email: 'anna@firma.pl',  name: 'Anna W.', role: 'user'  },
+          ])
+          .returning()
+
+        // Wstaw posty powiązane z userami
+        await db.insert(posts).values([
+          { title: 'Pierwszy post', authorId: admin.id, published: true },
+          { title: 'Drugi post',    authorId: user1.id, published: false },
+        ])
+
+        console.log('Seed done!')
+        process.exit(0)
+      }
+
+      seed().catch(console.error)
+
+      // package.json:
+      // "scripts": { "db:seed": "tsx scripts/seed.ts" }
+      // npm run db:seed
+    lang: typescript

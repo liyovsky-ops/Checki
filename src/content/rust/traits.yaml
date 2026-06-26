@@ -1,0 +1,205 @@
+labels:
+  main: Traity, Generyki i Iteratory
+  mainLang: rust
+
+intro:
+  title: Traits — interfejsy Rusta
+  desc: >
+    Trait to zestaw metod które typ musi zaimplementować. Odpowiednik interfejsów w innych językach,
+    ale potężniejszy — możesz implementować zewnętrzne traity na własnych typach i odwrotnie.
+    Generyki + traity = zero-cost abstractions — kompilator generuje specjalizowany kod dla każdego typu.
+
+items:
+  - title: Definiowanie i implementacja traita
+    desc: >
+      trait definiuje zachowanie. impl Trait for Type implementuje je dla konkretnego typu.
+      Może zawierać domyślne implementacje metod — typy mogą je nadpisać lub odziedziczyć.
+    code: |
+      trait Opisywalny {
+          fn opis(&self) -> String;
+
+          // Domyślna implementacja
+          fn skrot(&self) -> String {
+              let d = self.opis();
+              if d.len() > 20 {
+                  format!("{}...", &d[..20])
+              } else {
+                  d
+              }
+          }
+      }
+
+      struct Produkt {
+          nazwa: String,
+          cena: f64,
+      }
+
+      impl Opisywalny for Produkt {
+          fn opis(&self) -> String {
+              format!("{} — {:.2} zł", self.nazwa, self.cena)
+          }
+          // skrot() odziedziczyliśmy z traita
+      }
+
+      fn main() {
+          let p = Produkt { nazwa: "Klawiatura mechaniczna".to_string(), cena: 299.99 };
+          println!("{}", p.opis());
+          println!("{}", p.skrot()); // "Klawiatura mechaniczna..."
+      }
+    lang: rust
+
+  - title: Derive macros — automatyczne implementacje
+    desc: >
+      #[derive(...)] automatycznie generuje implementacje standardowych traitów.
+      Debug = formatowanie {:?}, Clone = .clone(), PartialEq = porównywanie ==, Hash = użycie w HashMap.
+    code: |
+      #[derive(Debug, Clone, PartialEq)]
+      struct Punkt {
+          x: f64,
+          y: f64,
+      }
+
+      impl Punkt {
+          fn odleglosc(&self, inny: &Punkt) -> f64 {
+              let dx = self.x - inny.x;
+              let dy = self.y - inny.y;
+              (dx * dx + dy * dy).sqrt()
+          }
+      }
+
+      fn main() {
+          let p1 = Punkt { x: 0.0, y: 0.0 };
+          let p2 = Punkt { x: 3.0, y: 4.0 };
+          let p3 = p1.clone(); // Clone
+
+          println!("{:?}", p1);     // Debug: Punkt { x: 0.0, y: 0.0 }
+          println!("{}", p1 == p3); // PartialEq: true
+          println!("{}", p1.odleglosc(&p2)); // 5.0
+      }
+    lang: rust
+
+  - title: Trait bounds i generyki
+    desc: >
+      Generyki pozwalają pisać kod działający dla wielu typów. Trait bounds (T: Trait) ograniczają
+      jakie typy są akceptowane. Kompilator generuje osobną wersję funkcji dla każdego użytego typu (monomorphization).
+    code: |
+      use std::fmt::Display;
+
+      // T musi implementować Display i PartialOrd
+      fn najwiekszy<T: PartialOrd + Display>(lista: &[T]) -> &T {
+          let mut max = &lista[0];
+          for el in lista {
+              if el > max {
+                  max = el;
+              }
+          }
+          println!("Największy: {}", max);
+          max
+      }
+
+      // where clause — czytelniej dla wielu bounds
+      fn wypisz_pare<T, U>(t: &T, u: &U)
+      where
+          T: Display + Clone,
+          U: Display,
+      {
+          println!("{} i {}", t, u);
+      }
+
+      fn main() {
+          let liczby = vec![34, 50, 25, 100, 65];
+          najwiekszy(&liczby); // 100
+
+          let znaki = vec!['y', 'm', 'a', 'q'];
+          najwiekszy(&znaki); // y
+
+          wypisz_pare(&"Rust", &42);
+      }
+    lang: rust
+
+  - title: Iterator trait — metody łańcuchowe
+    desc: >
+      Iterator to trait z metodą next(). Gdy go zaimplementujesz, dostajesz za darmo .map(),
+      .filter(), .collect(), .fold() i dziesiątki innych. Leniwe obliczenia — wartości obliczane dopiero gdy potrzebne.
+    code: |
+      fn main() {
+          let liczby = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+          // Łańcuch iteratora — leniwy, obliczany jednorazowo
+          let wynik: Vec<i32> = liczby.iter()
+              .filter(|&&x| x % 2 == 0)    // parzyste
+              .map(|&x| x * x)              // podnieś do kwadratu
+              .take(3)                      // pierwsze 3
+              .collect();                   // zbierz do Vec
+
+          println!("{:?}", wynik); // [4, 16, 36]
+
+          // fold — redukcja do jednej wartości
+          let suma: i32 = (1..=100).fold(0, |acc, x| acc + x);
+          println!("Suma 1-100: {}", suma); // 5050
+
+          // Własny iterator
+          struct Odliczanie {
+              count: u32,
+          }
+
+          impl Iterator for Odliczanie {
+              type Item = u32;
+
+              fn next(&mut self) -> Option<u32> {
+                  if self.count < 5 {
+                      self.count += 1;
+                      Some(self.count)
+                  } else {
+                      None
+                  }
+              }
+          }
+
+          let suma: u32 = Odliczanie { count: 0 }.sum();
+          println!("Suma odliczania: {}", suma); // 15
+      }
+    lang: rust
+
+  - title: impl Trait i dyn Trait
+    desc: >
+      impl Trait w argumentach/zwracanej wartości — statyczna dispatch (szybsza, rozmiar znany).
+      dyn Trait — dynamiczna dispatch przez vtable (elastyczna, typ nieznany w czasie kompilacji).
+    code: |
+      trait Dzwiek {
+          fn graj(&self) -> String;
+      }
+
+      struct Gitara;
+      struct Beben;
+
+      impl Dzwiek for Gitara {
+          fn graj(&self) -> String { "Trrr...".to_string() }
+      }
+      impl Dzwiek for Beben {
+          fn graj(&self) -> String { "Bum bum!".to_string() }
+      }
+
+      // impl Trait — statyczna dispatch, kompilator zna typ
+      fn graj_instrument(instrument: &impl Dzwiek) {
+          println!("{}", instrument.graj());
+      }
+
+      // dyn Trait — dynamiczna dispatch, typ wybierany w runtime
+      fn koncert(instrumenty: &[Box<dyn Dzwiek>]) {
+          for i in instrumenty {
+              println!("{}", i.graj());
+          }
+      }
+
+      fn main() {
+          graj_instrument(&Gitara);
+
+          let zespol: Vec<Box<dyn Dzwiek>> = vec![
+              Box::new(Gitara),
+              Box::new(Beben),
+              Box::new(Gitara),
+          ];
+          koncert(&zespol);
+      }
+    lang: rust

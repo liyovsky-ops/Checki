@@ -1,0 +1,91 @@
+title: Komendy TanStack Query
+
+groups:
+  - name: Instalacja
+    icon: "📦"
+    commands:
+      - cmd: npm install @tanstack/react-query
+        desc: Zainstaluj TanStack Query dla React
+        detail:
+          what: Główna paczka — useQuery, useMutation, useInfiniteQuery, QueryClient, QueryClientProvider.
+          tips:
+            - 'Wymaga React 18+. Dla React 17 użyj wersji 4.x'
+      - cmd: npm install @tanstack/react-query-devtools
+        desc: Zainstaluj React Query DevTools
+        detail:
+          what: Panel devtools — podgląd cache, statusów, danych. Tylko development build.
+          tips:
+            - 'DevTools automatycznie nie renderują się w production (process.env.NODE_ENV)'
+      - cmd: npm install @tanstack/react-query @tanstack/react-query-devtools
+        desc: Instalacja wszystkiego naraz
+        detail:
+          what: Główna biblioteka + devtools w jednym poleceniu.
+      - cmd: npm install @tanstack/eslint-plugin-query
+        desc: Zainstaluj ESLint plugin dla TanStack Query
+        detail:
+          what: Reguły ESLint — ostrzega gdy queryKey nie zgadza się z zależnościami queryFn, brak exhaustive-deps dla kluczy.
+
+  - name: Setup QueryClient
+    icon: "⚙️"
+    commands:
+      - cmd: "# main.tsx — minimalne setup\nnpm install @tanstack/react-query"
+        desc: Minimalna konfiguracja QueryClient
+        detail:
+          what: |
+            import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+            const queryClient = new QueryClient()
+            // Owiń <App /> w <QueryClientProvider client={queryClient}>
+      - cmd: "# Opcje globalne QueryClient\nnew QueryClient({ defaultOptions: { queries: { staleTime: 60_000, retry: 1 } } })"
+        desc: QueryClient z globalnymi opcjami
+        detail:
+          what: Ustaw domyślne staleTime, retry, refetchOnWindowFocus dla wszystkich zapytań.
+          tips:
+            - 'staleTime: 0 (domyślne) = zawsze re-fetch przy fokusie. Zwiększ dla rzadko zmieniających się danych'
+            - 'retry: 3 (domyślne) = trzy próby przy błędzie. retry: false = brak retry'
+
+  - name: DevTools
+    icon: "🛠️"
+    commands:
+      - cmd: "# Dodaj do App.tsx lub main.tsx\nimport { ReactQueryDevtools } from '@tanstack/react-query-devtools'"
+        desc: Import i dodanie DevTools do aplikacji
+        detail:
+          what: |
+            <QueryClientProvider client={queryClient}>
+              <App />
+              <ReactQueryDevtools initialIsOpen={false} />
+            </QueryClientProvider>
+          tips:
+            - 'initialIsOpen={false} — panel domyślnie zwinięty. true = otwarty przy starcie'
+            - 'buttonPosition="bottom-right" — pozycja przycisku (domyślnie bottom-left)'
+      - cmd: "# Tylko w development\n{process.env.NODE_ENV === 'development' && <ReactQueryDevtools />}"
+        desc: Warunkowo renderuj DevTools tylko w dev
+        detail:
+          what: Zapobiega dołączeniu DevTools bundle do production build.
+
+  - name: Przydatne wzorce
+    icon: "💡"
+    commands:
+      - cmd: "queryClient.invalidateQueries({ queryKey: ['todos'] })"
+        desc: Unieważnij wszystkie zapytania z kluczem 'todos'
+        detail:
+          what: Wymusza re-fetch wszystkich zapytań których klucz zaczyna się od 'todos'. Używaj po mutacjach.
+          tips:
+            - "exact: true — tylko dokładny klucz ['todos'], nie ['todos', 1]"
+      - cmd: "queryClient.prefetchQuery({ queryKey: ['user', id], queryFn: () => fetchUser(id) })"
+        desc: Pre-fetch danych przed nawigacją
+        detail:
+          what: Pobiera dane do cache przed faktycznym potrzebowaniem — np. na hover linku.
+      - cmd: "queryClient.setQueryData(['todos'], (old) => [...old, newTodo])"
+        desc: Ręczna aktualizacja danych w cache
+        detail:
+          what: Natychmiastowa aktualizacja UI bez re-fetcha. Używaj po mutacji zamiast lub razem z invalidateQueries.
+      - cmd: "queryClient.resetQueries({ queryKey: ['user'] })"
+        desc: Resetuj stan zapytania do initialnego
+        detail:
+          what: Usuwa dane i stan — zapytanie wróci do isPending przy następnym użyciu.
+      - cmd: "queryClient.clear()"
+        desc: Wyczyść cały cache QueryClient
+        detail:
+          what: Usuwa wszystkie dane ze wszystkich zapytań — np. przy wylogowaniu użytkownika.
+          tips:
+            - 'Przy wylogowaniu: queryClient.clear() + navigate("/login")'

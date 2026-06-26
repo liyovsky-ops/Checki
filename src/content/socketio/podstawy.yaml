@@ -1,0 +1,144 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Socket.io?
+  firstComponent: Pierwszy serwer + klient
+  firstComponentLang: javascript
+
+intro:
+  title: Czym jest Socket.io?
+  desc: >
+    Socket.io to biblioteka umożliwiająca dwukierunkową, opartą na zdarzeniach komunikację
+    w czasie rzeczywistym między przeglądarką a serwerem Node.js. Pod spodem używa WebSocketów,
+    ale automatycznie spada na HTTP long-polling gdy WebSocket jest niedostępny (np. za proxy).
+    Składa się z dwóch części: serwera integrowanego z Node.js (Express, Fastify, http)
+    oraz klienta działającego w przeglądarce lub w Node.js. Socket.io obsługuje reconnect,
+    rooms, namespaces, broadcasting i acknowledgements bez dodatkowej konfiguracji.
+    Używany przez Trello, Microsoft, Slack i wiele aplikacji czat/gier real-time.
+
+concepts:
+  - title: WebSocket + fallback
+    desc: >
+      Socket.io startuje od WebSocket (full-duplex, niskie opóźnienie). Gdy WS jest
+      zablokowany przez firewall lub stary proxy, automatycznie przełącza się na
+      HTTP long-polling. Dzięki temu działa wszędzie — nawet za korporacyjnym proxy.
+      Transport możesz wymusić ręcznie przez opcję transports.
+    icon: "🔄"
+  - title: Events (emit / on)
+    desc: >
+      Komunikacja opiera się na nazwanych zdarzeniach. Serwer i klient mogą dowolnie
+      emitować i nasłuchiwać eventów. Każdy event może nieść payload (string, number,
+      object, Buffer). To główny mechanizm wymiany danych — prosto i intuicyjnie.
+    icon: "📡"
+  - title: Rooms
+    desc: >
+      Room to kanał do którego socket może dołączyć (socket.join('room')) lub opuścić.
+      Serwer może emitować do całego room (io.to('room').emit(...)). Idealny do czatów,
+      gier wieloosobowych, notyfikacji per-użytkownik. Każdy socket automatycznie
+      ma własny room o id równym socket.id.
+    icon: "🏠"
+  - title: Namespaces
+    desc: >
+      Namespace to logicznie oddzielona przestrzeń na jednym połączeniu TCP.
+      Domyślny namespace to /. Możesz stworzyć /admin, /chat, /game — każdy
+      z własnym middleware i eventami. Klient łączy się do konkretnego namespace:
+      io('/admin'). Pozwala jedną aplikację podzielić na izolowane sekcje.
+    icon: "📂"
+  - title: Acknowledgements
+    desc: >
+      Acknowledgement (ack) to callback potwierdzający odebranie eventu. Emitujący
+      przekazuje callback jako ostatni argument emit(), odbiorca go wywołuje.
+      Daje gwarancję dostarczenia podobną do request/response — bez osobnego eventu
+      odpowiedzi. Przydatne do walidacji po stronie serwera.
+    icon: "✅"
+  - title: Broadcasting
+    desc: >
+      Broadcasting to wysyłanie eventu do wielu klientów. socket.broadcast.emit()
+      wysyła do wszystkich oprócz nadawcy. io.emit() wysyła do wszystkich.
+      io.to('room').emit() do całego room. Możesz łączyć: socket.to('room').emit()
+      wysyła do room z wyjątkiem nadawcy.
+    icon: "📢"
+
+whenToUse:
+  - Czat i komunikatory — wiadomości w czasie rzeczywistym
+  - Powiadomienia push — alerty, statusy, live feed
+  - Gry wieloosobowe — synchronizacja stanu gry
+  - Kolaboracja real-time — edytory jak Figma, Google Docs
+  - Live dashboard — aktualizacje metryk, monitorowanie
+  - Aukcje i systemy live bidding
+  - Geolokalizacja — śledzenie pozycji w czasie rzeczywistym
+
+firstComponent: |
+  // Instalacja
+  // npm install socket.io          (serwer)
+  // npm install socket.io-client   (klient React/browser)
+
+  // === SERWER (server.js) ===
+  import { createServer } from 'http'
+  import { Server } from 'socket.io'
+  import express from 'express'
+
+  const app = express()
+  const httpServer = createServer(app)
+
+  const io = new Server(httpServer, {
+    cors: {
+      origin: 'http://localhost:5173',  // Adres frontendu
+      methods: ['GET', 'POST'],
+    },
+  })
+
+  io.on('connection', (socket) => {
+    console.log('Klient połączony:', socket.id)
+
+    // Nasłuchuj eventu od klienta
+    socket.on('wiadomosc', (data) => {
+      console.log('Odebrano:', data)
+      // Wyślij do wszystkich (broadcast)
+      io.emit('wiadomosc', { ...data, id: socket.id })
+    })
+
+    socket.on('disconnect', () => {
+      console.log('Klient rozłączony:', socket.id)
+    })
+  })
+
+  httpServer.listen(3001, () => {
+    console.log('Serwer na porcie 3001')
+  })
+
+  // === KLIENT (React) ===
+  import { useEffect, useState } from 'react'
+  import { io } from 'socket.io-client'
+
+  // Inicjalizacja poza komponentem — jedno połączenie
+  const socket = io('http://localhost:3001')
+
+  function Chat() {
+    const [wiadomosci, setWiadomosci] = useState([])
+    const [input, setInput] = useState('')
+
+    useEffect(() => {
+      socket.on('wiadomosc', (data) => {
+        setWiadomosci((prev) => [...prev, data])
+      })
+
+      return () => {
+        socket.off('wiadomosc')  // Cleanup!
+      }
+    }, [])
+
+    const wyslij = () => {
+      socket.emit('wiadomosc', { tekst: input })
+      setInput('')
+    }
+
+    return (
+      <div>
+        {wiadomosci.map((m, i) => (
+          <p key={i}>{m.id}: {m.tekst}</p>
+        ))}
+        <input value={input} onChange={(e) => setInput(e.target.value)} />
+        <button onClick={wyslij}>Wyślij</button>
+      </div>
+    )
+  }

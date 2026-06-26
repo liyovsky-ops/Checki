@@ -1,0 +1,276 @@
+labels:
+  main: useQuery — pobieranie danych
+  mainLang: typescript
+
+intro:
+  title: useQuery — serce TanStack Query
+  desc: >
+    useQuery to główny hook do pobierania danych z serwera.
+    Przyjmuje queryKey (identyfikator) i queryFn (funkcja async zwracająca dane).
+    Automatycznie zarządza stanem loading, error, success, cache'owaniem i re-fetchingiem.
+    Wiele komponentów z tym samym kluczem współdzieli jedno zapytanie — zero duplikatów.
+
+items:
+  - title: Podstawowe useQuery
+    desc: >
+      Minimalna konfiguracja — queryKey i queryFn. TanStack Query robi resztę.
+      queryKey musi być unikalny dla danego zapytania. queryFn musi być funkcją async.
+      Destrukturyzuj: data (wynik), isPending, isError, error, isFetching.
+    code: |
+      import { useQuery } from '@tanstack/react-query'
+
+      interface Post {
+        id:    number
+        title: string
+        body:  string
+      }
+
+      async function fetchPost(id: number): Promise<Post> {
+        const res = await fetch(`/api/posts/${id}`)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      }
+
+      function PostDetail({ postId }: { postId: number }) {
+        const {
+          data,
+          isPending,
+          isError,
+          error,
+          isFetching,
+        } = useQuery({
+          queryKey: ['posts', postId],   // unikalny klucz per ID
+          queryFn:  () => fetchPost(postId),
+        })
+
+        if (isPending) return <div>Ładowanie posta...</div>
+        if (isError)   return <div>Błąd: {error.message}</div>
+
+        return (
+          <article>
+            {isFetching && <span>Odświeżanie w tle...</span>}
+            <h1>{data.title}</h1>
+            <p>{data.body}</p>
+          </article>
+        )
+      }
+    lang: typescript
+
+  - title: enabled — zapytanie warunkowe
+    desc: >
+      enabled: false wyłącza automatyczne wykonywanie zapytania.
+      Przydatne gdy potrzebujesz ID lub tokenu przed zapytaniem.
+      enabled: !!userId — wykonaj tylko gdy userId jest truthy.
+      Możesz ręcznie wywołać zapytanie przez refetch().
+    code: |
+      import { useQuery } from '@tanstack/react-query'
+
+      interface Profile {
+        id:       number
+        username: string
+        avatar:   string
+      }
+
+      function UserProfile({ userId }: { userId: number | null }) {
+        const { data, isPending, refetch } = useQuery({
+          queryKey: ['profile', userId],
+          queryFn:  async () => {
+            const res = await fetch(`/api/profile/${userId}`)
+            if (!res.ok) throw new Error('Brak profilu')
+            return res.json() as Promise<Profile>
+          },
+          enabled: !!userId,   // zapytanie tylko gdy userId istnieje
+        })
+
+        if (!userId)   return <button onClick={() => {}}>Zaloguj się</button>
+        if (isPending) return <p>Ładowanie profilu...</p>
+
+        return (
+          <div>
+            <img src={data?.avatar} alt={data?.username} />
+            <h2>{data?.username}</h2>
+            <button onClick={() => refetch()}>Odśwież</button>
+          </div>
+        )
+      }
+    lang: typescript
+
+  - title: retry i staleTime — konfiguracja
+    desc: >
+      retry — ile razy ponawiać zapytanie przy błędzie (domyślnie 3).
+      staleTime — jak długo dane są "świeże" (brak re-fetcha w tle).
+      refetchOnWindowFocus — odświeżaj gdy użytkownik wraca do okna.
+      refetchInterval — polling co N milisekund (np. live dashboard).
+    code: |
+      import { useQuery } from '@tanstack/react-query'
+
+      function LiveDashboard() {
+        // Polling co 5 sekund — live dane
+        const { data: metrics } = useQuery({
+          queryKey:          ['metrics'],
+          queryFn:           () => fetch('/api/metrics').then(r => r.json()),
+          refetchInterval:   5_000,   // odśwież co 5s
+          staleTime:         0,       // dane zawsze "stare" → zawsze re-fetch
+        })
+
+        return <MetricsPanel data={metrics} />
+      }
+
+      function UserSettings() {
+        // Dane rzadko się zmieniają — cache na 10 minut
+        const { data: settings } = useQuery({
+          queryKey:             ['settings'],
+          queryFn:              () => fetch('/api/settings').then(r => r.json()),
+          staleTime:            10 * 60 * 1000,   // 10 minut świeżości
+          refetchOnWindowFocus: false,             // nie odświeżaj przy fokusie
+          retry:                1,                // tylko 1 retry
+        })
+
+        return <SettingsForm data={settings} />
+      }
+    lang: typescript
+
+  - title: select — transformacja danych
+    desc: >
+      select pozwala transformować lub filtrować dane z cache przed zwróceniem do komponentu.
+      Komponent re-renderuje się tylko gdy wynik select() się zmieni (memoizacja).
+      Idealne do wyodrębniania podzbioru danych lub mapowania struktur.
+    code: |
+      import { useQuery } from '@tanstack/react-query'
+
+      interface Todo {
+        id:        number
+        title:     string
+        completed: boolean
+        userId:    number
+      }
+
+      async function fetchTodos(): Promise<Todo[]> {
+        const res = await fetch('/api/todos')
+        if (!res.ok) throw new Error('Błąd')
+        return res.json()
+      }
+
+      // Komponent widzi tylko ukończone todo
+      function CompletedTodos() {
+        const { data: completedTodos } = useQuery({
+          queryKey: ['todos'],
+          queryFn:  fetchTodos,
+          select:   (todos) => todos.filter(t => t.completed),
+          // Re-render tylko gdy lista ukończonych się zmieni
+        })
+
+        return (
+          <ul>
+            {completedTodos?.map(todo => (
+              <li key={todo.id}>✓ {todo.title}</li>
+            ))}
+          </ul>
+        )
+      }
+
+      // Inny komponent z tą samą queryKey — współdzieli cache
+      function TodoCount() {
+        const { data: count } = useQuery({
+          queryKey: ['todos'],
+          queryFn:  fetchTodos,
+          select:   (todos) => todos.length,  // tylko liczba
+        })
+
+        return <span>Łącznie: {count ?? 0} todo</span>
+      }
+    lang: typescript
+
+  - title: Dependent queries — zapytania zależne
+    desc: >
+      Zapytania zależne czekają na wynik innego zapytania.
+      Używaj enabled z wynikiem poprzedniego zapytania.
+      TanStack Query automatycznie re-fetche zależne zapytanie gdy dane się pojawią.
+    code: |
+      import { useQuery } from '@tanstack/react-query'
+
+      interface User {
+        id:       number
+        name:     string
+        teamId:   number
+      }
+
+      interface Team {
+        id:   number
+        name: string
+        lead: string
+      }
+
+      function UserWithTeam({ userId }: { userId: number }) {
+        // Krok 1: pobierz użytkownika
+        const { data: user } = useQuery({
+          queryKey: ['user', userId],
+          queryFn:  async () => {
+            const res = await fetch(`/api/users/${userId}`)
+            return res.json() as Promise<User>
+          },
+        })
+
+        // Krok 2: pobierz team tylko gdy mamy teamId
+        const { data: team, isPending: teamPending } = useQuery({
+          queryKey: ['team', user?.teamId],
+          queryFn:  async () => {
+            const res = await fetch(`/api/teams/${user!.teamId}`)
+            return res.json() as Promise<Team>
+          },
+          enabled: !!user?.teamId,   // czekaj na user.teamId
+        })
+
+        return (
+          <div>
+            <h2>{user?.name}</h2>
+            {teamPending
+              ? <p>Ładowanie teamu...</p>
+              : <p>Team: {team?.name} (Lead: {team?.lead})</p>
+            }
+          </div>
+        )
+      }
+    lang: typescript
+
+  - title: Obsługa błędów i placeholderData
+    desc: >
+      placeholderData — dane tymczasowe pokazywane zanim przyjdzie odpowiedź.
+      keepPreviousData (v4) → placeholderData: keepPreviousData (v5) — przy zmianie klucza trzymaj stare dane.
+      Idealne dla paginacji — brak "flashu" pustego stanu między stronami.
+    code: |
+      import { useQuery, keepPreviousData } from '@tanstack/react-query'
+
+      interface Page {
+        items:      Product[]
+        totalPages: number
+        page:       number
+      }
+
+      function ProductList({ page }: { page: number }) {
+        const {
+          data,
+          isPending,
+          isPlaceholderData,
+        } = useQuery({
+          queryKey:        ['products', { page }],
+          queryFn:         () =>
+            fetch(`/api/products?page=${page}`).then(r => r.json()) as Promise<Page>,
+          placeholderData: keepPreviousData,  // trzymaj dane poprzedniej strony
+          staleTime:       30_000,
+        })
+
+        return (
+          <div>
+            {/* Przyciemnij UI podczas ładowania nowej strony */}
+            <div style={{ opacity: isPlaceholderData ? 0.5 : 1 }}>
+              {isPending
+                ? <p>Ładowanie...</p>
+                : data?.items.map(p => <ProductCard key={p.id} product={p} />)
+              }
+            </div>
+            <Pagination total={data?.totalPages ?? 0} current={page} />
+          </div>
+        )
+      }
+    lang: typescript

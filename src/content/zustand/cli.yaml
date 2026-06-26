@@ -1,0 +1,84 @@
+title: Zustand — instalacja i komendy
+
+groups:
+  - name: Instalacja
+    icon: "📦"
+    commands:
+      - cmd: npm install zustand
+        desc: Zainstaluj Zustand (React 18+, TypeScript ready)
+        detail:
+          what: "Instaluje zustand — wszystkie middleware (persist, devtools, immer, subscribeWithSelector) są wbudowane. Brak peerDependencies poza React."
+          tips:
+            - 'Minimalna wersja React: 18.x (lub 16.8+ z hooks)'
+            - 'Zustand 5.x — pełna kompatybilność z React 19 i Concurrent Mode'
+      - cmd: npm install zustand immer
+        desc: Zainstaluj Zustand z Immer (mutowalny state)
+        detail:
+          what: "immer to peerDependency dla zustand/middleware/immer — musisz zainstalować osobno."
+          tips:
+            - 'Immer jest wymagany gdy używasz import { immer } from zustand/middleware/immer'
+      - cmd: npm install zustand @types/zustand
+        desc: Instalacja z typami (TypeScript <4.x)
+        detail:
+          what: "Zustand 4+ ma wbudowane typy TypeScript — @types/zustand nie jest potrzebny dla nowoczesnych projektów."
+
+  - name: Konfiguracja store
+    icon: "🏗️"
+    commands:
+      - cmd: "# store/authStore.ts\nimport { create } from 'zustand'\nexport const useAuthStore = create((set) => ({ user: null, setUser: (u) => set({ user: u }) }))"
+        desc: Utwórz minimalny store (inline, bez pliku)
+        detail:
+          what: "Jeden import, jedna funkcja, gotowy hook. Eksportuj jako useXxxStore — konwencja Zustand."
+      - cmd: "# tsconfig.json — strict mode dla Zustand\n{\n  \"compilerOptions\": {\n    \"strict\": true,\n    \"exactOptionalPropertyTypes\": true\n  }\n}"
+        desc: Włącz strict TypeScript (zalecane)
+        detail:
+          what: "strict: true wyłapuje błędy typów w store i selektorach. Zustand ma pełne wsparcie strict mode."
+
+  - name: Devtools setup
+    icon: "🔍"
+    commands:
+      - cmd: "# Pobierz Redux DevTools Extension\n# Chrome: https://chrome.google.com/webstore/detail/redux-devtools\n# Firefox: https://addons.mozilla.org/en-US/firefox/addon/reduxdevtools/"
+        desc: Zainstaluj Redux DevTools Extension w przeglądarce
+        detail:
+          what: "devtools() middleware Zustand wymaga Redux DevTools Extension. Bez pluginu middleware jest po prostu ignorowany."
+          tips:
+            - 'Po instalacji — otwórz DevTools → zakładka Redux'
+            - 'Store pojawi się z nazwą podaną w devtools({ name: "..." })'
+      - cmd: "import { devtools } from 'zustand/middleware'\nexport const useStore = create()(devtools((set) => ({ ... }), { name: 'MyStore', enabled: import.meta.env.DEV }))"
+        desc: Dodaj devtools middleware do store
+        detail:
+          what: "enabled: import.meta.env.DEV — devtools aktywne tylko w development, zero overhead w produkcji."
+
+  - name: Persist — localStorage
+    icon: "💾"
+    commands:
+      - cmd: "import { persist } from 'zustand/middleware'\nexport const useStore = create()(persist((set) => ({ ... }), { name: 'my-store' }))"
+        desc: Dodaj persist middleware (localStorage)
+        detail:
+          what: "persist() automatycznie zapisuje stan do localStorage pod kluczem name. Przy inicjalizacji odczytuje i rehydruje."
+          tips:
+            - 'Klucz name musi być unikalny w skali aplikacji'
+            - 'Użyj partialize: (s) => ({ ... }) aby persystować tylko wybrane pola'
+      - cmd: "# Wyczyść stan persist\nlocalStorage.removeItem('my-store')"
+        desc: Wyczyść persystowany stan ręcznie (dev)
+        detail:
+          what: "Przydatne gdy zmienisz kształt stanu i stary JSON w localStorage powoduje błędy."
+
+  - name: Debugowanie
+    icon: "🐛"
+    commands:
+      - cmd: "// Odczytaj stan poza komponentem\nconst state = useMyStore.getState()\nconsole.log(state)"
+        desc: Odczytaj aktualny stan store poza React
+        detail:
+          what: "getState() zwraca aktualny stan synchronicznie — przydatne w testach, konsoli, serwisach."
+      - cmd: "// Subskrybuj zmiany poza React\nconst unsub = useMyStore.subscribe((state) => console.log(state))\n// Cleanup:\nunsub()"
+        desc: Subskrybuj zmiany store poza komponentem
+        detail:
+          what: "subscribe() zwraca funkcję cleanup — zawsze ją wywołaj przy cleanup/unmount."
+          tips:
+            - 'subscribe() bez middleware zwraca cały stan przy każdej zmianie'
+            - 'Z subscribeWithSelector() możesz subskrybować fragment stanu'
+      - cmd: "// Wymuś aktualizację stanu w testach lub konsoli\nuseMyStore.setState({ count: 42 })\nuseMyStore.setState((s) => ({ count: s.count + 1 }))"
+        desc: Aktualizuj stan store poza React (testy, debug)
+        detail:
+          what: "setState() działa tak samo jak set() wewnątrz store — płytki merge lub replace (drugi arg true)."

@@ -1,0 +1,189 @@
+labels:
+  main: Rooms i Namespaces
+  mainLang: javascript
+
+intro:
+  title: Rooms i Namespaces — organizacja połączeń
+  desc: >
+    Rooms i Namespaces to dwa mechanizmy organizacji klientów w Socket.io. Room to dynamiczny
+    kanał — socket może dołączyć i opuścić w każdej chwili, serwer broadcastuje do room.
+    Namespace to statyczna przestrzeń logiczna na jednym połączeniu TCP — jak oddzielna
+    aplikacja w tej samej instancji Socket.io. Rooms są wewnątrz namespace. Domyślny
+    namespace to /. Razem dają elastyczną architekturę dla czatów, gier, dashboardów.
+
+items:
+  - name: Rooms — join, leave, emit
+    desc: >
+      socket.join() dołącza socket do room. socket.leave() opuszcza. io.to('room').emit()
+      wysyła do wszystkich w room. Jeden socket może być w wielu rooms jednocześnie.
+      Room nie wymaga tworzenia — powstaje automatycznie przy pierwszym join.
+    code: |
+      io.on('connection', (socket) => {
+
+        // Dołącz do room
+        socket.on('dolacz_do_pokoju', (nazwaRoom) => {
+          socket.join(nazwaRoom)
+          console.log(`${socket.id} dołączył do: ${nazwaRoom}`)
+
+          // Powiadom innych w room
+          socket.to(nazwaRoom).emit('uzytkownik_dolaczyl', {
+            socketId: socket.id,
+            pokoj:    nazwaRoom,
+          })
+        })
+
+        // Opuść room
+        socket.on('opusc_pokoj', (nazwaRoom) => {
+          socket.leave(nazwaRoom)
+          io.to(nazwaRoom).emit('uzytkownik_odszedl', { socketId: socket.id })
+        })
+
+        // Wyślij wiadomość do room
+        socket.on('wiadomosc_do_pokoju', ({ pokoj, tekst }) => {
+          io.to(pokoj).emit('nowa_wiadomosc', {
+            od:    socket.id,
+            tekst,
+            czas:  new Date().toISOString(),
+          })
+        })
+
+        // Sprawdź rooms socketu
+        console.log('Rooms socketu:', socket.rooms)  // Set { socket.id }
+      })
+    lang: javascript
+
+  - name: Pobieranie socketów z room
+    desc: >
+      io.in('room').fetchSockets() zwraca obiekty socketów w danym room. Możesz
+      sprawdzić liczbę uczestników, itd. Przydatne do implementacji listy online users.
+    code: |
+      // Pobierz wszystkie sockety w room
+      const sockety = await io.in('pokoj_a').fetchSockets()
+      console.log('Liczba uczestników:', sockety.length)
+
+      // Wyemituj do konkretnego socketu po stronie serwera
+      for (const s of sockety) {
+        s.emit('wiadomosc_serwera', 'Hej!')
+      }
+
+      // Przykład — endpoint HTTP zwracający uczestników room
+      app.get('/api/pokoj/:id/uczestnicy', async (req, res) => {
+        const sockety = await io.in(req.params.id).fetchSockets()
+        const uczestnicy = sockety.map((s) => ({
+          id:   s.id,
+          data: s.data,  // custom data (patrz niżej)
+        }))
+        res.json({ count: uczestnicy.length, lista: uczestnicy })
+      })
+
+      // Ustaw custom data na sockecie (np. po auth)
+      socket.data.userId   = 'user_123'
+      socket.data.userName = 'Łukasz'
+    lang: javascript
+
+  - name: Namespaces — izolacja logiczna
+    desc: >
+      Namespace tworzy oddzielony obszar z własnym middleware, eventami i rooms.
+      Klient łączy się do namespace przez io('/sciezka'). Serwer tworzy namespace
+      przez io.of('/sciezka'). Każdy namespace jest niezależny — eventy z /chat
+      nie przechodzą do /admin.
+    code: |
+      // === SERWER — definiuj namespaces ===
+      const chatNS  = io.of('/chat')
+      const adminNS = io.of('/admin')
+      const gameNS  = io.of('/game')
+
+      // Chat namespace
+      chatNS.on('connection', (socket) => {
+        console.log('Chat: nowy klient', socket.id)
+
+        socket.on('wiadomosc', (msg) => {
+          chatNS.emit('wiadomosc', msg)  // Do wszystkich w /chat
+        })
+      })
+
+      // Admin namespace z middleware
+      adminNS.use((socket, next) => {
+        const token = socket.handshake.auth.token
+        if (!isAdmin(token)) return next(new Error('Brak dostępu'))
+        next()
+      })
+
+      adminNS.on('connection', (socket) => {
+        console.log('Admin: zalogowany admin', socket.id)
+        socket.emit('panel', { stats: getServerStats() })
+      })
+
+      // === KLIENT — łącz do namespace ===
+      import { io } from 'socket.io-client'
+
+      const chatSocket  = io('http://localhost:3001/chat')
+      const adminSocket = io('http://localhost:3001/admin', {
+        auth: { token: localStorage.getItem('adminToken') },
+      })
+
+      chatSocket.on('wiadomosc', (msg) => console.log('[Chat]', msg))
+      adminSocket.on('panel', (data) => console.log('[Admin]', data))
+    lang: javascript
+
+  - name: Dynamic namespaces — wzorzec glob
+    desc: >
+      io.of(/^\/room\/\w+$/) pozwala tworzyć dynamiczne namespaces pasujące do wzorca.
+      Handler connection dostaje namespace jako parametr. Przydatne gdy rooms są znane
+      z góry ale namespaces generowane dynamicznie (np. per tenant).
+    code: |
+      // Dynamiczne namespaces — pasuje do /room/xyz, /room/abc123
+      const dynamiczne = io.of(/^\/room\/\w+$/)
+
+      dynamiczne.on('connection', (socket) => {
+        const nazwaRoom = socket.nsp.name  // np. '/room/abc123'
+        console.log('Połączono do dynamicznego NS:', nazwaRoom)
+
+        socket.join('participants')  // Room wewnątrz namespace
+
+        socket.on('akcja', (data) => {
+          // Emit tylko wewnątrz tego namespace
+          socket.nsp.emit('update', data)
+        })
+      })
+
+      // Klient łączy się podając pełną ścieżkę
+      const roomSocket = io('http://localhost:3001/room/abc123')
+      roomSocket.on('update', (data) => console.log('Update:', data))
+    lang: javascript
+
+  - name: Room z limit uczestników
+    desc: >
+      Przykład implementacji ograniczonej liczby uczestników w room —
+      typowy pattern w grach (max 4 graczy) lub wideokonferencjach.
+    code: |
+      const MAX_GRACZY = 4
+
+      io.on('connection', (socket) => {
+        socket.on('dolacz_do_gry', async (gameId) => {
+          const roomName = `game:${gameId}`
+
+          // Sprawdź liczbę uczestników
+          const sockety = await io.in(roomName).fetchSockets()
+
+          if (sockety.length >= MAX_GRACZY) {
+            socket.emit('blad_dolaczania', { powod: 'Pokój pełny' })
+            return
+          }
+
+          socket.join(roomName)
+          socket.data.gameId = gameId
+
+          // Powiadom wszystkich o nowym graczu
+          const aktualniGracze = sockety.length + 1
+          io.to(roomName).emit('gracz_dolaczyl', {
+            socketId:      socket.id,
+            liczbaGraczy:  aktualniGracze,
+          })
+
+          if (aktualniGracze === MAX_GRACZY) {
+            io.to(roomName).emit('gra_startuje')
+          }
+        })
+      })
+    lang: javascript

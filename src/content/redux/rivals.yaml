@@ -1,0 +1,103 @@
+title: Redux Toolkit vs inne rozwiązania state management
+
+items:
+  - name: Zustand
+    icon: "🐻"
+    color: "#745A3C"
+    tagline: Minimalistyczny state management — bez boilerplate, bez Providera
+    pros:
+      - Zero boilerplate — jeden create() tworzy cały store z akcjami
+      - Brak Providera — import i używaj natychmiast w każdym komponencie
+      - ~1KB gzip — śladowy rozmiar bundle
+      - Prosta API — łagodna krzywa uczenia, działa intuicyjnie
+      - Middleware przez kompozycję (immer, devtools, persist)
+    cons:
+      - Brak wbudowanego data fetching (trzeba dodać TanStack Query)
+      - Słabsze DevTools niż Redux (brak time-travel debugging)
+      - Brak konwencji dla dużych aplikacji — każdy robi inaczej
+      - Mniej narzędzi dla dużych teamów (code review, standardy)
+    vs: >
+      Zustand wygrywa prostotą i brakiem boilerplate — idealny dla małych/średnich aplikacji
+      i solo developerów. Redux Toolkit wygrywa dla dużych teamów: konwencje, DevTools,
+      RTK Query, audytowalność. Wybierz Zustand gdy zaczynasz projekt; Redux gdy masz 5+ osób.
+
+  - name: Jotai
+    icon: "👻"
+    color: "#6366f1"
+    tagline: Atomowy state management — każda wartość to atom
+    pros:
+      - Atomowy model — definiujesz niezależne atomy zamiast jednego store
+      - Automatyczna granulacja re-renderów — komponent re-renderuje tylko gdy jego atom się zmienia
+      - Brak selekotrów — atomowy model eliminuje potrzebę createSelector
+      - Świetna integracja z React Suspense i Transitions
+      - Prosty DX — atom(initialValue) to wszystko co potrzebujesz na start
+    cons:
+      - Trudniejsze debugowanie gdy atomów jest dużo (brak centralnego store)
+      - Mały ekosystem narzędzi
+      - Mniej oczywiste dla developerów przyzwyczajonych do Redux/Zustand
+      - Brak wbudowanego data fetching
+    vs: >
+      Jotai to inna filozofia niż Redux — atomowy model zamiast centralnego store.
+      Świetny dla aplikacji z wieloma niezależnymi fragmentami stanu (dashboardy, formularze).
+      Redux Toolkit lepszy gdy chcesz jeden punkt kontroli i klasyczne akcje/reducery.
+
+  - name: MobX
+    icon: "🔴"
+    color: "#FF7102"
+    tagline: Reaktywny state management — zmiany propagują automatycznie
+    pros:
+      - Automatyczne śledzenie zależności — brak ręcznych selektorów
+      - Mutowalny styl pisania — naturalny jak zwykłe obiekty JS
+      - Mniej kodu niż Redux — observer() i makeAutoObservable() wystarczą
+      - Fine-grained reaktywność — granularne re-rendery bez pracy
+      - Świetna wydajność przy dużych danych
+    cons:
+      - Nieprzywidywalność — autorun/reaction mogą wywoływać się niespodziewanie
+      - Trudniejsze debugowanie niż Redux (brak historii akcji)
+      - Mała popularność — mało ofert pracy, mały ekosystem
+      - Dekoratory (stara wersja) lub verbose setup (nowa wersja)
+      - Ciężki bundle (~58KB vs RTK ~46KB)
+    vs: >
+      MobX i Redux to różne filozofie: MobX = magiczna reaktywność (jak Vue pod spodem),
+      Redux = explicite akcje i stan. MobX szybszy w pisaniu, Redux przewidywalniejszy
+      w debugowaniu. Dla nowych projektów Redux Toolkit > MobX (lepsze DevTools, więcej ofert pracy).
+
+  - name: Context API
+    icon: "⚛️"
+    color: "#61dafb"
+    tagline: Wbudowany React — zero instalacji, dla prostego globalnego stanu
+    pros:
+      - Zero instalacji — wbudowany w React
+      - Wystarczający dla prostego stanu (motyw, język, auth)
+      - Brak external dependency
+      - Łatwy do zrozumienia dla każdego znającego React
+    cons:
+      - Re-renderuje wszystkich konsumentów przy każdej zmianie value
+      - Brak selektorów — nie możesz subskrybować na fragment kontekstu
+      - Bez useReducer — brak struktury dla złożonej logiki
+      - Nie skaluje się — przy 5+ contexts robi się chaos
+      - Brak DevTools (tylko React DevTools, nie debugger akcji)
+    vs: >
+      Context API wystarczy dla auth, motywu, języka — prostego stanu z rzadkimi zmianami.
+      RTK wygrywa dla każdego stanu który zmienia się często lub ma złożoną logikę.
+      Reguła: jeśli Context powoduje za dużo re-renderów lub brakuje Ci DevTools — przejdź na RTK.
+
+  - name: TanStack Query
+    icon: "🔄"
+    color: "#EF4444"
+    tagline: Server state management — fetching, cache, synchronizacja
+    pros:
+      - Najlepszy DX dla server state — loading/error/data automatycznie
+      - Inteligentne cachowanie i background refetch
+      - Stale-while-revalidate — szybkie UI, świeże dane
+      - Nie potrzebuje Redux — idealny standalone lub z Zustand
+      - Devtools, mutations, infinite queries — wszystko wbudowane
+    cons:
+      - Zarządza TYLKO danymi z serwera — brak client state
+      - Musisz nadal wybrać coś na client state (Zustand, Context)
+      - Inna filozofia niż RTK Query — nie zintegrowany ze store Redux
+    vs: >
+      TanStack Query vs RTK Query to wybór ekosystemu. TanStack Query + Zustand = lżejszy
+      stack bez Redux. RTK Query + Redux Toolkit = jeden spójny ekosystem z DevTools.
+      TanStack Query ma więcej funkcji (infinite query, suspense), RTK Query ma lepszą
+      integrację z Redux store i automatyczne invalidacje między endpointami.

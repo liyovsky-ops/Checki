@@ -1,0 +1,278 @@
+labels:
+  main: Bun HTTP Server
+  mainLang: typescript
+
+intro:
+  title: Bun.serve — wbudowany serwer HTTP
+  desc: >
+    Bun.serve() to wbudowany serwer HTTP o wydajności porównywalnej z Nginx dla prostych przypadków.
+    Nie potrzebujesz Express, Fastify ani Koa — jeden handler fetch() obsługuje wszystkie żądania.
+    WebSocket, TLS, routing, middleware — wszystko bez zewnętrznych paczek.
+
+items:
+  - title: Bun.serve — podstawy
+    desc: >
+      Bun.serve() przyjmuje obiekt konfiguracyjny z funkcją fetch(req) — standardowym
+      Web API Request/Response. Każde żądanie HTTP trafia do fetch() i musi zwrócić Response.
+    code: |
+      const server = Bun.serve({
+        port: 3000,
+        // hostname: "0.0.0.0", // domyślnie
+
+        fetch(req: Request): Response | Promise<Response> {
+          const url = new URL(req.url);
+
+          // Logowanie
+          console.log(`${req.method} ${url.pathname}`);
+
+          // Zwróć Response
+          return new Response("Witaj!", {
+            headers: { "Content-Type": "text/plain" },
+          });
+        },
+
+        // Obsługa błędów serwera
+        error(err) {
+          console.error(err);
+          return new Response("Błąd serwera", { status: 500 });
+        },
+      });
+
+      console.log(`Serwer na http://localhost:${server.port}`);
+
+      // Zatrzymanie serwera
+      // server.stop();
+    lang: typescript
+
+  - title: Routing — wzorzec ręczny
+    desc: >
+      Bun nie ma wbudowanego routera jak Express — routing budujesz ręcznie lub używasz
+      frameworków ElysiaJS/Hono. Wzorzec z URL i switch/if jest wydajny dla małych API.
+    code: |
+      const server = Bun.serve({
+        port: 3000,
+
+        async fetch(req: Request) {
+          const url = new URL(req.url);
+          const metoda = req.method;
+
+          // GET /
+          if (url.pathname === "/" && metoda === "GET") {
+            return Response.json({ status: "ok", runtime: "bun" });
+          }
+
+          // GET /users
+          if (url.pathname === "/users" && metoda === "GET") {
+            const users = await pobierzUzytkownikow();
+            return Response.json(users);
+          }
+
+          // GET /users/:id — parametr ścieżki
+          const matchUser = url.pathname.match(/^\/users\/(\d+)$/);
+          if (matchUser && metoda === "GET") {
+            const id = parseInt(matchUser[1]);
+            const user = await pobierzUzytkownika(id);
+            if (!user) return new Response("Nie znaleziono", { status: 404 });
+            return Response.json(user);
+          }
+
+          // POST /users
+          if (url.pathname === "/users" && metoda === "POST") {
+            const body = await req.json();
+            const nowy = await stworzUzytkownika(body);
+            return Response.json(nowy, { status: 201 });
+          }
+
+          return new Response("404 Not Found", { status: 404 });
+        },
+      });
+    lang: typescript
+
+  - title: Fetch handler — Request API
+    desc: >
+      Handler fetch() otrzymuje standardowy obiekt Request z Web API.
+      Możesz odczytywać headers, cookies, query params, body JSON lub FormData.
+    code: |
+      const server = Bun.serve({
+        port: 3000,
+
+        async fetch(req: Request) {
+          const url = new URL(req.url);
+
+          // Query params
+          const strona = url.searchParams.get("page") ?? "1";
+          const limit = url.searchParams.get("limit") ?? "10";
+
+          // Headers
+          const auth = req.headers.get("Authorization");
+          const contentType = req.headers.get("content-type") ?? "";
+
+          // Body — JSON
+          if (req.method === "POST" && contentType.includes("application/json")) {
+            const dane = await req.json();
+            console.log(dane);
+          }
+
+          // Body — FormData
+          if (contentType.includes("multipart/form-data")) {
+            const form = await req.formData();
+            const plik = form.get("plik") as File;
+            console.log(plik.name, plik.size);
+          }
+
+          // Cookies
+          const cookie = req.headers.get("cookie") ?? "";
+          const sesja = parseCookie(cookie)["session"];
+
+          return Response.json({
+            strona: parseInt(strona),
+            limit: parseInt(limit),
+            sesja,
+          });
+        },
+      });
+    lang: typescript
+
+  - title: TLS — HTTPS
+    desc: >
+      Bun obsługuje TLS bez zewnętrznych bibliotek. Podajesz ścieżki do certyfikatu i klucza
+      (PEM format). Do lokalnego developmentu możesz użyć mkcert.
+    code: |
+      // Generowanie certyfikatu lokalnego (dev):
+      // mkcert -install && mkcert localhost
+
+      const server = Bun.serve({
+        port: 443,
+
+        tls: {
+          cert: Bun.file("./cert.pem"),
+          key: Bun.file("./key.pem"),
+          // ca: Bun.file("./ca.pem"), // opcjonalne — własne CA
+          // passphrase: "haslo",       // jeśli klucz jest zaszyfrowany
+        },
+
+        fetch(req) {
+          return new Response("Bezpieczne połączenie HTTPS! 🔒");
+        },
+      });
+
+      console.log(`HTTPS na https://localhost:${server.port}`);
+
+      // Przekierowanie HTTP -> HTTPS
+      Bun.serve({
+        port: 80,
+        fetch(req) {
+          const url = new URL(req.url);
+          return Response.redirect(`https://${url.host}${url.pathname}`, 301);
+        },
+      });
+    lang: typescript
+
+  - title: Middleware — wzorzec kompozycji
+    desc: >
+      Bun nie ma wbudowanego systemu middleware jak Express. Wzorzec: kompozycja funkcji —
+      każdy middleware to funkcja przyjmująca Request i zwracająca Response lub przekazująca dalej.
+    code: |
+      type Handler = (req: Request) => Response | Promise<Response>;
+      type Middleware = (req: Request, next: Handler) => Response | Promise<Response>;
+
+      // Middleware logujący
+      function logMiddleware(next: Handler): Handler {
+        return async (req) => {
+          const start = Date.now();
+          const resp = await next(req);
+          const ms = Date.now() - start;
+          console.log(`${req.method} ${new URL(req.url).pathname} ${resp.status} ${ms}ms`);
+          return resp;
+        };
+      }
+
+      // Middleware autoryzacyjny
+      function authMiddleware(next: Handler): Handler {
+        return async (req) => {
+          const token = req.headers.get("Authorization")?.replace("Bearer ", "");
+          if (!token || !weryfikujToken(token)) {
+            return new Response("Unauthorized", { status: 401 });
+          }
+          return next(req);
+        };
+      }
+
+      // Łączenie middleware (compose)
+      function compose(...middlewares: Array<(h: Handler) => Handler>) {
+        return (handler: Handler): Handler =>
+          middlewares.reduceRight((h, m) => m(h), handler);
+      }
+
+      const glownyHandler: Handler = async (req) => {
+        return Response.json({ wiadomosc: "Chroniony zasób" });
+      };
+
+      const handler = compose(logMiddleware, authMiddleware)(glownyHandler);
+
+      const server = Bun.serve({ port: 3000, fetch: handler });
+    lang: typescript
+
+  - title: WebSocket z Bun.serve
+    desc: >
+      WebSocket jest w pełni zintegrowany z Bun.serve — jeden serwer obsługuje HTTP i WS.
+      Upgrade następuje w fetch(), a handlery websocket obsługują zdarzenia WS.
+    code: |
+      type DanePolaczenia = { pokojId: string; nick: string };
+
+      const server = Bun.serve<DanePolaczenia>({
+        port: 3000,
+
+        fetch(req, server) {
+          const url = new URL(req.url);
+
+          if (url.pathname === "/chat") {
+            const pokojId = url.searchParams.get("room") ?? "ogólny";
+            const nick = url.searchParams.get("nick") ?? "Anonimowy";
+
+            const upgraded = server.upgrade(req, {
+              data: { pokojId, nick },
+              headers: { "Set-Cookie": `nick=${nick}; Path=/` },
+            });
+
+            if (upgraded) return; // Bun obsługuje odpowiedź 101 automatycznie
+            return new Response("Upgrade nieudany", { status: 400 });
+          }
+
+          return new Response("Chat API — połącz się przez /chat?room=ogólny&nick=Łukasz");
+        },
+
+        websocket: {
+          open(ws) {
+            const { pokojId, nick } = ws.data;
+            ws.subscribe(pokojId); // dołącz do kanału pub/sub
+            server.publish(pokojId, JSON.stringify({
+              typ: "dołączył",
+              nick,
+              czas: new Date().toISOString(),
+            }));
+          },
+
+          message(ws, wiadomosc) {
+            const { pokojId, nick } = ws.data;
+            server.publish(pokojId, JSON.stringify({
+              typ: "wiadomosc",
+              nick,
+              tresc: wiadomosc,
+              czas: new Date().toISOString(),
+            }));
+          },
+
+          close(ws, kod, powod) {
+            const { pokojId, nick } = ws.data;
+            ws.unsubscribe(pokojId);
+            server.publish(pokojId, JSON.stringify({ typ: "wyszedl", nick }));
+          },
+
+          // Opcje WebSocket
+          perMessageDeflate: true, // kompresja wiadomości
+          maxPayloadLength: 64 * 1024, // max 64KB wiadomość
+          idleTimeout: 60, // rozłącz po 60s bezczynności
+        },
+      });
+    lang: typescript

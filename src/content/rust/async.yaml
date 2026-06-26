@@ -1,0 +1,211 @@
+labels:
+  main: Async/Await i Tokio
+  mainLang: rust
+
+intro:
+  title: Async Rust — współbieżność bez wątków OS
+  desc: >
+    Async/await w Rust to zero-cost — kompilator zamienia async fn w maszynę stanową bez alokacji sterty.
+    Tokio to de facto standardowy async runtime dla Rusta — używany przez Discord, AWS, Cloudflare i tysiące innych.
+    Jeden wątek obsługuje tysiące połączeń dzięki task scheduling opartemu na epoll/kqueue.
+
+items:
+  - title: async fn i .await — podstawy
+    desc: >
+      async fn zwraca Future — obietnicę wartości w przyszłości. .await wstrzymuje wykonanie
+      bieżącego taska do czasu zakończenia Future, nie blokując wątku OS.
+    code: |
+      // Cargo.toml: tokio = { version = "1", features = ["full"] }
+      use tokio::time::{sleep, Duration};
+
+      async fn pobierz_dane(id: u32) -> String {
+          // Symulacja operacji asynchronicznej
+          sleep(Duration::from_millis(100)).await;
+          format!("Dane dla ID: {}", id)
+      }
+
+      async fn przetworz() -> String {
+          let wynik = pobierz_dane(42).await;
+          format!("Przetworzone: {}", wynik)
+      }
+
+      #[tokio::main]
+      async fn main() {
+          let wynik = przetworz().await;
+          println!("{}", wynik);
+      }
+    lang: rust
+
+  - title: tokio::spawn — równoległe taski
+    desc: >
+      tokio::spawn uruchamia task asynchronicznie w tle — jak wątek ale o wiele lżejszy.
+      Zwraca JoinHandle który możesz .await żeby poczekać na wynik. Tysiące tasków w jednym wątku.
+    code: |
+      use tokio::task;
+
+      async fn pobierz_url(url: &str) -> String {
+          // Symulacja pobierania
+          tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+          format!("Odpowiedź z {}", url)
+      }
+
+      #[tokio::main]
+      async fn main() {
+          // Uruchom 3 taski równolegle
+          let handle1 = tokio::spawn(async {
+              pobierz_url("https://api1.example.com").await
+          });
+
+          let handle2 = tokio::spawn(async {
+              pobierz_url("https://api2.example.com").await
+          });
+
+          let handle3 = tokio::spawn(async {
+              pobierz_url("https://api3.example.com").await
+          });
+
+          // Poczekaj na wszystkie
+          let (r1, r2, r3) = tokio::join!(handle1, handle2, handle3);
+          println!("{}", r1.unwrap());
+          println!("{}", r2.unwrap());
+          println!("{}", r3.unwrap());
+      }
+    lang: rust
+
+  - title: tokio::join! i select! — koordynacja
+    desc: >
+      join! czeka na wszystkie futures jednocześnie (jak Promise.all).
+      select! czeka na pierwszą która się zakończy (jak Promise.race) — przydatne dla timeout'ów.
+    code: |
+      use tokio::time::{sleep, Duration};
+
+      async fn szybki() -> &'static str { sleep(Duration::from_millis(10)).await; "szybki" }
+      async fn wolny() -> &'static str { sleep(Duration::from_millis(100)).await; "wolny" }
+
+      #[tokio::main]
+      async fn main() {
+          // join! — oba muszą się zakończyć
+          let (s, w) = tokio::join!(szybki(), wolny());
+          println!("join: {} i {}", s, w);
+
+          // select! — pierwszy wygrywa
+          tokio::select! {
+              wynik = szybki() => println!("Wygrał: {}", wynik),
+              wynik = wolny() => println!("Wygrał: {}", wynik),
+          }
+
+          // Timeout z select!
+          tokio::select! {
+              wynik = wolny() => println!("Zakończono: {}", wynik),
+              _ = sleep(Duration::from_millis(50)) => println!("Timeout!"),
+          }
+      }
+    lang: rust
+
+  - title: reqwest — HTTP client
+    desc: >
+      reqwest to najpopularniejszy async HTTP client dla Rusta. Opiera się na Tokio.
+      Obsługuje JSON (z serde), nagłówki, autoryzację, multipart, streaming i więcej.
+    code: |
+      // Cargo.toml:
+      // reqwest = { version = "0.12", features = ["json"] }
+      // serde = { version = "1", features = ["derive"] }
+      // tokio = { version = "1", features = ["full"] }
+
+      use reqwest;
+      use serde::{Deserialize, Serialize};
+
+      #[derive(Debug, Deserialize)]
+      struct Post {
+          id: u32,
+          title: String,
+          body: String,
+      }
+
+      #[derive(Serialize)]
+      struct NowyPost {
+          title: String,
+          body: String,
+          user_id: u32,
+      }
+
+      #[tokio::main]
+      async fn main() -> Result<(), Box<dyn std::error::Error>> {
+          // GET z deserializacją JSON
+          let post: Post = reqwest::get("https://jsonplaceholder.typicode.com/posts/1")
+              .await?
+              .json()
+              .await?;
+          println!("{}: {}", post.id, post.title);
+
+          // POST z JSON body
+          let klient = reqwest::Client::new();
+          let nowy: Post = klient
+              .post("https://jsonplaceholder.typicode.com/posts")
+              .json(&NowyPost {
+                  title: "Mój post".to_string(),
+                  body: "Treść...".to_string(),
+                  user_id: 1,
+              })
+              .send()
+              .await?
+              .json()
+              .await?;
+          println!("Utworzono post ID: {}", nowy.id);
+
+          Ok(())
+      }
+    lang: rust
+
+  - title: Axum — web framework
+    desc: >
+      Axum to nowoczesny web framework zbudowany na Tokio i Tower. Ergonomiczne handlery,
+      ekstraktorzy (Json, Path, Query), middleware przez Tower layers. Bardzo szybki.
+    code: |
+      // Cargo.toml:
+      // axum = "0.7"
+      // tokio = { version = "1", features = ["full"] }
+      // serde = { version = "1", features = ["derive"] }
+
+      use axum::{
+          extract::{Path, Json},
+          routing::{get, post},
+          Router,
+      };
+      use serde::{Deserialize, Serialize};
+
+      #[derive(Serialize)]
+      struct Uzytkownik {
+          id: u32,
+          imie: String,
+      }
+
+      #[derive(Deserialize)]
+      struct NowyUzytkownik {
+          imie: String,
+      }
+
+      async fn pobierz_uzytkownika(Path(id): Path<u32>) -> Json<Uzytkownik> {
+          Json(Uzytkownik { id, imie: "Łukasz".to_string() })
+      }
+
+      async fn stworz_uzytkownika(Json(dane): Json<NowyUzytkownik>) -> Json<Uzytkownik> {
+          Json(Uzytkownik { id: 1, imie: dane.imie })
+      }
+
+      async fn health() -> &'static str {
+          "OK"
+      }
+
+      #[tokio::main]
+      async fn main() {
+          let app = Router::new()
+              .route("/health", get(health))
+              .route("/users/:id", get(pobierz_uzytkownika))
+              .route("/users", post(stworz_uzytkownika));
+
+          let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+          println!("Serwer na http://localhost:3000");
+          axum::serve(listener, app).await.unwrap();
+      }
+    lang: rust

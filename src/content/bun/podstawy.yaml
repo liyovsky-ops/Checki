@@ -1,0 +1,85 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Bun?
+  firstComponent: Twój pierwszy serwer HTTP
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Bun?
+  desc: >
+    Bun to ultraszybki JavaScript runtime, package manager i bundler w jednym narzędziu.
+    Napisany w Zig i oparty na silniku JavaScriptCore (Apple, ten sam co Safari) — nie V8 jak Node.js.
+    Bun jest w pełni kompatybilny z Node.js i npm, ale uruchamia TypeScript natywnie bez tsc,
+    startuje 3-4x szybciej niż Node i instaluje paczki 25x szybciej niż npm.
+
+concepts:
+  - title: JavaScriptCore (nie V8)
+    desc: >
+      Bun używa silnika JavaScriptCore od Apple — tego samego co przeglądarka Safari.
+      To jeden z powodów jego szybkości startowej. Node.js używa V8 od Google (Chrome).
+      Różnica jest szczególnie widoczna przy cold start i operacjach I/O.
+    icon: "⚡"
+  - title: Napisany w Zig
+    desc: >
+      Zig to niskopoziomowy język systemowy podobny do C — bez garbage collectora, z bezpośrednim
+      dostępem do pamięci. Dzięki temu Bun może implementować operacje I/O, crypto i HTTP
+      znacznie szybciej niż JavaScript runtime napisany w C++.
+    icon: "🔧"
+  - title: TypeScript natywnie
+    desc: >
+      Bun wykonuje pliki .ts bez żadnej konfiguracji — bun run index.ts działa od razu.
+      Nie potrzebujesz tsc, ts-node ani tsx. Typy są stripowane podczas parsowania —
+      jest to szybszy odpowiednik esbuild, nie pełna kompilacja TypeScript.
+    icon: "📘"
+  - title: Kompatybilność z Node.js
+    desc: >
+      Bun implementuje Node.js API — fs, path, crypto, http, streams, process, Buffer i setInterval.
+      Większość paczek npm działa bez modyfikacji. Możesz zamienić node na bun w istniejącym projekcie
+      i zazwyczaj wszystko zadziała od razu.
+    icon: "🔁"
+  - title: Web APIs wbudowane
+    desc: >
+      fetch, Request, Response, Headers, WebSocket, ReadableStream, FormData, URL, URLSearchParams —
+      wszystkie standardowe API przeglądarki są dostępne globalnie bez importów.
+      Nie trzeba instalować node-fetch ani innych polyfillów.
+    icon: "🌐"
+  - title: Wszystko w jednym
+    desc: >
+      Bun zastępuje: Node.js (runtime), npm/yarn/pnpm (package manager), esbuild/Rollup (bundler),
+      ts-node (TypeScript runner), Jest (test runner) i dotenv (env variables).
+      Jedno narzędzie — zero konfiguracji.
+    icon: "🧰"
+
+whenToUse:
+  - Backendy i API gdzie liczy się czas startu (serverless, edge functions)
+  - Skrypty i narzędzia CLI — TypeScript bez kompilacji
+  - Projekty wymagające ultraszybkiej instalacji paczek (CI/CD)
+  - Mikroserwisy gdzie Node.js był wąskim gardłem I/O
+  - Gdy chcesz SQLite, WebSocket i HTTP serwer bez żadnych zewnętrznych paczek
+  - Nowe projekty full-stack z ElysiaJS lub Hono
+
+firstComponent: |
+  // Instalacja Bun (Linux/macOS)
+  // curl -fsSL https://bun.sh/install | bash
+
+  // index.ts — uruchamiasz: bun run index.ts
+  // (bez tsc, bez kompilacji, bez konfiguracji)
+
+  const server = Bun.serve({
+    port: 3000,
+    fetch(req) {
+      const url = new URL(req.url);
+
+      if (url.pathname === "/") {
+        return new Response("Cześć z Bun! 🧅");
+      }
+
+      if (url.pathname === "/json") {
+        return Response.json({ runtime: "bun", fast: true });
+      }
+
+      return new Response("404 Not Found", { status: 404 });
+    },
+  });
+
+  console.log(`Serwer działa na http://localhost:${server.port}`);

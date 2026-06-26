@@ -1,0 +1,210 @@
+labels:
+  main: Middleware
+  mainLang: typescript
+
+intro:
+  title: Middleware w Zustand — owijasz create(), dostajesz supermoc
+  desc: >
+    Middleware w Zustand to funkcje wyższego rzędu owijające create(). Komponujesz
+    je przez zagnieżdżenie — immer() daje mutowalny draft, devtools() podłącza
+    Redux DevTools Extension, subscribeWithSelector() daje subscribe z selekatorem.
+    Kolejność ma znaczenie: devtools(immer(...)) — devtools "widzi" już zmutowany stan.
+    TypeScript wymaga dodatkowego () po create<T>() gdy używasz middleware.
+
+items:
+  - name: immer — mutowalny draft zamiast spread
+    desc: immer middleware pozwala pisać state.items.push(item) zamiast spread hell. Immer tworzy niezmienną kopię pod spodem. Szczególnie cenny przy głęboko zagnieżdżonych strukturach.
+    code: |
+      import { create }  from 'zustand'
+      import { immer }   from 'zustand/middleware/immer'
+
+      interface TreeState {
+        nodes: {
+          id:       string
+          name:     string
+          children: { id: string; name: string }[]
+        }[]
+        addNode:    (name: string) => void
+        addChild:   (parentId: string, childName: string) => void
+        removeNode: (id: string) => void
+      }
+
+      export const useTreeStore = create<TreeState>()(
+        immer((set) => ({
+          nodes: [],
+
+          // Bez immer: set(s => ({ nodes: [...s.nodes, { id, name, children: [] }] }))
+          addNode: (name) =>
+            set((state) => {
+              state.nodes.push({ id: crypto.randomUUID(), name, children: [] })
+            }),
+
+          // Bez immer: rozwijanie zagnieżdżonych tablic to nightmare
+          addChild: (parentId, childName) =>
+            set((state) => {
+              const parent = state.nodes.find((n) => n.id === parentId)
+              if (parent) {
+                parent.children.push({ id: crypto.randomUUID(), name: childName })
+              }
+            }),
+
+          removeNode: (id) =>
+            set((state) => {
+              state.nodes = state.nodes.filter((n) => n.id !== id)
+            }),
+        }))
+      )
+    lang: typescript
+
+  - name: devtools — Redux DevTools Extension
+    desc: devtools() podłącza Redux DevTools Extension (Chrome/Firefox). Widzisz historię akcji, możesz cofać stan (time travel), inspektować każdą zmianę. Dodaj name do store dla czytelności w DevTools.
+    code: |
+      import { create }    from 'zustand'
+      import { devtools }  from 'zustand/middleware'
+
+      interface StoreState {
+        count:    number
+        history:  number[]
+        increment: () => void
+        decrement: () => void
+        reset:     () => void
+      }
+
+      export const useCounterStore = create<StoreState>()(
+        devtools(
+          (set) => ({
+            count:   0,
+            history: [],
+
+            increment: () =>
+              set(
+                (s) => ({ count: s.count + 1, history: [...s.history, s.count + 1] }),
+                false,              // false = merge, true = replace całego stanu
+                'counter/increment' // Nazwa akcji w DevTools
+              ),
+
+            decrement: () =>
+              set(
+                (s) => ({ count: s.count - 1, history: [...s.history, s.count - 1] }),
+                false,
+                'counter/decrement'
+              ),
+
+            reset: () =>
+              set(
+                { count: 0, history: [] },
+                false,
+                'counter/reset'
+              ),
+          }),
+          {
+            name:    'CounterStore',  // Nazwa w Redux DevTools
+            enabled: process.env.NODE_ENV !== 'production',
+          }
+        )
+      )
+    lang: typescript
+
+  - name: subscribeWithSelector — reaktywne subskrypcje
+    desc: subscribeWithSelector() rozszerza subscribe() o selektor i equalityFn. Reaguj na zmiany konkretnego fragmentu stanu poza React — analytics, synchronizacja, side effecty.
+    code: |
+      import { create }                from 'zustand'
+      import { subscribeWithSelector } from 'zustand/middleware'
+
+      interface NotificationState {
+        notifications: { id: string; message: string; type: 'info' | 'error' }[]
+        unreadCount:   number
+        addNotification: (msg: string, type?: 'info' | 'error') => void
+        markAllRead:     () => void
+      }
+
+      export const useNotificationStore = create<NotificationState>()(
+        subscribeWithSelector((set) => ({
+          notifications: [],
+          unreadCount:   0,
+
+          addNotification: (message, type = 'info') =>
+            set((s) => ({
+              notifications: [
+                ...s.notifications,
+                { id: crypto.randomUUID(), message, type },
+              ],
+              unreadCount: s.unreadCount + 1,
+            })),
+
+          markAllRead: () => set({ unreadCount: 0 }),
+        }))
+      )
+
+      // Poza React — np. w app.ts przy inicjalizacji
+      // Odtwórz dźwięk przy błędzie — reaguj tylko na type === 'error'
+      useNotificationStore.subscribe(
+        (s) => s.notifications.at(-1),
+        (latest) => {
+          if (latest?.type === 'error') {
+            new Audio('/sounds/error.mp3').play()
+          }
+        }
+      )
+
+      // Reaguj na liczbę nieprzeczytanych — aktualizuj tytuł strony
+      useNotificationStore.subscribe(
+        (s) => s.unreadCount,
+        (count) => {
+          document.title = count > 0 ? `(${count}) Checki` : 'Checki'
+        }
+      )
+    lang: typescript
+
+  - name: Kompozycja middleware
+    desc: Middleware można łączyć przez zagnieżdżenie. Najczęstszy układ produkcyjny — devtools(persist(immer(...))). Kolejność od zewnątrz do wewnątrz, TypeScript wymaga () po create<T>().
+    code: |
+      import { create }                from 'zustand'
+      import { devtools, persist }     from 'zustand/middleware'
+      import { immer }                 from 'zustand/middleware/immer'
+
+      interface AppState {
+        theme:      'light' | 'dark'
+        language:   'pl' | 'en'
+        bookmarks:  string[]
+        setTheme:   (theme: AppState['theme'])    => void
+        setLanguage:(lang: AppState['language'])  => void
+        addBookmark:(url: string)                 => void
+        removeBookmark:(url: string)              => void
+      }
+
+      export const useAppStore = create<AppState>()(
+        devtools(
+          persist(
+            immer((set) => ({
+              theme:    'light',
+              language: 'pl',
+              bookmarks: [],
+
+              setTheme:    (theme)    => set((s) => { s.theme = theme }),
+              setLanguage: (language) => set((s) => { s.language = language }),
+
+              addBookmark: (url) =>
+                set((s) => {
+                  if (!s.bookmarks.includes(url)) {
+                    s.bookmarks.push(url)
+                  }
+                }),
+
+              removeBookmark: (url) =>
+                set((s) => {
+                  s.bookmarks = s.bookmarks.filter((b) => b !== url)
+                }),
+            })),
+            {
+              name:    'app-settings',          // Klucz w localStorage
+              partialize: (s) => ({             // Persystuj tylko te pola
+                theme:    s.theme,
+                language: s.language,
+              }),
+            }
+          ),
+          { name: 'AppStore' }
+        )
+      )
+    lang: typescript

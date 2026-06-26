@@ -1,0 +1,89 @@
+title: Supabase vs inne BaaS
+
+items:
+  - name: Firebase
+    icon: "🔥"
+    color: "#FFCA28"
+    tagline: BaaS od Google — Firestore NoSQL + Auth + Cloud Functions
+    pros:
+      - Dojrzały produkt od Google z 10+ latami na rynku
+      - Firestore excellent do hierarchicznych danych w real-time
+      - Firebase Auth z gotową biblioteką UI (FirebaseUI)
+      - Firebase Hosting + CDN — deploy statycznych aplikacji jedną komendą
+      - Offline support wbudowany w Firestore SDK
+    cons:
+      - Vendor lock-in — 100% Google, brak self-hostingu
+      - Firestore to NoSQL — brak JOINów, brak transakcji między kolekcjami
+      - Trudne zapytania analityczne — Firestore nie jest do tego stworzony
+      - Cold starty Cloud Functions bywają bolesne
+      - Cennik może zaskoczyć przy dużym ruchu (reads/writes/storage osobno)
+    vs: >
+      Supabase wygrywa kiedy masz relacyjne dane i potrzebujesz JOINów, transakcji ACID
+      i prawdziwego SQL. Firebase lepszy gdy dane są hierarchiczne i naturalnie pasują do NoSQL,
+      lub gdy potrzebujesz offline-first z wbudowanym sync. Supabase = PostgreSQL power,
+      Firebase = prostota i offline.
+
+  - name: PocketBase
+    icon: "🎒"
+    color: "#b8dbca"
+    tagline: Jeden plik wykonywalny — SQLite + Auth + Realtime + Admin UI
+    pros:
+      - Zero dependencies — jeden plik binarny Go uruchamiasz wszędzie
+      - Wbudowany admin panel dla niedewelopera od razu po uruchomieniu
+      - Self-hosted z natury — idealne do małych projektów i hobby
+      - SQLite underneath — prostota i szybkość dla mniejszych aplikacji
+      - Bardzo prosty deploy (single binary na VPS za $5/mies)
+    cons:
+      - SQLite nie skaluje się dla dużego ruchu zapisu (brak concurrent writes)
+      - Znacznie mniejszy ekosystem niż Supabase
+      - Brak managed cloud — musisz sam hostować i dbać o backupy
+      - Mniej możliwości niż PostgreSQL (brak procedur, ograniczone extensions)
+      - Mała społeczność, mniej integracji
+    vs: >
+      PocketBase idealny dla hobby projectów, MVP i małych aplikacji gdzie chcesz
+      zero konfiguracji i szybki start na własnym VPS. Supabase lepszy dla
+      produkcyjnych aplikacji wymagających skalowalności, team collaboration
+      i pełnej mocy PostgreSQL.
+
+  - name: Neon + Clerk
+    icon: "🚀"
+    color: "#00e599"
+    tagline: Serverless PostgreSQL (Neon) + Auth (Clerk) — best-of-breed
+    pros:
+      - Neon = prawdziwy serverless PostgreSQL z branching (dev/staging bazy jak git)
+      - Clerk = najbardziej dopracowane Auth UI na rynku (gotowe komponenty)
+      - Pełna kontrola nad każdą warstwą — nie jesteś przywiązany do jednego vendora
+      - Neon branch per PR — każdy PR ma własną bazę danych do testów
+      - Clerk obsługuje organizacje, role, multi-tenant z pudełka
+    cons:
+      - Dwa osobne produkty = dwa rachunki, dwa konta, dwie integracje
+      - Brak Realtime, Storage i Edge Functions — musisz dobierać osobno
+      - Więcej konfiguracji na start — każdy element osobno
+      - Clerk to SaaS — brak self-hostingu auth
+      - Koszty mogą być wyższe przy sumowaniu Neon + Clerk + inne usługi
+    vs: >
+      Neon+Clerk to podejście best-of-breed — bierzesz najlepsze narzędzie do każdego zadania.
+      Supabase to all-in-one — jeden dashboard, jedna integracja, jedna faktura.
+      Wybierz Neon+Clerk jeśli zależy ci na branch per PR i Clerk UI jest ważny.
+      Wybierz Supabase dla prostszej architektury i Realtime w pakiecie.
+
+  - name: Appwrite
+    icon: "🪄"
+    color: "#FD366E"
+    tagline: Open-source BaaS z self-hostingiem — Docker na własnym serwerze
+    pros:
+      - Open-source i self-hosted first — pełna kontrola nad danymi
+      - Docker compose — jeden plik konfiguracyjny, uruchamiasz lokalnie i na VPS
+      - Obsługuje wiele platform (Web, Flutter, Android, iOS, Node)
+      - Wbudowane Functions, Storage, Databases, Auth w jednym miejscu
+      - Brak limitów wersji cloud dla self-hosted
+    cons:
+      - Appwrite używa własnej bazy (nie PostgreSQL) — brak pełnego SQL
+      - Mniejsza społeczność niż Supabase
+      - Managed cloud service mniej dojrzały niż Supabase cloud
+      - Brak JOINów i relacji jak w PostgreSQL
+      - Mniej SDK i integracji ekosystemu
+    vs: >
+      Appwrite lepsza gdy priorytetem jest self-hosting i chcesz uniezależnić się od cloud.
+      Supabase lepszy gdy potrzebujesz pełnego PostgreSQL (JOINy, transakcje, rozszerzenia).
+      Appwrite = bardziej mobile-friendly (Flutter SDK), Supabase = bardziej web + SQL power.

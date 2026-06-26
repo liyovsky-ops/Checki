@@ -46,6 +46,26 @@ import { FW_NEXTJS_DATA }      from '../data/fw_nextjs.js';
 import { FW_TAILWIND_DATA }    from '../data/fw_tailwind.js';
 import { FW_NESTJS_DATA }     from '../data/fw_nestjs.js';
 import { FW_PRISMA_DATA }     from '../data/fw_prisma.js';
+import { FW_TYPESCRIPT_DATA }    from '../data/fw_typescript.js';
+import { FW_GRAPHQL_DATA }       from '../data/fw_graphql.js';
+import { FW_NGINX_DATA }         from '../data/fw_nginx.js';
+import { FW_KAFKA_DATA }         from '../data/fw_kafka.js';
+import { FW_ELASTICSEARCH_DATA } from '../data/fw_elasticsearch.js';
+import { FW_AIRFLOW_DATA }       from '../data/fw_airflow.js';
+import { FW_POLARS_DATA }        from '../data/fw_polars.js';
+import { FW_ZOD_DATA }           from '../data/fw_zod.js';
+import { FW_TRPC_DATA }          from '../data/fw_trpc.js';
+import { FW_STORYBOOK_DATA }     from '../data/fw_storybook.js';
+import { FW_SOCKETIO_DATA }     from '../data/fw_socketio.js';
+import { FW_ZUSTAND_DATA }      from '../data/fw_zustand.js';
+import { FW_REACTQUERY_DATA }   from '../data/fw_reactquery.js';
+import { FW_SUPABASE_DATA }     from '../data/fw_supabase.js';
+import { FW_GOLANG_DATA }       from '../data/fw_golang.js';
+import { FW_RUST_DATA }         from '../data/fw_rust.js';
+import { FW_VITE_DATA }         from '../data/fw_vite.js';
+import { FW_DRIZZLE_DATA }      from '../data/fw_drizzle.js';
+import { FW_REDUX_DATA }        from '../data/fw_redux.js';
+import { FW_BUN_DATA }          from '../data/fw_bun.js';
 
 let activeTab = 'podstawy';
 let activeFw  = 'react';
@@ -80,6 +100,26 @@ const FW_DATA_MAP = {
   tailwindcss: FW_TAILWIND_DATA,
   nestjs: FW_NESTJS_DATA,
   prisma: FW_PRISMA_DATA,
+  typescript: FW_TYPESCRIPT_DATA,
+  graphql: FW_GRAPHQL_DATA,
+  nginx: FW_NGINX_DATA,
+  apachekafka: FW_KAFKA_DATA,
+  elasticsearch: FW_ELASTICSEARCH_DATA,
+  apacheairflow: FW_AIRFLOW_DATA,
+  polars: FW_POLARS_DATA,
+  zod: FW_ZOD_DATA,
+  trpc: FW_TRPC_DATA,
+  storybook: FW_STORYBOOK_DATA,
+  socketio: FW_SOCKETIO_DATA,
+  zustand: FW_ZUSTAND_DATA,
+  reactquery: FW_REACTQUERY_DATA,
+  supabase: FW_SUPABASE_DATA,
+  golang: FW_GOLANG_DATA,
+  rust: FW_RUST_DATA,
+  vite: FW_VITE_DATA,
+  drizzle: FW_DRIZZLE_DATA,
+  redux: FW_REDUX_DATA,
+  bun: FW_BUN_DATA,
 };
 
 export function openFramework(fw) {

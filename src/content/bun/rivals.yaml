@@ -1,0 +1,70 @@
+title: Bun vs inne środowiska i narzędzia
+
+items:
+  - name: Node.js
+    icon: "🟢"
+    color: "#339933"
+    tagline: Dominujący JS runtime — stabilny, dojrzały, wszechobecny
+    pros:
+      - Ogromny ekosystem — 2M+ paczek npm działa bez problemów
+      - Stabilność — w produkcji od 2009, sprawdzony w dużych firmach
+      - V8 — jeden z najlepszych optymalizujących JIT kompilatorów
+      - Ogromna społeczność, dokumentacja i materiały do nauki
+      - Natywne addony (C++ N-API) — pełna kontrola wydajności
+    cons:
+      - Wolniejszy start niż Bun (szczególnie bez --watch)
+      - Brak natywnego TypeScript — potrzebujesz ts-node lub esbuild
+      - npm install jest wolny przy pierwszej instalacji
+      - Brak wbudowanego SQLite, password hashing, bundlera
+      - Wymaga dotenv dla .env — nie ładuje automatycznie
+    vs: Node.js wygrywa dojrzałością, społecznością i kompatybilnością. Bun wygrywa szybkością startu, instalacji i wbudowanymi narzędziami. Migracja Node → Bun zazwyczaj trywialna. Wybierz Node gdy stabilność > innowacja.
+
+  - name: Deno
+    icon: "🦕"
+    color: "#70ffaf"
+    tagline: Bezpieczny JS/TS runtime od twórcy Node.js — permissions i web-first API
+    pros:
+      - Bezpieczeństwo przez uprawnienia — plik nie ma dostępu do sieci bez --allow-net
+      - TypeScript first od początku — podobnie jak Bun
+      - Web API standard — fetch, URL, WebSocket wbudowane (podobnie do Bun)
+      - Wbudowane narzędzia — fmt, lint, test, bundle podobnie jak Bun
+      - Deno Deploy — edge hosting od twórców
+    cons:
+      - Słabsza kompatybilność z npm (Deno 2.0 poprawia, ale wciąż problemy)
+      - Wolniejszy od Bun w benchmarkach HTTP i instalacji
+      - Mniejsza społeczność od Node.js
+      - JSR zamiast npm — dodatkowe bariery wejścia
+    vs: Deno i Bun mają podobne cele (TypeScript, web APIs), ale różne podejście. Deno priorytetyzuje bezpieczeństwo (permissions model), Bun priorytetyzuje szybkość i kompatybilność z npm. Bun wygrywa kompatybilnością z istniejącym kodem Node/npm.
+
+  - name: Vite
+    icon: "⚡"
+    color: "#646cff"
+    tagline: Ultraszybki dev server i bundler dla aplikacji frontendowych
+    pros:
+      - Dev server z HMR — Hot Module Replacement bez przeładowania strony
+      - Ekosystem pluginów — Rollup plugins, React/Vue/Svelte first-class
+      - SSR mode, library mode, multi-page apps — elastyczność
+      - Oficjalny bundler dla Vue, Svelte, Solid i alternatywny dla React
+      - Bogata dokumentacja i ogromna społeczność
+    cons:
+      - Tylko bundler frontendowy — brak runtime, package manager, test runner
+      - W dev używa ESM natywnie, w prod — Rollup (różne zachowanie)
+      - Nie nadaje się do bundlowania aplikacji serwerowych (Bun.build to robi lepiej)
+    vs: Vite jest bundlerem frontendowym z HMR — Bun build to bundler back-endowy i bibliotek. Nie są bezpośrednimi rywalami. Możesz używać Vite na frontendzie + Bun na backendzie. Dla bibliotek npm Bun build jest prostszy i szybszy niż konfiguracja Vite.
+
+  - name: pnpm
+    icon: "📦"
+    color: "#f69220"
+    tagline: Szybki package manager z symlinkami — oszczędza miejsce na dysku
+    pros:
+      - Symlinki zamiast kopiowania — jeden cache dla wszystkich projektów
+      - Strict mode — izoluje zależności, brak "phantom dependencies"
+      - Szybszy od npm i yarn (ale wolniejszy od Bun)
+      - Dobre wsparcie dla monorepo (workspaces)
+      - Kompatybilny z Node.js — nie wymaga zmiany runtime
+    cons:
+      - Wolniejszy od Bun install (5x–10x)
+      - Wymaga Node.js — nie zastępuje runtime
+      - Strict mode może łamać paczki oczekujące phantom dependencies
+      - Bun.lockb vs pnpm-lock.yaml — musisz wybrać jeden
+    vs: pnpm wygrywa strict mode i izolacją zależności. Bun wygrywa szybkością instalacji i jest jednocześnie runtime. Dla projektów Node.js gdzie zależy Ci na izolacji — pnpm. Dla nowych projektów Bun — naturalny wybór.

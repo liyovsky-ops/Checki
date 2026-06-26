@@ -1,0 +1,50 @@
+title: Ekosystem TanStack Query
+
+categories:
+  - name: Adaptery frameworków
+    items:
+      - name: "@tanstack/react-query"
+        desc: Oficjalny adapter dla React 18+. useQuery, useMutation, useInfiniteQuery, useSuspenseQuery. Wsparcie dla React Server Components w Next.js 14+.
+        icon: "⚛️"
+      - name: "@tanstack/vue-query"
+        desc: Adapter dla Vue 3 z Composition API. useQuery działa jak Composable — reaktywne queries z computed refs jako queryKey.
+        icon: "💚"
+      - name: "@tanstack/angular-query-experimental"
+        desc: Eksperymentalny adapter dla Angular 17+ ze Signals. injectQuery(), injectMutation() — integracja z Angular DI.
+        icon: "🔴"
+      - name: "@tanstack/solid-query"
+        desc: Adapter dla SolidJS — reaktywne queries oparte na Solid Signals. Zero overhead, natywna reaktywność Solid.
+        icon: "🔵"
+      - name: "@tanstack/svelte-query"
+        desc: Adapter dla Svelte 5. createQuery(), createMutation() jako Svelte stores. Integracja z SvelteKit.
+        icon: "🟠"
+
+  - name: DevTools
+    items:
+      - name: "@tanstack/react-query-devtools"
+        desc: Panel DevTools dla React — podgląd cache, statusów zapytań, danych, staleTime, historia re-fetchów. Aktywne tylko w development. Dodaj <ReactQueryDevtools /> do App.
+        icon: "🛠️"
+      - name: "@tanstack/query-sync-storage-persister"
+        desc: Persystencja cache do localStorage/sessionStorage. Odtwórz cache po odświeżeniu strony — brak ponownego fetchowania przy powrocie.
+        icon: "💾"
+      - name: "@tanstack/query-async-storage-persister"
+        desc: Persystencja cache do async storage (np. AsyncStorage w React Native, IndexedDB). Dla aplikacji mobilnych i dużych danych.
+        icon: "📱"
+
+  - name: Integracje
+    items:
+      - name: tRPC + TanStack Query
+        desc: tRPC automatycznie generuje useQuery/useMutation hooki z definicji procedur. Pełne type-safety end-to-end bez kodowania zapytań. Domyślna integracja w create-t3-app.
+        icon: "🔷"
+      - name: Axios + TanStack Query
+        desc: Użyj Axios jako queryFn — interceptory, baseURL, auth headers. Axios instance w queryFn zamiast fetch. Obsługa błędów przez Axios interceptors.
+        icon: "🌐"
+      - name: React Hook Form + TanStack Query
+        desc: Popularne połączenie — RHF dla formularzy, TanStack Query dla inicjalnych danych (useQuery) i zapisu (useMutation). Brak konfliktu, uzupełniają się.
+        icon: "📝"
+      - name: Zod + TanStack Query
+        desc: Walidacja odpowiedzi API w queryFn przez Zod. parse() lub safeParse() daje pewność że dane mają oczekiwany kształt — rzuć błąd jeśli nie.
+        icon: "🛡️"
+      - name: Next.js + TanStack Query
+        desc: "Hydration z Server Components — prefetchQuery na serwerze, dehydrate/HydrationBoundary po stronie klienta. Zero waterfalls: dane dostępne bez loading state."
+        icon: "▲"

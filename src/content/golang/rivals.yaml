@@ -1,0 +1,78 @@
+title: Go vs inne języki i platformy
+
+items:
+  - name: Rust
+    icon: "🦀"
+    color: "#dea584"
+    tagline: Bezpieczeństwo pamięci bez GC — maksymalna kontrola i wydajność
+    pros:
+      - Brak Garbage Collectora — zero pauz GC, deterministyczne zwalnianie pamięci
+      - Borrow checker eliminuje race conditions i null pointer na etapie kompilacji
+      - Wydajność na poziomie C/C++ — idealny dla systemowego i embedded
+      - Wyjątkowo bogaty system typów (algebraiczne typy, traits, lifetimes)
+    cons:
+      - Stroma krzywa uczenia — borrow checker wymaga nowego myślenia
+      - Wolniejsza kompilacja niż Go
+      - Mniej bibliotek dla backend/web niż Go
+      - Async (tokio) skomplikowany w porównaniu do goroutines
+    vs: >
+      Go dla serwisów backendowych, API, CLI i narzędzi DevOps — szybki development, prosta współbieżność.
+      Rust gdy liczy się każdy bajt pamięci i brak GC pauz — systemy operacyjne, WebAssembly, sterowniki.
+      Go kompiluje się w sekundy; Rust w minuty. 90% przypadków Go wystarczy.
+
+  - name: Python (FastAPI)
+    icon: "🐍"
+    color: "#3572A5"
+    tagline: Szybki development, ogromny ekosystem AI/ML — ale wolniejszy runtime
+    pros:
+      - Największy ekosystem bibliotek AI/ML (PyTorch, scikit-learn, pandas)
+      - Szybszy development — mniej kodu dla tej samej funkcjonalności
+      - Czytelna składnia — łatwiejszy do nauki
+      - FastAPI z type hints zbliżony do Go w DX
+    cons:
+      - 10-100x wolniejszy od Go przy CPU-bound workloads
+      - GIL ogranicza prawdziwą wielowątkowość
+      - async Python skomplikowany — event loop, blocking calls, debug
+      - Wdrożenie bardziej złożone — venv, zależności, rozmiar obrazu Docker
+    vs: >
+      Python gdy potrzebujesz ML/AI, data science lub bardzo szybkiego prototypowania.
+      Go gdy budujesz API produkcyjne, mikroserwisy, narzędzia infrastrukturalne.
+      Go binarki to jeden plik — deployment prostszy niż Python z virtualenv.
+
+  - name: Node.js (TypeScript)
+    icon: "🟩"
+    color: "#68a063"
+    tagline: JavaScript wszędzie — ogromny npm, async I/O, full-stack sharing
+    pros:
+      - Jeden język dla frontendu i backendu — sharing typów przez monorepo
+      - Ogromny ekosystem npm (2M+ pakietów)
+      - Szybkie I/O async — event loop dobrze sprawdza się w API gateway
+      - TypeScript daje statyczne typy bez oddzielnego kroku kompilacji w dev
+    cons:
+      - Single-threaded — CPU-bound tasks blokują event loop
+      - Callback/Promise/async hell — trudniejsza obsługa błędów niż Go
+      - npm hell — zależności zależności zależności, security vulnerabilities
+      - Brak prawdziwej wielowątkowości (Worker Threads niezbyt ergonomiczne)
+    vs: >
+      Node.js gdy cały stack to JavaScript/TypeScript lub potrzebujesz bogatego ekosystemu npm.
+      Go dla mikroserwisów wymagających wysokiej przepustowości i niskich zasobów.
+      Go startuje w milisekundach vs sekundy dla Node.js (cold start w serverless).
+
+  - name: Java (Spring Boot)
+    icon: "☕"
+    color: "#b07219"
+    tagline: Enterprise, dojrzały ekosystem, JVM — ale ciężki i powolny start
+    pros:
+      - Dojrzały ekosystem enterprise — security, ORM (Hibernate), DI (Spring)
+      - JIT kompilacja — wydajność zbliżona do Go po rozgrzaniu JVM
+      - Ogromna liczba programistów — łatwo zatrudnić
+      - Świetne narzędzia — IntelliJ IDEA, debug, profiling
+    cons:
+      - Wolny cold start — JVM potrzebuje kilku sekund (fatal dla serverless/Kubernetes)
+      - Duże zużycie pamięci — typowy Spring Boot = 256-512MB RAM vs Go = 10-50MB
+      - Boilerplate — annotations, XML config, beans, gettery/settery
+      - Złożona ekosystem — Spring Security, Spring Data, Spring Cloud...
+    vs: >
+      Java/Spring dla istniejących enterprise systemów, gdy cały team zna Javę, lub potrzebujesz bogatego Spring ekosystemu.
+      Go dla nowych mikroserwisów, kontenerów i chmury — mały obraz Docker (~10MB vs ~200MB), szybki start, mało RAM.
+      Kubernetes i Docker są napisane w Go — nie bez powodu.

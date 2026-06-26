@@ -1,0 +1,302 @@
+title: Ekosystem Go
+
+items:
+  - name: Gin
+    desc: Najpopularniejszy web framework Go — szybki routing, middleware, JSON binding. Używany przez wiele firm produkcyjnych.
+    icon: "🍸"
+    code: |
+      go get github.com/gin-gonic/gin
+
+      package main
+
+      import (
+          "net/http"
+          "github.com/gin-gonic/gin"
+      )
+
+      func main() {
+          r := gin.Default() // Logger + Recovery
+
+          r.GET("/ping", func(c *gin.Context) {
+              c.JSON(http.StatusOK, gin.H{"message": "pong"})
+          })
+
+          // Parametry URL
+          r.GET("/users/:id", func(c *gin.Context) {
+              id := c.Param("id")
+              c.JSON(200, gin.H{"id": id})
+          })
+
+          // Query params
+          r.GET("/search", func(c *gin.Context) {
+              q := c.DefaultQuery("q", "wszystko")
+              c.JSON(200, gin.H{"query": q})
+          })
+
+          r.Run(":8080")
+      }
+
+  - name: Echo
+    desc: Elegancki framework z automatycznym bindowaniem, walidacją i WebSocket support. Czysty API — lubią go teams dbające o DX.
+    icon: "🔊"
+    code: |
+      go get github.com/labstack/echo/v4
+
+      package main
+
+      import (
+          "net/http"
+          "github.com/labstack/echo/v4"
+          "github.com/labstack/echo/v4/middleware"
+      )
+
+      type User struct {
+          Name  string `json:"name" validate:"required"`
+          Email string `json:"email" validate:"required,email"`
+      }
+
+      func main() {
+          e := echo.New()
+
+          // Middleware
+          e.Use(middleware.Logger())
+          e.Use(middleware.Recover())
+          e.Use(middleware.CORS())
+
+          // Routy
+          e.GET("/", func(c echo.Context) error {
+              return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+          })
+
+          e.POST("/users", func(c echo.Context) error {
+              u := new(User)
+              if err := c.Bind(u); err != nil {
+                  return err
+              }
+              return c.JSON(http.StatusCreated, u)
+          })
+
+          e.Logger.Fatal(e.Start(":8080"))
+      }
+
+  - name: chi
+    desc: Lekki router 100% kompatybilny ze stdlib net/http. Zero zależności zewnętrznych poza nim samym. Idealne do zachowania elastyczności stdlib.
+    icon: "🔀"
+    code: |
+      go get github.com/go-chi/chi/v5
+
+      package main
+
+      import (
+          "encoding/json"
+          "net/http"
+          "github.com/go-chi/chi/v5"
+          "github.com/go-chi/chi/v5/middleware"
+      )
+
+      func main() {
+          r := chi.NewRouter()
+
+          r.Use(middleware.Logger)
+          r.Use(middleware.Recoverer)
+          r.Use(middleware.RealIP)
+
+          r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+              json.NewEncoder(w).Encode(map[string]string{"ok": "true"})
+          })
+
+          // Zagnieżdżone grupy
+          r.Route("/api/v1", func(r chi.Router) {
+              r.Get("/users/{id}", func(w http.ResponseWriter, r *http.Request) {
+                  id := chi.URLParam(r, "id")
+                  json.NewEncoder(w).Encode(map[string]string{"id": id})
+              })
+          })
+
+          http.ListenAndServe(":8080", r)
+      }
+
+  - name: GORM
+    desc: Najpopularniejszy ORM dla Go. Obsługuje PostgreSQL, MySQL, SQLite, SQL Server. Auto-migracje, associations, preloading.
+    icon: "🗄️"
+    code: |
+      go get gorm.io/gorm gorm.io/driver/postgres
+
+      package main
+
+      import (
+          "gorm.io/driver/postgres"
+          "gorm.io/gorm"
+      )
+
+      type User struct {
+          gorm.Model         // ID, CreatedAt, UpdatedAt, DeletedAt
+          Name  string       `gorm:"not null"`
+          Email string       `gorm:"uniqueIndex;not null"`
+          Posts []Post       // has many
+      }
+
+      type Post struct {
+          gorm.Model
+          Title  string
+          UserID uint   // foreign key
+      }
+
+      func main() {
+          dsn := "host=localhost user=postgres dbname=mydb sslmode=disable"
+          db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+          if err != nil {
+              panic(err)
+          }
+
+          // Auto-migracja — tworzy/aktualizuje tabele
+          db.AutoMigrate(&User{}, &Post{})
+
+          // CRUD
+          user := User{Name: "Alice", Email: "alice@example.com"}
+          db.Create(&user)
+
+          var found User
+          db.Preload("Posts").First(&found, "email = ?", "alice@example.com")
+
+          db.Model(&found).Update("Name", "Alice Updated")
+          db.Delete(&found)
+      }
+
+  - name: sqlc
+    desc: Generuje type-safe Go z SQL. Piszesz SQL → sqlc generuje Go. Zero ORM — pełna kontrola nad zapytaniami.
+    icon: "⚡"
+    code: |
+      go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+
+      # sqlc.yaml
+      version: "2"
+      sql:
+        - engine: "postgresql"
+          queries: "./queries.sql"
+          schema: "./schema.sql"
+          gen:
+            go:
+              package: "db"
+              out: "./internal/db"
+
+      # queries.sql
+      -- name: GetUser :one
+      SELECT id, name, email FROM users WHERE id = $1;
+
+      -- name: ListUsers :many
+      SELECT id, name, email FROM users ORDER BY name;
+
+      -- name: CreateUser :one
+      INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *;
+
+      # Wygenerowany kod (używasz tak):
+      # q := db.New(conn)
+      # user, err := q.GetUser(ctx, 1)
+      # users, err := q.ListUsers(ctx)
+
+  - name: cobra (CLI)
+    desc: Standardowy framework do budowania CLI w Go. Używany przez kubectl, gh, Hugo. Subkomendy, flagi, auto-completion.
+    icon: "🐍"
+    code: |
+      go get github.com/spf13/cobra
+
+      package main
+
+      import (
+          "fmt"
+          "os"
+          "github.com/spf13/cobra"
+      )
+
+      var rootCmd = &cobra.Command{
+          Use:   "myapp",
+          Short: "Moja aplikacja CLI",
+      }
+
+      var (
+          verbose bool
+          output  string
+      )
+
+      var runCmd = &cobra.Command{
+          Use:   "run [plik]",
+          Short: "Uruchom plik",
+          Args:  cobra.ExactArgs(1),
+          Run: func(cmd *cobra.Command, args []string) {
+              fmt.Printf("Uruchamiam: %s (verbose=%v, output=%s)\n",
+                  args[0], verbose, output)
+          },
+      }
+
+      func init() {
+          rootCmd.AddCommand(runCmd)
+          runCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Szczegółowy output")
+          runCmd.Flags().StringVarP(&output, "output", "o", "stdout", "Plik wyjściowy")
+      }
+
+      func main() {
+          if err := rootCmd.Execute(); err != nil {
+              os.Exit(1)
+          }
+      }
+
+  - name: testify
+    desc: De facto standard testów w Go — asercje, mocki, suite. Czytelniejsze błędy niż stdlib testing.
+    icon: "🧪"
+    code: |
+      go get github.com/stretchr/testify
+
+      package math_test
+
+      import (
+          "testing"
+          "github.com/stretchr/testify/assert"
+          "github.com/stretchr/testify/require"
+      )
+
+      func TestCalculator(t *testing.T) {
+          // assert — kontynuuje po błędzie
+          assert.Equal(t, 5, Add(2, 3), "2+3 powinno być 5")
+          assert.NotNil(t, someObject)
+          assert.Contains(t, "hello world", "world")
+          assert.Error(t, err)
+          assert.NoError(t, err)
+
+          // require — zatrzymuje test przy błędzie
+          result, err := Divide(10, 2)
+          require.NoError(t, err) // bez tego nie ma sensu sprawdzać result
+          assert.Equal(t, 5.0, result)
+      }
+
+  - name: zap (logowanie)
+    desc: Ultraszybki, structured logger od Uber. Zero alokacji w hot path. Produkuje JSON logi przyjazne dla Datadog/Elasticsearch.
+    icon: "⚡"
+    code: |
+      go get go.uber.org/zap
+
+      package main
+
+      import "go.uber.org/zap"
+
+      func main() {
+          // Produkcyjny logger — JSON, szybki
+          logger, _ := zap.NewProduction()
+          defer logger.Sync()
+
+          // Structured logging — logi jako JSON
+          logger.Info("serwer startuje",
+              zap.String("host", "localhost"),
+              zap.Int("port", 8080),
+              zap.String("env", "production"),
+          )
+
+          logger.Error("błąd połączenia",
+              zap.String("db", "postgres"),
+              zap.Error(fmt.Errorf("connection refused")),
+          )
+
+          // Sugar — bardziej przyjazny API (z małą kary w wydajności)
+          sugar := logger.Sugar()
+          sugar.Infof("przetworzono %d requestów", 1000)
+      }

@@ -1,0 +1,320 @@
+labels:
+  main: useMutation — modyfikacja danych
+  mainLang: typescript
+
+intro:
+  title: useMutation — zapis, aktualizacja, usuwanie
+  desc: >
+    useMutation służy do operacji modyfikujących dane — POST, PUT, DELETE.
+    W odróżnieniu od useQuery nie wykonuje się automatycznie — wywołujesz mutate() lub mutateAsync().
+    Callbacki onSuccess/onError/onSettled pozwalają reagować na wynik.
+    Po mutacji invaliduj powiązane zapytania aby UI pokazało świeże dane.
+
+items:
+  - title: Podstawowe useMutation
+    desc: >
+      useMutation przyjmuje mutationFn — funkcję async wykonującą operację.
+      mutate(variables) — wywołanie bez obsługi Promise (nie rzuca).
+      mutateAsync(variables) — zwraca Promise, możesz await i obsłużyć try/catch.
+      Stan: isPending, isSuccess, isError, data, error.
+    code: |
+      import { useMutation } from '@tanstack/react-query'
+
+      interface NewPost {
+        title: string
+        body:  string
+        userId: number
+      }
+
+      interface Post extends NewPost {
+        id: number
+      }
+
+      async function createPost(newPost: NewPost): Promise<Post> {
+        const res = await fetch('/api/posts', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(newPost),
+        })
+        if (!res.ok) throw new Error('Błąd tworzenia posta')
+        return res.json()
+      }
+
+      function CreatePostForm() {
+        const {
+          mutate,
+          isPending,
+          isSuccess,
+          isError,
+          error,
+          data: createdPost,
+        } = useMutation({
+          mutationFn: createPost,
+        })
+
+        const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+          e.preventDefault()
+          const form = e.currentTarget
+          mutate({
+            title:  (form.elements.namedItem('title') as HTMLInputElement).value,
+            body:   (form.elements.namedItem('body') as HTMLTextAreaElement).value,
+            userId: 1,
+          })
+        }
+
+        return (
+          <form onSubmit={handleSubmit}>
+            <input name="title" placeholder="Tytuł" required />
+            <textarea name="body" placeholder="Treść" required />
+            <button type="submit" disabled={isPending}>
+              {isPending ? 'Zapisywanie...' : 'Utwórz post'}
+            </button>
+            {isError   && <p style={{ color: 'red' }}>Błąd: {error.message}</p>}
+            {isSuccess && <p>Post #{createdPost.id} utworzony!</p>}
+          </form>
+        )
+      }
+    lang: typescript
+
+  - title: onSuccess + invalidateQueries
+    desc: >
+      invalidateQueries po mutacji unieważnia cache zapytań — wymusza re-fetch.
+      Użyj queryClient.invalidateQueries({ queryKey: ['posts'] }) w onSuccess.
+      Możesz unieważniać wiele kluczy naraz — np. ['posts'] i ['stats'].
+      Lista automatycznie odświeży się po dodaniu/edycji/usunięciu elementu.
+    code: |
+      import { useMutation, useQueryClient } from '@tanstack/react-query'
+
+      interface UpdatePost {
+        id:    number
+        title: string
+        body:  string
+      }
+
+      async function updatePost(data: UpdatePost) {
+        const res = await fetch(`/api/posts/${data.id}`, {
+          method:  'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(data),
+        })
+        if (!res.ok) throw new Error('Błąd aktualizacji')
+        return res.json()
+      }
+
+      function EditPostForm({ post }: { post: UpdatePost }) {
+        const queryClient = useQueryClient()
+
+        const { mutate, isPending } = useMutation({
+          mutationFn: updatePost,
+          onSuccess: (updatedPost) => {
+            // Unieważnij listę postów → re-fetch
+            queryClient.invalidateQueries({ queryKey: ['posts'] })
+            // Unieważnij konkretny post
+            queryClient.invalidateQueries({ queryKey: ['posts', updatedPost.id] })
+            // Ewentualnie unieważnij statystyki
+            queryClient.invalidateQueries({ queryKey: ['stats'] })
+          },
+          onError: (error) => {
+            console.error('Nie udało się zaktualizować:', error.message)
+          },
+          onSettled: () => {
+            // Wywoływane zawsze — po success lub error
+            console.log('Mutacja zakończona')
+          },
+        })
+
+        return (
+          <button
+            onClick={() => mutate({ id: post.id, title: 'Nowy tytuł', body: post.body })}
+            disabled={isPending}
+          >
+            Zapisz zmiany
+          </button>
+        )
+      }
+    lang: typescript
+
+  - title: setQueryData — natychmiastowa aktualizacja cache
+    desc: >
+      setQueryData ręcznie aktualizuje cache bez czekania na re-fetch.
+      Szybsze niż invalidateQueries — brak dodatkowego requestu.
+      Używaj gdy serwer zwraca zaktualizowany obiekt w odpowiedzi na mutację.
+      Kombinuj z invalidateQueries dla pewności — setQueryData jako szybka aktualizacja,
+      invalidateQueries jako synchronizacja w tle.
+    code: |
+      import { useMutation, useQueryClient } from '@tanstack/react-query'
+
+      interface Todo {
+        id:        number
+        title:     string
+        completed: boolean
+      }
+
+      async function toggleTodo(id: number): Promise<Todo> {
+        const res = await fetch(`/api/todos/${id}/toggle`, { method: 'PATCH' })
+        if (!res.ok) throw new Error('Błąd')
+        return res.json()
+      }
+
+      function TodoItem({ todo }: { todo: Todo }) {
+        const queryClient = useQueryClient()
+
+        const { mutate } = useMutation({
+          mutationFn: toggleTodo,
+          onSuccess: (updatedTodo) => {
+            // Natychmiastowa aktualizacja konkretnego todo w cache
+            queryClient.setQueryData<Todo>(
+              ['todos', updatedTodo.id],
+              updatedTodo
+            )
+            // Aktualizuj listę todo bez re-fetcha
+            queryClient.setQueryData<Todo[]>(['todos'], (oldTodos) =>
+              oldTodos?.map(t => t.id === updatedTodo.id ? updatedTodo : t) ?? []
+            )
+          },
+        })
+
+        return (
+          <li>
+            <input
+              type="checkbox"
+              checked={todo.completed}
+              onChange={() => mutate(todo.id)}
+            />
+            <span style={{ textDecoration: todo.completed ? 'line-through' : 'none' }}>
+              {todo.title}
+            </span>
+          </li>
+        )
+      }
+    lang: typescript
+
+  - title: mutateAsync — obsługa z async/await
+    desc: >
+      mutateAsync zwraca Promise — możesz await i obsłużyć try/catch w komponencie.
+      Przydatne gdy po mutacji chcesz nawigować lub wykonać kolejną operację.
+      mutate() połyka błędy — mutateAsync() je rzuca (obsłuż try/catch!).
+    code: |
+      import { useMutation, useQueryClient } from '@tanstack/react-query'
+      import { useNavigate } from 'react-router-dom'
+
+      interface RegisterData {
+        email:    string
+        password: string
+        name:     string
+      }
+
+      async function registerUser(data: RegisterData) {
+        const res = await fetch('/api/auth/register', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(data),
+        })
+        if (!res.ok) {
+          const err = await res.json()
+          throw new Error(err.message ?? 'Błąd rejestracji')
+        }
+        return res.json()
+      }
+
+      function RegisterForm() {
+        const navigate     = useNavigate()
+        const queryClient  = useQueryClient()
+        const [formError, setFormError] = React.useState<string | null>(null)
+
+        const { mutateAsync, isPending } = useMutation({
+          mutationFn: registerUser,
+        })
+
+        const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+          e.preventDefault()
+          setFormError(null)
+          const form = e.currentTarget
+
+          try {
+            const user = await mutateAsync({
+              email:    (form.elements.namedItem('email') as HTMLInputElement).value,
+              password: (form.elements.namedItem('password') as HTMLInputElement).value,
+              name:     (form.elements.namedItem('name') as HTMLInputElement).value,
+            })
+            // Ustaw dane użytkownika w cache od razu
+            queryClient.setQueryData(['user', 'me'], user)
+            navigate('/dashboard')
+          } catch (err) {
+            setFormError(err instanceof Error ? err.message : 'Nieznany błąd')
+          }
+        }
+
+        return (
+          <form onSubmit={handleSubmit}>
+            <input name="name"     placeholder="Imię i nazwisko" required />
+            <input name="email"    type="email" placeholder="Email" required />
+            <input name="password" type="password" placeholder="Hasło" required />
+            {formError && <p style={{ color: 'red' }}>{formError}</p>}
+            <button type="submit" disabled={isPending}>
+              {isPending ? 'Rejestrowanie...' : 'Zarejestruj się'}
+            </button>
+          </form>
+        )
+      }
+    lang: typescript
+
+  - title: Usuwanie z listy — DELETE
+    desc: >
+      Typowy wzorzec usuwania — DELETE request, potem invalidateQueries lub
+      optymistyczne usunięcie z listy przez setQueryData.
+      Przekazuj zmienne do mutate() — id usuwanego elementu.
+    code: |
+      import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
+
+      interface Comment {
+        id:     number
+        body:   string
+        postId: number
+      }
+
+      async function deleteComment(id: number): Promise<void> {
+        const res = await fetch(`/api/comments/${id}`, { method: 'DELETE' })
+        if (!res.ok) throw new Error('Błąd usuwania')
+      }
+
+      async function fetchComments(postId: number): Promise<Comment[]> {
+        return fetch(`/api/posts/${postId}/comments`).then(r => r.json())
+      }
+
+      function CommentList({ postId }: { postId: number }) {
+        const queryClient = useQueryClient()
+
+        const { data: comments } = useQuery({
+          queryKey: ['comments', postId],
+          queryFn:  () => fetchComments(postId),
+        })
+
+        const { mutate: deleteCommentMutation, isPending } = useMutation({
+          mutationFn: deleteComment,
+          onSuccess: (_, deletedId) => {
+            // Usuń z cache bez re-fetcha
+            queryClient.setQueryData<Comment[]>(
+              ['comments', postId],
+              (old) => old?.filter(c => c.id !== deletedId) ?? []
+            )
+          },
+        })
+
+        return (
+          <ul>
+            {comments?.map(comment => (
+              <li key={comment.id}>
+                <span>{comment.body}</span>
+                <button
+                  onClick={() => deleteCommentMutation(comment.id)}
+                  disabled={isPending}
+                >
+                  Usuń
+                </button>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    lang: typescript

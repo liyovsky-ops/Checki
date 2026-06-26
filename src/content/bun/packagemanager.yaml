@@ -1,0 +1,214 @@
+labels:
+  main: Bun jako Package Manager
+  mainLang: typescript
+
+intro:
+  title: Bun — najszybszy package manager
+  desc: >
+    Bun install jest 25x szybszy niż npm i 5x szybszy niż pnpm.
+    W pełni kompatybilny z npm registry — działa z package.json bez modyfikacji.
+    Zastępuje npm, yarn i pnpm — zero konfiguracji, lock file zawarty w repozytorium.
+
+items:
+  - title: bun install — szybka instalacja
+    desc: >
+      Bun install pobiera i instaluje wszystkie paczki z package.json.
+      Używa globalnego cache na dysku — kolejne instalacje są błyskawiczne.
+      Generuje bun.lockb (binarny lockfile) zamiast package-lock.json.
+    code: |
+      # Instalacja wszystkich zależności
+      bun install
+
+      # Instalacja z pominięciem devDependencies (produkcja)
+      bun install --production
+
+      # Wymuś pełną reinstalację (usuń cache)
+      bun install --frozen-lockfile  # CI — fail jeśli lockfile nieaktualny
+
+      # Instalacja zależności z cache (domyślne zachowanie)
+      # Cache: ~/.bun/install/cache/
+
+      # Statystyki — Bun wyświetla czas instalacji:
+      # bun install  (np. 127 packages installed [432ms])
+      # npm install  (te same pakiety: ~15s)
+    lang: bash
+
+  - title: bun add / remove — zarządzanie paczkami
+    desc: >
+      bun add dodaje paczki do dependencies lub devDependencies i od razu instaluje.
+      bun remove usuwa paczkę z package.json i node_modules.
+    code: |
+      # Dodaj do dependencies
+      bun add express
+      bun add zod hono
+
+      # Dodaj do devDependencies
+      bun add -d typescript @types/node
+      bun add --dev vitest
+
+      # Dodaj konkretną wersję
+      bun add react@18.2.0
+      bun add "typescript@^5.0"
+
+      # Dodaj z npm (domyślnie), GitHub lub URL
+      bun add github:sindresorhus/is
+      bun add https://github.com/user/repo
+
+      # Usuń paczkę
+      bun remove express
+      bun remove -d typescript
+
+      # Aktualizuj do najnowszej
+      bun update
+      bun update express zod  # tylko wybrane paczki
+    lang: bash
+
+  - title: bun.lockb — binarny lockfile
+    desc: >
+      Bun generuje bun.lockb zamiast package-lock.json lub yarn.lock.
+      Jest binarny — mniejszy i szybszy do parsowania. Commituj go do repozytorium.
+      Możesz podejrzeć zawartość lub wyeksportować do formatu yarn.
+    code: |
+      # Podgląd bun.lockb jako tekst (git diff friendly)
+      bun bun.lockb  # wyświetla YAML-like format
+
+      # Lub:
+      git diff HEAD bun.lockb  # Bun konwertuje do czytelnego formatu w git
+
+      # Eksport do yarn.lock (interoperability)
+      bun install --yarn
+
+      # Jeśli masz package-lock.json — Bun go przeczyta przy imporcie
+      # i wygeneruje bun.lockb:
+      bun install  # (migracja z npm — automatyczna)
+
+      # bun.lockb w .gitignore? NIE — powinien być w repo
+      # Zapewnia deterministyczne instalacje w CI i dla innych developerów
+    lang: bash
+
+  - title: bun run — uruchamianie skryptów
+    desc: >
+      bun run wykonuje skrypty z package.json lub bezpośrednio pliki TypeScript/JavaScript.
+      Szybszy cold start niż node — TypeScript natywnie bez ts-node.
+    code: |
+      // package.json
+      {
+        "scripts": {
+          "dev":   "bun run --hot src/index.ts",
+          "start": "bun run src/index.ts",
+          "build": "bun build src/index.ts --outdir ./dist",
+          "test":  "bun test",
+          "lint":  "eslint src/"
+        }
+      }
+
+      # Uruchomienie skryptów
+      bun run dev
+      bun run start
+      bun run test
+
+      # Skróty (bez "run")
+      bun dev       # odpowiednik bun run dev
+      bun start     # odpowiednik bun run start
+
+      # Bezpośrednie uruchomienie pliku TS (bez kompilacji!)
+      bun run src/migracje.ts
+      bun src/seed.ts
+
+      # Podgląd dostępnych skryptów
+      bun run  # (bez argumentów — wyświetla listę)
+    lang: bash
+
+  - title: bunx — uruchamianie CLI bez instalacji
+    desc: >
+      bunx to odpowiednik npx — uruchamia pakiety CLI bez globalnej instalacji.
+      Znacznie szybszy niż npx dzięki lokalnemu cache Bun.
+    code: |
+      # Uruchom bez instalacji
+      bunx cowsay "Witaj z Bun!"
+      bunx create-next-app@latest moja-apka
+      bunx prisma generate
+      bunx tsx src/skrypt.ts
+
+      # Wymuś konkretną wersję
+      bunx typescript@5.0 --version
+
+      # Jako lokalny odpowiednik npx w CI/CD
+      bunx jest --coverage
+      bunx eslint src/ --fix
+      bunx prettier --write .
+
+      # Różnica od npm exec:
+      # npx: ~2-5s (pobierz + uruchom)
+      # bunx: ~0.1-0.3s (cache + szybki start)
+    lang: bash
+
+  - title: .bunfig.toml — konfiguracja Bun
+    desc: >
+      .bunfig.toml to opcjonalny plik konfiguracyjny Bun — odpowiednik .npmrc lub .yarnrc.
+      Pozwala ustawić registry, scope, telemetrię i zachowanie testów.
+    code: |
+      # .bunfig.toml — w katalogu projektu lub ~/ (globalny)
+
+      # Domyślny registry npm
+      [install]
+      registry = "https://registry.npmjs.org"
+      # Lub prywatny Verdaccio/Nexus:
+      # registry = "http://localhost:4873"
+
+      # Scope-specific registry (paczki @firma/*)
+      [install.scopes]
+      "@firma" = { registry = "https://npm.firma.pl", token = "$FIRMA_TOKEN" }
+
+      # Zachowanie instalacji
+      [install]
+      auto = "auto"          # auto-install brakujących paczek
+      exact = false          # użyj ^ (caret) przy dodawaniu paczek
+      production = false     # instaluj devDependencies w dev
+
+      # Konfiguracja testów
+      [test]
+      coverage = true
+      coverageThreshold = 80
+      timeout = 10000        # 10 sekund timeout per test
+
+      # Zaufane skrypty (postinstall)
+      [install.trustedDependencies]
+      # Pakiety których skrypty postinstall są dozwolone
+    lang: toml
+
+  - title: Workspaces — monorepo
+    desc: >
+      Bun obsługuje npm workspaces dla monorepo. Wszystkie paczki workspace
+      są linkowane do node_modules/root z jednej instalacji.
+    code: |
+      // package.json (root)
+      {
+        "name": "moje-monorepo",
+        "workspaces": [
+          "packages/*",
+          "apps/*"
+        ]
+      }
+
+      // Struktura:
+      // monorepo/
+      // ├── package.json       (root)
+      // ├── bun.lockb
+      // ├── packages/
+      // │   ├── ui/            (współdzielona biblioteka UI)
+      // │   └── utils/         (współdzielone narzędzia)
+      // └── apps/
+      //     ├── web/           (aplikacja webowa)
+      //     └── api/           (backend API)
+
+      # Instalacja wszystkich workspaców
+      bun install  # jeden lock file dla całego monorepo
+
+      # Uruchomienie skryptu w konkretnym workspace
+      bun --filter="@firma/api" dev
+      bun --filter="./apps/web" build
+
+      # Dodanie paczki do konkretnego workspace
+      bun add zod --cwd packages/utils
+    lang: bash

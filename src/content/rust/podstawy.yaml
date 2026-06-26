@@ -1,0 +1,78 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Rusta?
+  firstComponent: Twój pierwszy program
+  firstComponentLang: rust
+
+intro:
+  title: Czym jest Rust?
+  desc: >
+    Rust to systemowy język programowania stworzony przez Mozilla Research (Graydon Hoare) w 2015 roku.
+    Łączy wydajność C/C++ z gwarancjami bezpieczeństwa pamięci — bez garbage collectora.
+    Używany przez Microsoft, Google, Amazon, Meta i Linux Kernel (od 2022 roku).
+    Ósmy rok z rzędu "najbardziej lubiany język" w ankiecie Stack Overflow.
+
+concepts:
+  - title: Ownership
+    desc: >
+      Każda wartość ma dokładnie jednego właściciela. Gdy właściciel wychodzi poza zakres (scope),
+      wartość jest automatycznie zwalniana. Zero garbage collectora, zero memory leaks.
+    icon: "🏠"
+  - title: Borrow Checker
+    desc: >
+      Kompilator Rusta sprawdza w czasie kompilacji czy Twoje referencje są zawsze prawidłowe.
+      Nie możesz używać wskaźnika do już zwolnionych danych — błąd use-after-free jest niemożliwy.
+    icon: "🔒"
+  - title: Zero-cost abstractions
+    desc: >
+      Traity, iteratory, generyki — piszesz elegancki kod wysokiego poziomu,
+      ale kompilator generuje tak wydajny assembly jak ręcznie pisany C. Brak overhead runtime.
+    icon: "⚡"
+  - title: Fearless Concurrency
+    desc: >
+      System typów Rusta gwarantuje brak data races w czasie kompilacji.
+      Wielowątkowy kod jest bezpieczny — kompilator nie pozwoli Ci popełnić klasycznych błędów.
+    icon: "🧵"
+
+whenToUse:
+  - Systemy operacyjne i sterowniki (kernel, embedded)
+  - Oprogramowanie WebAssembly (WASM) — najszybszy wybór
+  - Narzędzia CLI wymagające małego rozmiaru i szybkości
+  - Serwery HTTP o bardzo wysokiej wydajności (Axum, Actix-web)
+  - Silniki gier i grafika (Bevy, wgpu)
+  - Zastąpienie niebezpiecznego C/C++ w istniejących projektach
+  - Kryptografia i systemy bezpieczeństwa
+
+firstComponent: |
+  // Hello World w Rust
+  fn main() {
+      println!("Cześć, Rust! 🦀");
+  }
+
+  // Struct z implementacją
+  #[derive(Debug)]
+  struct Uzytkownik {
+      imie: String,
+      wiek: u32,
+      aktywny: bool,
+  }
+
+  impl Uzytkownik {
+      fn nowy(imie: &str, wiek: u32) -> Self {
+          Uzytkownik {
+              imie: imie.to_string(),
+              wiek,
+              aktywny: true,
+          }
+      }
+
+      fn powitanie(&self) -> String {
+          format!("Cześć, {}! Masz {} lat.", self.imie, self.wiek)
+      }
+  }
+
+  fn main() {
+      let user = Uzytkownik::nowy("Łukasz", 30);
+      println!("{}", user.powitanie());
+      println!("{:?}", user); // Debug print dzięki #[derive(Debug)]
+  }

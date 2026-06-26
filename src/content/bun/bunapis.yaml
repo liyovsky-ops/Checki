@@ -1,0 +1,254 @@
+labels:
+  main: Wbudowane API Bun
+  mainLang: typescript
+
+intro:
+  title: Bun — baterie w zestawie
+  desc: >
+    Bun dostarcza bogaty zestaw wbudowanych API bez potrzeby instalowania zewnętrznych paczek.
+    Pliki, hasła, procesy, SQLite, WebSocket — wszystko gotowe do użycia od razu.
+    Każde API jest zoptymalizowane pod kątem wydajności i napisane w Zig.
+
+items:
+  - title: Bun.file — odczyt plików
+    desc: >
+      Bun.file() zwraca obiekt BunFile — leniwe odwołanie do pliku na dysku.
+      Odczyt następuje dopiero przy wywołaniu .text(), .json(), .arrayBuffer() lub .stream().
+      Znacznie szybszy niż fs.readFile z Node.js.
+    code: |
+      // Odczyt jako tekst
+      const plik = Bun.file("./dane.txt");
+      const tekst = await plik.text();
+      console.log(tekst);
+
+      // Odczyt jako JSON
+      const config = await Bun.file("./config.json").json();
+      console.log(config.port);
+
+      // Sprawdzenie czy plik istnieje
+      const istnieje = await Bun.file("./brak.txt").exists();
+      console.log(istnieje); // false
+
+      // Strumień dla dużych plików
+      const stream = Bun.file("./duzy.log").stream();
+      for await (const chunk of stream) {
+        process(chunk);
+      }
+    lang: typescript
+
+  - title: Bun.write — zapis plików
+    desc: >
+      Bun.write() zapisuje dane do pliku — przyjmuje string, Buffer, Blob, TypedArray lub Response.
+      Automatycznie tworzy katalogi nadrzędne jeśli nie istnieją.
+    code: |
+      // Zapis stringa
+      await Bun.write("./wynik.txt", "Dane do zapisania");
+
+      // Zapis JSON
+      const dane = { imie: "Łukasz", wiek: 30 };
+      await Bun.write("./dane.json", JSON.stringify(dane, null, 2));
+
+      // Kopiowanie pliku
+      const zrodlo = Bun.file("./oryginał.png");
+      await Bun.write("./kopia.png", zrodlo);
+
+      // Zapis odpowiedzi HTTP do pliku
+      const resp = await fetch("https://api.example.com/data");
+      await Bun.write("./cache.json", resp);
+
+      // Sprawdzenie rozmiaru po zapisie
+      const plik = Bun.file("./wynik.txt");
+      console.log(await plik.size); // rozmiar w bajtach
+    lang: typescript
+
+  - title: Bun.password — hashing haseł
+    desc: >
+      Wbudowany, bezpieczny hashing haseł bez instalowania bcryptjs czy argon2.
+      Domyślnie używa algorytmu bcrypt, obsługuje też argon2id i argon2d.
+    code: |
+      // Hashowanie hasła (domyślnie bcrypt)
+      const hash = await Bun.password.hash("mojeTajneHaslo123");
+      console.log(hash);
+      // $2b$10$... (bcrypt)
+
+      // Weryfikacja hasła
+      const poprawne = await Bun.password.verify(
+        "mojeTajneHaslo123",
+        hash
+      );
+      console.log(poprawne); // true
+
+      // Użycie argon2id (zalecane dla nowych projektów)
+      const hashArgon = await Bun.password.hash("haslo", {
+        algorithm: "argon2id",
+        memoryCost: 4,   // 4 MB
+        timeCost: 3,     // 3 iteracje
+      });
+
+      const ok = await Bun.password.verify("haslo", hashArgon);
+      console.log(ok); // true
+    lang: typescript
+
+  - title: Bun.sleep — async sleep
+    desc: >
+      Prosta, wbudowana funkcja sleep zwracająca Promise. Odpowiednik setTimeout
+      w formie async/await — bez potrzeby tworzenia własnych wrapperów.
+    code: |
+      // Czekaj 1 sekundę
+      await Bun.sleep(1000);
+
+      // Czekaj 500ms
+      await Bun.sleep(500);
+
+      // Używane w retry logic
+      async function pobierzZRetry(url: string, proby = 3) {
+        for (let i = 0; i < proby; i++) {
+          try {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            return await resp.json();
+          } catch (err) {
+            if (i === proby - 1) throw err;
+            await Bun.sleep(1000 * (i + 1)); // exponential backoff
+            console.log(`Retry ${i + 1}...`);
+          }
+        }
+      }
+    lang: typescript
+
+  - title: Bun.env — zmienne środowiskowe
+    desc: >
+      Bun automatycznie ładuje plik .env bez potrzeby dotenv.
+      Bun.env to wygodny alias dla process.env z pełnym wsparciem TypeScript.
+    code: |
+      // .env (ładowany automatycznie przez Bun)
+      // DATABASE_URL=postgres://localhost/mydb
+      // PORT=3000
+      // SECRET_KEY=abc123
+
+      // Dostęp do zmiennych
+      const port = Bun.env.PORT ?? "3000";
+      const dbUrl = Bun.env.DATABASE_URL;
+
+      if (!dbUrl) {
+        throw new Error("DATABASE_URL is required");
+      }
+
+      // Bun.env === process.env — pełna kompatybilność
+      console.log(process.env.PORT); // też działa
+
+      // Pliki .env.local, .env.production też obsługiwane
+      // bun run --env-file=.env.production server.ts
+    lang: typescript
+
+  - title: Bun.spawn — procesy potomne
+    desc: >
+      Uruchamianie procesów systemowych z prostym API.
+      Obsługuje piping stdio, przekazywanie env vars i odczyt wyjścia.
+    code: |
+      // Proste uruchomienie procesu
+      const proc = Bun.spawn(["ls", "-la"]);
+      const output = await new Response(proc.stdout).text();
+      console.log(output);
+
+      // Z przekazaniem stdin
+      const proc2 = Bun.spawn(["grep", "błąd"], {
+        stdin: "linia 1\nbłąd tutaj\nlinia 3",
+        stdout: "pipe",
+      });
+      const wynik = await new Response(proc2.stdout).text();
+      console.log(wynik); // błąd tutaj
+
+      // Wykonanie shell command
+      const { stdout } = Bun.spawnSync(["git", "rev-parse", "HEAD"]);
+      const sha = Buffer.from(stdout).toString().trim();
+      console.log("Aktualny commit:", sha);
+
+      // Czekanie na zakończenie
+      await proc.exited;
+      console.log("Kod wyjścia:", proc.exitCode);
+    lang: typescript
+
+  - title: bun:sqlite — wbudowana baza SQLite
+    desc: >
+      Bun zawiera wbudowany klient SQLite bez żadnych zależności zewnętrznych.
+      Import z "bun:sqlite" — synchroniczne API, bardzo szybkie dzięki implementacji w Zig.
+    code: |
+      import { Database } from "bun:sqlite";
+
+      // Otwarcie bazy (tworzy plik jeśli nie istnieje)
+      const db = new Database("./aplikacja.db");
+
+      // Tworzenie tabeli
+      db.run(`
+        CREATE TABLE IF NOT EXISTS uzytkownicy (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          imie TEXT NOT NULL,
+          email TEXT UNIQUE NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Wstawianie danych (prepared statement)
+      const dodaj = db.prepare(
+        "INSERT INTO uzytkownicy (imie, email) VALUES (?, ?)"
+      );
+      dodaj.run("Łukasz", "lukasz@example.com");
+
+      // Pobieranie danych
+      const wszyscy = db.query("SELECT * FROM uzytkownicy").all();
+      console.log(wszyscy);
+
+      // Transakcja
+      const transakcja = db.transaction((uzytkownicy) => {
+        for (const u of uzytkownicy) dodaj.run(u.imie, u.email);
+      });
+      transakcja([
+        { imie: "Anna", email: "anna@example.com" },
+        { imie: "Piotr", email: "piotr@example.com" },
+      ]);
+
+      db.close();
+    lang: typescript
+
+  - title: WebSockets
+    desc: >
+      Bun.serve() obsługuje WebSocket natywnie — bez biblioteki ws ani socket.io.
+      Handlery upgrade, message, open i close w jednym miejscu.
+    code: |
+      const server = Bun.serve<{ uzytkownikId: string }>({
+        port: 3000,
+
+        fetch(req, server) {
+          const url = new URL(req.url);
+
+          // Upgrade do WebSocket
+          if (url.pathname === "/ws") {
+            const id = url.searchParams.get("id") ?? "anonimowy";
+            const ok = server.upgrade(req, { data: { uzytkownikId: id } });
+            if (ok) return; // upgrade udany — brak HTTP response
+            return new Response("WebSocket upgrade nieudany", { status: 400 });
+          }
+
+          return new Response("Witaj na serwerze Bun WebSocket!");
+        },
+
+        websocket: {
+          open(ws) {
+            console.log(`Połączono: ${ws.data.uzytkownikId}`);
+            ws.subscribe("broadcast"); // subskrybuj kanał
+          },
+
+          message(ws, message) {
+            console.log(`Wiadomość od ${ws.data.uzytkownikId}: ${message}`);
+            ws.publish("broadcast", `${ws.data.uzytkownikId}: ${message}`);
+          },
+
+          close(ws, code, reason) {
+            console.log(`Rozłączono: ${ws.data.uzytkownikId}`);
+          },
+        },
+      });
+
+      console.log(`WebSocket na ws://localhost:${server.port}/ws`);
+    lang: typescript

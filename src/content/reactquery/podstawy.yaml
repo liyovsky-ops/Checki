@@ -1,0 +1,131 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać TanStack Query?
+  firstComponent: Szybki start
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest TanStack Query?
+  desc: >
+    TanStack Query (dawniej React Query) to biblioteka do zarządzania stanem serwera —
+    fetching, caching, synchronizacja i aktualizacja danych asynchronicznych w aplikacjach.
+    Eliminuje setki linii boilerplate (useState + useEffect + loading + error).
+    Wersja 5.x — wsparcie dla React, Vue, Angular, Solid, Svelte.
+    Używana przez Walmart, Microsoft, Vercel, Shopify. 44k+ gwiazdek na GitHubie.
+
+concepts:
+  - title: QueryClient
+    desc: >
+      QueryClient to centralny obiekt zarządzający cache'm zapytań.
+      Tworzysz jeden na całą aplikację i opakowujesz nim drzewo komponentów.
+      Przechowuje wszystkie pobrane dane, stan loading/error, konfigurację retry.
+      Możesz przekazać defaultOptions — staleTime, retry, refetchOnWindowFocus.
+    icon: "🏛️"
+  - title: Query Keys
+    desc: >
+      Query key to unikalny identyfikator zapytania — tablica lub string.
+      ['users'] — lista, ['users', 1] — konkretny użytkownik, ['users', {status: 'active'}] — filtrowanie.
+      TanStack Query używa kluczy do cache'owania, invalidacji i współdzielenia danych między komponentami.
+      Zmiana klucza = nowe zapytanie (automatyczne re-fetch).
+    icon: "🔑"
+  - title: staleTime vs gcTime
+    desc: >
+      staleTime — jak długo dane są świeże (domyślnie 0ms). W tym czasie nie ma re-fetcha.
+      gcTime (dawniej cacheTime) — jak długo nieużywane dane trzymać w cache (domyślnie 5 minut).
+      Przykład: staleTime: 60_000 — dane ważne 1 minutę, potem odświeżane w tle.
+      gcTime: 300_000 — cache usuwany po 5 minutach od odmontowania komponentu.
+    icon: "⏱️"
+  - title: Status zapytania
+    desc: >
+      isPending — brak danych w cache, trwa pierwsze pobieranie.
+      isLoading — alias dla isPending && isFetching (stara API v4).
+      isError — zapytanie zakończyło się błędem.
+      isSuccess — dane dostępne, status === 'success'.
+      isFetching — trwa jakiekolwiek pobieranie (tle lub pierwsze).
+    icon: "📊"
+  - title: QueryClientProvider
+    desc: >
+      QueryClientProvider to React context provider — opakowuje całą aplikację.
+      Przekazuje instancję QueryClient do wszystkich komponentów.
+      Umieszcz jak najwyżej w drzewie — zwykle w main.tsx lub App.tsx.
+      Jeden provider = jeden shared cache dla całej aplikacji.
+    icon: "🌳"
+  - title: Automatyczne odświeżanie
+    desc: >
+      TanStack Query automatycznie re-fetche dane gdy: okno odzyskuje fokus (refetchOnWindowFocus),
+      komponent montuje się ponownie (refetchOnMount), sieć wraca (refetchOnReconnect).
+      Dane w tle są cicho aktualizowane — UI zawsze pokazuje świeże dane.
+      Wyłącz dla danych rzadko się zmieniających: refetchOnWindowFocus: false.
+    icon: "🔄"
+
+whenToUse:
+  - Fetching danych z API — lista produktów, profil użytkownika, posty
+  - Synchronizacja z serwerem — zawsze świeże dane bez manualnego refresh
+  - Cache z invalidacją — po mutacji odśwież powiązane zapytania
+  - Infinite scroll i paginacja — useInfiniteQuery
+  - Optimistic UI — aktualizuj UI przed odpowiedzią serwera
+  - Eliminacja boilerplate — zamiast useState/useEffect/loading/error
+
+firstComponent: |
+  // Instalacja
+  npm install @tanstack/react-query
+  npm install @tanstack/react-query-devtools  // opcjonalnie
+
+  // main.tsx — setup QueryClient i Provider
+  import React from 'react'
+  import ReactDOM from 'react-dom/client'
+  import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+  import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+  import App from './App'
+
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 60 * 1000,        // dane świeże przez 1 minutę
+        refetchOnWindowFocus: false,  // wyłącz refetch przy fokusie
+        retry: 1,                     // jeden retry przy błędzie
+      },
+    },
+  })
+
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <App />
+        <ReactQueryDevtools initialIsOpen={false} />
+      </QueryClientProvider>
+    </React.StrictMode>
+  )
+
+  // App.tsx — pierwszy useQuery
+  import { useQuery } from '@tanstack/react-query'
+
+  interface User {
+    id: number
+    name: string
+    email: string
+  }
+
+  async function fetchUsers(): Promise<User[]> {
+    const res = await fetch('https://jsonplaceholder.typicode.com/users')
+    if (!res.ok) throw new Error('Błąd pobierania użytkowników')
+    return res.json()
+  }
+
+  export default function App() {
+    const { data, isPending, isError, error } = useQuery({
+      queryKey: ['users'],
+      queryFn:  fetchUsers,
+    })
+
+    if (isPending) return <p>Ładowanie...</p>
+    if (isError)   return <p>Błąd: {error.message}</p>
+
+    return (
+      <ul>
+        {data.map(user => (
+          <li key={user.id}>{user.name} — {user.email}</li>
+        ))}
+      </ul>
+    )
+  }

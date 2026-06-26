@@ -1,0 +1,234 @@
+labels:
+  main: Tworzenie store
+  mainLang: typescript
+
+intro:
+  title: Anatomia store w Zustand
+  desc: >
+    Store w Zustand to jeden obiekt zawierający stan i akcje. create() przyjmuje
+    callback z set i get — set podmienia fragment stanu (płytki merge), get zwraca
+    aktualny stan (przydatne w async akcjach). Piszesz TypeScript interface,
+    jeden create<T>() i masz gotowy hook. Żadnych reducerów, żadnych switch-case.
+
+items:
+  - name: create() — podstawowa struktura
+    desc: create<T>() przyjmuje funkcję inicjalizującą zwracającą obiekt z stanem i akcjami. TypeScript inferencja działa automatycznie — interface T opisuje cały kształt store.
+    code: |
+      import { create } from 'zustand'
+
+      interface BearState {
+        bears:    number
+        name:     string
+        addBear:  () => void
+        setName:  (name: string) => void
+        removeAll: () => void
+      }
+
+      export const useBearStore = create<BearState>((set) => ({
+        bears: 0,
+        name:  'Panda',
+
+        addBear:   () => set((state) => ({ bears: state.bears + 1 })),
+        setName:   (name) => set({ name }),
+        removeAll: () => set({ bears: 0 }),
+      }))
+    lang: typescript
+
+  - name: set() — aktualizacja stanu
+    desc: set() wykonuje płytki merge (shallow merge) — nie musisz rozkładać całego stanu. Przekaż obiekt lub funkcję (state => newState). Funkcja daje dostęp do aktualnego stanu.
+    code: |
+      import { create } from 'zustand'
+
+      interface CartState {
+        items:      string[]
+        totalPrice: number
+        addItem:    (item: string, price: number) => void
+        clearCart:  () => void
+      }
+
+      export const useCartStore = create<CartState>((set) => ({
+        items:      [],
+        totalPrice: 0,
+
+        // Funkcja — dostęp do aktualnego stanu
+        addItem: (item, price) =>
+          set((state) => ({
+            items:      [...state.items, item],
+            totalPrice: state.totalPrice + price,
+          })),
+
+        // Obiekt — bezpośrednie nadpisanie (płytki merge)
+        clearCart: () => set({ items: [], totalPrice: 0 }),
+      }))
+    lang: typescript
+
+  - name: get() — odczyt w akcjach
+    desc: get() zwraca aktualny stan store — niezbędne w async akcjach, where stan może się zmienić między wywołaniem a resolve Promisa. Drugie argumenty callbacka obok set.
+    code: |
+      import { create } from 'zustand'
+
+      interface UserState {
+        user:       { id: string; name: string } | null
+        isLoading:  boolean
+        error:      string | null
+        fetchUser:  (id: string) => Promise<void>
+        updateName: (name: string) => void
+      }
+
+      export const useUserStore = create<UserState>((set, get) => ({
+        user:      null,
+        isLoading: false,
+        error:     null,
+
+        fetchUser: async (id) => {
+          // Sprawdź aktualny stan przed fetch
+          if (get().isLoading) return
+
+          set({ isLoading: true, error: null })
+
+          try {
+            const res  = await fetch(`/api/users/${id}`)
+            const user = await res.json()
+            set({ user, isLoading: false })
+          } catch (err) {
+            set({ error: 'Błąd pobierania użytkownika', isLoading: false })
+          }
+        },
+
+        updateName: (name) => {
+          const current = get().user
+          if (!current) return
+          set({ user: { ...current, name } })
+        },
+      }))
+    lang: typescript
+
+  - name: Async akcje
+    desc: Async akcje w Zustand wyglądają jak zwykłe async funkcje — set() możesz wywołać wielokrotnie (np. loading → success/error). Brak Thunk middleware, brak dodatkowej konfiguracji.
+    code: |
+      import { create } from 'zustand'
+
+      interface ProductState {
+        products:    Product[]
+        isLoading:   boolean
+        error:       string | null
+        fetchProducts: () => Promise<void>
+        createProduct: (data: Omit<Product, 'id'>) => Promise<void>
+      }
+
+      interface Product {
+        id:    string
+        name:  string
+        price: number
+      }
+
+      export const useProductStore = create<ProductState>((set) => ({
+        products:  [],
+        isLoading: false,
+        error:     null,
+
+        fetchProducts: async () => {
+          set({ isLoading: true, error: null })
+          try {
+            const res      = await fetch('/api/products')
+            const products = await res.json()
+            set({ products, isLoading: false })
+          } catch {
+            set({ error: 'Nie udało się pobrać produktów', isLoading: false })
+          }
+        },
+
+        createProduct: async (data) => {
+          set({ isLoading: true })
+          try {
+            const res     = await fetch('/api/products', {
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body:    JSON.stringify(data),
+            })
+            const product = await res.json()
+            // Dodaj nowy produkt do istniejącej listy
+            set((state) => ({
+              products:  [...state.products, product],
+              isLoading: false,
+            }))
+          } catch {
+            set({ error: 'Nie udało się dodać produktu', isLoading: false })
+          }
+        },
+      }))
+    lang: typescript
+
+  - name: Reset store
+    desc: Wzorzec resetu — zapisz stan początkowy poza create() i używaj go w akcji reset. Przydatne przy logout lub czyszczeniu formularzy.
+    code: |
+      import { create } from 'zustand'
+
+      interface AuthState {
+        token:    string | null
+        userId:   string | null
+        role:     'admin' | 'user' | 'guest'
+        login:    (token: string, userId: string, role: 'admin' | 'user') => void
+        logout:   () => void
+      }
+
+      // Stan początkowy poza create() — referencja do resetu
+      const initialState = {
+        token:  null,
+        userId: null,
+        role:   'guest' as const,
+      }
+
+      export const useAuthStore = create<AuthState>((set) => ({
+        ...initialState,
+
+        login: (token, userId, role) => set({ token, userId, role }),
+
+        // Reset do stanu początkowego — jeden spread
+        logout: () => set(initialState),
+      }))
+    lang: typescript
+
+  - name: Derived state — obliczany stan
+    desc: Zustand nie ma wbudowanego computed — wyliczaj w selektorze lub dodaj getter jako funkcję w store. Selektor to czysta funkcja JavaScript — brak magic.
+    code: |
+      import { create } from 'zustand'
+
+      interface TodoState {
+        todos:         { id: string; text: string; done: boolean }[]
+        addTodo:       (text: string) => void
+        toggleTodo:    (id: string) => void
+        // Getter jako akcja (dostępny w store)
+        getCompleted:  () => { id: string; text: string; done: boolean }[]
+        getPending:    () => { id: string; text: string; done: boolean }[]
+      }
+
+      export const useTodoStore = create<TodoState>((set, get) => ({
+        todos: [],
+
+        addTodo: (text) =>
+          set((state) => ({
+            todos: [
+              ...state.todos,
+              { id: crypto.randomUUID(), text, done: false },
+            ],
+          })),
+
+        toggleTodo: (id) =>
+          set((state) => ({
+            todos: state.todos.map((t) =>
+              t.id === id ? { ...t, done: !t.done } : t,
+            ),
+          })),
+
+        getCompleted: () => get().todos.filter((t) => t.done),
+        getPending:   () => get().todos.filter((t) => !t.done),
+      }))
+
+      // Użycie w komponencie — selektor wyliczający derived state
+      function TodoStats() {
+        const total     = useTodoStore((s) => s.todos.length)
+        const completed = useTodoStore((s) => s.todos.filter((t) => t.done).length)
+        return <p>{completed}/{total} ukończonych</p>
+      }
+    lang: typescript

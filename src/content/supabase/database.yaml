@@ -1,0 +1,241 @@
+labels:
+  main: Operacje na bazie danych
+  mainLang: typescript
+
+intro:
+  title: Database — PostgreSQL przez JS API
+  desc: >
+    Supabase udostępnia PostgreSQL przez fluent API w TypeScript.
+    Wszystkie operacje budują zapytania SQL pod spodem — .from('tabela') to odpowiednik FROM,
+    .select() to SELECT, .eq() to WHERE. Możesz też pisać surowe SQL przez .rpc() lub sql``.
+    Każda operacja zwraca { data, error } — zawsze sprawdzaj oba pola.
+
+items:
+  - name: SELECT — pobieranie danych
+    desc: >
+      Podstawowe pobieranie rekordów. .select('*') zwraca wszystkie kolumny,
+      możesz podać listę kolumn np. 'id, name, email'. Wynik to tablica obiektów TypeScript.
+    icon: "📖"
+    code: |
+      // Wszystkie kolumny
+      const { data, error } = await supabase
+        .from('users')
+        .select('*');
+
+      // Wybrane kolumny
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, name, email, created_at');
+
+      // Pojedynczy rekord przez .single()
+      const { data: user } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+  - name: INSERT — dodawanie rekordów
+    desc: >
+      Wstawianie nowych wierszy. Możesz wstawić jeden obiekt lub tablicę obiektów.
+      .select() na końcu zwraca wstawione rekordy — przydatne gdy baza generuje ID lub timestamps.
+    icon: "➕"
+    code: |
+      // Jeden rekord
+      const { data, error } = await supabase
+        .from('posts')
+        .insert({
+          title: 'Mój post',
+          content: 'Treść posta...',
+          user_id: supabase.auth.getUser().data.user?.id,
+        })
+        .select()
+        .single();
+
+      // Wiele rekordów naraz
+      const { data: posts } = await supabase
+        .from('posts')
+        .insert([
+          { title: 'Post 1', content: 'Treść 1' },
+          { title: 'Post 2', content: 'Treść 2' },
+        ])
+        .select();
+
+  - name: UPDATE — aktualizacja rekordów
+    desc: >
+      Aktualizacja istniejących wierszy. ZAWSZE dodawaj filtr (.eq, .in itd.) —
+      bez filtra UPDATE dotknie wszystkich wierszy w tabeli!
+    icon: "✏️"
+    code: |
+      // Aktualizuj jeden rekord po ID
+      const { data, error } = await supabase
+        .from('posts')
+        .update({ title: 'Nowy tytuł', updated_at: new Date().toISOString() })
+        .eq('id', postId)
+        .select()
+        .single();
+
+      // Aktualizuj wiele rekordów naraz
+      const { data: updated } = await supabase
+        .from('tasks')
+        .update({ status: 'completed' })
+        .in('id', [1, 2, 3]);
+
+      // UPSERT — wstaw jeśli nie istnieje, zaktualizuj jeśli istnieje
+      const { data } = await supabase
+        .from('profiles')
+        .upsert({ id: userId, username: 'nowa_nazwa' })
+        .select();
+
+  - name: DELETE — usuwanie rekordów
+    desc: >
+      Usuwanie wierszy z bazy. Jak przy UPDATE — zawsze używaj filtrów.
+      .select() na końcu zwraca usunięte rekordy.
+    icon: "🗑️"
+    code: |
+      // Usuń po ID
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId);
+
+      // Usuń i zwróć usunięte rekordy
+      const { data: deleted } = await supabase
+        .from('comments')
+        .delete()
+        .eq('post_id', postId)
+        .select();
+
+      // Usuń stare rekordy (filtr na datę)
+      const { error } = await supabase
+        .from('logs')
+        .delete()
+        .lt('created_at', '2024-01-01T00:00:00Z');
+
+  - name: Filtry — WHERE w TypeScript
+    desc: >
+      Supabase oferuje bogaty zestaw filtrów odpowiadających operatorom SQL WHERE.
+      Można łączyć wiele filtrów — działają jak AND.
+    icon: "🔍"
+    code: |
+      // .eq() — równość (= )
+      .eq('status', 'active')
+
+      // .neq() — nierówność (!= )
+      .neq('role', 'admin')
+
+      // .in() — IN (...)
+      .in('status', ['active', 'pending'])
+
+      // .like() / .ilike() — LIKE (ilike = case insensitive)
+      .ilike('name', '%jan%')
+
+      // .gte() .lte() .gt() .lt() — porównania
+      .gte('age', 18)
+      .lte('price', 100)
+
+      // .range() — między dwiema wartościami
+      .gte('created_at', '2024-01-01')
+      .lte('created_at', '2024-12-31')
+
+      // .is() — NULL check
+      .is('deleted_at', null)
+
+      // .contains() — dla tablic JSONB
+      .contains('tags', ['typescript', 'supabase'])
+
+      // or() — alternatywa
+      .or('status.eq.active,status.eq.pending')
+
+  - name: Relacje — JOIN przez select()
+    desc: >
+      Supabase rozumie relacje bazy przez klucze obce. W .select() możesz zagnieżdżać
+      nazwy powiązanych tabel — Supabase robi JOIN automatycznie. Działa dla relacji 1:1, 1:N i N:M.
+    icon: "🔗"
+    code: |
+      // Post z autorem (klucz obcy posts.user_id → users.id)
+      const { data: posts } = await supabase
+        .from('posts')
+        .select(`
+          id,
+          title,
+          created_at,
+          author:users(id, name, avatar_url)
+        `);
+      // data[0].author.name — działa!
+
+      // Post z komentarzami (1:N)
+      const { data: post } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          comments(id, content, created_at, user:users(name))
+        `)
+        .eq('id', postId)
+        .single();
+
+      // Filtrowanie na zagnieżdżonych relacjach
+      const { data } = await supabase
+        .from('posts')
+        .select('*, author:users!inner(name)')
+        .eq('users.role', 'admin');
+
+  - name: Row Level Security (RLS)
+    desc: >
+      RLS to polityki bezpieczeństwa w PostgreSQL. Włącz RLS na tabeli, potem definiuj
+      polityki kto może SELECT/INSERT/UPDATE/DELETE. auth.uid() to ID zalogowanego użytkownika.
+    icon: "🛡️"
+    code: |
+      -- Włącz RLS na tabeli (w SQL Editor w dashboardzie)
+      ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
+
+      -- Polityka: każdy może czytać posty
+      CREATE POLICY "Posty są publiczne"
+        ON posts FOR SELECT
+        USING (true);
+
+      -- Polityka: tylko właściciel może edytować swój post
+      CREATE POLICY "Właściciel edytuje post"
+        ON posts FOR UPDATE
+        USING (auth.uid() = user_id);
+
+      -- Polityka: zalogowany użytkownik może dodawać posty
+      CREATE POLICY "Zalogowani dodają posty"
+        ON posts FOR INSERT
+        WITH CHECK (auth.uid() = user_id);
+
+      -- Polityka: właściciel usuwa swój post
+      CREATE POLICY "Właściciel usuwa post"
+        ON posts FOR DELETE
+        USING (auth.uid() = user_id);
+
+  - name: Surowe SQL — .rpc() i sql``
+    desc: >
+      Gdy Query Builder nie wystarczy, możesz wywołać procedury składowane przez .rpc()
+      lub pisać surowe SQL przez tagged template literal (Supabase JS v2+).
+    icon: "⚙️"
+    code: |
+      // Wywołanie funkcji PostgreSQL przez rpc()
+      const { data } = await supabase
+        .rpc('get_posts_with_stats', {
+          p_user_id: userId,
+          p_limit: 10,
+        });
+
+      // Funkcja w PostgreSQL:
+      // CREATE FUNCTION get_posts_with_stats(p_user_id uuid, p_limit int)
+      // RETURNS TABLE(id uuid, title text, comment_count bigint) AS $$
+      //   SELECT p.id, p.title, COUNT(c.id)
+      //   FROM posts p LEFT JOIN comments c ON c.post_id = p.id
+      //   WHERE p.user_id = p_user_id
+      //   GROUP BY p.id
+      //   LIMIT p_limit;
+      // $$ LANGUAGE sql;
+
+      // Surowe SQL (Supabase JS v2 z rozszerzeniem)
+      const { data } = await supabase
+        .from('posts')
+        .select('id, title')
+        .textSearch('content', 'supabase postgresql', {
+          type: 'websearch',
+          config: 'english',
+        });

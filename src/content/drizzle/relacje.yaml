@@ -1,0 +1,244 @@
+title: Relacje i Joins w Drizzle
+
+items:
+  - name: Definiowanie relacji — relations()
+    desc: >
+      relations() to osobna funkcja do deklarowania relacji między tabelami.
+      Definiujesz one (jeden-do-jednego), many (jeden-do-wielu) po obu stronach.
+      Relations NIE wpływają na schema bazy — służą tylko do db.query API (relational queries).
+      Foreign key musisz zdefiniować osobno w tabeli.
+    code: |
+      import { pgTable, serial, text, integer } from 'drizzle-orm/pg-core'
+      import { relations } from 'drizzle-orm'
+
+      // Tabele
+      export const users = pgTable('users', {
+        id:    serial('id').primaryKey(),
+        email: text('email').notNull(),
+        name:  text('name'),
+      })
+
+      export const posts = pgTable('posts', {
+        id:       serial('id').primaryKey(),
+        title:    text('title').notNull(),
+        content:  text('content'),
+        authorId: integer('author_id').notNull(),
+      })
+
+      export const comments = pgTable('comments', {
+        id:      serial('id').primaryKey(),
+        text:    text('text').notNull(),
+        postId:  integer('post_id').notNull(),
+        userId:  integer('user_id').notNull(),
+      })
+
+      // Relacje — po stronie users
+      export const usersRelations = relations(users, ({ many }) => ({
+        posts:    many(posts),
+        comments: many(comments),
+      }))
+
+      // Relacje — po stronie posts
+      export const postsRelations = relations(posts, ({ one, many }) => ({
+        author:   one(users, {
+          fields:     [posts.authorId],
+          references: [users.id],
+        }),
+        comments: many(comments),
+      }))
+
+      // Relacje — po stronie comments
+      export const commentsRelations = relations(comments, ({ one }) => ({
+        post: one(posts, { fields: [comments.postId], references: [posts.id] }),
+        user: one(users, { fields: [comments.userId], references: [users.id] }),
+      }))
+    lang: typescript
+
+  - name: db.query API — relational queries
+    desc: >
+      db.query.users.findMany({ with: { posts: true } }) — automatyczne JOINy
+      na podstawie zdefiniowanych relations(). Możesz zagnieżdżać relacje,
+      filtrować, sortować i limitować zarówno główne wyniki jak i relacje.
+      Wymaga przekazania schema do drizzle(): drizzle(client, { schema }).
+    code: |
+      // Połączenie z schema (wymagane dla db.query)
+      import { drizzle } from 'drizzle-orm/postgres-js'
+      import postgres from 'postgres'
+      import * as schema from './schema'
+
+      const client = postgres(process.env.DATABASE_URL!)
+      export const db = drizzle(client, { schema })
+
+      // findMany z relacjami
+      const usersWithPosts = await db.query.users.findMany({
+        with: {
+          posts: true,            // załaduj wszystkie posty
+        },
+      })
+      // [{ id, email, name, posts: [{ id, title, ... }] }]
+
+      // Zagnieżdżone relacje
+      const full = await db.query.users.findMany({
+        with: {
+          posts: {
+            with: {
+              comments: true,    // posty + komentarze do postów
+            },
+          },
+        },
+      })
+
+      // Z filtrami i limitem na relacjach
+      import { eq, desc } from 'drizzle-orm'
+
+      const userWithRecentPosts = await db.query.users.findFirst({
+        where: eq(schema.users.id, userId),
+        with: {
+          posts: {
+            where:   eq(schema.posts.published, true),
+            orderBy: desc(schema.posts.createdAt),
+            limit:   5,
+            columns: { title: true, createdAt: true },  // tylko te pola
+          },
+        },
+      })
+    lang: typescript
+
+  - name: Many-to-Many z tabelą join
+    desc: >
+      Relacja wiele-do-wielu wymaga tabeli pośredniej (join table). Definiujesz
+      ją jak normalną tabelę z composite primary key. Relations definiujesz
+      przez tabelę pośrednią — many do join table, a join table ma one do obu stron.
+    code: |
+      import { pgTable, integer, text, serial, primaryKey } from 'drizzle-orm/pg-core'
+      import { relations } from 'drizzle-orm'
+
+      export const posts = pgTable('posts', {
+        id:    serial('id').primaryKey(),
+        title: text('title').notNull(),
+      })
+
+      export const tags = pgTable('tags', {
+        id:   serial('id').primaryKey(),
+        name: text('name').notNull().unique(),
+      })
+
+      // Join table
+      export const postsTags = pgTable('posts_tags', {
+        postId: integer('post_id').notNull(),
+        tagId:  integer('tag_id').notNull(),
+      }, (table) => ({
+        pk: primaryKey({ columns: [table.postId, table.tagId] }),
+      }))
+
+      // Relations przez join table
+      export const postsRelations = relations(posts, ({ many }) => ({
+        postsTags: many(postsTags),
+      }))
+
+      export const tagsRelations = relations(tags, ({ many }) => ({
+        postsTags: many(postsTags),
+      }))
+
+      export const postsTagsRelations = relations(postsTags, ({ one }) => ({
+        post: one(posts, { fields: [postsTags.postId], references: [posts.id] }),
+        tag:  "one(tags,  { fields: [postsTags.tagId],  references: [tags.id] }),"
+      }))
+
+      // Query
+      const postsWithTags = await db.query.posts.findMany({
+        with: {
+          postsTags: {
+            with: { tag: true },
+          },
+        },
+      })
+      // [{ id, title, postsTags: [{ postId, tagId, tag: { id, name } }] }]
+    lang: typescript
+
+  - name: Subqueries i CTE (WITH)
+    desc: >
+      Drizzle wspiera subqueries inline (jako wartość lub w FROM) oraz CTE (Common Table
+      Expressions) przez with(). CTE są czytelniejsze dla złożonych queries i pomagają
+      uniknąć duplikacji logiki. Oba są type-safe.
+    code: |
+      import { sql, eq, gt } from 'drizzle-orm'
+
+      // Subquery jako wartość (scalar subquery)
+      const usersWithPostCount = await db.select({
+        id:        users.id,
+        email:     users.email,
+        postCount: db.select({ count: sql<number>`count(*)` })
+                     .from(posts)
+                     .where(eq(posts.authorId, users.id))
+                     .as('post_count'),
+      }).from(users)
+
+      // CTE — with()
+      const activeUsersQuery = db.$with('active_users').as(
+        db.select().from(users).where(eq(users.active, true))
+      )
+
+      const topPosts = db.$with('top_posts').as(
+        db.select().from(posts).where(gt(posts.views, 1000))
+      )
+
+      const result = await db
+        .with(activeUsersQuery, topPosts)
+        .select({
+          userId:    activeUsersQuery.id,
+          userEmail: activeUsersQuery.email,
+          postTitle: topPosts.title,
+        })
+        .from(activeUsersQuery)
+        .innerJoin(topPosts, eq(topPosts.authorId, activeUsersQuery.id))
+    lang: typescript
+
+  - name: One-to-One i self-relation
+    desc: >
+      Relacja jeden-do-jednego — foreign key z unique constraint. Self-relation
+      pozwala modelowi odnosić się do samego siebie (drzewo kategorii, hierarchia
+      pracowników, komentarze z odpowiedziami).
+    code: |
+      import { pgTable, serial, text, integer } from 'drizzle-orm/pg-core'
+      import { relations } from 'drizzle-orm'
+
+      // One-to-One: User <-> Profile
+      export const userProfiles = pgTable('user_profiles', {
+        id:     serial('id').primaryKey(),
+        userId: integer('user_id').notNull().unique(),  // .unique() = 1:1
+        bio:    text('bio'),
+        avatar: text('avatar_url'),
+      })
+
+      export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
+        user: one(users, {
+          fields:     [userProfiles.userId],
+          references: [users.id],
+        }),
+      }))
+
+      // Self-relation: kategorie z rodzicami
+      export const categories = pgTable('categories', {
+        id:       serial('id').primaryKey(),
+        name:     text('name').notNull(),
+        parentId: integer('parent_id'),  // null = root kategoria
+      })
+
+      export const categoriesRelations = relations(categories, ({ one, many }) => ({
+        parent:   one(categories, {
+          fields:          [categories.parentId],
+          references:      [categories.id],
+          relationName:    'parent_child',
+        }),
+        children: many(categories, {
+          relationName: 'parent_child',
+        }),
+      }))
+
+      // Query — drzewko kategorii
+      const tree = await db.query.categories.findMany({
+        where: isNull(schema.categories.parentId),  // tylko root
+        with: { children: true },
+      })
+    lang: typescript

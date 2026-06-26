@@ -1,0 +1,317 @@
+labels:
+  main: Zaawansowane techniki
+  mainLang: typescript
+
+intro:
+  title: Zaawansowane funkcje TanStack Query
+  desc: >
+    TanStack Query oferuje zaawansowane wzorce poza podstawowym useQuery/useMutation.
+    useInfiniteQuery do infinite scroll i paginacji — load more bez stanu page.
+    prefetchQuery do pre-loadowania danych przed nawigacją — zero latencji.
+    Tryb Suspense — deklaratywna obsługa loading/error z React Suspense.
+    getQueryData/setQueryData do bezpośredniej manipulacji cache'm.
+
+items:
+  - title: useInfiniteQuery — infinite scroll
+    desc: >
+      useInfiniteQuery pobiera dane strona po stronie — każde wywołanie fetchNextPage
+      dodaje kolejną stronę do cache'owanej listy.
+      getNextPageParam — funkcja określająca parametr następnej strony.
+      hasNextPage: true gdy getNextPageParam zwróci wartość (nie undefined).
+      data.pages to tablica stron — flatMap żeby spłaszczyć do listy elementów.
+    code: |
+      import { useInfiniteQuery } from '@tanstack/react-query'
+      import { useInView } from 'react-intersection-observer'
+
+      interface Product {
+        id:    number
+        name:  string
+        price: number
+      }
+
+      interface ProductPage {
+        items:    Product[]
+        nextPage: number | null
+        total:    number
+      }
+
+      async function fetchProductPage(page: number): Promise<ProductPage> {
+        const res = await fetch(`/api/products?page=${page}&limit=20`)
+        if (!res.ok) throw new Error('Błąd pobierania')
+        return res.json()
+      }
+
+      function InfiniteProductList() {
+        const { ref, inView } = useInView()  // react-intersection-observer
+
+        const {
+          data,
+          fetchNextPage,
+          hasNextPage,
+          isFetchingNextPage,
+          isPending,
+        } = useInfiniteQuery({
+          queryKey:           ['products', 'infinite'],
+          queryFn:            ({ pageParam }) => fetchProductPage(pageParam),
+          initialPageParam:   1,
+          getNextPageParam:   (lastPage) => lastPage.nextPage ?? undefined,
+          // undefined → hasNextPage = false, zatrzymaj
+        })
+
+        // Auto-load gdy sentinel wejdzie w viewport
+        React.useEffect(() => {
+          if (inView && hasNextPage && !isFetchingNextPage) {
+            fetchNextPage()
+          }
+        }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage])
+
+        if (isPending) return <p>Ładowanie produktów...</p>
+
+        // Spłaszcz strony do jednej listy
+        const allProducts = data.pages.flatMap(page => page.items)
+
+        return (
+          <div>
+            <p>Łącznie: {data.pages[0].total} produktów</p>
+            <div className="product-grid">
+              {allProducts.map(product => (
+                <div key={product.id} className="product-card">
+                  <h3>{product.name}</h3>
+                  <p>{product.price} zł</p>
+                </div>
+              ))}
+            </div>
+            {/* Sentinel — trigger dla kolejnej strony */}
+            <div ref={ref}>
+              {isFetchingNextPage
+                ? <p>Ładowanie kolejnych...</p>
+                : hasNextPage
+                  ? <p>Przewiń aby załadować więcej</p>
+                  : <p>Koniec listy</p>
+              }
+            </div>
+          </div>
+        )
+      }
+    lang: typescript
+
+  - title: prefetchQuery — pre-loading danych
+    desc: >
+      prefetchQuery pobiera dane do cache przed faktycznym potrzebowaniem.
+      Wywołaj na hover linku lub przy montowaniu listy — użytkownik nie czeka.
+      Dane trafiają do cache z tym samym kluczem — useQuery je odbierze natychmiast.
+      queryClient.prefetchQuery zwraca Promise — await opcjonalne.
+    code: |
+      import { useQueryClient, useQuery } from '@tanstack/react-query'
+      import { Link } from 'react-router-dom'
+
+      interface Post {
+        id:    number
+        title: string
+        body:  string
+      }
+
+      async function fetchPost(id: number): Promise<Post> {
+        const res = await fetch(`/api/posts/${id}`)
+        if (!res.ok) throw new Error('Nie znaleziono posta')
+        return res.json()
+      }
+
+      // Lista z pre-loadingiem na hover
+      function PostList({ posts }: { posts: Post[] }) {
+        const queryClient = useQueryClient()
+
+        const prefetchPost = (id: number) => {
+          queryClient.prefetchQuery({
+            queryKey: ['posts', id],
+            queryFn:  () => fetchPost(id),
+            staleTime: 10_000,   // nie pre-fetchuj jeśli dane świeże < 10s
+          })
+        }
+
+        return (
+          <ul>
+            {posts.map(post => (
+              <li key={post.id}>
+                <Link
+                  to={`/posts/${post.id}`}
+                  onMouseEnter={() => prefetchPost(post.id)}  // pre-load na hover
+                >
+                  {post.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+
+      // Strona detalu — dane już w cache dzięki prefetchQuery
+      function PostDetail({ postId }: { postId: number }) {
+        const { data, isPending } = useQuery({
+          queryKey: ['posts', postId],
+          queryFn:  () => fetchPost(postId),
+        })
+
+        // isPending = false jeśli pre-fetch zdążył — natychmiastowe wyświetlenie
+        if (isPending) return <p>Ładowanie...</p>
+
+        return (
+          <article>
+            <h1>{data!.title}</h1>
+            <p>{data!.body}</p>
+          </article>
+        )
+      }
+    lang: typescript
+
+  - title: Suspense mode — deklaratywne loading
+    desc: >
+      useSuspenseQuery integruje z React Suspense — brak isPending/isError w komponencie.
+      Komponent zawiesza się gdy dane nie są gotowe — React Suspense renderuje fallback.
+      ErrorBoundary łapie błędy zapytań — deklaratywna obsługa błędów.
+      Upraszcza kod komponentów — data zawsze istnieje (no undefined).
+    code: |
+      import { useSuspenseQuery } from '@tanstack/react-query'
+      import { Suspense } from 'react'
+      import { ErrorBoundary } from 'react-error-boundary'
+
+      interface User {
+        id:   number
+        name: string
+        role: string
+      }
+
+      async function fetchUser(id: number): Promise<User> {
+        const res = await fetch(`/api/users/${id}`)
+        if (!res.ok) throw new Error('Użytkownik nie istnieje')
+        return res.json()
+      }
+
+      // Komponent BEZ obsługi loading/error — czyste dane
+      function UserCard({ userId }: { userId: number }) {
+        const { data: user } = useSuspenseQuery({
+          queryKey: ['user', userId],
+          queryFn:  () => fetchUser(userId),
+          // data zawsze jest User (nie User | undefined) — TypeScript wie
+        })
+
+        return (
+          <div className="user-card">
+            <h2>{user.name}</h2>
+            <span className="badge">{user.role}</span>
+          </div>
+        )
+      }
+
+      // Parent obsługuje loading i error deklaratywnie
+      function UserSection({ userId }: { userId: number }) {
+        return (
+          <ErrorBoundary
+            fallback={<div className="error">Nie można załadować użytkownika</div>}
+          >
+            <Suspense fallback={<div className="skeleton" />}>
+              <UserCard userId={userId} />
+            </Suspense>
+          </ErrorBoundary>
+        )
+      }
+    lang: typescript
+
+  - title: getQueryData i setQueryData — bezpośredni dostęp do cache
+    desc: >
+      getQueryData synchronicznie odczytuje dane z cache — bez requestu.
+      setQueryData synchronicznie zapisuje dane do cache — natychmiastowy update UI.
+      Oba działają poza komponentami (np. w event handlerach, utility functions).
+      Typ generyczny zapewnia bezpieczeństwo TypeScript.
+    code: |
+      import { useQueryClient } from '@tanstack/react-query'
+
+      interface Cart {
+        items: CartItem[]
+        total: number
+      }
+
+      interface CartItem {
+        productId: number
+        quantity:  number
+        price:     number
+      }
+
+      function useCart() {
+        const queryClient = useQueryClient()
+
+        // Odczytaj cart z cache (synchronicznie, bez fetcha)
+        const getCart = (): Cart | undefined =>
+          queryClient.getQueryData<Cart>(['cart'])
+
+        // Dodaj produkt do koszyka w cache
+        const addToCart = (item: CartItem) => {
+          queryClient.setQueryData<Cart>(['cart'], (oldCart) => {
+            if (!oldCart) return { items: [item], total: item.price * item.quantity }
+
+            const existingIdx = oldCart.items.findIndex(
+              i => i.productId === item.productId
+            )
+
+            const newItems = existingIdx >= 0
+              ? oldCart.items.map((i, idx) =>
+                  idx === existingIdx
+                    ? { ...i, quantity: i.quantity + item.quantity }
+                    : i
+                )
+              : [...oldCart.items, item]
+
+            const total = newItems.reduce((sum, i) => sum + i.price * i.quantity, 0)
+            return { items: newItems, total }
+          })
+        }
+
+        // Wyczyść koszyk
+        const clearCart = () => {
+          queryClient.setQueryData<Cart>(['cart'], { items: [], total: 0 })
+        }
+
+        return { getCart, addToCart, clearCart }
+      }
+
+      function AddToCartButton({ productId, price }: { productId: number; price: number }) {
+        const { addToCart } = useCart()
+
+        return (
+          <button onClick={() => addToCart({ productId, quantity: 1, price })}>
+            Dodaj do koszyka
+          </button>
+        )
+      }
+    lang: typescript
+
+  - title: QueryObserver i subskrypcje poza React
+    desc: >
+      QueryObserver pozwala obserwować zapytania poza komponentami React.
+      Przydatne w Zustand store, klasach serwisowych, testach integracyjnych.
+      Subskrybuj zmiany cache'u i reaguj na nie w logice biznesowej.
+    code: |
+      import { QueryClient, QueryObserver } from '@tanstack/react-query'
+
+      const queryClient = new QueryClient()
+
+      // Obserwuj zapytanie poza komponentem React
+      const observer = new QueryObserver<{ token: string }>(queryClient, {
+        queryKey: ['auth', 'session'],
+        queryFn:  () => fetch('/api/session').then(r => r.json()),
+      })
+
+      // Subskrybuj zmiany
+      const unsubscribe = observer.subscribe((result) => {
+        if (result.isSuccess) {
+          // Np. ustaw token w axios headers
+          console.log('Sesja aktywna, token:', result.data.token)
+        }
+        if (result.isError) {
+          console.log('Sesja wygasła — przekieruj na login')
+        }
+      })
+
+      // Zatrzymaj obserwację
+      // unsubscribe()
+    lang: typescript

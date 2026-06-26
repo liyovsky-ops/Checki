@@ -1,0 +1,175 @@
+title: Komendy Bun
+
+groups:
+  - name: Instalacja i setup
+    icon: "🚀"
+    commands:
+      - cmd: curl -fsSL https://bun.sh/install | bash
+        desc: Zainstaluj Bun (Linux/macOS)
+        detail:
+          what: Pobiera i instaluje najnowszą wersję Bun. Dodaje bun do PATH automatycznie.
+          how: Instalator wykrywa architekturę (x64/arm64) i pobiera odpowiedni binarny.
+          tips:
+            - "bun upgrade — zaktualizuj Bun do najnowszej wersji"
+            - "Windows: powershell -c 'irm bun.sh/install.ps1 | iex'"
+            - "bun --version — sprawdź wersję po instalacji"
+      - cmd: bun upgrade
+        desc: Zaktualizuj Bun do najnowszej wersji
+        detail:
+          what: Pobiera i zastępuje aktualny binarny Bun najnowszą wersją.
+          how: Bez potrzeby npm install -g bun — Bun aktualizuje samego siebie.
+          tips:
+            - "bun upgrade --canary — wersja canary (bleeding edge)"
+            - "Sprawdź changelog: github.com/oven-sh/bun/releases"
+      - cmd: bun init
+        desc: Utwórz nowy projekt Bun (interaktywny wizard)
+        detail:
+          what: Tworzy package.json, index.ts, tsconfig.json i .gitignore w bieżącym katalogu.
+          how: Zadaje pytania o nazwę projektu i entry point. Zero zewnętrznych zależności do startu.
+          tips:
+            - "bun init -y — pomiń pytania, użyj domyślnych wartości"
+            - "Generuje tsconfig.json gotowy pod Bun (compilerOptions.types: [bun-types])"
+
+  - name: Package Manager
+    icon: "📦"
+    commands:
+      - cmd: bun install
+        desc: Zainstaluj wszystkie zależności z package.json
+        detail:
+          what: Czyta package.json i instaluje wszystkie zależności. 25x szybszy niż npm install.
+          how: Używa globalnego cache (~/.bun/install/cache). Generuje/aktualizuje bun.lockb.
+          tips:
+            - "bun install --production — pomiń devDependencies"
+            - "bun install --frozen-lockfile — fail jeśli bun.lockb byłby zmieniony (CI)"
+            - "bun install --no-save — nie aktualizuj package.json"
+      - cmd: bun add <paczka>
+        desc: Dodaj nową zależność
+        detail:
+          what: Instaluje paczkę i dodaje ją do dependencies w package.json.
+          how: Automatycznie aktualizuje bun.lockb po instalacji.
+          tips:
+            - "bun add -d <paczka> — dodaj do devDependencies"
+            - "bun add <paczka>@1.2.3 — konkretna wersja"
+            - "bun add github:user/repo — bezpośrednio z GitHub"
+      - cmd: bun remove <paczka>
+        desc: Usuń zależność
+        detail:
+          what: Usuwa paczkę z node_modules i package.json.
+          how: Aktualizuje bun.lockb po usunięciu.
+          tips:
+            - "bun remove -d <paczka> — usuń devDependency"
+      - cmd: bun update
+        desc: Zaktualizuj zależności do najnowszych wersji
+        detail:
+          what: Aktualizuje wszystkie paczki do najnowszych wersji zgodnych z semver z package.json.
+          how: Respektuje ograniczenia semver (^ i ~). Aktualizuje bun.lockb.
+          tips:
+            - "bun update express zod — aktualizuj tylko wybrane paczki"
+            - "Sprawdź co się zmieni: bun outdated (od Bun 1.1)"
+
+  - name: Uruchamianie kodu
+    icon: "▶️"
+    commands:
+      - cmd: bun run <plik.ts>
+        desc: Uruchom plik TypeScript/JavaScript bezpośrednio
+        detail:
+          what: Wykonuje plik TypeScript bez kompilacji — typy są stripowane w locie.
+          how: Bun parsuje TypeScript szybciej niż ts-node używając własnego transpilera.
+          tips:
+            - "bun run index.ts — odpowiednik node index.js (ale TypeScript!)"
+            - "Nie potrzebujesz tsc, ts-node ani tsx"
+            - "bun ./src/index.ts — możesz pominąć 'run'"
+      - cmd: bun run --hot <plik.ts>
+        desc: Uruchom z hot reload (bez restartu procesu)
+        detail:
+          what: Przeładowuje moduły po zmianie pliku bez restartu całego procesu — zachowuje stan.
+          how: Hot reload jest szybszy niż --watch bo nie restartuje procesu, tylko podmienia moduły.
+          tips:
+            - "Idealny dla serwerów HTTP — zachowuje połączenia WebSocket"
+            - "bun --hot server.ts — 'run' jest opcjonalne"
+            - "Stan globalny jest zachowany między reloadami (uwaga: może powodować wycieki)"
+      - cmd: bun run --watch <plik.ts>
+        desc: Uruchom z restart przy zmianie pliku
+        detail:
+          what: Restartuje cały proces po wykryciu zmiany w plikach — pełny reset stanu.
+          how: Monitoruje pliki i uruchamia bun run od nowa przy każdej zmianie.
+          tips:
+            - "Bezpieczniejszy niż --hot jeśli zależy Ci na czystym stanie"
+            - "bun --watch test.ts — przydatne do skryptów jednorazowych"
+      - cmd: bun run <skrypt>
+        desc: Uruchom skrypt z package.json
+        detail:
+          what: Wykonuje skrypt zdefiniowany w sekcji scripts w package.json.
+          how: Bun wyszukuje skrypt po nazwie i wykonuje go w powłoce.
+          tips:
+            - "bun dev — skrót dla bun run dev (jeśli skrypt 'dev' istnieje)"
+            - "bun run — (bez argumentu) wyświetla listę dostępnych skryptów"
+
+  - name: Testing i Build
+    icon: "🧪"
+    commands:
+      - cmd: bun test
+        desc: Uruchom wszystkie testy (kompatybilne z Jest)
+        detail:
+          what: Szuka plików *.test.ts, *.spec.ts i __tests__/*.ts, uruchamia wszystkie.
+          how: Wbudowany test runner — bez Jest, Vitest ani innych zewnętrznych narzędzi.
+          tips:
+            - "bun test --watch — tryb watch (restartuje przy zmianach)"
+            - "bun test --coverage — raport pokrycia kodu"
+            - "bun test src/user.test.ts — konkretny plik"
+            - "bun test --test-name-pattern 'UserRepository' — filtr nazw"
+      - cmd: bun build <entry> --outdir <dir>
+        desc: Zbundluj projekt do katalogu docelowego
+        detail:
+          what: Kompiluje i bundluje TypeScript/JavaScript — zastępstwo esbuild/Rollup dla backendu.
+          how: Minifikacja, tree-shaking, code splitting — wszystko wbudowane.
+          tips:
+            - "bun build src/index.ts --outdir dist --minify — z minifikacją"
+            - "bun build src/index.ts --outdir dist --target node — dla Node.js runtime"
+            - "bun build src/cli.ts --compile --outfile my-tool — standalone executable!"
+      - cmd: bun build --compile <entry> --outfile <plik>
+        desc: Stwórz standalone executable (bez Node/Bun wymaganego)
+        detail:
+          what: Kompiluje aplikację do pojedynczego pliku binarnego — zawiera runtime Bun wewnątrz.
+          how: Plik binarny działa na systemach bez zainstalowanego Bun ani Node.js.
+          tips:
+            - "Cross-compilation: --target bun-linux-x64 / bun-windows-x64 / bun-darwin-arm64"
+            - "Idealny do dystrybucji narzędzi CLI"
+
+  - name: Narzędzia
+    icon: "🔧"
+    commands:
+      - cmd: bunx <paczka>
+        desc: Uruchom paczkę CLI bez instalowania (jak npx)
+        detail:
+          what: Pobiera i uruchamia CLI narzędzie jednorazowo — bez globalnej instalacji.
+          how: Używa globalnego cache Bun — po pierwszym pobraniu uruchamia natychmiast.
+          tips:
+            - "bunx prisma generate — szybszy niż npx prisma generate"
+            - "bunx create-next-app@latest — tworzenie projektu Next.js"
+            - "bunx cowsay 'Bun is fast!' — ważne narzędzie enterprise"
+      - cmd: bun repl
+        desc: Interaktywna konsola JavaScript/TypeScript
+        detail:
+          what: Uruchamia interaktywną konsolę (REPL) — możesz testować kod Bun API na żywo.
+          how: Pełne wsparcie TypeScript i Bun API w REPL — fetch, Bun.file, bun:sqlite działają.
+          tips:
+            - "Wyjście: .exit lub Ctrl+C dwukrotnie"
+            - "Historia komend zachowana między sesjami"
+      - cmd: bun pm ls
+        desc: Wylistuj zainstalowane paczki
+        detail:
+          what: Wyświetla drzewo zależności — wszystkie zainstalowane paczki i ich wersje.
+          how: Czyta node_modules i bun.lockb.
+          tips:
+            - "bun pm ls --all — pokaż pełne drzewo z zależnościami zależności"
+            - "bun pm cache rm — wyczyść globalny cache Bun"
+      - cmd: bun create <template>
+        desc: Utwórz projekt z szablonu
+        detail:
+          what: Tworzy nowy projekt na podstawie szablonu z npm lub GitHub.
+          how: Pobiera szablon i inicjalizuje projekt w bieżącym katalogu.
+          tips:
+            - "bun create elysia my-api — projekt ElysiaJS"
+            - "bun create hono my-app — projekt Hono"
+            - "bun create next my-next-app — projekt Next.js"

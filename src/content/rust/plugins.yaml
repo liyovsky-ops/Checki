@@ -1,0 +1,205 @@
+title: Ekosystem Rust (crates.io)
+
+items:
+  - name: Axum
+    desc: >
+      Nowoczesny web framework na Tokio i Tower. Makroless routing, ekstraktory typowane,
+      middleware przez Tower layers. Najlepszy wybór dla nowych projektów API.
+    icon: "🚀"
+    code: |
+      # Cargo.toml
+      axum = "0.7"
+      tokio = { version = "1", features = ["full"] }
+      serde_json = "1"
+
+      # Przykład routera
+      let app = Router::new()
+          .route("/", get(index))
+          .route("/users/:id", get(get_user).delete(delete_user))
+          .route("/users", post(create_user))
+          .layer(TraceLayer::new_for_http());
+
+  - name: Actix-web
+    desc: >
+      Najszybszy web framework na świecie w benchmarkach TechEmpower.
+      Aktor-based, bardzo dojrzały, ogromny ekosystem middleware. Dobry dla wydajności ekstremalnej.
+    icon: "⚡"
+    code: |
+      # Cargo.toml
+      actix-web = "4"
+
+      use actix_web::{web, App, HttpServer, HttpResponse};
+
+      async fn hello() -> HttpResponse {
+          HttpResponse::Ok().body("Hello!")
+      }
+
+      HttpServer::new(|| {
+          App::new()
+              .route("/", web::get().to(hello))
+      })
+      .bind("127.0.0.1:8080")?
+      .run()
+      .await
+
+  - name: Tokio
+    desc: >
+      De facto standardowy async runtime dla Rusta. Wielowątkowy scheduler, async I/O (epoll/kqueue),
+      timery, kanały, synchronizacja. Fundament większości async crates.
+    icon: "🔄"
+    code: |
+      # Cargo.toml
+      tokio = { version = "1", features = ["full"] }
+
+      # Najważniejsze features:
+      # full — wszystko (development)
+      # rt-multi-thread — wielowątkowy scheduler
+      # net — async TCP/UDP
+      # fs — async filesystem
+      # sync — Mutex, RwLock, channels
+      # time — sleep, interval, timeout
+
+      #[tokio::main]
+      async fn main() {
+          let (tx, mut rx) = tokio::sync::mpsc::channel(100);
+          tokio::spawn(async move { tx.send("wiadomość").await.unwrap(); });
+          println!("{}", rx.recv().await.unwrap());
+      }
+
+  - name: serde + serde_json
+    desc: >
+      Serialization/deserialization framework — absolutnie niezbędny w każdym projekcie Rust.
+      Zero-cost: generuje optymalny kod w czasie kompilacji. Obsługuje JSON, TOML, YAML, MessagePack i więcej.
+    icon: "📦"
+    code: |
+      # Cargo.toml
+      serde = { version = "1", features = ["derive"] }
+      serde_json = "1"
+
+      use serde::{Deserialize, Serialize};
+
+      #[derive(Debug, Serialize, Deserialize)]
+      struct Uzytkownik {
+          id: u32,
+          imie: String,
+          #[serde(skip_serializing_if = "Option::is_none")]
+          email: Option<String>,
+          #[serde(rename = "createdAt")]
+          utworzono: String,
+      }
+
+      // Serializacja do JSON
+      let json = serde_json::to_string(&user)?;
+      // Deserializacja z JSON
+      let user: Uzytkownik = serde_json::from_str(&json)?;
+
+  - name: sqlx
+    desc: >
+      Async SQL toolkit z weryfikacją zapytań w czasie kompilacji (!). Obsługuje PostgreSQL, MySQL, SQLite.
+      Makro query! sprawdza SQL i typy kolumn podczas kompilacji — zero runtime SQL errors.
+    icon: "🗄️"
+    code: |
+      # Cargo.toml
+      sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "macros"] }
+
+      use sqlx::PgPool;
+
+      let pool = PgPool::connect("postgres://user:pass@localhost/db").await?;
+
+      // Kompilator sprawdza SQL i typy!
+      let users = sqlx::query!(
+          "SELECT id, imie, email FROM users WHERE aktywny = $1",
+          true
+      )
+      .fetch_all(&pool)
+      .await?;
+
+      for user in users {
+          println!("{}: {}", user.id, user.imie);
+      }
+
+  - name: clap
+    desc: >
+      Command Line Argument Parser — standard dla CLI w Rust. Derive API: opisujesz strukturę
+      przez atrybuty, clap generuje parser, help, completion shell i weryfikację.
+    icon: "💻"
+    code: |
+      # Cargo.toml
+      clap = { version = "4", features = ["derive"] }
+
+      use clap::{Parser, Subcommand};
+
+      #[derive(Parser)]
+      #[command(name = "moje-cli", version, about = "Moja aplikacja CLI")]
+      struct Cli {
+          #[arg(short, long)]
+          verbose: bool,
+
+          #[command(subcommand)]
+          komenda: Komendy,
+      }
+
+      #[derive(Subcommand)]
+      enum Komendy {
+          /// Uruchom serwer
+          Serve { #[arg(short, long, default_value = "3000")] port: u16 },
+          /// Sprawdź konfigurację
+          Check,
+      }
+
+      let cli = Cli::parse();
+
+  - name: wasm-bindgen + wasm-pack
+    desc: >
+      Rust kompiluje do WebAssembly — najszybszy i najmniejszy WASM na rynku.
+      wasm-bindgen generuje bindings JS<->Rust. wasm-pack buduje pakiet npm gotowy do użycia.
+    icon: "🌐"
+    code: |
+      # Cargo.toml
+      [lib]
+      crate-type = ["cdylib"]
+
+      [dependencies]
+      wasm-bindgen = "0.2"
+
+      use wasm_bindgen::prelude::*;
+
+      #[wasm_bindgen]
+      pub fn fibonacci(n: u32) -> u32 {
+          match n {
+              0 => 0,
+              1 => 1,
+              _ => fibonacci(n - 1) + fibonacci(n - 2),
+          }
+      }
+
+      # Build:
+      # wasm-pack build --target web
+      # Potem w JS:
+      # import { fibonacci } from './pkg/moja_lib.js';
+      # console.log(fibonacci(40)); // Ultra szybko!
+
+  - name: rayon
+    desc: >
+      Data parallelism bez wysiłku — zamień .iter() na .par_iter() i Twój kod działa
+      na wszystkich rdzeniach CPU. Zero deadlocks — Rust ownership gwarantuje bezpieczeństwo.
+    icon: "🚄"
+    code: |
+      # Cargo.toml
+      rayon = "1"
+
+      use rayon::prelude::*;
+
+      fn main() {
+          let dane: Vec<i64> = (1..=1_000_000).collect();
+
+          // Zamiast .iter() — .par_iter() = wszystkie rdzenie CPU!
+          let suma: i64 = dane.par_iter().sum();
+          println!("Suma: {}", suma);
+
+          let kwadraty: Vec<i64> = dane.par_iter()
+              .map(|&x| x * x)
+              .filter(|&x| x % 3 == 0)
+              .collect();
+          println!("Liczba kwadratów podzielnych przez 3: {}", kwadraty.len());
+      }

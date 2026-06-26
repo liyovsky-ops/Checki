@@ -1,0 +1,239 @@
+labels:
+  main: Subskrypcje Real-time
+  mainLang: typescript
+
+intro:
+  title: Realtime — live updates z PostgreSQL
+  desc: >
+    Supabase Realtime pozwala nasłuchiwać zmian w bazie danych przez WebSocket.
+    Bazuje na PostgreSQL logical replication — gdy wiersz zostanie INSERT/UPDATE/DELETE,
+    Supabase emituje event do wszystkich nasłuchujących klientów. Oprócz zmian bazy
+    dostępny jest Broadcast (wysyłanie wiadomości między klientami przez serwer)
+    i Presence (śledzenie kto jest online w kanale). Idealne do czatów, kolaboracji,
+    powiadomień live, tablic kanban, gier wieloosobowych.
+
+items:
+  - name: postgres_changes — nasłuchiwanie zmian bazy
+    desc: >
+      Podstawowy use case: reaguj na INSERT/UPDATE/DELETE w tabeli PostgreSQL.
+      Wymaga włączenia Realtime dla tabeli w dashboardzie (lub przez ALTER PUBLICATION).
+      RLS chroni dane — użytkownik zobaczy tylko eventy dla wierszy do których ma dostęp.
+    icon: "🐘"
+    code: |
+      // Nasłuchuj wszystkich INSERT w tabeli messages
+      const channel = supabase
+        .channel('messages-inserts')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',          // INSERT | UPDATE | DELETE | *
+            schema: 'public',
+            table: 'messages',
+          },
+          (payload) => {
+            console.log('Nowa wiadomość:', payload.new);
+            // payload.new — nowy wiersz (dla INSERT i UPDATE)
+            // payload.old — stary wiersz (dla UPDATE i DELETE)
+          }
+        )
+        .subscribe();
+
+      // Filtrowanie — tylko wiadomości w konkretnym pokoju
+      const channel = supabase
+        .channel('room-messages')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',               // Wszystkie eventy
+            schema: 'public',
+            table: 'messages',
+            filter: `room_id=eq.${roomId}`,
+          },
+          (payload) => {
+            if (payload.eventType === 'INSERT') {
+              setMessages(prev => [...prev, payload.new as Message]);
+            }
+            if (payload.eventType === 'DELETE') {
+              setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+            }
+          }
+        )
+        .subscribe();
+
+  - name: Kompletny czat real-time w React
+    desc: >
+      Przykład pełnego czatu — inicjalne ładowanie wiadomości, subskrypcja na nowe,
+      wysyłanie wiadomości przez INSERT do bazy. Realtime + baza = jedno źródło prawdy.
+    icon: "💬"
+    code: |
+      import { useEffect, useState, useRef } from 'react';
+      import type { RealtimeChannel } from '@supabase/supabase-js';
+
+      interface Message {
+        id: string;
+        content: string;
+        user_id: string;
+        created_at: string;
+        user: { name: string };
+      }
+
+      function ChatRoom({ roomId }: { roomId: string }) {
+        const [messages, setMessages] = useState<Message[]>([]);
+        const channelRef = useRef<RealtimeChannel | null>(null);
+
+        useEffect(() => {
+          // 1. Załaduj historię wiadomości
+          supabase
+            .from('messages')
+            .select('*, user:profiles(name)')
+            .eq('room_id', roomId)
+            .order('created_at', { ascending: true })
+            .then(({ data }) => setMessages(data ?? []));
+
+          // 2. Subskrybuj nowe wiadomości
+          channelRef.current = supabase
+            .channel(`room:${roomId}`)
+            .on('postgres_changes', {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'messages',
+              filter: `room_id=eq.${roomId}`,
+            }, (payload) => {
+              setMessages(prev => [...prev, payload.new as Message]);
+            })
+            .subscribe();
+
+          // 3. Cleanup przy unmount
+          return () => {
+            channelRef.current?.unsubscribe();
+          };
+        }, [roomId]);
+
+        const sendMessage = async (content: string) => {
+          await supabase.from('messages').insert({
+            room_id: roomId,
+            content,
+            user_id: (await supabase.auth.getUser()).data.user?.id,
+          });
+          // Nie aktualizuj state ręcznie — Realtime dostarczy INSERT event
+        };
+
+        return (
+          <div>
+            {messages.map(m => (
+              <div key={m.id}>
+                <strong>{m.user?.name}</strong>: {m.content}
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+  - name: Broadcast — wiadomości między klientami
+    desc: >
+      Broadcast pozwala wysyłać dowolne wiadomości między klientami przez serwer Supabase —
+      bez zapisywania do bazy. Idealne do kursora myszy w kolaboracji, tymczasowych zdarzeń,
+      wskaźników "użytkownik pisze...".
+    icon: "📡"
+    code: |
+      // Kanał Broadcast
+      const channel = supabase.channel('live-cursor', {
+        config: {
+          broadcast: { self: true },  // Otrzymuj własne wiadomości
+        },
+      });
+
+      // Nasłuchuj wiadomości typu 'cursor'
+      channel.on('broadcast', { event: 'cursor' }, ({ payload }) => {
+        updateCursorPosition(payload.userId, payload.x, payload.y);
+      });
+
+      channel.subscribe();
+
+      // Wysyłaj pozycję kursora (throttled)
+      document.addEventListener('mousemove', (e) => {
+        channel.send({
+          type: 'broadcast',
+          event: 'cursor',
+          payload: {
+            userId: currentUser.id,
+            x: e.clientX,
+            y: e.clientY,
+          },
+        });
+      });
+
+  - name: Presence — kto jest online
+    desc: >
+      Presence śledzi kto aktualnie jest w kanale. Gdy użytkownik dołącza lub wychodzi,
+      wszyscy w kanale dostają aktualizację. Idealne do "5 osób ogląda ten produkt",
+      aktywnych użytkowników w dokumencie, listy online w czacie.
+    icon: "👥"
+    code: |
+      const channel = supabase.channel('online-users');
+
+      // Nasłuchuj zmian Presence
+      channel
+        .on('presence', { event: 'sync' }, () => {
+          // Cały aktualny stan online użytkowników
+          const state = channel.presenceState();
+          const users = Object.values(state).flat() as OnlineUser[];
+          setOnlineUsers(users);
+        })
+        .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+          console.log('Dołączył:', newPresences);
+        })
+        .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+          console.log('Wyszedł:', leftPresences);
+        })
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            // Zadeklaruj swoją obecność
+            await channel.track({
+              userId: currentUser.id,
+              name: currentUser.name,
+              avatar: currentUser.avatar_url,
+              online_at: new Date().toISOString(),
+            });
+          }
+        });
+
+      // Cleanup — Supabase automatycznie usuwa Presence przy unsubscribe
+      return () => channel.unsubscribe();
+
+  - name: unsubscribe i zarządzanie kanałami
+    desc: >
+      Zawsze odsubskrybuj kanały przy unmount komponentu — wyciek subskrypcji spowalnia aplikację.
+      Możesz też usunąć wszystkie kanały naraz przez removeAllChannels().
+    icon: "🔌"
+    code: |
+      // Odsubskrybuj konkretny kanał
+      const channel = supabase.channel('my-channel');
+      channel.subscribe();
+
+      // Przy unmount (useEffect cleanup)
+      return () => {
+        channel.unsubscribe();
+        // lub:
+        supabase.removeChannel(channel);
+      };
+
+      // Usuń wszystkie kanały (np. przy wylogowaniu)
+      await supabase.removeAllChannels();
+
+      // Sprawdź status kanału
+      const channels = supabase.getChannels();
+      console.log('Aktywne kanały:', channels.length);
+
+      // Status subskrypcji w callback
+      channel.subscribe((status, error) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Połączono z kanałem');
+        }
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Błąd kanału:', error);
+        }
+        if (status === 'TIMED_OUT') {
+          console.warn('Timeout połączenia');
+        }
+      });

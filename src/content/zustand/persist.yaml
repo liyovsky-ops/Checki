@@ -1,0 +1,245 @@
+labels:
+  main: Persist i Devtools
+  mainLang: typescript
+
+intro:
+  title: Persist — stan przeżywający odświeżenie strony
+  desc: >
+    persist() to wbudowany middleware Zustand do persystowania stanu w localStorage,
+    sessionStorage lub dowolnym custom storage (IndexedDB, AsyncStorage React Native).
+    partialize() pozwala zapisywać tylko wybrane pola — nie persystuj tokenów, nie persystuj
+    loading states. onRehydrateStorage() daje callback po przywróceniu stanu z pamięci.
+    Devtools() podłącza Redux DevTools Extension — debug, time travel, inspekcja akcji.
+
+items:
+  - name: persist — podstawowy setup
+    desc: persist() wrappuje store i automatycznie zapisuje stan do localStorage po każdej zmianie. Przy inicjalizacji odczytuje i rehydruje. Klucz name musi być unikalny w skali aplikacji.
+    code: |
+      import { create }   from 'zustand'
+      import { persist }  from 'zustand/middleware'
+
+      interface ThemeState {
+        theme:        'light' | 'dark' | 'system'
+        fontSize:     'sm' | 'md' | 'lg'
+        sidebarWidth: number
+        setTheme:     (theme: ThemeState['theme'])    => void
+        setFontSize:  (size: ThemeState['fontSize'])  => void
+        setSidebarWidth: (width: number)              => void
+      }
+
+      export const useThemeStore = create<ThemeState>()(
+        persist(
+          (set) => ({
+            theme:        'system',
+            fontSize:     'md',
+            sidebarWidth: 240,
+
+            setTheme:        (theme)        => set({ theme }),
+            setFontSize:     (fontSize)     => set({ fontSize }),
+            setSidebarWidth: (sidebarWidth) => set({ sidebarWidth }),
+          }),
+          {
+            name: 'theme-settings',  // Klucz w localStorage
+            // Domyślnie: localStorage. Inne opcje — patrz niżej.
+          }
+        )
+      )
+    lang: typescript
+
+  - name: partialize — persystuj tylko wybrane pola
+    desc: partialize() filtruje które pola trafiają do storage. Kluczowe — nie persystuj tokenów auth (bezpieczeństwo), stanów loading, error, ani tymczasowych danych UI. Tylko to, co ma sens między sesjami.
+    code: |
+      import { create }   from 'zustand'
+      import { persist }  from 'zustand/middleware'
+
+      interface UserPrefsState {
+        // Persystowane — ustawienia użytkownika
+        language:     'pl' | 'en'
+        notifications: boolean
+        compactMode:  boolean
+
+        // NIE persystowane — stan sesji
+        isLoading:    boolean
+        error:        string | null
+        lastActivity: Date | null
+
+        setLanguage:      (lang: UserPrefsState['language']) => void
+        setNotifications: (enabled: boolean)                 => void
+        setCompactMode:   (compact: boolean)                 => void
+        setLoading:       (loading: boolean)                 => void
+      }
+
+      export const useUserPrefsStore = create<UserPrefsState>()(
+        persist(
+          (set) => ({
+            language:      'pl',
+            notifications: true,
+            compactMode:   false,
+            isLoading:     false,
+            error:         null,
+            lastActivity:  null,
+
+            setLanguage:      (language)      => set({ language }),
+            setNotifications: (notifications) => set({ notifications }),
+            setCompactMode:   (compactMode)   => set({ compactMode }),
+            setLoading:       (isLoading)     => set({ isLoading }),
+          }),
+          {
+            name: 'user-preferences',
+            // Tylko te pola trafią do localStorage
+            partialize: (state) => ({
+              language:      state.language,
+              notifications: state.notifications,
+              compactMode:   state.compactMode,
+            }),
+          }
+        )
+      )
+    lang: typescript
+
+  - name: sessionStorage i custom storage
+    desc: Domyślnie persist używa localStorage. Zmień na sessionStorage (tab-only), lub zdefiniuj custom storage — np. IndexedDB dla dużych danych, AsyncStorage w React Native.
+    code: |
+      import { create }             from 'zustand'
+      import { persist, createJSONStorage } from 'zustand/middleware'
+
+      // === sessionStorage — stan na czas zakładki ===
+      export const useSessionStore = create<{ token: string | null; setToken: (t: string) => void }>()(
+        persist(
+          (set) => ({
+            token:    null,
+            setToken: (token) => set({ token }),
+          }),
+          {
+            name:    'session-data',
+            storage: createJSONStorage(() => sessionStorage),  // Zakładka = reset
+          }
+        )
+      )
+
+      // === Custom storage — IndexedDB przez idb-keyval ===
+      import { get, set as idbSet, del } from 'idb-keyval'
+
+      const idbStorage = {
+        getItem: async (name: string) => {
+          const value = await get(name)
+          return value ?? null
+        },
+        setItem: async (name: string, value: string) => {
+          await idbSet(name, value)
+        },
+        removeItem: async (name: string) => {
+          await del(name)
+        },
+      }
+
+      export const useLargeDataStore = create<{ data: unknown[] }>()(
+        persist(
+          (set) => ({ data: [] }),
+          {
+            name:    'large-dataset',
+            storage: createJSONStorage(() => idbStorage),
+          }
+        )
+      )
+    lang: typescript
+
+  - name: onRehydrateStorage — callback po rehydracji
+    desc: onRehydrateStorage() wywołuje się gdy Zustand skończy wczytywać stan z storage. Użyj do ustawienia flagi _hasHydrated — blokuj UI zanim store jest gotowy (problem SSR/Next.js).
+    code: |
+      import { create }  from 'zustand'
+      import { persist } from 'zustand/middleware'
+
+      interface AuthState {
+        token:         string | null
+        _hasHydrated:  boolean
+        setToken:      (token: string | null) => void
+        setHasHydrated:(state: boolean)       => void
+      }
+
+      export const useAuthStore = create<AuthState>()(
+        persist(
+          (set) => ({
+            token:        null,
+            _hasHydrated: false,
+
+            setToken:       (token)  => set({ token }),
+            setHasHydrated: (state)  => set({ _hasHydrated: state }),
+          }),
+          {
+            name: 'auth',
+            partialize: (s) => ({ token: s.token }),
+            onRehydrateStorage: () => (state) => {
+              // Wywołuje się po zakończeniu rehydracji
+              state?.setHasHydrated(true)
+            },
+          }
+        )
+      )
+
+      // Komponent czekający na hydration (Next.js / SSR)
+      function ProtectedRoute({ children }: { children: React.ReactNode }) {
+        const hasHydrated = useAuthStore((s) => s._hasHydrated)
+        const token       = useAuthStore((s) => s.token)
+
+        if (!hasHydrated) return <div>Ładowanie...</div>
+        if (!token)       return <Navigate to="/login" />
+        return <>{children}</>
+      }
+    lang: typescript
+
+  - name: devtools — Redux DevTools Extension
+    desc: devtools() middleware podłącza Redux DevTools w przeglądarce. Widzisz każdą akcję z nazwą, możesz cofać stan (time travel debugging), eksportować historię. Wyłącz w produkcji.
+    code: |
+      import { create }   from 'zustand'
+      import { devtools } from 'zustand/middleware'
+
+      interface CartState {
+        items:      { id: string; name: string; qty: number; price: number }[]
+        addItem:    (item: Omit<CartState['items'][0], 'qty'>) => void
+        updateQty:  (id: string, qty: number) => void
+        removeItem: (id: string) => void
+        clearCart:  () => void
+      }
+
+      export const useCartStore = create<CartState>()(
+        devtools(
+          (set) => ({
+            items: [],
+
+            // Trzeci argument set() to nazwa akcji w DevTools
+            addItem: (item) =>
+              set(
+                (s) => ({
+                  items: [...s.items, { ...item, qty: 1 }],
+                }),
+                false,
+                'cart/addItem'  // Widoczne w Redux DevTools
+              ),
+
+            updateQty: (id, qty) =>
+              set(
+                (s) => ({
+                  items: s.items.map((i) => (i.id === id ? { ...i, qty } : i)),
+                }),
+                false,
+                'cart/updateQty'
+              ),
+
+            removeItem: (id) =>
+              set(
+                (s) => ({ items: s.items.filter((i) => i.id !== id) }),
+                false,
+                'cart/removeItem'
+              ),
+
+            clearCart: () =>
+              set({ items: [] }, false, 'cart/clearCart'),
+          }),
+          {
+            name:    'CartStore',
+            enabled: import.meta.env.DEV,  // Tylko w development
+          }
+        )
+      )
+    lang: typescript

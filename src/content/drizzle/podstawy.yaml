@@ -1,0 +1,105 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Drizzle?
+  firstComponent: Quickstart — połączenie + insert + select
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Drizzle ORM?
+  desc: >
+    Drizzle ORM to lekki, TypeScript-first ORM z SQL-like API. W odróżnieniu od Prismy nie jest
+    ActiveRecord — zamiast prisma.user.findMany() piszesz db.select().from(users).where(...).
+    Drizzle generuje dokładnie taki SQL jaki napiszesz ręcznie — zero magic, zero overhead.
+    Schema definiujesz w TypeScript (nie DSL), co daje pełną kontrolę i zero dodatkowych plików.
+    Obsługuje PostgreSQL, MySQL i SQLite. Działa na edge runtimes (Cloudflare Workers, Vercel Edge,
+    Bun, Deno) gdzie inne ORMy mają problemy z bundle size.
+
+concepts:
+  - title: Schema-first w TypeScript
+    desc: >
+      Schema definiujesz w TypeScript używając pgTable/mysqlTable/sqliteTable.
+      Nie ma osobnego pliku .prisma — typy TypeScript są generowane bezpośrednio ze schematu.
+      Jedna funkcja = jedna tabela. Eksportujesz ją i używasz w queries.
+    icon: "📋"
+  - title: SQL-like API
+    desc: >
+      db.select().from(users).where(eq(users.email, 'jan@x.com')).limit(10) —
+      to jest niemal 1:1 z SQL. Jeśli znasz SQL, znasz Drizzle. Zero nowych abstrakcji
+      do nauki. Drizzle nie ukrywa SQL — pozwala Ci myśleć w SQL.
+    icon: "🔍"
+  - title: Lekki i edge-ready
+    desc: >
+      Drizzle nie ma query engine jako osobnego procesu (jak Prisma). To zwykła biblioteka
+      Node.js/JS — działa wszędzie. Bundle size jest minimalny. Cloudflare Workers,
+      Vercel Edge Functions, Bun, Deno — wszystkie wspierane bez konfiguracji.
+    icon: "⚡"
+  - title: Wiele baz danych
+    desc: >
+      PostgreSQL (via postgres.js, node-postgres, Neon, PlanetScale, Xata),
+      MySQL (via mysql2, PlanetScale), SQLite (via better-sqlite3, Bun SQLite,
+      Cloudflare D1, Turso, libSQL). Ta sama API, różne adaptery.
+    icon: "🗄️"
+  - title: Drizzle Kit
+    desc: >
+      CLI do migracji — drizzle-kit generate tworzy pliki SQL, drizzle-kit migrate
+      aplikuje je, drizzle-kit push pushuje schema bezpośrednio do bazy (do prototypów),
+      drizzle-kit studio otwiera GUI.
+    icon: "🔧"
+  - title: Relational Queries API
+    desc: >
+      db.query API — alternatywa do SQL-like selects. Definiujesz relacje raz
+      w relations(), potem db.query.users.findMany({ with: { posts: true } }).
+      Auto-joins, type-safe, bez ręcznego pisania JOIN.
+    icon: "🔗"
+
+whenToUse:
+  - Edge runtimes (Cloudflare Workers, Vercel Edge) — Drizzle działa, Prisma ma problemy
+  - Projekty gdzie chcesz być blisko SQL — Drizzle nie ukrywa generowanego SQL
+  - Serverless z małym cold startem — brak osobnego procesu query engine
+  - Gdy bundle size ma znaczenie (np. Bun, Deno, Workers)
+  - Gdy chcesz pełnej kontroli nad queries bez abstraction overhead
+  - SQLite projekty (Cloudflare D1, Turso, Bun) — Drizzle ma najlepsze wsparcie
+
+firstComponent: |
+  // 1. Instalacja (PostgreSQL + postgres.js)
+  npm install drizzle-orm postgres
+  npm install -D drizzle-kit
+
+  // 2. Schema — src/db/schema.ts
+  import { pgTable, serial, text, varchar, timestamp } from 'drizzle-orm/pg-core'
+
+  export const users = pgTable('users', {
+    id:        serial('id').primaryKey(),
+    email:     varchar('email', { length: 255 }).notNull().unique(),
+    name:      text('name'),
+    createdAt: timestamp('created_at').defaultNow(),
+  })
+
+  // 3. Połączenie — src/db/index.ts
+  import { drizzle } from 'drizzle-orm/postgres-js'
+  import postgres from 'postgres'
+  import * as schema from './schema'
+
+  const client = postgres(process.env.DATABASE_URL!)
+  export const db = drizzle(client, { schema })
+
+  // 4. Insert
+  import { db } from './db'
+  import { users } from './db/schema'
+
+  const newUser = await db.insert(users).values({
+    email: 'jan@firma.pl',
+    name: 'Jan Kowalski',
+  }).returning()
+
+  console.log(newUser[0]) // { id: 1, email: 'jan@firma.pl', name: 'Jan Kowalski', ... }
+
+  // 5. Select
+  import { eq } from 'drizzle-orm'
+
+  const result = await db.select()
+    .from(users)
+    .where(eq(users.email, 'jan@firma.pl'))
+    .limit(1)
+
+  console.log(result[0]) // User object

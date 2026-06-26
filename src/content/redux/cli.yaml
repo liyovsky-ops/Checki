@@ -1,0 +1,142 @@
+title: Komendy Redux Toolkit
+
+groups:
+  - name: Instalacja
+    icon: "📦"
+    commands:
+      - cmd: npm install @reduxjs/toolkit react-redux
+        desc: Instalacja RTK i react-redux (wymagane razem)
+        detail:
+          what: >
+            Instaluje Redux Toolkit (@reduxjs/toolkit) i oficjalną integrację React
+            (react-redux). Oba pakiety są wymagane — RTK to logika store, react-redux
+            to hooki i Provider dla React.
+          how: >
+            @reduxjs/toolkit zawiera: configureStore, createSlice, createAsyncThunk,
+            createApi (RTK Query), createEntityAdapter, createSelector (reselect).
+            react-redux dostarcza: Provider, useSelector, useDispatch.
+          tips:
+            - 'TypeScript: typy dołączone w obu pakietach — nie potrzebujesz @types/*'
+            - 'Minimalne wersje: RTK 2.x wymaga React 18+ i react-redux 9+'
+
+      - cmd: npm install @reduxjs/toolkit react-redux redux-persist
+        desc: Instalacja z persist (zapis stanu do localStorage)
+        detail:
+          what: >
+            Dodaje redux-persist do zapisywania wybranych fragmentów store
+            w localStorage lub sessionStorage między odświeżeniami strony.
+          how: >
+            persistReducer owijasz rootReducer, persistStore tworzy persistor,
+            PersistGate z react wstrzymuje render do czasu przywrócenia stanu.
+          tips:
+            - 'Dodaj { serializableCheck: false } do middleware gdy używasz persist'
+            - 'Używaj whitelist zamiast blacklist — lepsza kontrola co zapisujesz'
+
+      - cmd: npm install redux-logger
+        desc: Instalacja loggera (dev only)
+        detail:
+          what: Logger który drukuje każdą akcję do konsoli przeglądarki z kolorami.
+          how: Dodaj do middleware TYLKO w development — pomiń w production buildzie.
+          tips:
+            - 'Alternatywa: wbudowane Redux DevTools Extension — nie wymaga kodu'
+            - 'Zawsze guard: if (process.env.NODE_ENV === "development")'
+
+  - name: Szablony projektów
+    icon: "🚀"
+    commands:
+      - cmd: npm create vite@latest my-app -- --template react-ts
+        desc: Nowy projekt Vite + React + TypeScript (zalecana baza)
+        detail:
+          what: Tworzy projekt React z TypeScript — najlepsza baza do dodania RTK.
+          how: Po utworzeniu projektu dodaj RTK ręcznie — Vite nie ma szablonu z Redux.
+          tips:
+            - 'Vite + RTK = najszybszy setup w 2024+ (bez CRA)'
+            - 'Następny krok: npm install @reduxjs/toolkit react-redux'
+
+      - cmd: npx create-react-app my-app --template redux-typescript
+        desc: CRA z wbudowanym szablonem Redux + TypeScript (deprecated)
+        detail:
+          what: >
+            Create React App z oficjalnym szablonem Redux — zawiera gotowy store,
+            slice przykładowy i typowane hooki. CRA jest oficjalnie deprecated od 2023.
+          how: >
+            Szablon zawiera: store/index.ts, features/counter/counterSlice.ts,
+            app/hooks.ts z useAppSelector i useAppDispatch.
+          tips:
+            - 'CRA jest deprecated — preferuj Vite lub Next.js'
+            - 'Template redux-typescript to dobry wzorzec struktury plików'
+
+      - cmd: npx create-next-app@latest my-app --typescript
+        desc: Next.js + TypeScript — dodaj RTK ręcznie
+        detail:
+          what: Tworzy Next.js z TypeScript. RTK dodajesz ręcznie po inicjalizacji.
+          how: >
+            Dla Next.js + RTK z SSR dodaj next-redux-wrapper.
+            Bez SSR — standardowy setup jak dla SPA.
+          tips:
+            - 'SSR z RTK: npm install next-redux-wrapper'
+            - 'App Router + RTK: store inicjalizuj po stronie klienta ("use client")'
+
+  - name: Development i DevTools
+    icon: "🔧"
+    commands:
+      - cmd: npm run dev
+        desc: Uruchom Vite dev server z HMR
+        detail:
+          what: Dev server z Hot Module Replacement — zmiany widoczne bez odświeżania.
+          how: RTK store reinicjalizuje się przy HMR — Redux DevTools zachowuje historię.
+          tips:
+            - 'Redux DevTools Extension w Chrome/Firefox — zainstaluj raz, działa zawsze'
+            - 'HMR + Redux: akcje z przed odświeżenia widoczne w DevTools'
+
+      - cmd: npx @rtk-query/codegen-openapi openapi-config.ts
+        desc: Generuj RTK Query API slice z OpenAPI schema
+        detail:
+          what: Generuje typowany apiSlice z definicji OpenAPI — bez ręcznego pisania endpointów.
+          how: >
+            Potrzebujesz pliku konfiguracyjnego openapi-config.ts z schemaFile (URL lub plik)
+            i outputFile. Wynik to gotowy plik z createApi() i wszystkimi hookami.
+          tips:
+            - 'npm install -D @rtk-query/codegen-openapi'
+            - 'Uruchamiaj po każdej zmianie API schema: dodaj do npm scripts'
+
+  - name: TypeScript
+    icon: "🔷"
+    commands:
+      - cmd: npx tsc --noEmit
+        desc: Sprawdź typy w projekcie (bez generowania JS)
+        detail:
+          what: Uruchamia TypeScript type checker — sprawdza czy typy RTK są poprawne.
+          how: >
+            RTK ma pełne typy — PayloadAction, RootState, AppDispatch.
+            Błędy typów w selektorach i action creators są wykrywane tutaj.
+          tips:
+            - 'Typowe błędy: brakujący AppDispatch dla thunków, zły PayloadAction<T>'
+            - 'Dodaj do CI: npx tsc --noEmit jako osobny krok'
+
+  - name: Przydatne pakiety
+    icon: "⚡"
+    commands:
+      - cmd: npm install immer
+        desc: Immer standalone (poza RTK) — niemutatywne aktualizacje
+        detail:
+          what: >
+            Immer jest wbudowany w RTK, ale możesz zainstalować samodzielnie
+            dla użycia poza reducerami (np. w useReducer lub w logice biznesowej).
+          how: produce(currentState, draft => { draft.x = 1 }) zwraca nowy obiekt.
+          tips:
+            - 'W RTK reducerach Immer jest automatyczny — nie musisz importować'
+            - 'Przydatny w testach: łatwa mutacja initialState bez spread'
+
+      - cmd: npm install reselect
+        desc: reselect standalone — memoizowane selektory
+        detail:
+          what: >
+            reselect jest wbudowany w RTK jako createSelector.
+            Instaluj standalone tylko gdy używasz reselect bez Redux.
+          how: >
+            createSelector([inputSelectors], resultFn) — wywołuje resultFn
+            tylko gdy wyniki inputSelectors się zmieniły.
+          tips:
+            - 'Import z RTK: import { createSelector } from "@reduxjs/toolkit"'
+            - 'Nie potrzebujesz instalować osobno jeśli używasz RTK'

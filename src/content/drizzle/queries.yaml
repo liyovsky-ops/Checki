@@ -1,0 +1,294 @@
+title: Drizzle Queries — SELECT, INSERT, UPDATE, DELETE
+
+items:
+  - name: SELECT podstawowy — select().from().where()
+    desc: >
+      db.select().from(tabela) to odpowiednik SELECT * FROM tabela. Dodajesz
+      .where() z operatorami (eq, ne, gt, lt, like, ilike, inArray, isNull),
+      .orderBy(), .limit(), .offset(). Wszystkie operatory z drizzle-orm są type-safe.
+    code: |
+      import { db } from './db'
+      import { users, posts } from './db/schema'
+      import { eq, ne, gt, lt, like, ilike, inArray, isNull, and, or, desc, asc } from 'drizzle-orm'
+
+      // SELECT * FROM users
+      const allUsers = await db.select().from(users)
+
+      // SELECT * FROM users WHERE email = 'jan@x.com'
+      const user = await db.select()
+        .from(users)
+        .where(eq(users.email, 'jan@x.com'))
+
+      // SELECT z wieloma warunkami (AND)
+      const activeAdults = await db.select()
+        .from(users)
+        .where(and(
+          eq(users.active, true),
+          gt(users.age, 18),
+        ))
+
+      // OR
+      const results = await db.select()
+        .from(users)
+        .where(or(
+          like(users.name, '%Jan%'),
+          ilike(users.email, '%@firma.pl'),  // ilike = case-insensitive
+        ))
+
+      // IN, ORDER BY, LIMIT, OFFSET
+      const admins = await db.select()
+        .from(users)
+        .where(inArray(users.role, ['admin', 'moderator']))
+        .orderBy(desc(users.createdAt))
+        .limit(10)
+        .offset(20)
+
+      // NULL checks
+      const noName = await db.select()
+        .from(users)
+        .where(isNull(users.name))
+    lang: typescript
+
+  - name: SELECT — wybór kolumn i aliasy
+    desc: >
+      Zamiast SELECT * możesz wybrać konkretne kolumny. Drizzle zwróci tylko
+      wybrane pola — type-safe, bez nadmiarowych danych. Możesz też używać
+      sql template tag do custom expressions i aliasów.
+    code: |
+      import { sql } from 'drizzle-orm'
+
+      // Wybierz tylko id i email
+      const emails = await db.select({
+        id:    users.id,
+        email: users.email,
+      }).from(users)
+      // Type: { id: number; email: string }[]
+
+      // Custom expression z aliasem
+      const withFullName = await db.select({
+        id:       users.id,
+        fullName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`.as('full_name'),
+        emailLen: sql<number>`length(${users.email})`.as('email_length'),
+      }).from(users)
+
+      // COUNT
+      const countResult = await db.select({
+        count: sql<number>`count(*)`.mapWith(Number),
+      }).from(users)
+      const total = countResult[0].count
+    lang: typescript
+
+  - name: INSERT — wstaw jeden lub wiele rekordów
+    desc: >
+      db.insert(tabela).values(dane) — wstawia jeden rekord lub tablicę rekordów.
+      .returning() zwraca wstawione rekordy (PostgreSQL/SQLite). MySQL nie wspiera returning —
+      tam używasz .returning() tylko z id. Typy danych są sprawdzane przez TypeScript.
+    code: |
+      // Insert jednego rekordu
+      const [newUser] = await db.insert(users)
+        .values({
+          email: 'anna@firma.pl',
+          name:  'Anna Nowak',
+        })
+        .returning()  // zwraca { id, email, name, createdAt }
+
+      // Insert wielu rekordów (bulk)
+      const newUsers = await db.insert(users)
+        .values([
+          { email: 'jan@x.com',   name: 'Jan K.' },
+          { email: 'maria@x.com', name: 'Maria W.' },
+          { email: 'adam@x.com',  name: 'Adam B.' },
+        ])
+        .returning()
+
+      // Upsert — insert or update on conflict
+      await db.insert(users)
+        .values({ email: 'jan@x.com', name: 'Jan K.' })
+        .onConflictDoUpdate({
+          target: users.email,    // kolumna z unique constraint
+          set: { name: 'Jan K. (updated)' },
+        })
+
+      // Ignoruj duplikaty
+      await db.insert(users)
+        .values({ email: 'jan@x.com', name: 'Jan K.' })
+        .onConflictDoNothing()
+    lang: typescript
+
+  - name: UPDATE — aktualizuj rekordy
+    desc: >
+      db.update(tabela).set(dane).where(warunek) — aktualizuje rekordy pasujące
+      do warunku. .returning() zwraca zaktualizowane rekordy. Bez .where() aktualizuje
+      WSZYSTKIE rekordy — Drizzle wymaga jawnego potwierdzenia tej operacji.
+    code: |
+      import { eq, lt, sql } from 'drizzle-orm'
+
+      // Aktualizuj jednego usera
+      const [updated] = await db.update(users)
+        .set({ name: 'Jan Kowalski (new)' })
+        .where(eq(users.id, 1))
+        .returning()
+
+      // Aktualizuj wiele — wszystkich nieaktywnych
+      await db.update(users)
+        .set({ active: false })
+        .where(lt(users.lastLogin, new Date('2024-01-01')))
+
+      // Atomic increment (atomowa aktualizacja licznika)
+      await db.update(posts)
+        .set({ views: sql`${posts.views} + 1` })
+        .where(eq(posts.id, postId))
+
+      // Update z returning
+      const [result] = await db.update(users)
+        .set({
+          name:      'Nowe Imię',
+          updatedAt: new Date(),
+        })
+        .where(eq(users.email, 'jan@x.com'))
+        .returning({ id: users.id, name: users.name })
+    lang: typescript
+
+  - name: DELETE — usuń rekordy
+    desc: >
+      db.delete(tabela).where(warunek) — usuwa pasujące rekordy. .returning()
+      zwraca usunięte rekordy. Bez .where() usuwa WSZYSTKO — Drizzle ostrzega.
+      Dla soft delete używaj update z deleted_at zamiast fizycznego usuwania.
+    code: |
+      import { eq, lt } from 'drizzle-orm'
+
+      // Usuń jednego usera
+      const [deleted] = await db.delete(users)
+        .where(eq(users.id, 1))
+        .returning()
+
+      // Usuń stare logi (bulk delete)
+      const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // 30 dni
+      await db.delete(logs)
+        .where(lt(logs.createdAt, cutoff))
+
+      // Soft delete — nie usuwaj, oznacz jako usunięte
+      await db.update(users)
+        .set({ deletedAt: new Date() })
+        .where(eq(users.id, userId))
+
+      // Query z filtrem soft delete
+      const activeUsers = await db.select()
+        .from(users)
+        .where(isNull(users.deletedAt))
+    lang: typescript
+
+  - name: WHERE — wszystkie operatory
+    desc: >
+      Drizzle ma pełny zestaw operatorów SQL. Importujesz je z 'drizzle-orm'.
+      Wszystkie są type-safe — TypeScript sprawdza typy kolumn. Można łączyć
+      and()/or()/not() dla złożonych warunków.
+    code: |
+      import {
+        eq, ne, gt, gte, lt, lte,       // porównania
+        like, ilike, notLike,            // LIKE
+        inArray, notInArray,             // IN
+        isNull, isNotNull,               // NULL checks
+        between, notBetween,             // BETWEEN
+        and, or, not,                    // logiczne
+        sql,                             // raw SQL
+      } from 'drizzle-orm'
+
+      // Przykłady
+      eq(users.id, 1)                          // id = 1
+      ne(users.role, 'admin')                  // role != 'admin'
+      gt(users.age, 18)                        // age > 18
+      gte(users.score, 100)                    // score >= 100
+      lt(users.createdAt, new Date())          // created_at < now
+      like(users.name, 'Jan%')                 // name LIKE 'Jan%'
+      ilike(users.email, '%@gmail.com')        // case-insensitive LIKE
+      inArray(users.role, ['admin', 'mod'])    // role IN ('admin', 'mod')
+      isNull(users.deletedAt)                  // deleted_at IS NULL
+      isNotNull(users.verifiedAt)              // verified_at IS NOT NULL
+      between(users.age, 18, 65)              // age BETWEEN 18 AND 65
+
+      // Złożone warunki
+      const query = await db.select().from(users).where(
+        and(
+          isNull(users.deletedAt),
+          or(
+            gte(users.score, 100),
+            eq(users.role, 'vip'),
+          ),
+          not(eq(users.blocked, true)),
+        )
+      )
+    lang: typescript
+
+  - name: JOIN — łączenie tabel
+    desc: >
+      Drizzle wspiera innerJoin, leftJoin, rightJoin, fullJoin. Wynik zawiera
+      pola z wszystkich tabel w flat obiekcie lub możesz wybrać kolumny selektywnie.
+      JOIN jest type-safe — TypeScript wie jakie kolumny są dostępne.
+    code: |
+      import { eq, isNull } from 'drizzle-orm'
+
+      // INNER JOIN — tylko rekordy z obu tabel
+      const postsWithAuthors = await db.select({
+        postId:    posts.id,
+        postTitle: posts.title,
+        userName:  users.name,
+        userEmail: users.email,
+      })
+        .from(posts)
+        .innerJoin(users, eq(posts.authorId, users.id))
+
+      // LEFT JOIN — wszystkie posty, nullable dane autora
+      const allPostsWithAuthors = await db.select()
+        .from(posts)
+        .leftJoin(users, eq(posts.authorId, users.id))
+
+      // JOIN z WHERE
+      const publishedPostsWithAuthors = await db.select({
+        title:  posts.title,
+        author: users.name,
+      })
+        .from(posts)
+        .innerJoin(users, eq(posts.authorId, users.id))
+        .where(eq(posts.published, true))
+        .orderBy(posts.createdAt)
+
+      // Multiple JOINs
+      const fullData = await db.select()
+        .from(orders)
+        .innerJoin(users,    eq(orders.userId,    users.id))
+        .innerJoin(products, eq(orders.productId, products.id))
+        .where(eq(users.id, userId))
+    lang: typescript
+
+  - name: Transakcje
+    desc: >
+      db.transaction(async (tx) => {...}) — wykonuje operacje atomowo. Jeśli
+      którakolwiek failuje (throw) — wszystkie są cofane. tx ma to samo API co db.
+      Drizzle automatycznie obsługuje COMMIT i ROLLBACK.
+    code: |
+      // Transfer pieniędzy — atomowy
+      const result = await db.transaction(async (tx) => {
+        const [sender] = await tx.select()
+          .from(accounts)
+          .where(eq(accounts.id, senderId))
+
+        if (sender.balance < amount) {
+          throw new Error('Niewystarczające środki')  // → ROLLBACK
+        }
+
+        await tx.update(accounts)
+          .set({ balance: sql`${accounts.balance} - ${amount}` })
+          .where(eq(accounts.id, senderId))
+
+        await tx.update(accounts)
+          .set({ balance: sql`${accounts.balance} + ${amount}` })
+          .where(eq(accounts.id, receiverId))
+
+        const [log] = await tx.insert(transfers)
+          .values({ senderId, receiverId, amount })
+          .returning()
+
+        return log  // tylko jeśli wszystko OK → COMMIT
+      })
+    lang: typescript

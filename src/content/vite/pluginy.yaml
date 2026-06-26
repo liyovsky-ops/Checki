@@ -1,0 +1,228 @@
+labels:
+  main: Pluginy Vite — używanie i tworzenie
+  mainLang: typescript
+
+intro:
+  title: Pluginy Vite — rozszerzanie możliwości
+  desc: >
+    Pluginy Vite rozszerzają pipeline budowania: transformują pliki, dodają wirtualne
+    moduły, modyfikują HTML, wstrzykują kod. API jest kompatybilne z Rollup plugins
+    (większość Rollup plugins działa w Vite). Oficjalne pluginy od Vite Team obsługują
+    React, Vue, Svelte. Pluginy dodajesz w tablicy plugins w vite.config.ts.
+    Kolejność pluginów ma znaczenie — Vite przetwarza je w kolejności.
+
+items:
+  - title: Oficjalne pluginy — React i Vue
+    desc: >
+      @vitejs/plugin-react używa Babel dla Fast Refresh (HMR stanu React).
+      @vitejs/plugin-react-swc używa SWC zamiast Babel — szybszy.
+      @vitejs/plugin-vue obsługuje Single File Components (.vue).
+      @vitejs/plugin-vue-jsx dodaje JSX support dla Vue 3.
+    code: |
+      // React + TypeScript (domyślny wybór)
+      // npm install -D @vitejs/plugin-react
+      import { defineConfig } from 'vite';
+      import react from '@vitejs/plugin-react';
+
+      export default defineConfig({
+        plugins: [
+          react({
+            // Babel plugins dla react-plugin
+            babel: {
+              plugins: ['babel-plugin-styled-components'],
+            },
+          }),
+        ],
+      });
+
+      // React z SWC (szybszy cold start)
+      // npm install -D @vitejs/plugin-react-swc
+      import react from '@vitejs/plugin-react-swc';
+
+      export default defineConfig({
+        plugins: [react()],
+      });
+
+      // Vue 3 SFC
+      // npm install -D @vitejs/plugin-vue
+      import vue from '@vitejs/plugin-vue';
+
+      export default defineConfig({
+        plugins: [
+          vue({
+            reactivityTransform: true, // eksperymentalne
+          }),
+        ],
+      });
+    lang: typescript
+
+  - title: Anatomia pluginu Vite
+    desc: >
+      Plugin Vite to obiekt z nazwą i hookami. Hooki wywoływane są w różnych fazach
+      pipeline: resolveId (rozwiązywanie ścieżek), load (ładowanie zawartości modułu),
+      transform (transformacja kodu), buildStart/buildEnd (lifecycle). Funkcja zwracająca
+      plugin (factory) jest standardowym wzorcem.
+    code: |
+      import type { Plugin } from 'vite';
+
+      // Prosty plugin — factory function
+      function myPlugin(options: { greeting: string }): Plugin {
+        return {
+          // Wymagane: unikalna nazwa pluginu
+          name: 'vite-plugin-my',
+
+          // enforce: 'pre' | 'post' — kolejność względem innych pluginów
+          // 'pre' → przed oficjalnymi pluginami Vite
+          // 'post' → po oficjalnych pluginach Vite
+          enforce: 'pre',
+
+          // apply: 'serve' | 'build' — kiedy plugin jest aktywny
+          apply: 'serve', // tylko w dev
+
+          // resolveId — przechwyć import i zwróć własne ID
+          resolveId(source, importer) {
+            if (source === 'virtual:my-module') {
+              return '\0virtual:my-module'; // \0 = konwencja dla virtualnych modułów
+            }
+          },
+
+          // load — załaduj zawartość modułu po ID
+          load(id) {
+            if (id === '\0virtual:my-module') {
+              return `export const greeting = "${options.greeting}";`;
+            }
+          },
+
+          // transform — transformuj kod modułu
+          transform(code, id) {
+            if (!id.endsWith('.ts')) return;
+            // Zwróć zmodyfikowany kod lub null (bez zmian)
+            return {
+              code: code.replace(/__GREETING__/g, options.greeting),
+              map: null, // source map
+            };
+          },
+        };
+      }
+
+      export default defineConfig({
+        plugins: [myPlugin({ greeting: 'Hej Vite!' })],
+      });
+    lang: typescript
+
+  - title: Wirtualne moduły
+    desc: >
+      Wirtualne moduły to moduły które nie istnieją na dysku — są generowane
+      przez plugin w locie. Konwencja: prefiks virtual: w imporcie, \0 w wewnętrznym
+      ID (ukrywa przed innymi pluginami). Używane do generowania kodu na podstawie
+      konfiguracji, plików konfiguracyjnych, meta-danych.
+    code: |
+      // Plugin generujący wirtualny moduł z routami
+      import type { Plugin } from 'vite';
+      import { readdirSync } from 'fs';
+      import path from 'path';
+
+      function autoRoutesPlugin(): Plugin {
+        const virtualModuleId = 'virtual:routes';
+        const resolvedVirtualModuleId = '\0' + virtualModuleId;
+
+        return {
+          name: 'vite-plugin-auto-routes',
+
+          resolveId(id) {
+            if (id === virtualModuleId) {
+              return resolvedVirtualModuleId;
+            }
+          },
+
+          load(id) {
+            if (id === resolvedVirtualModuleId) {
+              // Skanuj katalog pages i generuj kod
+              const pages = readdirSync('./src/pages')
+                .filter(f => f.endsWith('.tsx'))
+                .map(f => f.replace('.tsx', ''));
+
+              const imports = pages
+                .map(p => `import ${p}Page from '../pages/${p}.tsx';`)
+                .join('\n');
+
+              const routes = pages
+                .map(p => `{ path: '/${p.toLowerCase()}', component: ${p}Page }`)
+                .join(',\n');
+
+              return `${imports}\nexport const routes = [${routes}];`;
+            }
+          },
+        };
+      }
+
+      // Użycie w kodzie aplikacji:
+      import { routes } from 'virtual:routes';
+      // TypeScript — deklaracja modułu:
+      declare module 'virtual:routes' {
+        export const routes: Array<{ path: string; component: any }>;
+      }
+    lang: typescript
+
+  - title: Hooki lifecycle pluginu
+    desc: >
+      Vite dodaje własne hooki do standardowych hooków Rollup. configResolved daje
+      dostęp do finalnej konfiguracji. configureServer daje dostęp do dev servera
+      (możesz dodać middleware). transformIndexHtml modyfikuje główny HTML.
+      handleHotUpdate reaguje na zmiany plików w HMR.
+    code: |
+      import type { Plugin, ViteDevServer } from 'vite';
+
+      function lifecyclePlugin(): Plugin {
+        return {
+          name: 'vite-plugin-lifecycle',
+
+          // config — modyfikuj config przed resolucją
+          config(config, { command }) {
+            if (command === 'build') {
+              return { build: { sourcemap: true } };
+            }
+          },
+
+          // configResolved — finalna config (read-only)
+          configResolved(resolvedConfig) {
+            console.log('Build mode:', resolvedConfig.mode);
+          },
+
+          // configureServer — dostęp do Express dev servera
+          configureServer(server: ViteDevServer) {
+            server.middlewares.use('/api/health', (req, res) => {
+              res.end(JSON.stringify({ status: 'ok' }));
+            });
+          },
+
+          // transformIndexHtml — modyfikuj index.html
+          transformIndexHtml(html) {
+            return html.replace(
+              '<title>',
+              '<title>Moja Aplikacja | '
+            );
+          },
+
+          // handleHotUpdate — custom HMR logic
+          handleHotUpdate({ file, server }) {
+            if (file.endsWith('.config.json')) {
+              // Wymuś full reload przy zmianie konfiguracji
+              server.ws.send({ type: 'full-reload' });
+              return []; // pomiń domyślny HMR
+            }
+          },
+
+          // buildStart — przed budowaniem
+          buildStart() {
+            console.log('Build started!');
+          },
+
+          // buildEnd — po budowaniu
+          buildEnd(error) {
+            if (error) console.error('Build failed:', error);
+            else console.log('Build finished!');
+          },
+        };
+      }
+    lang: typescript

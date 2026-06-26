@@ -1,0 +1,145 @@
+labels:
+  main: System własności i pożyczania
+  mainLang: rust
+
+intro:
+  title: Ownership — serce Rusta
+  desc: >
+    Ownership to unikalny mechanizm Rusta który zastępuje garbage collector.
+    Trzy proste reguły: każda wartość ma jednego właściciela, właściciel może być tylko jeden naraz,
+    gdy właściciel wychodzi poza scope — wartość jest zwalniana.
+    Borrow checker weryfikuje te reguły w czasie kompilacji — zero kosztów w runtime.
+
+items:
+  - title: Move semantics — przenoszenie własności
+    desc: >
+      Przypisanie wartości przenosi własność. Po przeniesieniu stara zmienna jest nieważna.
+      Dotyczy typów które nie implementują Copy (String, Vec, własne struktury).
+    code: |
+      fn main() {
+          let s1 = String::from("hello");
+          let s2 = s1; // s1 zostaje przeniesione do s2
+
+          // println!("{}", s1); // BŁĄD: s1 jest już przeniesione!
+          println!("{}", s2); // OK
+
+          // Typy Copy (i32, f64, bool) są kopiowane, nie przenoszone
+          let x = 5;
+          let y = x;
+          println!("{} {}", x, y); // OK — oba są dostępne
+      }
+    lang: rust
+
+  - title: Borrowing — pożyczanie niezmiennych referencji
+    desc: >
+      Zamiast przenosić własność, możesz pożyczyć wartość przez referencję (&T).
+      Możesz mieć wiele niezmiennych referencji naraz. Referencja nie może przeżyć właściciela.
+    code: |
+      fn oblicz_dlugosc(s: &String) -> usize {
+          s.len() // pożyczamy s, nie przejmujemy własności
+      }
+
+      fn main() {
+          let s = String::from("hello world");
+
+          // Pożyczamy s — s nadal jest dostępne po wywołaniu
+          let len = oblicz_dlugosc(&s);
+
+          println!("'{}' ma {} znaków", s, len);
+
+          // Wiele niezmiennych referencji jednocześnie — OK
+          let r1 = &s;
+          let r2 = &s;
+          println!("{} i {}", r1, r2);
+      }
+    lang: rust
+
+  - title: Mutable borrowing — pożyczanie zmiennej referencji
+    desc: >
+      Zmienna referencja (&mut T) pozwala modyfikować pożyczoną wartość.
+      Reguła: tylko jedna zmienna referencja naraz. Nie możesz mieć &mut i & jednocześnie.
+    code: |
+      fn dodaj_tekst(s: &mut String) {
+          s.push_str(", świecie!");
+      }
+
+      fn main() {
+          let mut s = String::from("cześć");
+
+          dodaj_tekst(&mut s);
+          println!("{}", s); // "cześć, świecie!"
+
+          // Tylko jedna &mut naraz:
+          let r1 = &mut s;
+          // let r2 = &mut s; // BŁĄD: nie można mieć dwóch &mut
+
+          r1.push_str(" 🦀");
+          println!("{}", s);
+      }
+    lang: rust
+
+  - title: Slices — widoki na dane
+    desc: >
+      Slice to referencja do ciągłego fragmentu kolekcji — nie posiada danych, tylko na nie wskazuje.
+      &str to slice Stringa. &[i32] to slice wektora. Bezpieczny dostęp do części danych.
+    code: |
+      fn pierwszy_wyraz(s: &str) -> &str {
+          let bytes = s.as_bytes();
+
+          for (i, &bajt) in bytes.iter().enumerate() {
+              if bajt == b' ' {
+                  return &s[0..i]; // slice do pierwszej spacji
+              }
+          }
+
+          &s[..] // cały string jeśli brak spacji
+      }
+
+      fn main() {
+          let zdanie = String::from("cześć świecie");
+          let wyraz = pierwszy_wyraz(&zdanie);
+          println!("Pierwszy wyraz: {}", wyraz); // "cześć"
+
+          // Slice tablicy
+          let liczby = [1, 2, 3, 4, 5];
+          let srodek: &[i32] = &liczby[1..4];
+          println!("{:?}", srodek); // [2, 3, 4]
+      }
+    lang: rust
+
+  - title: Lifetimes — adnotacje czasu życia
+    desc: >
+      Lifetime annotations mówią kompilatorowi jak długo referencje są ważne.
+      Kompilator sam wnioskuje lifetimes w prostych przypadkach (elision).
+      Musisz podać jawnie gdy funkcja zwraca referencję zależną od argumentów.
+    code: |
+      // 'a oznacza: wynikowa referencja żyje co najmniej tyle co krótszy argument
+      fn dluzszy<'a>(x: &'a str, y: &'a str) -> &'a str {
+          if x.len() > y.len() {
+              x
+          } else {
+              y
+          }
+      }
+
+      // Struct przechowujący referencję — wymaga lifetime
+      struct Fragment<'a> {
+          czesc: &'a str,
+      }
+
+      impl<'a> Fragment<'a> {
+          fn wypisz(&self) {
+              println!("Fragment: {}", self.czesc);
+          }
+      }
+
+      fn main() {
+          let s1 = String::from("długi string");
+          let wynik;
+          {
+              let s2 = String::from("xyz");
+              wynik = dluzszy(s1.as_str(), s2.as_str());
+              println!("Dłuższy: {}", wynik);
+          }
+      }
+    lang: rust

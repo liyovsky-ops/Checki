@@ -1,0 +1,104 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Zustand?
+  firstComponent: Pierwszy store
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Zustand?
+  desc: >
+    Zustand to minimalistyczna biblioteka do zarządzania stanem w React — stworzona przez
+    Pmndrs (Paul Henschel, twórca react-spring i react-three-fiber). Cały store tworzy się
+    jedną funkcją create() — bez Providerów, bez reducerów, bez akcji w osobnych plikach.
+    Stan i akcje żyją razem, hooki selektorowe zapobiegają zbędnym re-renderom.
+    Zustand działa poza React (vanilla JS), obsługuje middleware (immer, devtools, persist)
+    i ma 51k+ gwiazdek na GitHubie przy niecałych 1kB gzip. Używają go Vercel, Liveblocks,
+    Poimandres — wszędzie tam, gdzie Redux Toolkit to za dużo ceremoniału.
+
+concepts:
+  - title: create() — jeden wywołanie, cały store
+    desc: >
+      Zamiast reducerów, action creators i dispatchowania — jedna funkcja create().
+      Zwraca hook, który komponent wywołuje bezpośrednio. Stan i akcje definiujesz
+      razem, jako jeden obiekt. Brak boilerplate to filozofia Zustand.
+    icon: "🏗️"
+  - title: Brak Providera
+    desc: >
+      Zustand przechowuje stan poza drzewem React — w zwykłym obiekcie JS.
+      Nie owijasz aplikacji w <Provider> — store jest globalny i dostępny z każdego
+      komponentu natychmiast po imporcie. Wielkie odciążenie w testach i SSR.
+    icon: "🚫"
+  - title: Selektory — subskrypcja na fragment
+    desc: >
+      useStore(state => state.count) subskrybuje tylko pole count — komponent
+      re-renderuje się wyłącznie gdy count się zmieni. Reszta stanu nie wywołuje
+      renderów. To klucz do wydajności bez memoizacji.
+    icon: "🎯"
+  - title: Akcje w środku store
+    desc: >
+      Akcje (funkcje mutujące stan) definiujesz razem ze stanem w create().
+      set() podmienia stan, get() czyta aktualny. Async akcje działają tak samo
+      jak synchroniczne — po prostu piszesz async/await bez dodatkowej ceremonii.
+    icon: "⚡"
+  - title: Middleware — kompozycja przez owijanie
+    desc: >
+      Middleware owijają create() — immer() daje mutowalną składnię (draft => draft.count++),
+      devtools() podłącza Redux DevTools, persist() zapisuje do localStorage.
+      Komponujesz je przez zagnieżdżenie: devtools(persist(immer(...))).
+    icon: "🔧"
+  - title: Vanilla JS API
+    desc: >
+      createStore() (bez React) daje ci getState(), setState(), subscribe() i destroy().
+      Możesz używać Zustand poza React — w Web Workerach, Node.js, testach jednostkowych
+      bez montowania komponentów. Idealne dla logiki biznesowej odseparowanej od UI.
+    icon: "🍦"
+
+whenToUse:
+  - Globalny stan UI — koszyk, sidebar otwarty/zamknięty, motyw, powiadomienia
+  - Gdy Redux Toolkit to za dużo kodu dla małego/średniego projektu
+  - Stan wielodostępny między niespokrewnionymi komponentami
+  - Gdy Context API powoduje za dużo re-renderów
+  - Aplikacje z potrzebą persist (localStorage) bez konfiguracji
+  - Projekty React + React Native współdzielące logikę store
+
+firstComponent: |
+  // Instalacja
+  npm install zustand
+
+  // store/counterStore.ts
+  import { create } from 'zustand'
+
+  interface CounterState {
+    count: number
+    increment: () => void
+    decrement: () => void
+    reset:     () => void
+  }
+
+  export const useCounterStore = create<CounterState>((set) => ({
+    count: 0,
+
+    increment: () => set((state) => ({ count: state.count + 1 })),
+    decrement: () => set((state) => ({ count: state.count - 1 })),
+    reset:     () => set({ count: 0 }),
+  }))
+
+  // components/Counter.tsx — brak Providera, brak importu store instancji
+  import { useCounterStore } from '../store/counterStore'
+
+  export function Counter() {
+    // Subskrypcja tylko na potrzebne pole — brak zbędnych re-renderów
+    const count     = useCounterStore((state) => state.count)
+    const increment = useCounterStore((state) => state.increment)
+    const decrement = useCounterStore((state) => state.decrement)
+    const reset     = useCounterStore((state) => state.reset)
+
+    return (
+      <div>
+        <h2>Licznik: {count}</h2>
+        <button onClick={decrement}>-</button>
+        <button onClick={increment}>+</button>
+        <button onClick={reset}>Reset</button>
+      </div>
+    )
+  }

@@ -1,0 +1,197 @@
+labels:
+  main: System eventów Socket.io
+  mainLang: javascript
+
+intro:
+  title: System eventów Socket.io
+  desc: >
+    Socket.io opiera się na wzorcu publish/subscribe opartym na zdarzeniach. Każdy event
+    ma nazwę (string) i opcjonalny payload dowolnego typu. Klient i serwer mogą emitować
+    i nasłuchiwać eventów symetrycznie. Wbudowane eventy systemowe (connect, disconnect,
+    error) zaczynają się bez prefiksu. Własne eventy nazywasz dowolnie — konwencja to
+    snake_case lub camelCase. Acknowledgements dają gwarancję dostarczenia.
+
+items:
+  - name: emit / on — podstawowa komunikacja
+    desc: >
+      emit() wysyła event z payloadem. on() rejestruje handler. off() usuwa handler
+      (ważne w React cleanup). Payload może być stringiem, obiektem, Bufferem — Socket.io
+      serializuje automatycznie przez JSON.
+    code: |
+      // === SERWER ===
+      io.on('connection', (socket) => {
+
+        // Nasłuchuj eventu od klienta
+        socket.on('zamow_produkt', (dane) => {
+          console.log('Zamówienie:', dane.produktId, 'ilość:', dane.ilosc)
+
+          // Odpowiedź do tego samego klienta
+          socket.emit('potwierdzenie_zamowienia', {
+            status:    'przyjeto',
+            zamId:     Math.random().toString(36).slice(2),
+            produktId: dane.produktId,
+          })
+        })
+      })
+
+      // === KLIENT ===
+      // Wyślij event do serwera
+      socket.emit('zamow_produkt', { produktId: 'abc123', ilosc: 2 })
+
+      // Nasłuchuj odpowiedzi
+      socket.on('potwierdzenie_zamowienia', (data) => {
+        console.log('Zamówienie przyjęte, ID:', data.zamId)
+      })
+
+      // Usuń handler (np. w React useEffect cleanup)
+      socket.off('potwierdzenie_zamowienia')
+    lang: javascript
+
+  - name: Acknowledgements — gwarancja dostarczenia
+    desc: >
+      Acknowledgement to callback przekazywany jako ostatni argument emit(). Odbiorca
+      wywołuje go gdy obsłuży event. Działa jak request/response — bez dodatkowego
+      kanału. Możesz zwrócić dane i/lub błąd przez callback.
+    code: |
+      // === KLIENT wysyła z ack ===
+      socket.emit('zapisz_dane', { tytul: 'Notatka', tresc: 'Lorem ipsum' }, (odpowiedz) => {
+        if (odpowiedz.error) {
+          console.error('Błąd zapisu:', odpowiedz.error)
+        } else {
+          console.log('Zapisano z ID:', odpowiedz.id)
+        }
+      })
+
+      // === SERWER odbiera i potwierdza ===
+      socket.on('zapisz_dane', async (dane, callback) => {
+        try {
+          const rekord = await db.save(dane)
+          callback({ id: rekord.id, status: 'ok' })    // Sukces
+        } catch (err) {
+          callback({ error: err.message })              // Błąd
+        }
+      })
+
+      // Socket.io v4+ — async/await ack po stronie serwera
+      socket.on('pobierz_user', async (userId, callback) => {
+        const user = await db.users.findById(userId)
+        callback(user)
+      })
+    lang: javascript
+
+  - name: Broadcasting — wysyłanie do wielu klientów
+    desc: >
+      Broadcasting pozwala wysłać event do wielu odbiorców jednocześnie. io.emit()
+      do wszystkich, socket.broadcast.emit() do wszystkich poza nadawcą,
+      io.to('room').emit() do konkretnego room.
+    code: |
+      io.on('connection', (socket) => {
+        socket.on('nowa_wiadomosc', (msg) => {
+
+          // 1. Do wszystkich (łącznie z nadawcą)
+          io.emit('wiadomosc', msg)
+
+          // 2. Do wszystkich POZA nadawcą
+          socket.broadcast.emit('wiadomosc', msg)
+
+          // 3. Do konkretnego room (poza nadawcą)
+          socket.to('pokoj_glowny').emit('wiadomosc', msg)
+
+          // 4. Do konkretnego room (łącznie z nadawcą)
+          io.to('pokoj_glowny').emit('wiadomosc', msg)
+
+          // 5. Do konkretnego socketu (prywatna wiadomość)
+          io.to(targetSocketId).emit('wiadomosc_prywatna', msg)
+
+          // 6. Do wielu room naraz
+          io.to('room1').to('room2').emit('alert', { tekst: 'Uwaga!' })
+        })
+      })
+    lang: javascript
+
+  - name: Wbudowane eventy systemowe
+    desc: >
+      Socket.io emituje wbudowane eventy: connect, disconnect, connect_error po stronie
+      klienta. Po stronie serwera: connection, disconnect, disconnecting.
+      Można je nasłuchiwać jak każdy inny event.
+    code: |
+      // === KLIENT — eventy systemowe ===
+      socket.on('connect', () => {
+        console.log('Połączono. ID:', socket.id)
+      })
+
+      socket.on('disconnect', (reason) => {
+        // reason: 'io server disconnect' | 'transport close' | 'ping timeout'
+        console.log('Rozłączono:', reason)
+        if (reason === 'io server disconnect') {
+          socket.connect()  // Ręczny reconnect
+        }
+        // Automatyczny reconnect dla innych przyczyn
+      })
+
+      socket.on('connect_error', (err) => {
+        console.error('Błąd połączenia:', err.message)
+      })
+
+      // === SERWER — eventy połączenia ===
+      io.on('connection', (socket) => {
+        console.log('Nowe połączenie:', socket.id)
+
+        // Tuż przed rozłączeniem — socket jeszcze w rooms
+        socket.on('disconnecting', (reason) => {
+          console.log('Rozłącza się z rooms:', [...socket.rooms])
+        })
+
+        socket.on('disconnect', (reason) => {
+          console.log('Rozłączony:', socket.id, reason)
+        })
+      })
+    lang: javascript
+
+  - name: Volatile events — eventy bez gwarancji
+    desc: >
+      Volatile events to eventy które zostaną pominięte jeśli połączenie jest niestabilne
+      lub serwer jest zajęty. Używaj dla danych gdzie utrata jest akceptowalna —
+      np. pozycja kursora w edytorze, ping, live metryki.
+    code: |
+      // Klient — wyślij pozycję kursora (utrata jest OK)
+      document.addEventListener('mousemove', (e) => {
+        socket.volatile.emit('kursor_pozycja', {
+          x: e.clientX,
+          y: e.clientY,
+        })
+      })
+
+      // Serwer — broadcast pozycji do innych w room
+      socket.on('kursor_pozycja', (pos) => {
+        socket.volatile.to('edytor').emit('kursor_innego', {
+          userId: socket.id,
+          ...pos,
+        })
+      })
+    lang: javascript
+
+  - name: Timeout na emit — czekaj na odpowiedź
+    desc: >
+      Socket.io v4.4+ pozwala ustawić timeout na acknowledgement. Jeśli odbiorca
+      nie odpowie w zadanym czasie, callback dostaje błąd. Przydatne do walidacji
+      krytycznych operacji.
+    code: |
+      // Klient z timeoutem 5 sekund na ack
+      socket.timeout(5000).emit('krytyczna_akcja', { payload: 'dane' }, (err, odpowiedz) => {
+        if (err) {
+          // Timeout — serwer nie odpowiedział
+          console.error('Serwer nie odpowiedział w czasie:', err)
+          return
+        }
+        console.log('Akcja zakończona:', odpowiedz)
+      })
+
+      // Wersja Promise (async/await)
+      try {
+        const [odpowiedz] = await socket.timeout(5000).emitWithAck('krytyczna_akcja', { payload: 'dane' })
+        console.log('Sukces:', odpowiedz)
+      } catch (err) {
+        console.error('Timeout lub błąd:', err)
+      }
+    lang: javascript

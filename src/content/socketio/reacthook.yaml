@@ -1,0 +1,288 @@
+labels:
+  main: Integracja Socket.io z React
+  mainLang: javascript
+
+intro:
+  title: Socket.io w React — custom hook useSocket
+  desc: >
+    Integracja Socket.io z React wymaga uwagi na kilka kwestii: połączenie należy
+    tworzyć raz (poza komponentem lub w kontekście), handlery eventów rejestrować
+    w useEffect z cleanup przez socket.off(), oraz unikać race conditions przy
+    aktualizacjach stanu. Biblioteka socket.io-client działa świetnie z hookami
+    i Context API. Custom hook useSocket enkapsuluje logikę połączenia i daje
+    czysty interfejs dla komponentów.
+
+items:
+  - name: useSocket — podstawowy custom hook
+    desc: >
+      Hook zarządzający połączeniem Socket.io — inicjalizacja, eventy systemowe,
+      cleanup. Instancja socketu żyje poza React (poza komponentem) dzięki czemu
+      jest jedno połączenie dla całej aplikacji.
+    code: |
+      // hooks/useSocket.js
+      import { useEffect, useRef, useState } from 'react'
+      import { io } from 'socket.io-client'
+
+      // Singleton połączenia — poza komponentem!
+      let socketInstance = null
+
+      function getSocket(url, opcje = {}) {
+        if (!socketInstance) {
+          socketInstance = io(url, {
+            autoConnect: true,
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+            ...opcje,
+          })
+        }
+        return socketInstance
+      }
+
+      export function useSocket(url = 'http://localhost:3001') {
+        const [polaczony, setPolaczony] = useState(false)
+        const [blad, setBlad]           = useState(null)
+        const socket = useRef(getSocket(url))
+
+        useEffect(() => {
+          const s = socket.current
+
+          const onConnect    = () => { setPolaczony(true);  setBlad(null) }
+          const onDisconnect = () => setPolaczony(false)
+          const onError      = (err) => setBlad(err.message)
+
+          s.on('connect',       onConnect)
+          s.on('disconnect',    onDisconnect)
+          s.on('connect_error', onError)
+
+          // Jeśli już połączony (hot reload)
+          if (s.connected) setPolaczony(true)
+
+          return () => {
+            s.off('connect',       onConnect)
+            s.off('disconnect',    onDisconnect)
+            s.off('connect_error', onError)
+          }
+        }, [])
+
+        return { socket: socket.current, polaczony, blad }
+      }
+
+      // Użycie w komponencie
+      function StatusBar() {
+        const { polaczony, blad } = useSocket()
+        return (
+          <div>
+            {polaczony ? '🟢 Online' : '🔴 Offline'}
+            {blad && <span>Błąd: {blad}</span>}
+          </div>
+        )
+      }
+    lang: javascript
+
+  - name: useSocketEvent — nasłuchiwanie eventów
+    desc: >
+      Hook do nasłuchiwania konkretnego eventu z automatycznym cleanup.
+      Eliminuje boilerplate useEffect + socket.on + socket.off w każdym komponencie.
+    code: |
+      // hooks/useSocketEvent.js
+      import { useEffect } from 'react'
+      import { useSocket } from './useSocket'
+
+      export function useSocketEvent(nazwaEventu, handler) {
+        const { socket } = useSocket()
+
+        useEffect(() => {
+          socket.on(nazwaEventu, handler)
+          return () => {
+            socket.off(nazwaEventu, handler)
+          }
+        }, [socket, nazwaEventu, handler])
+      }
+
+      // Użycie — komponent czatu
+      import { useState, useCallback } from 'react'
+
+      function ListaWiadomosci() {
+        const [wiadomosci, setWiadomosci] = useState([])
+
+        // useCallback — stabilna referencja handlera!
+        const onWiadomosc = useCallback((msg) => {
+          setWiadomosci((prev) => [...prev, msg])
+        }, [])
+
+        useSocketEvent('nowa_wiadomosc', onWiadomosc)
+
+        return (
+          <ul>
+            {wiadomosci.map((m, i) => (
+              <li key={i}><b>{m.od}:</b> {m.tekst}</li>
+            ))}
+          </ul>
+        )
+      }
+    lang: javascript
+
+  - name: SocketContext — provider dla całej aplikacji
+    desc: >
+      Context API pozwala wstrzyknąć socket do dowolnego komponentu bez prop drillingu.
+      Jeden provider na górze drzewa, hook useSocketContext wszędzie indziej.
+    code: |
+      // context/SocketContext.jsx
+      import { createContext, useContext, useEffect, useRef, useState } from 'react'
+      import { io } from 'socket.io-client'
+
+      const SocketContext = createContext(null)
+
+      export function SocketProvider({ url, children }) {
+        const socketRef = useRef(null)
+        const [polaczony, setPolaczony] = useState(false)
+
+        useEffect(() => {
+          const socket = io(url, { autoConnect: true })
+          socketRef.current = socket
+
+          socket.on('connect',    () => setPolaczony(true))
+          socket.on('disconnect', () => setPolaczony(false))
+
+          return () => {
+            socket.disconnect()
+            socketRef.current = null
+          }
+        }, [url])
+
+        return (
+          <SocketContext.Provider value={{ socket: socketRef.current, polaczony }}>
+            {children}
+          </SocketContext.Provider>
+        )
+      }
+
+      export function useSocketContext() {
+        const ctx = useContext(SocketContext)
+        if (!ctx) throw new Error('useSocketContext wymaga SocketProvider!')
+        return ctx
+      }
+
+      // App.jsx
+      function App() {
+        return (
+          <SocketProvider url="http://localhost:3001">
+            <Router>
+              <Routes>
+                <Route path="/chat" element={<Chat />} />
+              </Routes>
+            </Router>
+          </SocketProvider>
+        )
+      }
+
+      // Chat.jsx — dowolny komponent
+      function Chat() {
+        const { socket, polaczony } = useSocketContext()
+        // ...
+      }
+    lang: javascript
+
+  - name: useRoom — dołączanie i wychodzenie z room
+    desc: >
+      Hook zarządzający cyklem życia room — join przy mount, leave przy unmount.
+      Idealny do komponentów które odpowiadają konkretnej room (np. strona czatu,
+      widok gry).
+    code: |
+      // hooks/useRoom.js
+      import { useEffect } from 'react'
+      import { useSocket } from './useSocket'
+
+      export function useRoom(nazwaRoom) {
+        const { socket, polaczony } = useSocket()
+
+        useEffect(() => {
+          if (!polaczony || !nazwaRoom) return
+
+          socket.emit('dolacz_do_pokoju', nazwaRoom)
+
+          return () => {
+            socket.emit('opusc_pokoj', nazwaRoom)
+          }
+        }, [socket, polaczony, nazwaRoom])
+      }
+
+      // Użycie — strona konkretnego czatu
+      function PokoiCzat({ roomId }) {
+        useRoom(roomId)  // Join przy mount, leave przy unmount
+
+        const [wiadomosci, setWiadomosci] = useState([])
+        const { socket } = useSocket()
+
+        useEffect(() => {
+          const handler = (msg) => setWiadomosci((p) => [...p, msg])
+          socket.on('nowa_wiadomosc', handler)
+          return () => socket.off('nowa_wiadomosc', handler)
+        }, [socket])
+
+        return <div>{/* lista wiadomości */}</div>
+      }
+    lang: javascript
+
+  - name: useEmit — wysyłanie z ack i loading state
+    desc: >
+      Hook do wysyłania eventów z obsługą stanu ładowania, błędu i timeout.
+      Zwraca funkcję emit oraz stany loading/error — jak useQuery ale dla WebSocket.
+    code: |
+      // hooks/useEmit.js
+      import { useCallback, useState } from 'react'
+      import { useSocket } from './useSocket'
+
+      export function useEmit(nazwaEventu, opcje = {}) {
+        const { socket } = useSocket()
+        const [ladowanie, setLadowanie] = useState(false)
+        const [blad, setBlad]           = useState(null)
+
+        const wyslij = useCallback(async (payload) => {
+          setLadowanie(true)
+          setBlad(null)
+
+          try {
+            const timeout = opcje.timeout ?? 5000
+            const [wynik] = await socket
+              .timeout(timeout)
+              .emitWithAck(nazwaEventu, payload)
+            return wynik
+          } catch (err) {
+            setBlad(err.message)
+            throw err
+          } finally {
+            setLadowanie(false)
+          }
+        }, [socket, nazwaEventu, opcje.timeout])
+
+        return { wyslij, ladowanie, blad }
+      }
+
+      // Użycie
+      function FormularzCzatu() {
+        const [tekst, setTekst] = useState('')
+        const { wyslij, ladowanie, blad } = useEmit('wyslij_wiadomosc', { timeout: 3000 })
+
+        const handleSubmit = async (e) => {
+          e.preventDefault()
+          try {
+            await wyslij({ tekst, pokoj: 'main' })
+            setTekst('')
+          } catch {
+            // blad jest w stanie hooka
+          }
+        }
+
+        return (
+          <form onSubmit={handleSubmit}>
+            <input value={tekst} onChange={(e) => setTekst(e.target.value)} />
+            <button disabled={ladowanie}>
+              {ladowanie ? 'Wysyłanie...' : 'Wyślij'}
+            </button>
+            {blad && <p className="blad">{blad}</p>}
+          </form>
+        )
+      }
+    lang: javascript

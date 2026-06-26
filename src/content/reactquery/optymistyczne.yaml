@@ -1,0 +1,356 @@
+labels:
+  main: Optimistic UI — natychmiastowe aktualizacje
+  mainLang: typescript
+
+intro:
+  title: Optimistic Updates — UI przed odpowiedzią serwera
+  desc: >
+    Optimistic UI aktualizuje interfejs natychmiast — bez czekania na serwer.
+    Użytkownik widzi zmianę od razu (np. polubienie, checkmark, usunięcie).
+    Jeśli serwer zwróci błąd — cofnij zmianę (rollback) i pokaż komunikat.
+    TanStack Query obsługuje to przez onMutate (snapshot + update), onError (rollback), onSettled (invalidate).
+
+items:
+  - title: Pełny wzorzec optimistic update
+    desc: >
+      Krok 1 (onMutate): Anuluj pending queries, pobierz snapshot, zaktualizuj cache.
+      Krok 2 (onError): Przywróć snapshot (rollback) gdy serwer zwróci błąd.
+      Krok 3 (onSettled): Invaliduj queries aby zsynchronizować z prawdziwymi danymi serwera.
+      Zmienna context przekazuje snapshot między onMutate a onError.
+    code: |
+      import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
+
+      interface Todo {
+        id:        number
+        title:     string
+        completed: boolean
+      }
+
+      async function fetchTodos(): Promise<Todo[]> {
+        const res = await fetch('/api/todos')
+        if (!res.ok) throw new Error('Błąd')
+        return res.json()
+      }
+
+      async function toggleTodoApi(id: number): Promise<Todo> {
+        const res = await fetch(`/api/todos/${id}/toggle`, { method: 'PATCH' })
+        if (!res.ok) throw new Error('Błąd serwera')
+        return res.json()
+      }
+
+      function TodoList() {
+        const queryClient = useQueryClient()
+
+        const { data: todos } = useQuery({
+          queryKey: ['todos'],
+          queryFn:  fetchTodos,
+        })
+
+        const { mutate: toggleTodo } = useMutation({
+          mutationFn: toggleTodoApi,
+
+          // Krok 1: Optymistyczna aktualizacja PRZED requestem
+          onMutate: async (todoId: number) => {
+            // Anuluj pending queries dla tego klucza
+            // (żeby nie nadpisały naszej optymistycznej aktualizacji)
+            await queryClient.cancelQueries({ queryKey: ['todos'] })
+
+            // Snapshot poprzedniego stanu (do rollbacku)
+            const previousTodos = queryClient.getQueryData<Todo[]>(['todos'])
+
+            // Optymistycznie zaktualizuj cache
+            queryClient.setQueryData<Todo[]>(['todos'], (oldTodos) =>
+              oldTodos?.map(todo =>
+                todo.id === todoId
+                  ? { ...todo, completed: !todo.completed }
+                  : todo
+              ) ?? []
+            )
+
+            // Zwróć context z snapshotem — dostępny w onError
+            return { previousTodos }
+          },
+
+          // Krok 2: Rollback jeśli serwer zwróci błąd
+          onError: (_error, _todoId, context) => {
+            if (context?.previousTodos) {
+              queryClient.setQueryData<Todo[]>(['todos'], context.previousTodos)
+            }
+          },
+
+          // Krok 3: Zawsze na końcu zsynchronizuj z serwera
+          onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['todos'] })
+          },
+        })
+
+        return (
+          <ul>
+            {todos?.map(todo => (
+              <li key={todo.id} onClick={() => toggleTodo(todo.id)}>
+                <input
+                  type="checkbox"
+                  readOnly
+                  checked={todo.completed}
+                />
+                <span style={{
+                  textDecoration: todo.completed ? 'line-through' : 'none',
+                  cursor: 'pointer',
+                }}>
+                  {todo.title}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    lang: typescript
+
+  - title: Optimistic add — dodawanie elementu
+    desc: >
+      Dodawanie elementu do listy przed odpowiedzią serwera.
+      Wygeneruj tymczasowe ID (np. Date.now()) dla optymistycznego elementu.
+      Po odpowiedzi serwera — invalidateQueries podmieni tymczasowe ID na prawdziwe.
+      Rollback usuwa tymczasowy element z listy.
+    code: |
+      import { useMutation, useQueryClient } from '@tanstack/react-query'
+
+      interface Comment {
+        id:        number
+        body:      string
+        author:    string
+        createdAt: string
+      }
+
+      interface NewComment {
+        body:   string
+        author: string
+        postId: number
+      }
+
+      async function addComment(data: NewComment): Promise<Comment> {
+        const res = await fetch('/api/comments', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(data),
+        })
+        if (!res.ok) throw new Error('Błąd dodawania komentarza')
+        return res.json()
+      }
+
+      function AddCommentForm({ postId }: { postId: number }) {
+        const queryClient = useQueryClient()
+        const [text, setText] = React.useState('')
+
+        const { mutate, isPending } = useMutation({
+          mutationFn: addComment,
+
+          onMutate: async (newComment: NewComment) => {
+            await queryClient.cancelQueries({ queryKey: ['comments', postId] })
+
+            const previousComments = queryClient.getQueryData<Comment[]>(
+              ['comments', postId]
+            )
+
+            // Optymistyczny komentarz z tymczasowym ID
+            const optimisticComment: Comment = {
+              id:        Date.now(),   // tymczasowe ID
+              body:      newComment.body,
+              author:    newComment.author,
+              createdAt: new Date().toISOString(),
+            }
+
+            queryClient.setQueryData<Comment[]>(
+              ['comments', postId],
+              (old) => [...(old ?? []), optimisticComment]
+            )
+
+            return { previousComments }
+          },
+
+          onError: (_err, _newComment, context) => {
+            // Rollback — przywróć poprzednią listę
+            queryClient.setQueryData<Comment[]>(
+              ['comments', postId],
+              context?.previousComments
+            )
+          },
+
+          onSettled: () => {
+            // Pobierz prawdziwe dane z serwera (podmieni tymczasowe ID)
+            queryClient.invalidateQueries({ queryKey: ['comments', postId] })
+          },
+        })
+
+        const handleSubmit = (e: React.FormEvent) => {
+          e.preventDefault()
+          if (!text.trim()) return
+          mutate({ body: text, author: 'Ja', postId })
+          setText('')
+        }
+
+        return (
+          <form onSubmit={handleSubmit}>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Dodaj komentarz..."
+            />
+            <button type="submit" disabled={isPending || !text.trim()}>
+              Dodaj
+            </button>
+          </form>
+        )
+      }
+    lang: typescript
+
+  - title: Optimistic delete — usuwanie elementu
+    desc: >
+      Natychmiastowe usunięcie z UI — element znika przed potwierdzeniem serwera.
+      onMutate usuwa z cache, onError przywraca usuniętą pozycję w oryginalne miejsce.
+      Rollback rekonstruuje listę ze snapshotu.
+    code: |
+      import { useMutation, useQueryClient } from '@tanstack/react-query'
+
+      interface Notification {
+        id:      number
+        message: string
+        read:    boolean
+      }
+
+      async function deleteNotification(id: number): Promise<void> {
+        const res = await fetch(`/api/notifications/${id}`, { method: 'DELETE' })
+        if (!res.ok) throw new Error('Nie można usunąć powiadomienia')
+      }
+
+      function NotificationItem({
+        notification,
+      }: {
+        notification: Notification
+      }) {
+        const queryClient = useQueryClient()
+
+        const { mutate: remove, isPending } = useMutation({
+          mutationFn: deleteNotification,
+
+          onMutate: async (id: number) => {
+            await queryClient.cancelQueries({ queryKey: ['notifications'] })
+
+            const previous = queryClient.getQueryData<Notification[]>(['notifications'])
+
+            // Usuń natychmiast z cache
+            queryClient.setQueryData<Notification[]>(
+              ['notifications'],
+              (old) => old?.filter(n => n.id !== id) ?? []
+            )
+
+            return { previous }
+          },
+
+          onError: (_err, _id, context) => {
+            // Przywróć usunięte powiadomienie
+            if (context?.previous) {
+              queryClient.setQueryData<Notification[]>(
+                ['notifications'],
+                context.previous
+              )
+            }
+          },
+
+          onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['notifications'] })
+          },
+        })
+
+        return (
+          <div style={{ opacity: isPending ? 0.5 : 1 }}>
+            <span>{notification.message}</span>
+            <button
+              onClick={() => remove(notification.id)}
+              disabled={isPending}
+              aria-label="Usuń powiadomienie"
+            >
+              ✕
+            </button>
+          </div>
+        )
+      }
+    lang: typescript
+
+  - title: Like/Unlike — toggle z optimistic state
+    desc: >
+      Klasyczny przykład — przycisk polubienia który reaguje natychmiast.
+      Licznik zmienia się bez czekania na serwer — rollback przy błędzie sieciowym.
+      Przekaż stan do UI przez isFetching lub isPending dla wizualnego feedbacku.
+    code: |
+      import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
+
+      interface Post {
+        id:       number
+        title:    string
+        likes:    number
+        isLiked:  boolean
+      }
+
+      async function fetchPost(id: number): Promise<Post> {
+        return fetch(`/api/posts/${id}`).then(r => r.json())
+      }
+
+      async function toggleLike(postId: number): Promise<Post> {
+        const res = await fetch(`/api/posts/${postId}/like`, { method: 'POST' })
+        if (!res.ok) throw new Error('Błąd polubienia')
+        return res.json()
+      }
+
+      function LikeButton({ postId }: { postId: number }) {
+        const queryClient = useQueryClient()
+
+        const { data: post } = useQuery({
+          queryKey: ['posts', postId],
+          queryFn:  () => fetchPost(postId),
+        })
+
+        const { mutate, isPending } = useMutation({
+          mutationFn: () => toggleLike(postId),
+
+          onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ['posts', postId] })
+
+            const previousPost = queryClient.getQueryData<Post>(['posts', postId])
+
+            // Przełącz stan lokalnie
+            queryClient.setQueryData<Post>(['posts', postId], (old) => {
+              if (!old) return old
+              return {
+                ...old,
+                isLiked: !old.isLiked,
+                likes:   old.isLiked ? old.likes - 1 : old.likes + 1,
+              }
+            })
+
+            return { previousPost }
+          },
+
+          onError: (_err, _vars, context) => {
+            queryClient.setQueryData<Post>(['posts', postId], context?.previousPost)
+          },
+
+          onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['posts', postId] })
+          },
+        })
+
+        if (!post) return null
+
+        return (
+          <button
+            onClick={() => mutate()}
+            disabled={isPending}
+            aria-label={post.isLiked ? 'Cofnij polubienie' : 'Polub'}
+            style={{ color: post.isLiked ? '#FF4154' : 'inherit' }}
+          >
+            {post.isLiked ? '❤️' : '🤍'} {post.likes}
+          </button>
+        )
+      }
+    lang: typescript

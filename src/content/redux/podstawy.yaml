@@ -1,0 +1,145 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Redux Toolkit?
+  firstComponent: Quickstart — licznik
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Redux Toolkit?
+  desc: >
+    Redux Toolkit (RTK) to oficjalny, nowoczesny sposób pisania Redux — stworzony przez
+    Mark Eriksona i społeczność, żeby wyeliminować ~70% boilerplate klasycznego Reduxa.
+    Zamiast osobnych plików action types, action creators i reducerów — masz createSlice(),
+    który łączy to wszystko w jednym miejscu. Pod spodem działa Immer, więc możesz pisać
+    "mutowalne" aktualizacje stanu (state.count++) zamiast spreadu. Jeden globalny store,
+    konfigurowany przez configureStore() z wbudowanymi devtools i middleware.
+    RTK to standard dla enterprise React: duże aplikacje, wiele developerów, potrzeba
+    debugowania z time-travel, śledzenia historii akcji i przewidywalnego stanu.
+
+concepts:
+  - title: Jeden store — jedna prawda
+    desc: >
+      Redux ma jeden globalny store dla całej aplikacji. Cały stan aplikacji mieszka
+      w jednym obiekcie JS — nie ma rozproszonego stanu między komponentami.
+      configureStore() tworzy store z automatyczną integracją Redux DevTools i
+      thunk middleware. Stan jest niemutowalny — aktualizujesz go przez akcje.
+    icon: "🏛️"
+  - title: Slice — reducer + akcje razem
+    desc: >
+      createSlice() to serce Redux Toolkit. Definiujesz nazwę, initialState i reducery
+      w jednym miejscu — RTK automatycznie generuje action creators o tych samych nazwach.
+      Nie musisz pisać switch/case, osobnych plików akcji ani stałych typów.
+      Jeden slice = jeden fragment stanu z logiką do jego modyfikacji.
+    icon: "🍕"
+  - title: Immer — mutuj bezpiecznie
+    desc: >
+      RTK używa biblioteki Immer pod spodem — możesz pisać kod wyglądający jak mutacja
+      (state.items.push(item), state.count++) a Immer tworzy nowy obiekt przez strukturalne
+      współdzielenie. Brak spreadu (...state), brak Object.assign(). Kod jest krótszy
+      i bardziej czytelny — zwłaszcza dla zagnieżdżonych struktur danych.
+    icon: "🧊"
+  - title: Async — createAsyncThunk
+    desc: >
+      createAsyncThunk() to standardowy sposób na operacje asynchroniczne (fetch, API).
+      Zwraca thunk który automatycznie dispatchuje trzy akcje: pending (ładowanie),
+      fulfilled (sukces) i rejected (błąd). W slicach obsługujesz je przez builder.addCase()
+      w sekcji extraReducers. Brak ręcznego pisania loading/error state.
+    icon: "⚡"
+  - title: RTK Query — data fetching wbudowany
+    desc: >
+      Redux Toolkit zawiera RTK Query — potężne narzędzie do fetchowania i cachowania danych.
+      Definiujesz API endpoints, a RTK Query generuje hooki (useGetUsersQuery, useAddUserMutation).
+      Automatyczne cachowanie, invalidacja, polling, loading states — bez pisania thunków.
+      Bezpośredni rywal TanStack Query, ale zintegrowany ze store Redux.
+    icon: "🔌"
+  - title: Redux DevTools — debugowanie
+    desc: >
+      configureStore() automatycznie włącza Redux DevTools — rozszerzenie przeglądarki,
+      które pokazuje historię wszystkich akcji, stan przed i po każdej akcji,
+      time-travel debugging (cofanie i przewijanie akcji) i diff stanu.
+      To największa przewaga Redux nad Zustand dla dużych aplikacji.
+    icon: "🔍"
+
+whenToUse:
+  - Duże aplikacje z wieloma developerami i złożoną logiką stanu
+  - Gdy potrzebujesz time-travel debugging i pełnej historii akcji
+  - Enterprise projekty gdzie przewidywalność i audytowalność są kluczowe
+  - Aplikacje z complex async flow (cache invalidation, optimistic updates)
+  - Gdy już używasz Redux i chcesz zmodernizować kod
+  - Projekty z RTK Query zamiast TanStack Query (jeden ekosystem)
+
+firstComponent: |
+  // Instalacja
+  npm install @reduxjs/toolkit react-redux
+
+  // store/counterSlice.ts
+  import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+
+  interface CounterState {
+    value: number
+  }
+
+  const initialState: CounterState = { value: 0 }
+
+  export const counterSlice = createSlice({
+    name: 'counter',
+    initialState,
+    reducers: {
+      increment: (state) => {
+        state.value++  // Immer — wygląda jak mutacja, jest niemutatywne
+      },
+      decrement: (state) => {
+        state.value--
+      },
+      incrementByAmount: (state, action: PayloadAction<number>) => {
+        state.value += action.payload
+      },
+    },
+  })
+
+  // RTK automatycznie generuje action creators
+  export const { increment, decrement, incrementByAmount } = counterSlice.actions
+  export default counterSlice.reducer
+
+  // store/index.ts
+  import { configureStore } from '@reduxjs/toolkit'
+  import counterReducer from './counterSlice'
+
+  export const store = configureStore({
+    reducer: {
+      counter: counterReducer,
+    },
+    // devTools: true domyślnie w development
+  })
+
+  export type RootState   = ReturnType<typeof store.getState>
+  export type AppDispatch = typeof store.dispatch
+
+  // main.tsx — owijamy Provider
+  import { Provider } from 'react-redux'
+  import { store } from './store'
+
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <Provider store={store}>
+      <App />
+    </Provider>
+  )
+
+  // components/Counter.tsx
+  import { useSelector, useDispatch } from 'react-redux'
+  import { increment, decrement, incrementByAmount } from '../store/counterSlice'
+  import type { RootState } from '../store'
+
+  export function Counter() {
+    const count    = useSelector((state: RootState) => state.counter.value)
+    const dispatch = useDispatch()
+
+    return (
+      <div>
+        <h2>Licznik: {count}</h2>
+        <button onClick={() => dispatch(decrement())}>-</button>
+        <button onClick={() => dispatch(increment())}>+</button>
+        <button onClick={() => dispatch(incrementByAmount(5))}>+5</button>
+      </div>
+    )
+  }

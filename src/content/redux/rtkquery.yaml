@@ -1,0 +1,257 @@
+labels:
+  main: RTK Query — data fetching
+  mainLang: typescript
+
+intro:
+  title: RTK Query — cache i fetching w Redux
+  desc: >
+    RTK Query to wbudowane w Redux Toolkit narzędzie do fetchowania i cachowania danych z API.
+    Definiujesz endpointy raz w createApi() — RTK Query automatycznie generuje typowane hooki
+    React (useGetUsersQuery, useAddUserMutation). Bez pisania thunków, bez ręcznego
+    loading/error state, z automatycznym cachowaniem i invalidacją danych.
+    Bezpośredni rywal TanStack Query, ale głęboko zintegrowany z Redux DevTools i store.
+
+items:
+  - title: createApi — definicja API
+    desc: >
+      createApi() to punkt wejścia RTK Query. Definiujesz baseUrl i wszystkie endpointy.
+      RTK Query generuje z tego hooki, automatycznie zarządza cache i integracją ze store.
+      apiSlice.reducer i apiSlice.middleware musisz dodać do configureStore().
+    code: |
+      import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+
+      interface User {
+        id:    number
+        name:  string
+        email: string
+      }
+
+      interface Post {
+        id:     number
+        userId: number
+        title:  string
+        body:   string
+      }
+
+      export const apiSlice = createApi({
+        reducerPath: 'api',  // klucz w store Redux
+        baseQuery: fetchBaseQuery({
+          baseUrl: 'https://jsonplaceholder.typicode.com',
+          // Nagłówki autoryzacji
+          prepareHeaders: (headers, { getState }) => {
+            const token = (getState() as RootState).auth.token
+            if (token) headers.set('authorization', `Bearer ${token}`)
+            return headers
+          },
+        }),
+        // Tag types dla invalidacji cache
+        tagTypes: ['User', 'Post'],
+        endpoints: (builder) => ({
+          // Query — pobieranie danych
+          getUsers: builder.query<User[], void>({
+            query: () => '/users',
+            providesTags: ['User'],
+          }),
+          getUserById: builder.query<User, number>({
+            query: (id) => `/users/${id}`,
+            providesTags: (result, error, id) => [{ type: 'User', id }],
+          }),
+          // Mutation — modyfikowanie danych
+          addUser: builder.mutation<User, Omit<User, 'id'>>({
+            query: (body) => ({ url: '/users', method: 'POST', body }),
+            invalidatesTags: ['User'],  // po sukcesie odśwież wszystkich users
+          }),
+          updateUser: builder.mutation<User, Partial<User> & Pick<User, 'id'>>({
+            query: ({ id, ...body }) => ({ url: `/users/${id}`, method: 'PATCH', body }),
+            invalidatesTags: (result, error, { id }) => [{ type: 'User', id }],
+          }),
+          deleteUser: builder.mutation<void, number>({
+            query: (id) => ({ url: `/users/${id}`, method: 'DELETE' }),
+            invalidatesTags: (result, error, id) => [{ type: 'User', id }],
+          }),
+        }),
+      })
+
+      // Eksportuj auto-generowane hooki
+      export const {
+        useGetUsersQuery,
+        useGetUserByIdQuery,
+        useAddUserMutation,
+        useUpdateUserMutation,
+        useDeleteUserMutation,
+      } = apiSlice
+    lang: typescript
+
+  - title: Konfiguracja store z RTK Query
+    desc: >
+      apiSlice.reducer i apiSlice.middleware muszą być dodane do configureStore.
+      Middleware obsługuje automatyczne cachowanie, invalidację, polling i lifecycle hooks.
+      Bez middleware RTK Query nie zadziała.
+    code: |
+      import { configureStore } from '@reduxjs/toolkit'
+      import { apiSlice } from './apiSlice'
+      import authReducer from './authSlice'
+
+      export const store = configureStore({
+        reducer: {
+          auth: authReducer,
+          [apiSlice.reducerPath]: apiSlice.reducer,  // klucz = reducerPath z createApi
+        },
+        middleware: (getDefaultMiddleware) =>
+          getDefaultMiddleware().concat(apiSlice.middleware),  // wymagane!
+      })
+
+      export type RootState   = ReturnType<typeof store.getState>
+      export type AppDispatch = typeof store.dispatch
+    lang: typescript
+
+  - title: useQuery — hooki do pobierania danych
+    desc: >
+      Wygenerowane hooki query zwracają obiekt z data, isLoading, isFetching, isError, error.
+      Hook automatycznie pobiera dane przy montowaniu komponentu i cachuje wynik.
+      Ten sam hook w różnych komponentach współdzieli jeden request (deduplication).
+    code: |
+      import { useGetUsersQuery, useGetUserByIdQuery } from '../store/apiSlice'
+
+      function UsersList() {
+        const {
+          data: users,      // wynik zapytania
+          isLoading,        // true podczas pierwszego ładowania
+          isFetching,       // true podczas każdego ładowania (w tym refetch)
+          isError,
+          error,
+          refetch,          // ręczne ponowne pobranie
+        } = useGetUsersQuery()
+
+        if (isLoading) return <Spinner />
+        if (isError)   return <p>Błąd: {error.toString()}</p>
+
+        return (
+          <div>
+            {isFetching && <p>Odświeżanie...</p>}
+            {users?.map(user => <UserCard key={user.id} user={user} />)}
+            <button onClick={refetch}>Odśwież</button>
+          </div>
+        )
+      }
+
+      function UserDetail({ userId }: { userId: number }) {
+        // Przekazujesz argument bezpośrednio do hooka
+        const { data: user, isLoading } = useGetUserByIdQuery(userId)
+
+        // Opcjonalne — skip gdy nie masz ID
+        const { data } = useGetUserByIdQuery(userId, {
+          skip: !userId,                    // nie pobieraj gdy brak ID
+          pollingInterval: 30_000,          // polling co 30 sekund
+          refetchOnMountOrArgChange: true,  // pobierz nawet jeśli jest w cache
+        })
+
+        if (isLoading) return <Spinner />
+        return <div>{user?.name}</div>
+      }
+    lang: typescript
+
+  - title: useMutation — hooki do modyfikacji danych
+    desc: >
+      Hooki mutation zwracają tuple [triggerFn, result]. triggerFn wywołujesz ręcznie
+      (na kliknięcie, submit formularza). result zawiera isLoading, isSuccess, isError, data.
+      Po sukcesie invalidatesTags automatycznie odświeża powiązane query.
+    code: |
+      import {
+        useAddUserMutation,
+        useUpdateUserMutation,
+        useDeleteUserMutation,
+      } from '../store/apiSlice'
+
+      function AddUserForm() {
+        const [addUser, { isLoading, isSuccess, isError, error }] = useAddUserMutation()
+
+        const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+          e.preventDefault()
+          const form = new FormData(e.currentTarget)
+          try {
+            // unwrap() rzuca wyjątek przy błędzie (zamiast zapisywać do result)
+            const newUser = await addUser({
+              name:  form.get('name') as string,
+              email: form.get('email') as string,
+            }).unwrap()
+            console.log('Dodano:', newUser)
+          } catch (err) {
+            console.error('Błąd:', err)
+          }
+        }
+
+        return (
+          <form onSubmit={handleSubmit}>
+            <input name="name"  placeholder="Imię"  required />
+            <input name="email" placeholder="Email" required />
+            <button type="submit" disabled={isLoading}>
+              {isLoading ? 'Dodawanie...' : 'Dodaj'}
+            </button>
+            {isSuccess && <p>Dodano pomyślnie!</p>}
+            {isError   && <p>Błąd: {error?.toString()}</p>}
+          </form>
+        )
+      }
+
+      function UserRow({ user }: { user: User }) {
+        const [deleteUser, { isLoading }] = useDeleteUserMutation()
+
+        return (
+          <tr>
+            <td>{user.name}</td>
+            <td>
+              <button
+                onClick={() => deleteUser(user.id)}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Usuwanie...' : 'Usuń'}
+              </button>
+            </td>
+          </tr>
+        )
+      }
+    lang: typescript
+
+  - title: Zaawansowane — transformResponse i selectFromResult
+    desc: >
+      transformResponse przetwarza odpowiedź API przed zapisem do cache — normalizacja,
+      mapowanie, wyodrębnianie pola data. selectFromResult pozwala komponentowi
+      subskrybować tylko część wyniku query — re-render tylko gdy ta część się zmieni.
+    code: |
+      const apiSlice = createApi({
+        // ...
+        endpoints: (builder) => ({
+          getUsers: builder.query<User[], void>({
+            query: () => '/users',
+            // Przetwórz odpowiedź zanim trafi do cache
+            transformResponse: (response: { data: User[]; total: number }) => {
+              return response.data.map(user => ({
+                ...user,
+                name: user.name.trim(),  // normalizacja
+              }))
+            },
+          }),
+          getPosts: builder.query<{ data: Post[]; total: number }, { page: number }>({
+            query: ({ page }) => `/posts?_page=${page}&_limit=10`,
+            // Merge wyniki paginacji zamiast zastępować
+            serializeQueryArgs: ({ queryArgs }) => 'posts',  // jeden klucz cache
+            merge: (currentCache, newItems) => {
+              currentCache.data.push(...newItems.data)
+            },
+            forceRefetch: ({ currentArg, previousArg }) =>
+              currentArg?.page !== previousArg?.page,
+          }),
+        }),
+      })
+
+      // selectFromResult — subskrypcja na fragment wyniku
+      function UserCount() {
+        const { count } = useGetUsersQuery(undefined, {
+          selectFromResult: ({ data }) => ({
+            count: data?.length ?? 0,  // re-render tylko gdy count się zmieni
+          }),
+        })
+        return <span>Użytkownicy: {count}</span>
+      }
+    lang: typescript

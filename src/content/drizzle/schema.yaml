@@ -1,0 +1,154 @@
+labels:
+  main: Definiowanie schemy
+  mainLang: typescript
+
+intro:
+  title: Schema — fundament Drizzle
+  desc: >
+    W Drizzle schema to zwykły TypeScript — definiujesz tabele używając pgTable (PostgreSQL),
+    mysqlTable (MySQL) lub sqliteTable (SQLite). Każda kolumna ma typ i opcjonalne modyfikatory.
+    Wyeksportowane tabele używasz bezpośrednio w queries — pełna type safety bez generowania kodu.
+
+items:
+  - title: pgTable — definiowanie tabeli PostgreSQL
+    desc: >
+      pgTable(nazwaTabeli, kolumny) — pierwsza argument to nazwa w bazie danych.
+      Typy kolumn: serial (auto-increment), text, varchar, integer, boolean, timestamp,
+      json, jsonb, uuid, numeric, bigint. Każda kolumna to funkcja z chainable metodami.
+    code: |
+      import {
+        pgTable, serial, text, varchar, integer,
+        boolean, timestamp, json, uuid, numeric
+      } from 'drizzle-orm/pg-core'
+
+      export const products = pgTable('products', {
+        id:          serial('id').primaryKey(),
+        name:        varchar('name', { length: 255 }).notNull(),
+        description: text('description'),
+        price:       numeric('price', { precision: 10, scale: 2 }).notNull(),
+        inStock:     boolean('in_stock').default(true).notNull(),
+        metadata:    json('metadata').$type<{ tags: string[] }>(),
+        categoryId:  integer('category_id'),
+        createdAt:   timestamp('created_at').defaultNow().notNull(),
+        updatedAt:   timestamp('updated_at').defaultNow().notNull(),
+      })
+
+      // TypeScript typ automatycznie z tabeli:
+      // type Product = typeof products.$inferSelect
+      // type NewProduct = typeof products.$inferInsert
+    lang: typescript
+
+  - title: Ograniczenia — primaryKey, unique, notNull, default
+    desc: >
+      Modyfikatory chainujesz na kolumnie: .notNull(), .unique(), .default(wartość),
+      .defaultNow() (dla dat), .primaryKey(). Composite primary key i composite unique
+      definiujesz w trzecim argumencie pgTable — obiekt z constraint funkcjami.
+    code: |
+      import { pgTable, serial, text, integer, uniqueIndex, primaryKey } from 'drizzle-orm/pg-core'
+      import { sql } from 'drizzle-orm'
+
+      export const accounts = pgTable('accounts', {
+        id:       uuid('id').defaultRandom().primaryKey(),
+        email:    text('email').notNull().unique(),
+        tenantId: text('tenant_id').notNull(),
+        slug:     text('slug').notNull(),
+        balance:  integer('balance').default(0).notNull(),
+        // Default z SQL expression
+        token:    text('token').default(sql`gen_random_uuid()`),
+      }, (table) => ({
+        // Composite unique constraint
+        tenantSlugUniq: uniqueIndex('tenant_slug_idx').on(table.tenantId, table.slug),
+      }))
+
+      // Composite primary key (join table)
+      export const postsTags = pgTable('posts_tags', {
+        postId: integer('post_id').notNull(),
+        tagId:  integer('tag_id').notNull(),
+      }, (table) => ({
+        pk: primaryKey({ columns: [table.postId, table.tagId] }),
+      }))
+    lang: typescript
+
+  - title: Indeksy — index, uniqueIndex
+    desc: >
+      Indeksy definiujesz w trzecim argumencie pgTable. index() tworzy zwykły indeks,
+      uniqueIndex() — unikalny. Można tworzyć indeksy złożone (composite) na wielu kolumnach.
+      Indeksy poprawiają wydajność queries na często filtrowanych polach.
+    code: |
+      import { pgTable, serial, text, integer, index, uniqueIndex } from 'drizzle-orm/pg-core'
+
+      export const posts = pgTable('posts', {
+        id:        serial('id').primaryKey(),
+        title:     text('title').notNull(),
+        slug:      text('slug').notNull(),
+        authorId:  integer('author_id').notNull(),
+        published: integer('published').default(0),
+        views:     integer('views').default(0),
+      }, (table) => ({
+        // Indeks na autorze (często filtrujemy posty po autorze)
+        authorIdx:     index('posts_author_idx').on(table.authorId),
+        // Unikalny slug
+        slugIdx:       uniqueIndex('posts_slug_idx').on(table.slug),
+        // Composite indeks — posty autora posortowane po views
+        authorViewsIdx: index('posts_author_views_idx').on(table.authorId, table.views),
+      }))
+    lang: typescript
+
+  - title: MySQL i SQLite — mysqlTable, sqliteTable
+    desc: >
+      MySQL i SQLite mają własne funkcje z różnymi typami kolumn. mysqlTable używa
+      int zamiast integer, varchar z długością jest wymagany. sqliteTable ma tylko
+      text, integer, real, blob — SQLite jest dynamicznie typowany.
+    code: |
+      // MySQL
+      import { mysqlTable, int, varchar, boolean, datetime } from 'drizzle-orm/mysql-core'
+
+      export const mysqlUsers = mysqlTable('users', {
+        id:        int('id').autoincrement().primaryKey(),
+        email:     varchar('email', { length: 255 }).notNull().unique(),
+        name:      varchar('name', { length: 100 }),
+        active:    boolean('active').default(true),
+        createdAt: datetime('created_at').default(sql`CURRENT_TIMESTAMP`),
+      })
+
+      // SQLite
+      import { sqliteTable, integer, text, real } from 'drizzle-orm/sqlite-core'
+
+      export const sqliteUsers = sqliteTable('users', {
+        id:        integer('id').primaryKey({ autoIncrement: true }),
+        email:     text('email').notNull().unique(),
+        name:      text('name'),
+        score:     real('score').default(0),
+        createdAt: integer('created_at', { mode: 'timestamp' }).defaultNow(),
+      })
+    lang: typescript
+
+  - title: Typy TypeScript z tabeli
+    desc: >
+      Drizzle automatycznie inferuje typy TypeScript ze schema — bez generowania kodu,
+      bez prisma generate. $inferSelect to typ rekordu z bazy (wszystkie pola),
+      $inferInsert to typ do insertu (nullable pola są opcjonalne).
+    code: |
+      import { pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core'
+
+      export const users = pgTable('users', {
+        id:        serial('id').primaryKey(),
+        email:     text('email').notNull(),
+        name:      text('name'),           // nullable = undefined w insert
+        createdAt: timestamp('created_at').defaultNow(),
+      })
+
+      // Typy inferowane automatycznie
+      type User    = typeof users.$inferSelect
+      // { id: number; email: string; name: string | null; createdAt: Date | null }
+
+      type NewUser = typeof users.$inferInsert
+      // { email: string; name?: string | null; createdAt?: Date | null }
+      // id i createdAt są opcjonalne (mają default)
+
+      // Użycie w funkcji
+      async function createUser(data: NewUser): Promise<User> {
+        const [user] = await db.insert(users).values(data).returning()
+        return user
+      }
+    lang: typescript
