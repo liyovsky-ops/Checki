@@ -1,0 +1,42 @@
+title: Kafka Streams i przetwarzanie strumieni
+
+items:
+  - name: Faust — Kafka Streams dla Python
+    desc: Faust to Python library do stream processingu na Kafka. Agenty czytają topic i przetwarzają eventy. Tabele (changelog topics) do stateful processing.
+    code: |
+      import faust
+
+      app = faust.App(
+          'order-processor',
+          broker='kafka://localhost:9092',
+          value_serializer='raw',
+      )
+
+      # Model eventu
+      class Order(faust.Record):
+          order_id: str
+          user_id: str
+          amount: float
+          status: str
+
+      # Topic
+      orders_topic = app.topic('orders', value_type=Order)
+      results_topic = app.topic('order-results', value_type=Order)
+
+      # Tabela do śledzenia stanu (persisted w Kafka)
+      user_totals = app.Table('user-totals', default=float)
+
+      # Agent — przetwarza eventy
+      @app.agent(orders_topic)
+      async def process_orders(orders):
+          async for order in orders:
+              # Agreguj wydatki per user
+              user_totals[order.user_id] += order.amount
+
+              # Wyślij wynik
+              processed = order.asdict()
+              processed['status'] = 'processed'
+              await results_topic.send(value=processed)
+
+      # Uruchomienie
+      # faust -A myapp worker -l info

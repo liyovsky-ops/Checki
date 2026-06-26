@@ -1,0 +1,66 @@
+title: Nginx vs alternatywy
+
+items:
+  - name: Apache HTTP Server
+    icon: "🪶"
+    color: "#d22128"
+    tagline: Klasyczny web server — moduły, .htaccess, dojrzały ekosystem
+    pros:
+      - .htaccess — konfiguracja per-katalog bez restartu serwera
+      - mod_php — PHP działa wewnątrz procesu Apache (prostszy setup)
+      - Ogromna dokumentacja i community
+      - Moduły dynamiczne — łatwe rozszerzanie funkcjonalności
+    cons:
+      - Thread per request — dużo RAM przy wielu połączeniach
+      - Wolniejszy dla plików statycznych i high concurrency
+      - Skomplikowana konfiguracja (mod_rewrite, VirtualHost)
+      - Mniejsze wsparcie dla nowoczesnych protokołów (HTTP/2)
+    vs: Apache gdy potrzebujesz .htaccess lub shared hosting z PHP. Nginx dla nowoczesnych aplikacji i high-performance.
+
+  - name: Caddy
+    icon: "🏠"
+    color: "#22b455"
+    tagline: Automatyczny HTTPS, prosta konfiguracja, zero konfiguracji TLS
+    pros:
+      - Automatyczny HTTPS z Let's Encrypt — zero ręcznej konfiguracji
+      - Prosta składnia Caddyfile — 10× krótsza od nginx.conf
+      - HTTP/3 (QUIC) domyślnie
+      - API do dynamicznej konfiguracji
+    cons:
+      - Mniejsza społeczność i ekosystem
+      - Wyższe zużycie RAM niż Nginx
+      - Mniej zaawansowane opcje load balancingu
+      - Mniej opcji tuningu dla high-performance
+    vs: Caddy dla prostych projektów gdzie chcesz automatyczny HTTPS. Nginx gdy potrzebujesz pełnej kontroli.
+
+  - name: Traefik
+    icon: "🐱"
+    color: "#37abc8"
+    tagline: Cloud-native reverse proxy — auto-discovery Docker/Kubernetes
+    pros:
+      - Auto-discovery — wykrywa nowe serwisy Docker/K8s bez konfiguracji
+      - Dashboard UI out of the box
+      - Native Kubernetes Ingress Controller
+      - Automatyczny Let's Encrypt
+    cons:
+      - Złożona konfiguracja YAML/TOML dla zaawansowanych przypadków
+      - Wyższe zużycie zasobów niż Nginx
+      - Overkill dla prostych setups
+      - Wolniejszy niż Nginx dla plików statycznych
+    vs: Traefik w środowisku Docker/Kubernetes gdzie dynamicznie dodajesz serwisy. Nginx dla klasycznego deployment.
+
+  - name: HAProxy
+    icon: "⚖️"
+    color: "#1b6ca8"
+    tagline: Specjalizowany load balancer — najwyższa wydajność i niezawodność
+    pros:
+      - Wydajność load balancingu — lepszy niż Nginx przy bardzo dużym ruchu
+      - Zaawansowane health checking i circuit breaker
+      - ACL (Access Control Lists) — potężny routing
+      - Używany przez GitHub, Stack Overflow, Instagram
+    cons:
+      - Nie serwuje plików statycznych
+      - Nie obsługuje PHP, CGI
+      - Mniej elastyczny niż Nginx jako web server
+      - Trudniejsza konfiguracja
+    vs: HAProxy gdy potrzebujesz wyspecjalizowanego, wysokowydajnego load balancera. Nginx gdy chcesz jednego serwera do wszystkiego.

@@ -127,9 +127,9 @@ items:
       export const postsTags = pgTable('posts_tags', {
         postId: integer('post_id').notNull(),
         tagId:  integer('tag_id').notNull(),
-      }, (table) => ({
-        pk: primaryKey({ columns: [table.postId, table.tagId] }),
-      }))
+      }, (table) => [
+        primaryKey({ columns: [table.postId, table.tagId] }),
+      ])
 
       // Relations przez join table
       export const postsRelations = relations(posts, ({ many }) => ({
@@ -142,7 +142,7 @@ items:
 
       export const postsTagsRelations = relations(postsTags, ({ one }) => ({
         post: one(posts, { fields: [postsTags.postId], references: [posts.id] }),
-        tag:  "one(tags,  { fields: [postsTags.tagId],  references: [tags.id] }),"
+        tag:  one(tags,  { fields: [postsTags.tagId],  references: [tags.id] }),
       }))
 
       // Query
@@ -164,14 +164,14 @@ items:
     code: |
       import { sql, eq, gt } from 'drizzle-orm'
 
-      // Subquery jako wartość (scalar subquery)
+      // Correlated scalar subquery — jako kolumna używaj sql template
+      // (builder .as() tworzy subquery do FROM/JOIN, nie skalar w SELECT)
       const usersWithPostCount = await db.select({
         id:        users.id,
         email:     users.email,
-        postCount: db.select({ count: sql<number>`count(*)` })
-                     .from(posts)
-                     .where(eq(posts.authorId, users.id))
-                     .as('post_count'),
+        postCount: sql<number>`(
+          select count(*) from ${posts} where ${posts.authorId} = ${users.id}
+        )`.mapWith(Number),
       }).from(users)
 
       // CTE — with()

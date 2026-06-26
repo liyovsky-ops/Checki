@@ -129,30 +129,33 @@ items:
       Jeden provider na górze drzewa, hook useSocketContext wszędzie indziej.
     code: |
       // context/SocketContext.jsx
-      import { createContext, useContext, useEffect, useRef, useState } from 'react'
+      import { createContext, useContext, useEffect, useState } from 'react'
       import { io } from 'socket.io-client'
 
       const SocketContext = createContext(null)
 
       export function SocketProvider({ url, children }) {
-        const socketRef = useRef(null)
-        const [polaczony, setPolaczony] = useState(false)
+        // Lazy init — socket istnieje już przy PIERWSZYM renderze
+        // (useRef = null aż do useEffect → konsumenci dostają null)
+        const [socket] = useState(() => io(url, { autoConnect: true }))
+        const [polaczony, setPolaczony] = useState(socket.connected)
 
         useEffect(() => {
-          const socket = io(url, { autoConnect: true })
-          socketRef.current = socket
+          const onConnect    = () => setPolaczony(true)
+          const onDisconnect = () => setPolaczony(false)
 
-          socket.on('connect',    () => setPolaczony(true))
-          socket.on('disconnect', () => setPolaczony(false))
+          socket.on('connect',    onConnect)
+          socket.on('disconnect', onDisconnect)
 
           return () => {
+            socket.off('connect',    onConnect)
+            socket.off('disconnect', onDisconnect)
             socket.disconnect()
-            socketRef.current = null
           }
-        }, [url])
+        }, [socket])
 
         return (
-          <SocketContext.Provider value={{ socket: socketRef.current, polaczony }}>
+          <SocketContext.Provider value={{ socket, polaczony }}>
             {children}
           </SocketContext.Provider>
         )
@@ -245,7 +248,8 @@ items:
 
           try {
             const timeout = opcje.timeout ?? 5000
-            const [wynik] = await socket
+            // emitWithAck zwraca pojedynczą wartość ack (nie tablicę)
+            const wynik = await socket
               .timeout(timeout)
               .emitWithAck(nazwaEventu, payload)
             return wynik

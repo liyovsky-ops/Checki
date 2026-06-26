@@ -1,0 +1,84 @@
+title: Integracja z Next.js App Router
+
+items:
+  - name: Setup w Next.js App Router
+    desc: tRPC w Next.js App Router — handler API, TRPCProvider wrapper, Server Components z bezpośrednim wywołaniem. Bez HTTP round-trip w RSC.
+    code: |
+      // app/api/trpc/[trpc]/route.ts
+      import { fetchRequestHandler } from '@trpc/server/adapters/fetch'
+      import { appRouter } from '@/server/router'
+      import { createContext } from '@/server/context'
+
+      const handler = (req: Request) =>
+        fetchRequestHandler({
+          endpoint: '/api/trpc',
+          req,
+          router: appRouter,
+          createContext: () => createContext({ req }),
+        })
+
+      export { handler as GET, handler as POST }
+
+      // app/providers.tsx — TRPCProvider wrapper
+      'use client'
+      import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+      import { trpc } from '@/utils/trpc'
+      import { httpBatchLink } from '@trpc/client'
+      import { useState } from 'react'
+
+      export function TRPCProvider({ children }: { children: React.ReactNode }) {
+        const [queryClient] = useState(() => new QueryClient())
+        const [trpcClient] = useState(() =>
+          trpc.createClient({
+            links: [
+              httpBatchLink({ url: '/api/trpc' }),
+            ],
+          })
+        )
+        return (
+          <trpc.Provider client={trpcClient} queryClient={queryClient}>
+            <QueryClientProvider client={queryClient}>
+              {children}
+            </QueryClientProvider>
+          </trpc.Provider>
+        )
+      }
+
+  - name: Server Components — wywołanie bez HTTP
+    desc: W React Server Components możesz wywołać procedury tRPC bezpośrednio — bez HTTP. Szybszy SSR, bez waterfall. Użyj createCaller() lub createServerSideHelpers().
+    code: |
+      // app/posts/page.tsx — Server Component
+      import { appRouter } from '@/server/router'
+      import { createContext } from '@/server/context'
+      import { headers } from 'next/headers'
+
+      export default async function PostsPage() {
+        // Wywołanie bezpośrednie — bez HTTP!
+        const ctx = await createContext({ headers: headers() })
+        const caller = appRouter.createCaller(ctx)
+
+        const posts = await caller.posts.list({ limit: 10 })
+
+        return (
+          <ul>
+            {posts.items.map(post => (
+              <li key={post.id}>{post.title}</li>
+            ))}
+          </ul>
+        )
+      }
+
+      // Prefetch dla Client Components (hydration)
+      import { createServerSideHelpers } from '@trpc/react-query/server'
+      import superjson from 'superjson'
+
+      export async function generateStaticParams() {
+        const helpers = createServerSideHelpers({
+          router: appRouter,
+          ctx: await createContext({}),
+          transformer: superjson,
+        })
+
+        await helpers.posts.list.prefetch({ limit: 10 })
+        return { trpcState: helpers.dehydrate() }
+      }

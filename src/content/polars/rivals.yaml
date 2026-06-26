@@ -1,0 +1,66 @@
+title: Polars vs alternatywy
+
+items:
+  - name: Pandas
+    icon: "🐼"
+    color: "#130654"
+    tagline: Klasyczny DataFrame Python — ogromny ekosystem, znany wszystkim
+    pros:
+      - Ogromny ekosystem — matplotlib, sklearn, seaborn natywnie
+      - 15+ lat historii — więcej tutoriali, StackOverflow odpowiedzi
+      - Named index — wygodny dla time series
+      - Lepsza integracja z Jupyter i narzędziami EDA
+    cons:
+      - Wolny dla dużych zbiorów (GIL, kopiowanie)
+      - Wysokie zużycie RAM (często 5-10x rozmiar pliku)
+      - NaN vs None zamieszanie
+      - Chaining operacji nieczytelny (inplace=True)
+    vs: Pandas gdy potrzebujesz ekosystemu lub uczysz się data science. Polars gdy masz duże dane lub zależy na wydajności.
+
+  - name: DuckDB
+    icon: "🦆"
+    color: "#FDAD06"
+    tagline: SQL na plikach — analityczna baza in-process, ultraszybka
+    pros:
+      - Pełny SQL z window functions, CTEs
+      - Czyta Parquet/CSV/JSON bezpośrednio bez wczytywania
+      - Integracja z Polars i Pandas przez Arrow
+      - Niższe zużycie RAM dzięki zewnętrznemu procesowi
+    cons:
+      - Wymaga SQL — nie Python expressions
+      - Mniej elastyczny niż DataFrame API
+      - Wolniejszy dla prostych operacji per-row
+      - Mniejsza ekosystem Python integracji
+    vs: DuckDB gdy preferujesz SQL lub masz skomplikowane joiny/analitykę. Polars gdy chcesz Python API i wyrażenia.
+
+  - name: PySpark
+    icon: "⚡"
+    color: "#E25A1C"
+    tagline: Distributed computing — miliardy wierszy, klaster Spark
+    pros:
+      - Skaluje na klastry (10-1000 maszyn)
+      - Obsługuje petabajty danych
+      - Streaming + batch w jednym API
+      - Ekosystem MLlib, Delta Lake, Databricks
+    cons:
+      - Ogromny overhead dla małych/średnich danych
+      - JVM-based — setup złożony, latency wyższa
+      - Droższy w utrzymaniu (klaster Spark)
+      - API bardziej skomplikowane
+    vs: PySpark dla danych które nie mieszczą się na jednym serwerze. Polars gdy dane mieszczą się w RAM lub na jednym mocnym serwerze.
+
+  - name: cuDF (RAPIDS)
+    icon: "🖥️"
+    color: "#76B900"
+    tagline: GPU-accelerated DataFrame — Pandas API na GPU NVIDIA
+    pros:
+      - GPU acceleration — 100x szybszy niż CPU dla odpowiednich operacji
+      - Pandas-kompatybilny API (zero-code migration)
+      - Świetny dla ML preprocessing z GPU
+      - Integracja z cuML (GPU scikit-learn)
+    cons:
+      - Wymaga GPU NVIDIA + CUDA — hardware dependency
+      - Drogi w chmurze (GPU instances)
+      - Nie wszystkie operacje obsługiwane
+      - Nie działa bez GPU
+    vs: cuDF gdy masz GPU i przetwarzasz dane dla ML. Polars gdy chcesz szybkiego CPU DataFrame bez GPU dependency.

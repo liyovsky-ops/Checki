@@ -1,0 +1,59 @@
+title: Lazy API — optymalizowane zapytania
+
+items:
+  - name: LazyFrame — opóźnione wykonanie
+    desc: scan_csv/scan_parquet tworzy LazyFrame — plan zapytania. Dodajesz transformacje, collect() wyzwala wykonanie. Polars optymalizuje plan — wczytuje tylko potrzebne kolumny.
+    code: |
+      import polars as pl
+
+      # scan_* = LazyFrame (nie wczytuje danych)
+      lf = pl.scan_csv("data/events.csv")
+
+      # Buduj plan bez wykonania
+      plan = (
+          lf
+          .filter(pl.col("event_type") == "purchase")
+          .filter(pl.col("amount") > 100)
+          .select(["user_id", "amount", "date"])
+          .with_columns(
+              pl.col("date").str.to_date().alias("date_parsed")
+          )
+          .group_by("user_id")
+          .agg(
+              pl.col("amount").sum().alias("total_spent"),
+              pl.col("amount").count().alias("purchase_count"),
+          )
+          .sort("total_spent", descending=True)
+          .limit(100)
+      )
+
+      # Pokaż plan przed wykonaniem
+      print(plan.explain(optimized=True))
+
+      # Wykonaj — Polars wczyta tylko kolumny event_type, amount, date, user_id
+      result = plan.collect()
+      print(result)
+
+  - name: Streaming — dane większe niż RAM
+    desc: streaming=True w collect() przetwarza dane strumieniowo — nie ładuje wszystkich danych do pamięci. Dla plików GB+ które nie mieszczą się w RAM.
+    code: |
+      import polars as pl
+
+      # 100GB parquet — streaming przez collect(streaming=True)
+      result = (
+          pl.scan_parquet("data/huge_dataset.parquet")
+          .filter(pl.col("country") == "PL")
+          .group_by("product_id")
+          .agg(pl.col("revenue").sum())
+          .sort("revenue", descending=True)
+          .limit(10)
+          .collect(streaming=True)  # Nie ładuj wszystkiego do RAM
+      )
+      print(result)
+
+      # Sink — zapisz wynik bez ładowania do pamięci
+      (
+          pl.scan_parquet("data/huge_dataset.parquet")
+          .filter(pl.col("country") == "PL")
+          .sink_parquet("output/pl_filtered.parquet")  # Bezpośredni zapis
+      )

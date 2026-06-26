@@ -1,0 +1,118 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać TypeScript?
+  firstComponent: Pierwszy plik TypeScript
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest TypeScript?
+  desc: >
+    TypeScript to język programowania rozwijany przez Microsoft — nadzbiór JavaScript z opcjonalnym
+    systemem typów. Każdy poprawny kod JS jest też kodem TS. TypeScript kompiluje się do czystego
+    JavaScript i działa wszędzie gdzie działa JS — w przeglądarce, Node.js, Deno, Bun.
+    System typów wykrywa błędy podczas pisania kodu (w edytorze), a nie dopiero w runtime.
+    Ogromny ekosystem — React, Angular, Next.js, NestJS, Prisma — wszystkie napisane lub
+    w pełni wspierające TypeScript. Standardowy wybór w każdym poważnym projekcie JS/TS.
+
+concepts:
+  - title: Type Annotations
+    desc: >
+      Adnotacje typów to deklaracje mówiące co dana zmienna/funkcja przyjmuje i zwraca.
+      TypeScript sprawdza je podczas kompilacji — błąd typu = błąd kompilacji.
+      Większość adnotacji można pominąć — TypeScript sam je wywnioskuje (type inference).
+    icon: "🏷️"
+  - title: Type Inference
+    desc: >
+      TypeScript automatycznie wnioskuje typy bez konieczności pisania adnotacji.
+      const x = 42 → TypeScript wie że x to number. Funkcja zwracająca string
+      ma automatycznie typ () => string. Inference jest bardzo silna — pisz adnotacje
+      tylko tam gdzie inference nie daje rady.
+    icon: "🔍"
+  - title: Interface vs Type
+    desc: >
+      Interface i type alias to dwa sposoby definiowania kształtu obiektów.
+      Interface można rozszerzać (extends) i deklarować wielokrotnie (declaration merging).
+      Type alias jest bardziej elastyczny — obsługuje union, intersection, mapped types.
+      W praktyce: interface dla kształtów obiektów, type dla aliasów i złożonych typów.
+    icon: "📐"
+  - title: Union i Intersection
+    desc: >
+      Union (A | B) — wartość jest A LUB B. Intersection (A & B) — wartość jest A I B jednocześnie.
+      Union świetny do discriminated unions (pattern matching po tagu).
+      Intersection do łączenia typów (mixiny, composition).
+    icon: "⚡"
+  - title: Generyki
+    desc: >
+      Generyki pozwalają pisać kod działający z różnymi typami zachowując bezpieczeństwo typów.
+      function identity<T>(x: T): T — T to parametr typowy, "typ dla typów".
+      Używane wszędzie: Array<T>, Promise<T>, React.FC<Props>, useState<T>().
+    icon: "🔧"
+  - title: Narrowing
+    desc: >
+      TypeScript śledzi możliwe typy wartości wewnątrz bloków warunkowych.
+      Po if (typeof x === 'string') TypeScript wie że x to string.
+      Po if (error instanceof ApiError) TypeScript wie że error to ApiError.
+      Discriminated unions + switch = type-safe pattern matching.
+    icon: "🎯"
+  - title: strictMode
+    desc: >
+      Tryb strict włącza zestaw najważniejszych sprawdzeń: strictNullChecks (null ≠ undefined ≠ typ),
+      noImplicitAny (brak niejawnych any), strictFunctionTypes i inne.
+      Zawsze włączaj strict: true — to jedyny sposób żeby TS faktycznie chronił przed bugami.
+    icon: "🛡️"
+
+whenToUse:
+  - Każdy nowy projekt JavaScript — standardem jest TS, nie JS
+  - Kod który będzie utrzymywany przez wiele osób przez długi czas
+  - Biblioteki i frameworki — typy to dokumentacja i kontrakt API
+  - Refaktoring istniejącego kodu — typy wyłapują przypadkowe zmiany API
+  - Projekty gdzie ważna jest IDE autocomplete i navigation
+  - Integracja z zewnętrznymi API — typy z definicji odpowiedzi
+
+firstComponent: |
+  // Instalacja
+  npm install -D typescript tsx @types/node
+
+  // Inicjalizacja konfiguracji
+  npx tsc --init
+
+  // hello.ts
+  interface User {
+    id: number;
+    name: string;
+    email: string;
+    role: 'admin' | 'user' | 'guest';
+  }
+
+  function greetUser(user: User): string {
+    return `Hello, ${user.name}! Role: ${user.role}`;
+  }
+
+  function fetchUser(id: number): Promise<User> {
+    return fetch(`/api/users/${id}`)
+      .then(res => res.json());
+  }
+
+  // Type inference — brak adnotacji, TypeScript wywnioskuje
+  const users = [
+    { id: 1, name: 'Alice', email: 'a@b.com', role: 'admin' as const },
+    { id: 2, name: 'Bob',   email: 'b@c.com', role: 'user'  as const },
+  ];
+
+  // Union type — discriminated union
+  type Result<T> =
+    | { ok: true;  data: T }
+    | { ok: false; error: string };
+
+  function parseUser(raw: unknown): Result<User> {
+    if (typeof raw !== 'object' || raw === null) {
+      return { ok: false, error: 'Not an object' };
+    }
+    // ... walidacja
+    return { ok: true, data: raw as User };
+  }
+
+  // Kompilacja
+  npx tsc
+  // Lub uruchom bezpośrednio (bez kompilacji do pliku)
+  npx tsx hello.ts

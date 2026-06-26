@@ -1,0 +1,102 @@
+title: Komendy Storybook
+
+groups:
+  - name: Instalacja i inicjalizacja
+    icon: "📦"
+    commands:
+      - cmd: npx storybook@latest init
+        desc: Zainicjuj Storybook w istniejącym projekcie
+        detail:
+          what: Wykrywa framework (React, Vue, Angular, Svelte), instaluje zależności, tworzy .storybook/main.ts i example stories.
+          tips:
+            - 'Działa w istniejącym projekcie — nie tworzy nowego'
+      - cmd: npx create-react-app my-app --template typescript && cd my-app && npx storybook@latest init
+        desc: Nowa aplikacja React z Storybook od zera
+        detail:
+          what: Utwórz CRA projekt i zainicjuj Storybook w jednym kroku.
+      - cmd: npm install @storybook/addon-a11y @storybook/addon-interactions @storybook/test
+        desc: Zainstaluj popularne addony
+        detail:
+          what: a11y = accessibility audit, interactions = play() support, test = userEvent/expect.
+      - cmd: npm install chromatic --save-dev
+        desc: Zainstaluj Chromatic do visual testing
+        detail:
+          what: Visual regression testing — porównuje screenshoty stories między buildami.
+
+  - name: Uruchamianie
+    icon: "▶️"
+    commands:
+      - cmd: npm run storybook
+        desc: Uruchom Storybook dev server (http://localhost:6006)
+        detail:
+          what: Hot reload — zmiany w .stories.tsx widoczne natychmiast.
+          tips:
+            - 'Domyślnie port 6006 — zmień w .storybook/main.ts: server: {port: 6007}'
+      - cmd: npm run build-storybook
+        desc: Zbuduj Storybook jako statyczną stronę HTML
+        detail:
+          what: Generuje statyczny bundle w storybook-static/ — do deploymentu na GitHub Pages, Netlify.
+          flags:
+            - flag: '-o ./public/storybook'
+              desc: Zmień katalog wyjściowy
+      - cmd: npx http-server storybook-static
+        desc: Serwuj zbudowany Storybook lokalnie
+        detail:
+          what: Testuj zbudowaną wersję przed deploymentem.
+
+  - name: Stories i testy
+    icon: "🧪"
+    commands:
+      - cmd: npx test-storybook
+        desc: Uruchom play() stories jako testy (Playwright)
+        detail:
+          what: Każda story z play() staje się testem. Wymaga uruchomionego Storybook dev server.
+          tips:
+            - 'Uruchom Storybook osobno: npm run storybook & npx test-storybook'
+      - cmd: npx test-storybook --url http://localhost:6006 --ci
+        desc: Uruchom testy Storybook w trybie CI
+        detail:
+          what: Headless, raport JUnit. Integracja z GitHub Actions, CircleCI.
+          flags:
+            - flag: '--coverage'
+              desc: Generuj coverage report
+      - cmd: npx storybook test --watch
+        desc: Uruchom testy w trybie watch (Storybook 8+)
+        detail:
+          what: Storybook 8 ma wbudowany test runner — bez osobnego test-storybook pakietu.
+
+  - name: Chromatic i visual testing
+    icon: "📸"
+    commands:
+      - cmd: npx chromatic --project-token=<token>
+        desc: Prześlij stories do Chromatic
+        detail:
+          what: Chromatic robi screenshoty każdej story i porównuje z poprzednim. Zmiany wizualne wymagają review.
+          tips:
+            - 'Token pobierz z app.chromatic.com po rejestracji projektu'
+      - cmd: npx chromatic --project-token=<token> --auto-accept-changes
+        desc: Zaakceptuj wszystkie zmiany wizualne automatycznie (baseline update)
+        detail:
+          what: Przydatne po dużym refactorze komponentów — aktualizuj baseline.
+      - cmd: npx chromatic --project-token=<token> --only-changed
+        desc: Testuj tylko zmienione stories (TurboSnap)
+        detail:
+          what: TurboSnap — Chromatic analizuje git diff i testuje tylko dotknięte stories. Szybszy CI.
+
+  - name: Konfiguracja
+    icon: "⚙️"
+    commands:
+      - cmd: cat .storybook/main.ts
+        desc: Sprawdź konfigurację główną Storybook
+        detail:
+          what: "main.ts zawiera: stories (glob pattern), addons (lista), framework, viteFinal (config Vite)."
+      - cmd: cat .storybook/preview.ts
+        desc: Sprawdź globalną konfigurację stories
+        detail:
+          what: "preview.ts zawiera: parameters (globalne), decorators (wrapper dla wszystkich stories), globalTypes."
+      - cmd: npx storybook@latest upgrade
+        desc: Zaktualizuj Storybook do najnowszej wersji
+        detail:
+          what: Automatyczna migracja konfiguracji i zależności. Uruchom po major update.
+          tips:
+            - 'npx storybook@latest doctor — sprawdź problemy z konfiguracją'

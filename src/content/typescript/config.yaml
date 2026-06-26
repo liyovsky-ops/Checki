@@ -1,0 +1,113 @@
+title: Konfiguracja tsconfig.json
+
+items:
+  - name: Podstawowa konfiguracja
+    desc: >
+      tsconfig.json steruje kompilatorem TypeScript — co kompilować, dokąd, z jakimi
+      sprawdzeniami. Najważniejsze opcje: strict, target, module, outDir, paths.
+      Konfiguracje dziedziczą przez extends — współdziel bazową konfigurację w monorepo.
+    code: |
+      // tsconfig.json — konfiguracja dla Node.js
+      {
+        "compilerOptions": {
+          "target": "ES2022",          // Docelowa wersja JS
+          "module": "NodeNext",        // System modułów (NodeNext dla ESM)
+          "moduleResolution": "NodeNext",
+          "outDir": "./dist",          // Gdzie trafią pliki JS
+          "rootDir": "./src",          // Gdzie są pliki TS
+          "strict": true,              // Wszystkie strict checks
+          "esModuleInterop": true,     // default imports z CommonJS
+          "skipLibCheck": true,        // Pomij sprawdzanie .d.ts bibliotek
+          "declaration": true,         // Generuj .d.ts pliki
+          "sourceMap": true,           // Source maps dla debugowania
+          "paths": {
+            "@/*": ["./src/*"]         // Path aliasy
+          }
+        },
+        "include": ["src/**/*.ts"],
+        "exclude": ["node_modules", "dist"]
+      }
+
+  - name: Konfiguracja dla przeglądarki (Vite/Webpack)
+    desc: >
+      W projektach z bundlerem (Vite, Webpack) TypeScript nie kompiluje — bundler robi transpilację.
+      tsconfig służy tylko do type-checking. Opcje module i target są mniej istotne.
+    code: |
+      // tsconfig.json — projekt Vite/React
+      {
+        "compilerOptions": {
+          "target": "ES2020",
+          "lib": ["ES2020", "DOM", "DOM.Iterable"],
+          "module": "ESNext",
+          "moduleResolution": "bundler",  // Nowy tryb dla bundlerów
+          "jsx": "react-jsx",             // React 17+ transform
+          "strict": true,
+          "noUnusedLocals": true,
+          "noUnusedParameters": true,
+          "noFallthroughCasesInSwitch": true,
+          "paths": {
+            "@/*": ["./src/*"]
+          }
+        },
+        "include": ["src"],
+        "references": [{ "path": "./tsconfig.node.json" }]
+      }
+
+  - name: Project references i monorepo
+    desc: >
+      Project references pozwalają podzielić duży projekt na mniejsze paczki
+      z własnym tsconfig. Kompilacja inkrementalna — zmiana w paczce A nie
+      wymaga rekompilacji B jeśli API nie zmieniło się.
+    code: |
+      // packages/shared/tsconfig.json
+      {
+        "compilerOptions": {
+          "composite": true,         // Wymagane dla project references
+          "declaration": true,
+          "outDir": "./dist"
+        }
+      }
+
+      // packages/app/tsconfig.json
+      {
+        "references": [
+          { "path": "../shared" }    // Zależność od shared
+        ],
+        "compilerOptions": { ... }
+      }
+
+      // Kompilacja wszystkich paczek naraz
+      // tsc --build lub tsc -b
+
+  - name: Path mapping i barrel imports
+    desc: >
+      Ścieżki względne (../../utils/helper) są brzydkie i trudne do refaktorowania.
+      Path aliases (@/utils/helper) rozwiązują problem — konfiguracja w tsconfig.json,
+      w bundlerze (Vite/Webpack) i opcjonalnie w tsconfig-paths dla Node.
+    code: |
+      // tsconfig.json
+      {
+        "compilerOptions": {
+          "paths": {
+            "@/*":         ["./src/*"],
+            "@components/*": ["./src/components/*"],
+            "@utils/*":    ["./src/utils/*"]
+          }
+        }
+      }
+
+      // vite.config.ts
+      import { defineConfig } from 'vite'
+      import path from 'path'
+
+      export default defineConfig({
+        resolve: {
+          alias: {
+            '@': path.resolve(__dirname, './src'),
+          }
+        }
+      })
+
+      // Użycie
+      import { Button } from '@components/Button';
+      import { formatDate } from '@utils/date';

@@ -41,12 +41,14 @@ items:
     icon: "➕"
     code: |
       // Jeden rekord
+      const { data: { user } } = await supabase.auth.getUser();
+
       const { data, error } = await supabase
         .from('posts')
         .insert({
           title: 'Mój post',
           content: 'Treść posta...',
-          user_id: supabase.auth.getUser().data.user?.id,
+          user_id: user?.id,
         })
         .select()
         .single();
@@ -133,11 +135,11 @@ items:
       .gte('age', 18)
       .lte('price', 100)
 
-      // .range() — między dwiema wartościami
+      // Zakres dat = dwa filtry łączone jako AND
       .gte('created_at', '2024-01-01')
       .lte('created_at', '2024-12-31')
 
-      // .is() — NULL check
+      // .is() — NULL check (nie używaj .eq(col, null)!)
       .is('deleted_at', null)
 
       // .contains() — dla tablic JSONB
@@ -145,6 +147,42 @@ items:
 
       // or() — alternatywa
       .or('status.eq.active,status.eq.pending')
+
+  - name: Paginacja, sortowanie i count
+    desc: >
+      .order() sortuje, .range(from, to) pobiera zakres wierszy (paginacja, indeksy od 0),
+      a opcja count zwraca liczbę pasujących rekordów. .single() rzuca błąd gdy nie ma
+      dokładnie jednego wiersza — .maybeSingle() zwraca null zamiast błędu.
+    icon: "📄"
+    code: |
+      // Paginacja — strona 2, po 10 rekordów (wiersze 10–19)
+      const page = 2;
+      const pageSize = 10;
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data, error, count } = await supabase
+        .from('posts')
+        .select('id, title', { count: 'exact' }) // count zwraca total
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      // count — łączna liczba pasujących wierszy (do paginacji UI)
+      const totalPages = Math.ceil((count ?? 0) / pageSize);
+
+      // .maybeSingle() — zwraca null zamiast błędu gdy brak wiersza
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('username', username)
+        .maybeSingle(); // bezpieczne gdy rekord może nie istnieć
+
+      // Sortowanie po zagnieżdżonej relacji / wielu kolumnach
+      const { data: ordered } = await supabase
+        .from('posts')
+        .select('*')
+        .order('pinned', { ascending: false })
+        .order('created_at', { ascending: false });
 
   - name: Relacje — JOIN przez select()
     desc: >
@@ -173,11 +211,12 @@ items:
         .eq('id', postId)
         .single();
 
-      // Filtrowanie na zagnieżdżonych relacjach
+      // Filtrowanie po zagnieżdżonej relacji — !inner wymusza JOIN,
+      // a filtr odwołuje się do aliasu osadzonej tabeli (author)
       const { data } = await supabase
         .from('posts')
-        .select('*, author:users!inner(name)')
-        .eq('users.role', 'admin');
+        .select('*, author:users!inner(name, role)')
+        .eq('author.role', 'admin');
 
   - name: Row Level Security (RLS)
     desc: >
@@ -208,10 +247,11 @@ items:
         ON posts FOR DELETE
         USING (auth.uid() = user_id);
 
-  - name: Surowe SQL — .rpc() i sql``
+  - name: Surowe SQL — funkcje RPC
     desc: >
-      Gdy Query Builder nie wystarczy, możesz wywołać procedury składowane przez .rpc()
-      lub pisać surowe SQL przez tagged template literal (Supabase JS v2+).
+      Klient supabase-js NIE pozwala wysyłać dowolnego surowego SQL z aplikacji (bezpieczeństwo).
+      Gdy Query Builder nie wystarczy (agregacje, CTE, złożone JOINy), tworzysz funkcję
+      PostgreSQL i wołasz ją przez .rpc(). Pełny SQL piszesz w migracji lub SQL Editorze.
     icon: "⚙️"
     code: |
       // Wywołanie funkcji PostgreSQL przez rpc()
@@ -231,11 +271,11 @@ items:
       //   LIMIT p_limit;
       // $$ LANGUAGE sql;
 
-      // Surowe SQL (Supabase JS v2 z rozszerzeniem)
+      // Full-text search — buduje SQL to_tsquery() pod spodem
       const { data } = await supabase
         .from('posts')
         .select('id, title')
-        .textSearch('content', 'supabase postgresql', {
+        .textSearch('content', 'supabase & postgresql', {
           type: 'websearch',
           config: 'english',
         });

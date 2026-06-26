@@ -1,0 +1,259 @@
+title: Komendy TypeScript
+
+groups:
+  - name: Kompilacja — tsc
+    icon: "🔨"
+    commands:
+      - cmd: npx tsc
+        desc: Kompiluj projekt według tsconfig.json
+        detail:
+          what: Kompiluje wszystkie pliki .ts z rootDir do outDir generując .js (i opcjonalnie .d.ts, .map).
+          how: Czyta tsconfig.json z bieżącego katalogu. Zgłasza błędy typów i składni.
+          flags:
+            - flag: '--noEmit'
+              desc: Tylko sprawdź typy, nie generuj plików
+            - flag: '--watch'
+              desc: Tryb watch — kompiluj po każdej zmianie
+            - flag: '--project ./tsconfig.prod.json'
+              desc: Użyj konkretnego tsconfig
+          tips:
+            - 'tsc --noEmit w CI — czysty type check'
+            - 'tsc --diagnostics — pokaż czas kompilacji per plik'
+      - cmd: npx tsc --noEmit
+        desc: Sprawdź typy bez generowania plików JS
+        detail:
+          what: Uruchamia type-checker ale nie zapisuje żadnych plików wyjściowych.
+          how: Idealne do CI/CD i git hooks — szybkie sprawdzenie błędów typów.
+          tips:
+            - 'npx tsc --noEmit --pretty — kolorowe błędy'
+            - 'Łącz z bundlerem: tsc --noEmit && vite build'
+      - cmd: npx tsc --watch
+        desc: Kompiluj automatycznie po każdej zmianie pliku
+        detail:
+          what: Nasłuchuje zmian w plikach .ts i rekompiluje tylko zmienione fragmenty (incremental).
+          how: Używa incremental compilation — śledzi zależności między plikami.
+          tips:
+            - 'W dev preferuj tsx watch zamiast tsc --watch (szybszy)'
+            - 'tsc --watch --noEmit — tylko type check w watch mode'
+      - cmd: npx tsc --init
+        desc: Wygeneruj domyślny plik tsconfig.json
+        detail:
+          what: Tworzy tsconfig.json z domyślnymi wartościami i komentarzami wyjaśniającymi każdą opcję.
+          how: Dobrą praktyką jest zacząć od --init i dostosować do projektu.
+          tips:
+            - 'Zawsze włącz strict: true po wygenerowaniu'
+            - 'Ustaw target i module adekwatnie do środowiska'
+      - cmd: npx tsc --showConfig
+        desc: Wyświetl pełną przetworzoną konfigurację tsconfig
+        detail:
+          what: Pokazuje finalną konfigurację po uwzględnieniu extends, domyślnych wartości i flagi CLI.
+          how: Przydatne do debugowania dlaczego TS zachowuje się inaczej niż oczekujesz.
+          tips:
+            - 'Sprawdź czy include/exclude pasuje do twoich plików'
+      - cmd: npx tsc --build
+        desc: Kompiluj projekt z project references (monorepo)
+        detail:
+          what: Kompiluje projekt i wszystkie jego zależności przez project references.
+          how: Incremental — kompiluje tylko to co się zmieniło od ostatniej kompilacji.
+          flags:
+            - flag: '--clean'
+              desc: Usuń pliki wyjściowe i zbuduj od nowa
+            - flag: '--dry'
+              desc: Pokaż co zostałoby zbudowane bez kompilowania
+          tips:
+            - 'tsc --build --force — wymuszono pełną rekompilację'
+
+  - name: Uruchamianie plików TS — tsx
+    icon: "▶️"
+    commands:
+      - cmd: npx tsx src/index.ts
+        desc: Uruchom plik TypeScript bezpośrednio (bez kompilacji)
+        detail:
+          what: Transpiluje i uruchamia plik TS w locie używając esbuild. Zero konfiguracji.
+          how: esbuild jest 100× szybszy od tsc — tsx startuje natychmiastowo.
+          tips:
+            - 'Nie sprawdza typów — użyj tsc --noEmit osobno'
+            - 'npx tsx --tsconfig tsconfig.special.json src/script.ts'
+      - cmd: npx tsx watch src/index.ts
+        desc: Uruchom z hot-reload przy każdej zmianie pliku
+        detail:
+          what: Restartuje skrypt automatycznie gdy zmienią się pliki .ts.
+          how: Idealne do lokalnego dev serwera w Node.js.
+          tips:
+            - 'Szybszy restart niż nodemon + ts-node'
+            - 'Obsługuje ESM i CJS — zero konfiguracji'
+      - cmd: npx ts-node src/index.ts
+        desc: Klasyczny runner TypeScript z pełną integracją tsconfig
+        detail:
+          what: Interpretuje TypeScript z pełnym respektowaniem tsconfig.json.
+          how: Wolniejszy od tsx (używa tsc transformer), ale pełne sprawdzanie typów.
+          flags:
+            - flag: '--transpile-only'
+              desc: Pomiń type checking — szybszy start
+            - flag: '--esm'
+              desc: Obsługa ESM modułów
+          tips:
+            - 'ts-node-esm dla projektów z "type": "module"'
+
+  - name: Zarządzanie typami
+    icon: "🏷️"
+    commands:
+      - cmd: npm install -D @types/node
+        desc: Zainstaluj typy dla Node.js
+        detail:
+          what: Instaluje definicje typów (@types/node) dla Node.js API — fs, path, http, etc.
+          how: DefinitelyTyped — główne repozytorium typów dla bibliotek JS bez wbudowanych typów.
+          tips:
+            - 'npm install -D @types/express @types/cors @types/multer'
+            - 'Sprawdź czy biblioteka ma wbudowane typy: "types" w package.json'
+      - cmd: npm install -D @types/express
+        desc: Zainstaluj typy dla Express.js
+        detail:
+          what: Definicje typów dla Express — Request, Response, NextFunction, Router.
+          how: Instalujesz jako devDependency — potrzebne tylko do type-checking.
+          tips:
+            - 'Extend Request type dla custom properties: declare module "express" { interface Request { user?: User } }'
+      - cmd: npx dts-gen -m lodash
+        desc: Wygeneruj .d.ts dla biblioteki bez typów
+        detail:
+          what: Generuje podstawowe definicje typów dla biblioteki JS na podstawie jej API.
+          how: Przydatne gdy @types/* nie istnieje dla danej biblioteki.
+          tips:
+            - 'Alternatywnie: declare module "lib-name" { export function foo(): void; } w global.d.ts'
+
+  - name: Linting i formatowanie
+    icon: "🔍"
+    commands:
+      - cmd: npx eslint . --ext .ts,.tsx
+        desc: Sprawdź kod TypeScript linterem
+        detail:
+          what: Uruchamia ESLint z parserem TypeScript na wszystkich plikach .ts i .tsx.
+          how: Wymaga @typescript-eslint/parser i @typescript-eslint/eslint-plugin.
+          flags:
+            - flag: '--fix'
+              desc: Automatycznie napraw co się da
+            - flag: '--max-warnings 0'
+              desc: Traktuj warningi jako błędy (CI)
+          tips:
+            - 'Dodaj do pre-commit hook: npx lint-staged'
+      - cmd: npx prettier --write "src/**/*.ts"
+        desc: Sformatuj pliki TypeScript przez Prettier
+        detail:
+          what: Prettier automatycznie formatuje kod — wcięcia, cudzysłowy, przecinki.
+          how: Prettier + ESLint = formatowanie + linting. Używaj eslint-config-prettier do wyłączenia konfliktów.
+          tips:
+            - 'npx prettier --check "src/**/*.ts" — sprawdź bez zmiany (CI)'
+
+  - name: Analiza projektu
+    icon: "📊"
+    commands:
+      - cmd: npx ts-prune
+        desc: Znajdź nieużywane exporty w projekcie
+        detail:
+          what: Skanuje projekt i raportuje eksportowane symbole których nikt nie importuje.
+          how: Pomaga czyścić dead code — szczególnie ważne w bibliotekach.
+          tips:
+            - 'ts-prune | grep -v ".d.ts" — pomiń pliki definicji'
+      - cmd: npx depcheck
+        desc: Znajdź nieużywane zależności npm
+        detail:
+          what: Sprawdza które pakiety z package.json są faktycznie używane w kodzie.
+          how: Analizuje importy w plikach .ts/.js i porównuje z package.json.
+          tips:
+            - 'Regularnie uruchamiaj żeby nie akumulować nieużywanych paczek'
+      - cmd: npx type-coverage
+        desc: Sprawdź % kodu z pokryciem typami (bez any)
+        detail:
+          what: Raportuje jaki % wyrażeń w kodzie ma typ inny niż any (implicit lub explicit).
+          how: "Cel: 95%+. Niższy % = zbyt dużo any = mniej korzyści z TypeScript."
+          flags:
+            - flag: '--detail'
+              desc: Pokaż każde miejsce z any
+            - flag: '--strict'
+              desc: Liczone z strict mode
+          tips:
+            - 'Dodaj do CI z progiem minimalnym: npx type-coverage --atLeast 95'
+      - cmd: npx madge --ts-config tsconfig.json --image graph.svg src/index.ts
+        desc: Wygeneruj graf zależności modułów
+        detail:
+          what: Wizualizuje zależności między plikami — pomaga wykryć cykliczne importy.
+          how: Generuje SVG/PNG grafu. Cykliczne zależności to czerwone strzałki.
+          tips:
+            - 'npx madge --circular src/ — tylko cykliczne zależności'
+
+  - name: Migracja JS → TS
+    icon: "🔄"
+    commands:
+      - cmd: npx ts-migrate init <project-dir>
+        desc: Zainicjuj migrację projektu JS do TypeScript (narzędzie Airbnb)
+        detail:
+          what: Narzędzie od Airbnb do automatycznej migracji dużych projektów JS do TS.
+          how: Dodaje tsconfig.json, zmienia rozszerzenia plików i wstawia niezbędne adnotacje.
+          tips:
+            - 'ts-migrate migrate <dir> — uruchom pełną migrację'
+            - 'Wstawi @ts-ignore tam gdzie nie może wywnioskować typów — poprawiaj iteracyjnie'
+      - cmd: npx ts-migrate reignore <project-dir>
+        desc: Zaktualizuj @ts-ignore komentarze po migracji
+        detail:
+          what: Usuwa nieaktualne @ts-ignore i dodaje nowe gdzie pojawiły się błędy.
+          how: Przydatne po aktualizacji TS lub poprawieniu części kodu.
+          tips:
+            - 'Cel: stopniowo eliminuj @ts-ignore i any'
+      - cmd: npx jscodeshift -t @next/codemod/transforms/name-default-component.js src/
+        desc: Uruchom codemod transformację na plikach TS
+        detail:
+          what: jscodeshift to framework do automatycznego refaktorowania kodu przez codemody.
+          how: Codemody parsują AST i transformują kod — bezpieczniejsze niż regex.
+          tips:
+            - 'TS Codemods od TypeScript team: github.com/microsoft/TypeScript-Transforms'
+
+  - name: Narzędzia diagnostyczne
+    icon: "🔬"
+    commands:
+      - cmd: npx tsc --noEmit --diagnostics
+        desc: Pokaż czas kompilacji i statystyki
+        detail:
+          what: Wyświetla szczegółowe statystyki kompilacji — czas per plik, memory usage, cache hits.
+          how: Pomaga zidentyfikować pliki spowalniające kompilację.
+          tips:
+            - 'Szukaj plików z czasem >1s — sprawdź czy mają zbyt złożone typy'
+      - cmd: npx tsc --noEmit --listFiles
+        desc: Wylistuj wszystkie pliki uwzględnione w kompilacji
+        detail:
+          what: Pokazuje pełną listę plików .ts przetwarzanych przez kompilator.
+          how: Przydatne do debugowania include/exclude w tsconfig lub zbyt dużych kompilacji.
+          tips:
+            - 'Liczba plików >5000 może spowalniać kompilację — sprawdź exclude'
+      - cmd: npx typescript-language-server --stdio
+        desc: Uruchom TypeScript Language Server manualnie
+        detail:
+          what: LSP server TypeScript który IDE używa do autocomplete, go-to-definition, etc.
+          how: Normalnie uruchamiany przez IDE. Ręczne uruchomienie do debugowania.
+          tips:
+            - 'VS Code: Ctrl+Shift+P → "TypeScript: Restart TS Server" jeśli IDE się zawiesza'
+
+  - name: Build i deployment
+    icon: "🚀"
+    commands:
+      - cmd: npx tsup src/index.ts --format esm,cjs --dts
+        desc: Zbuduj bibliotekę NPM (ESM + CJS + .d.ts) w jednej komendzie
+        detail:
+          what: tsup to zero-config bundler dla bibliotek TS. Generuje ESM i CJS równolegle z typami.
+          how: Oparty na esbuild — ekstremalnie szybki. Idealne do publikowania npm packages.
+          flags:
+            - flag: '--format esm,cjs'
+              desc: Generuj oba formaty modułów
+            - flag: '--dts'
+              desc: Generuj pliki .d.ts (deklaracje typów)
+            - flag: '--minify'
+              desc: Minifikuj wyjście
+          tips:
+            - 'Dodaj "exports" do package.json: { ".": { "import": "./dist/index.mjs", "require": "./dist/index.cjs" } }'
+      - cmd: npx tsc && node dist/index.js
+        desc: Skompiluj i uruchom w produkcji
+        detail:
+          what: Standardowy flow produkcyjny — najpierw kompilacja do JS, potem uruchomienie Node.js.
+          how: Nie używaj tsx/ts-node w produkcji — kompiluj do JS dla lepszej wydajności i bezpieczeństwa.
+          tips:
+            - 'Zapisz dist/ do .gitignore — nie commituj skompilowanego kodu'
+            - 'W Dockerfile: RUN npm run build && CMD node dist/index.js'

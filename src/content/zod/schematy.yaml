@@ -1,0 +1,79 @@
+title: Typy i schematy Zod
+
+items:
+  - name: Podstawowe typy i modyfikatory
+    desc: Zod ma typy dla każdej wartości JavaScript. Każdy typ ma łańcuch metod — .min(), .max(), .email(), .url(), .optional(), .nullable(), .default().
+    code: |
+      import { z } from 'zod'
+
+      // Prymitywy
+      z.string()
+      z.number()
+      z.boolean()
+      z.date()
+      z.bigint()
+      z.undefined()
+      z.null()
+      z.any()
+      z.unknown()
+
+      // String modyfikatory
+      const emailSchema = z.string()
+        .email()
+        .min(5)
+        .max(255)
+        .toLowerCase()     // transform przed walidacją
+        .trim()
+
+      // Number modyfikatory
+      const priceSchema = z.number()
+        .positive()
+        .multipleOf(0.01)  // Cena z dokładnością do grosza
+        .max(999999)
+
+      // Nullable i Optional
+      const maybeString = z.string().nullable()   // string | null
+      const optionalNum = z.number().optional()   // number | undefined
+
+      // Enum
+      const RoleSchema = z.enum(["admin", "user", "guest"])
+      type Role = z.infer<typeof RoleSchema>   // "admin" | "user" | "guest"
+
+      // Union
+      const IdSchema = z.union([z.string(), z.number()])
+      // Lub krócej:
+      const IdSchema2 = z.string().or(z.number())
+
+  - name: Obiekty i tablice
+    desc: z.object() dla struktury JSON. z.array() dla list. Zagnieżdżone obiekty, opcjonalne pola, dodatkowe klucze (strip/strict/passthrough).
+    code: |
+      import { z } from 'zod'
+
+      // Obiekt z zagnieżdżeniem
+      const AddressSchema = z.object({
+        street: z.string(),
+        city:   z.string(),
+        zip:    z.string().regex(/^\d{2}-\d{3}$/, "Format: XX-XXX"),
+      })
+
+      const UserSchema = z.object({
+        id:       z.number(),
+        name:     z.string(),
+        email:    z.string().email(),
+        address:  AddressSchema.optional(),
+        tags:     z.array(z.string()).max(10),
+        metadata: z.record(z.string()),  // { [key: string]: string }
+      })
+
+      // Modyfikacje schematu
+      const UpdateUserSchema = UserSchema
+        .omit({ id: true })        // Usuń id
+        .partial()                 // Wszystkie pola opcjonalne
+      // type UpdateUser = { name?: string; email?: string; ... }
+
+      const LoginSchema = UserSchema.pick({ email: true })
+        .extend({ password: z.string().min(8) })
+
+      // Dodatkowe klucze
+      const StrictUser = UserSchema.strict()      // Błąd gdy nieznane klucze
+      const PassUser   = UserSchema.passthrough() // Przepuść nieznane klucze

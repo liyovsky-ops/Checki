@@ -1,0 +1,66 @@
+title: Storybook vs alternatywy
+
+items:
+  - name: Ladle
+    icon: "🥄"
+    color: "#3B82F6"
+    tagline: Lekki, szybki katalog komponentów — Storybook-kompatybilny, Vite-natywny
+    pros:
+      - Ultraszybki — Vite-natywny, brak webpack
+      - Zero konfiguracji — działa z istniejącymi .stories.tsx
+      - Mały bundle — szybki start
+      - Kompatybilny z CSF (możliwa migracja z Storybook)
+    cons:
+      - Brak ekosystemu addonów (brak a11y, Chromatic)
+      - Brak play() i interakcji
+      - Mała społeczność vs Storybook
+      - Brak automatycznej dokumentacji (autodocs)
+    vs: Ladle gdy chcesz super szybki katalog bez addonów. Storybook dla pełnego ekosystemu, testowania i dokumentacji.
+
+  - name: Histoire (Vue-first)
+    icon: "📚"
+    color: "#2DD4BF"
+    tagline: Storybook dla Vue 3 i Svelte — native experience, Vite-first
+    pros:
+      - Natywny DX dla Vue 3 i Svelte (bez React centric API)
+      - Vite-first — bardzo szybki
+      - Stories w .story.vue plikach — naturalny Vue
+      - Wbudowane dokumentowanie propów
+    cons:
+      - Tylko Vue 3 i Svelte (brak React wsparcia)
+      - Mały ekosystem vs Storybook
+      - Brak Chromatic integracji
+      - Mniej dokumentacji i przykładów
+    vs: Histoire dla projektów Vue 3 lub Svelte. Storybook dla React lub gdy potrzebujesz Chromatic/a11y/testowania.
+
+  - name: Docz
+    icon: "📝"
+    color: "#7C3AED"
+    tagline: Dokumentacja z MDX — Gatsby-based, prosty setup
+    pros:
+      - Prosty — fokus na dokumentację MDX
+      - Dobry dla bibliotek z dużą ilością tekstu
+      - Gatsby plugin — integracja z istniejącymi Gatsby projektami
+      - Custom theming
+    cons:
+      - Praktycznie nierozwijany (ostatni release 2021)
+      - Brak interaktywnych Controls
+      - Brak testowania i play()
+      - Mała społeczność
+    vs: Docz niepolecany do nowych projektów. Storybook ma MDX + documentation + testowanie w jednym.
+
+  - name: React Styleguidist
+    icon: "🎨"
+    color: "#09AFDE"
+    tagline: Component documentation z JSDoc — props table, live editor
+    pros:
+      - Prosty setup dla React
+      - Live code editor w dokumentacji
+      - Auto-dokumentacja z JSDoc i PropTypes
+      - Lekki, bez zależności
+    cons:
+      - Tylko React (brak Vue, Angular, Svelte)
+      - Brak addonów i ekosystemu
+      - Brak visual testing
+      - Mała aktywność maintainerów
+    vs: Styleguidist dla starszych projektów React z PropTypes. Storybook dla TypeScript, testowania, Chromatic.

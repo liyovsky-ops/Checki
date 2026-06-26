@@ -58,7 +58,7 @@ items:
 
       // Sprawdzenie rozmiaru po zapisie
       const plik = Bun.file("./wynik.txt");
-      console.log(await plik.size); // rozmiar w bajtach
+      console.log(plik.size); // rozmiar w bajtach (synchroniczna właściwość, nie Promise)
     lang: typescript
 
   - title: Bun.password — hashing haseł
@@ -81,8 +81,8 @@ items:
       // Użycie argon2id (zalecane dla nowych projektów)
       const hashArgon = await Bun.password.hash("haslo", {
         algorithm: "argon2id",
-        memoryCost: 4,   // 4 MB
-        timeCost: 3,     // 3 iteracje
+        memoryCost: 65536, // pamięć w KiB (tu 64 MiB)
+        timeCost: 3,       // liczba iteracji
       });
 
       const ok = await Bun.password.verify("haslo", hashArgon);
@@ -151,9 +151,9 @@ items:
       const output = await new Response(proc.stdout).text();
       console.log(output);
 
-      // Z przekazaniem stdin
+      // Z przekazaniem stdin (Blob/TypedArray/Response — nie zwykły string)
       const proc2 = Bun.spawn(["grep", "błąd"], {
-        stdin: "linia 1\nbłąd tutaj\nlinia 3",
+        stdin: new Blob(["linia 1\nbłąd tutaj\nlinia 3"]),
         stdout: "pipe",
       });
       const wynik = await new Response(proc2.stdout).text();

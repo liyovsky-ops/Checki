@@ -1,0 +1,218 @@
+title: Komendy Nginx
+
+groups:
+  - name: Zarządzanie serwisem
+    icon: "⚙️"
+    commands:
+      - cmd: sudo nginx -t
+        desc: Sprawdź poprawność konfiguracji przed reloadem
+        detail:
+          what: Testuje nginx.conf i wszystkie include bez restartowania serwera.
+          how: Parsuje konfigurację i sprawdza składnię. Zwraca "test is successful" jeśli OK.
+          tips:
+            - 'Zawsze rób -t przed reload/restart — błąd konfiguracji = serwer nie startuje'
+            - 'sudo nginx -t -c /etc/nginx/nginx.conf — wskaż konkretny plik'
+      - cmd: sudo systemctl reload nginx
+        desc: Przeładuj konfigurację bez przestoju (graceful reload)
+        detail:
+          what: Wysyła SIGHUP do master procesu — ładuje nową konfigurację, stare workery kończą obsługę requestów.
+          how: Zero downtime — nowe połączenia obsługuje zaktualizowany worker, stare dogrywa stary.
+          tips:
+            - 'Zawsze reload zamiast restart w produkcji'
+            - 'sudo nginx -s reload — alternatywa bez systemctl'
+      - cmd: sudo systemctl restart nginx
+        desc: Pełny restart Nginx (z chwilą niedostępności)
+        detail:
+          what: Zatrzymuje i startuje Nginx — przerywa aktywne połączenia.
+          how: Używaj tylko gdy reload nie działa lub po zmianie konfiguracji worker processes.
+          tips:
+            - 'Unikaj w produkcji — reload jest bezpieczniejszy'
+      - cmd: sudo systemctl start nginx
+        desc: Uruchom Nginx
+        detail:
+          what: Startuje nginx jeśli nie działa.
+          tips:
+            - 'sudo systemctl enable nginx — włącz autostart po reboot'
+      - cmd: sudo systemctl stop nginx
+        desc: Zatrzymaj Nginx
+        detail:
+          what: Zatrzymuje Nginx — wszystkie połączenia zostają przerwane.
+          tips:
+            - 'sudo nginx -s stop — natychmiastowe zatrzymanie bez systemctl'
+            - 'sudo nginx -s quit — graceful stop (dokończy aktywne requesty)'
+      - cmd: sudo systemctl status nginx
+        desc: Sprawdź status i ostatnie logi
+        detail:
+          what: Pokazuje czy Nginx działa, PID, użycie pamięci i ostatnie linie logów.
+          tips:
+            - 'systemctl status nginx -l — pełne logi bez obcinania'
+
+  - name: Konfiguracja i składnia
+    icon: "📝"
+    commands:
+      - cmd: sudo nginx -T
+        desc: Wyświetl pełną, przetworzoną konfigurację (z include)
+        detail:
+          what: Drukuje całą konfigurację po przetworzeniu wszystkich include dyrektyw.
+          how: Przydatne do inspekcji co faktycznie jest załadowane.
+          tips:
+            - 'sudo nginx -T | grep proxy_pass — znajdź wszystkie proxy'
+      - cmd: sudo nginx -V
+        desc: Pokaż wersję i wszystkie flagi kompilacji
+        detail:
+          what: Wyświetla wersję Nginx i wszystkie opcje z jakimi był kompilowany (moduły, ścieżki).
+          how: Przydatne do sprawdzenia czy moduł (ssl, gzip, stub_status) jest dostępny.
+          tips:
+            - 'nginx -V 2>&1 | grep -o "with-[a-z_-]*" — listuj moduły'
+      - cmd: sudo ln -s /etc/nginx/sites-available/myapp /etc/nginx/sites-enabled/
+        desc: Włącz site (konfigurację virtual hosta)
+        detail:
+          what: Tworzy symlink z sites-available do sites-enabled — konwencja Nginx na Debian/Ubuntu.
+          how: nginx.conf include /etc/nginx/sites-enabled/* — wszystkie symlinki są ładowane.
+          tips:
+            - 'sudo unlink /etc/nginx/sites-enabled/myapp — wyłącz site'
+      - cmd: sudo rm /etc/nginx/sites-enabled/default
+        desc: Usuń domyślny site (welcome page)
+        detail:
+          what: Wyłącza domyślną stronę powitalną Nginx na porcie 80.
+          how: Koniecznie zrób przed konfiguracją własnych sitów.
+          tips:
+            - 'Lub zmodyfikuj /etc/nginx/sites-available/default zamiast usuwać'
+
+  - name: Logi i monitoring
+    icon: "📊"
+    commands:
+      - cmd: sudo tail -f /var/log/nginx/access.log
+        desc: Śledź logi dostępu na żywo
+        detail:
+          what: "Pokazuje logi HTTP access — każdy request: IP, metoda, URL, status, rozmiar."
+          how: Format Combined Log Format domyślnie. Można customizować przez log_format.
+          tips:
+            - 'tail -f /var/log/nginx/access.log | grep "404" — filtruj statusy'
+            - 'tail -f /var/log/nginx/error.log — logi błędów'
+      - cmd: sudo tail -f /var/log/nginx/error.log
+        desc: Śledź logi błędów Nginx
+        detail:
+          what: Logi błędów konfiguracji, upstream errors, SSL problemy.
+          how: "Poziomy: debug, info, notice, warn, error, crit, alert, emerg."
+          tips:
+            - 'error_log /var/log/nginx/error.log debug; — włącz debug w nginx.conf (temp)'
+      - cmd: sudo nginx -s reopen
+        desc: Otwórz pliki logów ponownie (po rotacji)
+        detail:
+          what: Używane przez logrotate — po rotacji pliku logu Nginx musi otworzyć nowy plik.
+          how: Wysyła USR1 signal do master procesu.
+          tips:
+            - 'Normalnie obsługiwane automatycznie przez logrotate'
+      - cmd: awk '{print $9}' /var/log/nginx/access.log | sort | uniq -c | sort -rn | head
+        desc: Policz statusy HTTP z logów
+        detail:
+          what: Parsuje logi i liczy ile razy wystąpił każdy status HTTP (200, 404, 500, etc.).
+          how: $9 to 9. pole w Combined Log Format = status kod.
+          tips:
+            - 'awk "{print $1}" access.log | sort | uniq -c | sort -rn | head — top IP'
+      - cmd: sudo cat /var/log/nginx/access.log | awk '{print $7}' | sort | uniq -c | sort -rn | head -20
+        desc: Znajdź najczęściej odpytywane URL-e
+        detail:
+          what: $7 to URL w logu Nginx. Pozwala znaleźć hot paths i problematyczne endpointy.
+          tips:
+            - 'Szukaj URL z dużą liczbą 404 lub powolnych (access_log + proxy_response_time)'
+
+  - name: Certbot i SSL
+    icon: "🔒"
+    commands:
+      - cmd: sudo certbot --nginx -d example.com -d www.example.com
+        desc: Wydaj certyfikat Let's Encrypt i skonfiguruj Nginx automatycznie
+        detail:
+          what: Certbot kontaktuje się z Let's Encrypt, wydaje certyfikat i modyfikuje nginx.conf.
+          how: Wyzwanie HTTP-01 — Let's Encrypt sprawdza czy kontrolujesz domenę przez port 80.
+          flags:
+            - flag: '--nginx'
+              desc: Plugin Nginx — automatyczna konfiguracja
+            - flag: '-d example.com'
+              desc: Domena do certyfikatu (można podać wielokrotnie)
+          tips:
+            - 'Certyfikat ważny 90 dni — certbot auto-odnawia przez cron'
+            - 'sudo certbot certonly --nginx — tylko certyfikat, bez modyfikacji nginx'
+      - cmd: sudo certbot renew --dry-run
+        desc: Testuj odnawianie certyfikatu bez faktycznej zmiany
+        detail:
+          what: Symuluje proces odnawiania — sprawdza czy odnowienie się uda bez wydawania nowego certyfikatu.
+          how: Certbot dodaje do cron.d lub systemd timer automatyczne odnawianie.
+          tips:
+            - 'Uruchom raz przed wygaśnięciem certyfikatu żeby sprawdzić czy działa'
+      - cmd: sudo certbot certificates
+        desc: Pokaż wszystkie zarządzane certyfikaty
+        detail:
+          what: Lista wszystkich certyfikatów z datami ważności i domenami.
+          tips:
+            - 'Certyfikaty wygasające w ciągu 30 dni są automatycznie odnawiane'
+      - cmd: sudo openssl x509 -in /etc/letsencrypt/live/example.com/cert.pem -text -noout
+        desc: Sprawdź szczegóły certyfikatu SSL
+        detail:
+          what: Wyświetla pełne informacje o certyfikacie — data ważności, domeny, wystawca.
+          tips:
+            - 'openssl s_client -connect example.com:443 -showcerts — sprawdź live certyfikat'
+
+  - name: Diagnostyka i debug
+    icon: "🔬"
+    commands:
+      - cmd: curl -I https://example.com
+        desc: Sprawdź nagłówki HTTP odpowiedzi Nginx
+        detail:
+          what: Wysyła HEAD request i pokazuje nagłówki odpowiedzi — status, Content-Type, Cache-Control, Server.
+          how: "Nagłówek Server: nginx potwierdza że Nginx odpowiada."
+          tips:
+            - 'curl -I -L https://example.com — śledź redirecty'
+            - 'curl -v https://example.com 2>&1 | head -50 — pełny verbose'
+      - cmd: curl -w "@curl-format.txt" -o /dev/null -s https://example.com
+        desc: Zmierz czas odpowiedzi Nginx
+        detail:
+          what: Formatuje szczegółowe czasy — DNS, connect, TLS handshake, TTFB, total.
+          how: Plik curl-format.txt zawiera zmienne %{time_*} do formatowania.
+          tips:
+            - 'echo "time_total: %{time_total}s\n" > curl-format.txt'
+      - cmd: sudo nginx -g "daemon off;"
+        desc: Uruchom Nginx w foreground (debug)
+        detail:
+          what: Nginx działa na pierwszym planie — logi idą do stdout. Przydatne w Docker.
+          how: 'W Dockerfile: CMD ["nginx", "-g", "daemon off;"]'
+          tips:
+            - 'Połącz z error_log /dev/stderr debug; dla pełnego debugowania'
+      - cmd: ab -n 1000 -c 100 https://example.com/
+        desc: Prosty test obciążeniowy (Apache Bench)
+        detail:
+          what: Wysyła 1000 requestów z 100 jednocześnie — mierzy requests/sec, latency, błędy.
+          how: ab (Apache Bench) dostępny przez apt install apache2-utils.
+          flags:
+            - flag: '-n 1000'
+              desc: Łączna liczba requestów
+            - flag: '-c 100'
+              desc: Jednoczesne połączenia (concurrency)
+          tips:
+            - 'wrk -t12 -c400 -d30s https://example.com — nowocześniejszy benchmark'
+
+  - name: Snippety konfiguracji
+    icon: "✂️"
+    commands:
+      - cmd: "sudo nginx -c /etc/nginx/nginx.conf -t && sudo nginx -s reload"
+        desc: Sprawdź konfigurację i przeładuj jedną komendą
+        detail:
+          what: Dwustopniowy bezpieczny reload — najpierw test, potem reload.
+          tips:
+            - 'Dodaj do skryptu deploy: nginx -t && systemctl reload nginx || echo "NGINX CONFIG ERROR"'
+      - cmd: sudo htpasswd -c /etc/nginx/.htpasswd admin
+        desc: Stwórz plik z hasłem dla HTTP Basic Auth
+        detail:
+          what: Tworzy plik z hashed hasłem dla dyrektywy auth_basic w Nginx.
+          how: 'W nginx.conf: auth_basic "Area"; auth_basic_user_file /etc/nginx/.htpasswd;'
+          tips:
+            - 'sudo htpasswd /etc/nginx/.htpasswd user2 — dodaj kolejnego usera'
+            - '-c flag tworzy nowy plik (nadpisuje istniejący!)'
+      - cmd: sudo logrotate -f /etc/logrotate.d/nginx
+        desc: Wymuś rotację logów Nginx
+        detail:
+          what: Archiwizuje bieżący log, tworzy nowy, wysyła sygnał do Nginx żeby otworzył nowy plik.
+          how: Logrotate konfigurowany w /etc/logrotate.d/nginx — daily, 14 days retention.
+          tips:
+            - 'Sprawdź konfigurację: cat /etc/logrotate.d/nginx'

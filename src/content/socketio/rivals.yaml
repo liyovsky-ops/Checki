@@ -64,3 +64,19 @@ items:
       - Brak rooms, namespaces, broadcast
       - HTTP/1.1 — jeden stream per połączenie
     vs: SSE gdy potrzebujesz tylko push z serwera (notyfikacje, live feed, progress bar). Socket.io gdy potrzebujesz dwukierunkowej komunikacji.
+
+  - name: Centrifugo
+    icon: "🚀"
+    color: "#1A1A2E"
+    tagline: Samo-hostowany serwer real-time w Go — skalowalny, niezależny od języka
+    pros:
+      - Osobny proces w Go — odciąża Node.js, skaluje na miliony połączeń
+      - Niezależny od języka backendu — publikujesz przez HTTP / GRPC API
+      - Wbudowane presence, history, JWT auth, kanały i recovery
+      - Open-source i self-hosted — brak vendor lock-in
+    cons:
+      - Osobna infrastruktura do wdrożenia i utrzymania
+      - Własny protokół — wymaga klienta centrifuge-js (nie socket.io-client)
+      - Stromsza krzywa wejścia niż biblioteka in-process
+      - Brak logiki aplikacji na połączeniu — to czysty transport pub/sub
+    vs: Centrifugo gdy potrzebujesz skali milionów połączeń lub backend nie jest w Node.js. Socket.io gdy chcesz logikę w tym samym procesie Node i prostszy stack.

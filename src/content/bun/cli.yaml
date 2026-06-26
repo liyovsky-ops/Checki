@@ -37,16 +37,16 @@ groups:
         desc: Zainstaluj wszystkie zależności z package.json
         detail:
           what: Czyta package.json i instaluje wszystkie zależności. 25x szybszy niż npm install.
-          how: Używa globalnego cache (~/.bun/install/cache). Generuje/aktualizuje bun.lockb.
+          how: Używa globalnego cache (~/.bun/install/cache). Generuje/aktualizuje bun.lock.
           tips:
             - "bun install --production — pomiń devDependencies"
-            - "bun install --frozen-lockfile — fail jeśli bun.lockb byłby zmieniony (CI)"
+            - "bun install --frozen-lockfile — fail jeśli bun.lock byłby zmieniony (CI)"
             - "bun install --no-save — nie aktualizuj package.json"
       - cmd: bun add <paczka>
         desc: Dodaj nową zależność
         detail:
           what: Instaluje paczkę i dodaje ją do dependencies w package.json.
-          how: Automatycznie aktualizuje bun.lockb po instalacji.
+          how: Automatycznie aktualizuje bun.lock po instalacji.
           tips:
             - "bun add -d <paczka> — dodaj do devDependencies"
             - "bun add <paczka>@1.2.3 — konkretna wersja"
@@ -55,14 +55,14 @@ groups:
         desc: Usuń zależność
         detail:
           what: Usuwa paczkę z node_modules i package.json.
-          how: Aktualizuje bun.lockb po usunięciu.
+          how: Aktualizuje bun.lock po usunięciu.
           tips:
             - "bun remove -d <paczka> — usuń devDependency"
       - cmd: bun update
         desc: Zaktualizuj zależności do najnowszych wersji
         detail:
           what: Aktualizuje wszystkie paczki do najnowszych wersji zgodnych z semver z package.json.
-          how: Respektuje ograniczenia semver (^ i ~). Aktualizuje bun.lockb.
+          how: Respektuje ograniczenia semver (^ i ~). Aktualizuje bun.lock.
           tips:
             - "bun update express zod — aktualizuj tylko wybrane paczki"
             - "Sprawdź co się zmieni: bun outdated (od Bun 1.1)"
@@ -147,7 +147,7 @@ groups:
           tips:
             - "bunx prisma generate — szybszy niż npx prisma generate"
             - "bunx create-next-app@latest — tworzenie projektu Next.js"
-            - "bunx cowsay 'Bun is fast!' — ważne narzędzie enterprise"
+            - "bunx tsx skrypt.ts — jednorazowe uruchomienie bez instalacji paczki"
       - cmd: bun repl
         desc: Interaktywna konsola JavaScript/TypeScript
         detail:
@@ -160,7 +160,7 @@ groups:
         desc: Wylistuj zainstalowane paczki
         detail:
           what: Wyświetla drzewo zależności — wszystkie zainstalowane paczki i ich wersje.
-          how: Czyta node_modules i bun.lockb.
+          how: Czyta node_modules i bun.lock.
           tips:
             - "bun pm ls --all — pokaż pełne drzewo z zależnościami zależności"
             - "bun pm cache rm — wyczyść globalny cache Bun"
@@ -172,4 +172,4 @@ groups:
           tips:
             - "bun create elysia my-api — projekt ElysiaJS"
             - "bun create hono my-app — projekt Hono"
-            - "bun create next my-next-app — projekt Next.js"
+            - "bunx create-next-app@latest my-app — projekt Next.js (przez bunx)"

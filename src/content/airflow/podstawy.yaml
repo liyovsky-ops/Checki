@@ -1,0 +1,109 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Apache Airflow?
+  firstComponent: Pierwszy DAG
+  firstComponentLang: python
+
+intro:
+  title: Czym jest Apache Airflow?
+  desc: >
+    Apache Airflow to platforma do orkiestracji pipeline'ów danych.
+    Pipelines są definiowane jako DAGi (Directed Acyclic Graphs) — grafai zadań w Pythonie.
+    Każde zadanie (task) to node w grafie, strzałki definiują zależności.
+    Airflow scheduluje, wykonuje i monitoruje taski automatycznie.
+    Stworzony przez Airbnb w 2014, używany przez Airbnb, Twitter, Lyft, PayPal,
+    Adobe do ETL pipelines, ML pipelines, data quality checks.
+    UI do monitorowania wykonania, logi per task, retry logic, alerting.
+
+concepts:
+  - title: DAG (Directed Acyclic Graph)
+    desc: >
+      DAG to zbiór tasków z zależnościami — co po czym. "Acyclic" = brak pętli.
+      Każdy DAG ma id, schedule (cron), start_date. Airflow czyta pliki Python
+      z katalogu dags/ i rejestruje DAGi automatycznie.
+    icon: "🕸️"
+  - title: Task i Operator
+    desc: >
+      Task to jeden krok pipeline'u. Operator definiuje co task robi —
+      PythonOperator (kod Python), BashOperator (shell), PostgresOperator (SQL),
+      HttpSensor (czekaj na HTTP response). Każdy task ma unikalny task_id.
+    icon: "⚙️"
+  - title: TaskFlow API (@task)
+    desc: >
+      Airflow 2.0+ upraszcza tworzenie DAGów przez dekoratory. @dag zamiast DAG(),
+      @task zamiast PythonOperator. Czysty kod Python bez boilerplate.
+      Zależności widoczne z kodu — return value jednego tasku = input kolejnego.
+    icon: "🎯"
+  - title: Scheduler
+    desc: >
+      Scheduler monitoruje DAGi i triggeruje task runs zgodnie ze schedule.
+      Schedule_interval: cron string ("0 0 * * *"), timedelta, lub "@daily".
+      Catchup=True oznacza że scheduler "nadrabia" przeszłe uruchomienia.
+    icon: "⏰"
+  - title: XCom (Cross-Communication)
+    desc: >
+      XCom pozwala taskam wymieniać dane — jeden task push'uje wartość,
+      kolejny ją pull'uje. TaskFlow API automatycznie używa XCom przez
+      return values i argumenty funkcji. Przechowywane w bazie metadanych.
+    icon: "🔄"
+  - title: Connection i Variable
+    desc: >
+      Connection to dane połączenia (DB host, port, credentials) przechowywane
+      bezpiecznie w Airflow. Variable to para klucz-wartość (konfiguracja,
+      flagi). Oba zarządzane przez UI lub environment variables.
+    icon: "🔑"
+
+whenToUse:
+  - ETL/ELT pipelines — extract z baz/API, transform, load do data warehouse
+  - ML pipelines — przygotowanie danych, trening, walidacja, deployment modelu
+  - Data quality checks — scheduled walidacja danych w bazach
+  - Orkiestracja mikrousług — sekwencja wywołań API z logiką retry
+  - Raporty i agregacje — cykliczne obliczenia i eksporty
+  - Zastąpienie skryptów crona gdy potrzebujesz monitoringu i retry logic
+
+firstComponent: |
+  # dags/my_first_dag.py
+  from datetime import datetime, timedelta
+  from airflow.decorators import dag, task
+
+  @dag(
+      dag_id='my_first_pipeline',
+      schedule='@daily',              # Co dzień
+      start_date=datetime(2024, 1, 1),
+      catchup=False,                  # Nie nadrabiaj historycznych uruchomień
+      default_args={
+          'retries': 2,
+          'retry_delay': timedelta(minutes=5),
+      },
+      tags=['example', 'etl'],
+  )
+  def my_pipeline():
+
+      @task()
+      def extract() -> dict:
+          """Pobierz dane z API"""
+          import httpx
+          response = httpx.get('https://api.example.com/data')
+          return response.json()
+
+      @task()
+      def transform(raw_data: dict) -> list:
+          """Przekształć dane"""
+          return [
+              {'id': item['id'], 'value': item['value'] * 2}
+              for item in raw_data['items']
+          ]
+
+      @task()
+      def load(processed: list) -> None:
+          """Załaduj do bazy"""
+          print(f"Ładuję {len(processed)} rekordów")
+          # Tutaj insert do bazy danych
+
+      # Zależności wynikają z przepływu danych
+      raw = extract()
+      processed = transform(raw)
+      load(processed)
+
+  # Zarejestruj DAG
+  dag_instance = my_pipeline()

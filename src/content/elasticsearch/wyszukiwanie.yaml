@@ -1,0 +1,66 @@
+title: Wyszukiwanie i Query DSL
+
+items:
+  - name: Podstawowe typy queries
+    desc: match dla FTS, term dla dokładnego dopasowania, range dla zakresów, bool do łączenia. Query DSL to język JSON zapytań Elasticsearch.
+    code: |
+      # Full-text search
+      es.search(index="products", body={
+          "query": {"match": {"description": "szybki laptop do pracy"}}
+      })
+
+      # Dokładne dopasowanie (keyword field)
+      es.search(index="products", body={
+          "query": {"term": {"category": "laptopy"}}
+      })
+
+      # Zakres ceny
+      es.search(index="products", body={
+          "query": {"range": {"price": {"gte": 1000, "lte": 5000}}}
+      })
+
+      # Bool query — łączenie warunków
+      es.search(index="products", body={
+          "query": {
+              "bool": {
+                  "must": [{"match": {"description": "laptop"}}],
+                  "filter": [
+                      {"term":  {"category": "laptopy"}},
+                      {"term":  {"in_stock": True}},
+                      {"range": {"price": {"lte": 5000}}}
+                  ],
+                  "must_not": [{"term": {"brand": "Acer"}}],
+                  "should": [{"term": {"brand": "Dell"}}]
+              }
+          },
+          "sort": [{"price": "asc"}, "_score"],
+          "from": 0, "size": 20
+      })
+
+  - name: Autocomplete i sugestie
+    desc: completion suggester dla szybkiego autocomplete. search_as_you_type typ pola dla prefix matching. Edge n-grams dla dokładnej kontroli.
+    code: |
+      # Mapping z completion
+      es.indices.create(index="products", body={
+          "mappings": {
+              "properties": {
+                  "name": {
+                      "type": "search_as_you_type",  # Automatyczne n-gramy
+                  },
+                  "suggest": {
+                      "type": "completion"  # Completion suggester
+                  }
+              }
+          }
+      })
+
+      # Autocomplete query (search_as_you_type)
+      es.search(index="products", body={
+          "query": {
+              "multi_match": {
+                  "query": "lapt",
+                  "type": "bool_prefix",
+                  "fields": ["name", "name._2gram", "name._3gram"]
+              }
+          }
+      })

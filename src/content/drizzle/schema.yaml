@@ -42,9 +42,10 @@ items:
     desc: >
       Modyfikatory chainujesz na kolumnie: .notNull(), .unique(), .default(wartość),
       .defaultNow() (dla dat), .primaryKey(). Composite primary key i composite unique
-      definiujesz w trzecim argumencie pgTable — obiekt z constraint funkcjami.
+      definiujesz w trzecim argumencie pgTable — funkcja zwracająca tablicę constraintów
+      (forma object-return jest deprecated od Drizzle 0.31).
     code: |
-      import { pgTable, serial, text, integer, uniqueIndex, primaryKey } from 'drizzle-orm/pg-core'
+      import { pgTable, uuid, text, integer, uniqueIndex, primaryKey } from 'drizzle-orm/pg-core'
       import { sql } from 'drizzle-orm'
 
       export const accounts = pgTable('accounts', {
@@ -55,18 +56,18 @@ items:
         balance:  integer('balance').default(0).notNull(),
         // Default z SQL expression
         token:    text('token').default(sql`gen_random_uuid()`),
-      }, (table) => ({
+      }, (table) => [
         // Composite unique constraint
-        tenantSlugUniq: uniqueIndex('tenant_slug_idx').on(table.tenantId, table.slug),
-      }))
+        uniqueIndex('tenant_slug_idx').on(table.tenantId, table.slug),
+      ])
 
       // Composite primary key (join table)
       export const postsTags = pgTable('posts_tags', {
         postId: integer('post_id').notNull(),
         tagId:  integer('tag_id').notNull(),
-      }, (table) => ({
-        pk: primaryKey({ columns: [table.postId, table.tagId] }),
-      }))
+      }, (table) => [
+        primaryKey({ columns: [table.postId, table.tagId] }),
+      ])
     lang: typescript
 
   - title: Indeksy — index, uniqueIndex
@@ -84,14 +85,14 @@ items:
         authorId:  integer('author_id').notNull(),
         published: integer('published').default(0),
         views:     integer('views').default(0),
-      }, (table) => ({
+      }, (table) => [
         // Indeks na autorze (często filtrujemy posty po autorze)
-        authorIdx:     index('posts_author_idx').on(table.authorId),
+        index('posts_author_idx').on(table.authorId),
         // Unikalny slug
-        slugIdx:       uniqueIndex('posts_slug_idx').on(table.slug),
+        uniqueIndex('posts_slug_idx').on(table.slug),
         // Composite indeks — posty autora posortowane po views
-        authorViewsIdx: index('posts_author_views_idx').on(table.authorId, table.views),
-      }))
+        index('posts_author_views_idx').on(table.authorId, table.views),
+      ])
     lang: typescript
 
   - title: MySQL i SQLite — mysqlTable, sqliteTable
@@ -102,6 +103,7 @@ items:
     code: |
       // MySQL
       import { mysqlTable, int, varchar, boolean, datetime } from 'drizzle-orm/mysql-core'
+      import { sql } from 'drizzle-orm'
 
       export const mysqlUsers = mysqlTable('users', {
         id:        int('id').autoincrement().primaryKey(),
@@ -119,7 +121,8 @@ items:
         email:     text('email').notNull().unique(),
         name:      text('name'),
         score:     real('score').default(0),
-        createdAt: integer('created_at', { mode: 'timestamp' }).defaultNow(),
+        // SQLite nie ma .defaultNow() — użyj $defaultFn (app-side) lub sql`(unixepoch())`
+        createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
       })
     lang: typescript
 

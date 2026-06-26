@@ -1,0 +1,136 @@
+title: System typów TypeScript
+
+items:
+  - name: Typy prymitywne i literalne
+    desc: >
+      Podstawowe typy: string, number, boolean, null, undefined, symbol, bigint.
+      Typy literalne — konkretna wartość jako typ: 'left' | 'right', 42, true.
+      Świetne do discriminated unions i type-safe API.
+    code: |
+      // Prymitywne
+      const name: string = 'Alice';
+      const age: number = 30;
+      const active: boolean = true;
+
+      // Literalne
+      type Direction = 'left' | 'right' | 'up' | 'down';
+      type StatusCode = 200 | 201 | 400 | 404 | 500;
+
+      // Discriminated union
+      type Shape =
+        | { kind: 'circle';    radius: number }
+        | { kind: 'rectangle'; width: number; height: number }
+        | { kind: 'triangle';  base: number;  height: number };
+
+      function area(shape: Shape): number {
+        switch (shape.kind) {
+          case 'circle':    return Math.PI * shape.radius ** 2;
+          case 'rectangle': return shape.width * shape.height;
+          case 'triangle':  return 0.5 * shape.base * shape.height;
+        }
+      }
+
+  - name: Interface i type alias
+    desc: >
+      Interface — kształt obiektu, można rozszerzać i mergować deklaracje.
+      Type alias — alias na dowolny typ, obsługuje union, intersection, mapped types.
+      Preferuj interface dla obiektów publicznych API, type dla złożonych operacji.
+    code: |
+      // Interface — rozszerzalne
+      interface Animal {
+        name: string;
+        sound(): string;
+      }
+
+      interface Dog extends Animal {
+        breed: string;
+        fetch(item: string): void;
+      }
+
+      // Type alias — dla złożonych typów
+      type ID = string | number;
+      type Nullable<T> = T | null;
+      type Callback<T> = (value: T) => void;
+
+      // Intersection
+      type AdminUser = User & {
+        permissions: string[];
+        lastLogin: Date;
+      };
+
+      // Mapped type
+      type ReadOnly<T> = {
+        readonly [K in keyof T]: T[K];
+      };
+
+  - name: Utility types
+    desc: >
+      TypeScript wbudował dziesiątki utility types do transformacji istniejących typów.
+      Partial, Required, Readonly, Record, Pick, Omit, Exclude, Extract, NonNullable,
+      ReturnType, Parameters, InstanceType — codziennie używane w praktyce.
+    code: |
+      interface User {
+        id: number;
+        name: string;
+        email: string;
+        age: number;
+      }
+
+      // Partial — wszystkie pola opcjonalne
+      type UserUpdate = Partial<User>;
+
+      // Pick — wybierz pola
+      type UserPreview = Pick<User, 'id' | 'name'>;
+
+      // Omit — usuń pola
+      type UserWithoutId = Omit<User, 'id'>;
+
+      // Record — słownik o znanych kluczach
+      type UserMap = Record<string, User>;
+
+      // ReturnType — typ zwracanej wartości funkcji
+      async function fetchUser() { return {} as User; }
+      type FetchedUser = Awaited<ReturnType<typeof fetchUser>>;
+
+      // NonNullable — usuń null i undefined
+      type SafeString = NonNullable<string | null | undefined>; // string
+
+  - name: Template literal types
+    desc: >
+      Template literal types pozwalają budować typy przez konkatenację stringów.
+      Przydatne do event names, CSS klasy, endpoint paths — type-safe bez ręcznego wyliczania.
+    code: |
+      type EventName = 'click' | 'focus' | 'blur';
+      type Handler = `on${Capitalize<EventName>}`;
+      // 'onClick' | 'onFocus' | 'onBlur'
+
+      type HttpMethod = 'get' | 'post' | 'put' | 'delete';
+      type Endpoint = `/api/${string}`;
+
+      // Kombinacja z mapped types
+      type EventMap = {
+        [K in EventName as `on${Capitalize<K>}`]: (e: Event) => void;
+      };
+      // { onClick: ..., onFocus: ..., onBlur: ... }
+
+  - name: Conditional types i infer
+    desc: >
+      Conditional types: T extends U ? X : Y — typ warunkowy.
+      infer — wyciągnij typ z warunku. Razem budują potężne transformacje typów.
+      Używane w utility types i bibliotekach do ekstrakcji zagnieżdżonych typów.
+    code: |
+      // Conditional type
+      type IsArray<T> = T extends any[] ? true : false;
+      type A = IsArray<number[]>; // true
+      type B = IsArray<string>;   // false
+
+      // infer — wyciągnij typ elementu tablicy
+      type ArrayElement<T> = T extends (infer E)[] ? E : never;
+      type NumEl = ArrayElement<number[]>; // number
+
+      // Unwrap Promise
+      type Awaited<T> = T extends Promise<infer U> ? Awaited<U> : T;
+
+      // Funkcja → parametry → pierwszy parametr
+      type FirstParam<T extends (...args: any) => any> =
+        T extends (first: infer F, ...rest: any[]) => any ? F : never;

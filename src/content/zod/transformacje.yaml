@@ -1,0 +1,82 @@
+title: Transform, Refine i preprocessing
+
+items:
+  - name: .transform() — konwersja po walidacji
+    desc: transform() uruchamia się po pomyślnej walidacji — przekształca dane. Możesz zwrócić inny typ niż wejście. Łącz z .pipe() dla wieloetapowej transformacji.
+    code: |
+      import { z } from 'zod'
+
+      // Transform: string → Date
+      const DateFromString = z.string()
+        .datetime()
+        .transform(str => new Date(str))
+      // z.infer<typeof DateFromString> = Date (nie string!)
+
+      // Transform: string → number (z walidacją po)
+      const NumberFromString = z.string()
+        .transform(val => parseFloat(val))
+        .pipe(z.number().positive())
+
+      // Preprocessing — normalizuj przed walidacją
+      const TrimmedEmail = z.preprocess(
+        val => typeof val === 'string' ? val.trim().toLowerCase() : val,
+        z.string().email()
+      )
+
+      // Transform obiektu — zmień kształt
+      const ApiResponseSchema = z.object({
+        user_id:    z.number(),
+        full_name:  z.string(),
+        created_at: z.string(),
+      }).transform(data => ({
+        userId:    data.user_id,              // snake_case → camelCase
+        fullName:  data.full_name,
+        createdAt: new Date(data.created_at), // string → Date
+      }))
+
+      const user = ApiResponseSchema.parse({
+        user_id: 1, full_name: "Jan Kowalski", created_at: "2024-01-15"
+      })
+      // { userId: 1, fullName: "Jan Kowalski", createdAt: Date }
+
+  - name: .refine() i .superRefine() — własna logika
+    desc: .refine() dla prostej walidacji zależnej od wartości. .superRefine() gdy potrzebujesz wielu błędów lub kontroli ścieżki błędu.
+    code: |
+      import { z } from 'zod'
+
+      // Refine — proste sprawdzenie
+      const PasswordSchema = z.object({
+        password:        z.string().min(8),
+        confirmPassword: z.string(),
+      }).refine(
+        data => data.password === data.confirmPassword,
+        {
+          message: "Hasła muszą być identyczne",
+          path:    ["confirmPassword"],  // Błąd na tym polu
+        }
+      )
+
+      // SuperRefine — wiele błędów, pełna kontrola
+      const RegisterSchema = z.object({
+        username: z.string(),
+        age:      z.number(),
+        role:     z.string(),
+      }).superRefine((data, ctx) => {
+        if (data.username.length < 3) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.too_small,
+            minimum: 3,
+            type: "string",
+            inclusive: true,
+            message: "Nazwa użytkownika min 3 znaki",
+            path: ["username"],
+          })
+        }
+        if (data.age < 18 && data.role === "admin") {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Admin musi mieć 18+",
+            path: ["role"],
+          })
+        }
+      })

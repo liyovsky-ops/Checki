@@ -12,7 +12,7 @@ items:
       - Ogromna społeczność, dokumentacja, ekosystem (Accelerate, Pulse)
     cons:
       - Ciężki — osobny query engine (binary), duży cold start
-      - Nie działa na edge runtimes (Cloudflare Workers) bez Accelerate
+      - Edge (Cloudflare Workers) wymaga driver adapters lub Accelerate — Drizzle działa natywnie
       - ActiveRecord-style — ukrywa SQL, trudniej debugować
       - Wolniejszy od Drizzle na prostych queries (overhead abstrakcji)
     vs: Prisma dla projektów Next.js/NestJS gdzie DX jest priorytetem i nie zależy Ci na edge. Drizzle gdy piszesz na Cloudflare Workers, Vercel Edge lub gdy chcesz być bliżej SQL i mieć mniejszy bundle.

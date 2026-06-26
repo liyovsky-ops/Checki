@@ -1,0 +1,141 @@
+title: Komendy Apache Airflow
+
+groups:
+  - name: Zarządzanie DAGami
+    icon: "🕸️"
+    commands:
+      - cmd: airflow dags list
+        desc: Listuj wszystkie zarejestrowane DAGi
+        detail:
+          what: Wyświetla dag_id, is_paused, fileloc dla każdego DAGa.
+          tips:
+            - 'airflow dags list-import-errors — pokaż DAGi z błędami parsowania'
+      - cmd: airflow dags trigger my_dag
+        desc: Wyzwól ręczne uruchomienie DAGa
+        detail:
+          what: Uruchamia DAG natychmiast, niezależnie od harmonogramu.
+          flags:
+            - flag: '--run-id my_run'
+              desc: Własny ID uruchomienia
+            - flag: '--conf ''{"key": "value"}'''
+              desc: Konfiguracja JSON dla tego uruchomienia
+      - cmd: airflow dags pause my_dag
+        desc: Wstrzymaj DAG (nie będzie się schedulować)
+        detail:
+          what: Pauzuje DAG — scheduler go ignoruje do czasu wznowienia.
+          tips:
+            - 'airflow dags unpause my_dag — wznów'
+      - cmd: airflow dags test my_dag 2024-01-15
+        desc: Przetestuj DAG lokalnie bez zapisu do bazy
+        detail:
+          what: Uruchamia wszystkie taski DAGa sekwencyjnie, idealnie do debugowania.
+          how: Nie zapisuje wyników do bazy — tylko wypisuje logi.
+      - cmd: airflow dags backfill my_dag --start-date 2024-01-01 --end-date 2024-01-31
+        desc: Uruchom DAG dla zakresu dat historycznych
+        detail:
+          what: Wykonuje wszystkie pominiete/historyczne uruchomienia w podanym zakresie.
+          flags:
+            - flag: '--reset-dagruns'
+              desc: Resetuj istniejące uruchomienia
+            - flag: '-y'
+              desc: Potwierdź bez pytania
+
+  - name: Zarządzanie taskami
+    icon: "⚙️"
+    commands:
+      - cmd: airflow tasks list my_dag
+        desc: Listuj wszystkie taski w DAGu
+        detail:
+          what: Wyświetla task_id i typ operatora dla każdego tasku.
+          flags:
+            - flag: '--tree'
+              desc: Pokaż jako drzewo zależności
+      - cmd: airflow tasks test my_dag my_task 2024-01-15
+        desc: Przetestuj jeden task bez zapis do bazy
+        detail:
+          what: Uruchamia pojedynczy task dla podanej daty. Logi w stdout.
+      - cmd: airflow tasks clear my_dag --task-regex "extract.*" --start-date 2024-01-01
+        desc: Wyczyść historię tasków (możliwość ponownego uruchomienia)
+        detail:
+          what: Resetuje status tasków pasujących do regex — mogą być uruchomione ponownie.
+          flags:
+            - flag: '--downstream'
+              desc: Wyczyść też downstream taski
+            - flag: '-y'
+              desc: Potwierdź bez pytania
+      - cmd: airflow tasks states-for-dag-run my_dag manual__2024-01-15 --output table
+        desc: Sprawdź stan wszystkich tasków w konkretnym uruchomieniu
+        detail:
+          what: Wyświetla status (success/failed/running) każdego tasku w run_id.
+
+  - name: Scheduler i webserver
+    icon: "🖥️"
+    commands:
+      - cmd: airflow scheduler
+        desc: Uruchom scheduler (monitoruje i triggeruje DAGi)
+        detail:
+          what: Główny proces Airflow — skanuje dags/, triggeruje task instances zgodnie z harmonogramem.
+          tips:
+            - 'Uruchom w tle: airflow scheduler -D (daemonize)'
+      - cmd: airflow webserver --port 8080
+        desc: Uruchom web UI na porcie 8080
+        detail:
+          what: Interfejs webowy do monitorowania DAGów, logów, XCom, połączeń.
+          flags:
+            - flag: '--port 8080'
+              desc: Port (domyślnie 8080)
+            - flag: '-D'
+              desc: Uruchom jako daemon w tle
+      - cmd: airflow db init
+        desc: Zainicjuj bazę metadanych Airflow
+        detail:
+          what: Tworzy tabele w bazie (SQLite domyślnie). Wymagane przy pierwszym uruchomieniu.
+          tips:
+            - 'airflow db migrate — aktualizuj schemat po upgrade Airflow'
+      - cmd: airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin
+        desc: Utwórz użytkownika administratora
+        detail:
+          what: Tworzy konto admina dla dostępu do UI. Wymagane dla pierwszego uruchomienia.
+
+  - name: Connections i Variables
+    icon: "🔑"
+    commands:
+      - cmd: airflow connections add my_postgres --conn-type postgres --conn-host localhost --conn-login user --conn-password pass --conn-schema mydb --conn-port 5432
+        desc: Dodaj connection do bazy PostgreSQL
+        detail:
+          what: Rejestruje dane połączenia w Airflow — potem używasz conn_id='my_postgres'.
+      - cmd: airflow connections list
+        desc: Listuj wszystkie zarejestrowane connections
+        detail:
+          what: Wyświetla conn_id, conn_type, host dla każdego połączenia.
+      - cmd: airflow variables set my_var "my_value"
+        desc: Ustaw zmienną konfiguracyjną
+        detail:
+          what: Zapisuje parę klucz-wartość dostępną z kodu DAGa przez Variable.get().
+          flags:
+            - flag: '--json'
+              desc: Wartość to JSON (słownik/lista)
+      - cmd: airflow variables get my_var
+        desc: Pobierz wartość zmiennej
+        detail:
+          what: Wypisuje wartość zmiennej na stdout.
+
+  - name: Docker i lokalne środowisko
+    icon: "🐳"
+    commands:
+      - cmd: curl -LfO 'https://airflow.apache.org/docs/apache-airflow/stable/docker-compose.yaml' && docker compose up -d
+        desc: Uruchom pełny Airflow stack przez Docker Compose
+        detail:
+          what: Oficjalny docker-compose.yaml — Postgres, Redis, Scheduler, Webserver, Worker.
+          tips:
+            - 'Ustaw AIRFLOW_UID=$(id -u) przed docker compose up'
+      - cmd: pip install apache-airflow==2.8.0 --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.8.0/constraints-3.11.txt"
+        desc: Zainstaluj Airflow lokalnie z constraints
+        detail:
+          what: Constraints plik zapewnia kompatybilne wersje zależności.
+          tips:
+            - 'Zawsze używaj constraints przy instalacji Airflow!'
+      - cmd: pip install apache-airflow-providers-postgres apache-airflow-providers-amazon apache-airflow-providers-google
+        desc: Zainstaluj popularne providery (Postgres, AWS, GCP)
+        detail:
+          what: Providers dodają operatory i hooki dla zewnętrznych systemów.

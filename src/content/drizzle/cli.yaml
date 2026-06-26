@@ -119,7 +119,7 @@ groups:
         desc: INSERT z powrotem wstawionych danych
         detail:
           what: Wstawia rekord(y) i zwraca je. .values() przyjmuje obiekt lub tablicę obiektów.
-          how: ".returning() działa na PostgreSQL i SQLite. MySQL — tylko .returning({ id: table.id })."
+          how: ".returning() działa na PostgreSQL i SQLite. MySQL nie ma .returning() — auto-id przez .$returningId()."
           tips:
             - 'const [user] = await db.insert(users).values({...}).returning()'
             - '.onConflictDoUpdate() — upsert'

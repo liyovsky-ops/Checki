@@ -1,0 +1,122 @@
+title: Definiowanie schematu GraphQL
+
+items:
+  - name: SDL — Schema Definition Language
+    desc: >
+      SDL to język do definiowania schematu GraphQL. Typy, pola, dyrektyw.
+      Wykrzyknik (!) oznacza pole non-nullable — serwer musi zwrócić wartość.
+      Brak ! = pole może być null.
+    code: |
+      # Typy obiektów
+      type User {
+        id: ID!           # non-nullable ID
+        name: String!     # non-nullable String
+        email: String!
+        age: Int          # nullable — może być null
+        role: Role!       # enum
+        posts: [Post!]!   # tablica non-null elementów, non-null tablica
+        address: Address  # opcjonalny obiekt zagnieżdżony
+        createdAt: String!
+      }
+
+      # Enum
+      enum Role {
+        ADMIN
+        USER
+        GUEST
+      }
+
+      # Input type — argumenty w mutations
+      input CreateUserInput {
+        name: String!
+        email: String!
+        role: Role = USER    # domyślna wartość
+      }
+
+      # Interface
+      interface Node {
+        id: ID!
+      }
+
+      type Post implements Node {
+        id: ID!
+        title: String!
+        content: String!
+        author: User!
+      }
+
+      # Union
+      union SearchResult = User | Post | Comment
+
+  - name: Query i Mutation root types
+    desc: >
+      Query i Mutation to specjalne typy — punkty wejścia do API.
+      Query = odczyt (GET w REST), Mutation = zapis (POST/PUT/DELETE).
+      Każde pole w Query/Mutation ma swój resolver.
+    code: |
+      type Query {
+        # Pobierz jednego użytkownika (może być null jeśli nie znaleziony)
+        user(id: ID!): User
+
+        # Pobierz wszystkich (zawsze tablica, nigdy null)
+        users(
+          limit: Int = 20
+          offset: Int = 0
+          role: Role
+        ): [User!]!
+
+        # Wyszukiwanie zwracające union
+        search(query: String!): [SearchResult!]!
+
+        # Pole bezargumentowe
+        me: User
+      }
+
+      type Mutation {
+        createUser(input: CreateUserInput!): User!
+        updateUser(id: ID!, input: UpdateUserInput!): User!
+        deleteUser(id: ID!): Boolean!
+
+        # Mutation może zwrócić złożony wynik
+        login(email: String!, password: String!): AuthPayload!
+      }
+
+      type AuthPayload {
+        token: String!
+        user: User!
+        expiresAt: String!
+      }
+
+  - name: Dyrektywy
+    desc: >
+      Dyrektywy to meta-adnotacje w SDL i queries. @deprecated, @skip, @include
+      wbudowane. Można tworzyć własne do autoryzacji, caching, transformacji.
+    code: |
+      # Wbudowane dyrektywy w schemacie
+      type User {
+        id: ID!
+        name: String!
+        email: String!
+        legacyField: String @deprecated(reason: "Użyj email zamiast tego")
+      }
+
+      # Własna dyrektywa do autoryzacji
+      directive @auth(role: Role = USER) on FIELD_DEFINITION
+
+      type Query {
+        publicData: String!
+        adminData: String! @auth(role: ADMIN)
+        userData: String!  @auth
+      }
+
+      # W query — dyrektywy warunkowe
+      query GetUser($id: ID!, $withPosts: Boolean!) {
+        user(id: $id) {
+          id
+          name
+          posts @include(if: $withPosts) {
+            title
+          }
+          legacyField @skip(if: true)
+        }
+      }

@@ -87,6 +87,7 @@ items:
       auto-open w przeglądarce i hot module replacement.
     code: |
       import { defineConfig } from 'vite';
+      import { readFileSync } from 'node:fs';
 
       export default defineConfig({
         server: {
@@ -108,11 +109,14 @@ items:
             },
           },
 
-          // HTTPS z własnym certyfikatem
+          // HTTPS — UWAGA: key/cert to TREŚĆ certyfikatu (Buffer), nie ścieżka!
+          // server.https jest przekazywane wprost do Node https.createServer
           https: {
-            key: './certs/key.pem',
-            cert: './certs/cert.pem',
+            key: readFileSync('./certs/key.pem'),
+            cert: readFileSync('./certs/cert.pem'),
           },
+          // Najprościej: plugin @vitejs/plugin-basic-ssl generuje self-signed cert
+          // plugins: [basicSsl()]  →  server.https = {} wystarczy
 
           // Nagłówki CORS dla dev
           headers: {
@@ -196,6 +200,8 @@ items:
       lokalizacja, inject. PostCSS config przez postcss.config.js lub inline.
     code: |
       import { defineConfig } from 'vite';
+      import tailwindcss from 'tailwindcss';
+      import autoprefixer from 'autoprefixer';
 
       export default defineConfig({
         css: {
@@ -206,12 +212,16 @@ items:
           },
 
           // PostCSS inline (lub przez postcss.config.js)
+          // UWAGA: w configu ESM ("type":"module") NIE używaj require() — użyj import.
           postcss: {
             plugins: [
-              require('tailwindcss'),
-              require('autoprefixer'),
+              tailwindcss(),     // Tailwind v3 (PostCSS)
+              autoprefixer(),
             ],
           },
+          // Tailwind v4 (2025+) NIE używa PostCSS — to dedykowany plugin Vite:
+          // import tailwindcss from '@tailwindcss/vite'
+          // plugins: [tailwindcss()]  (w sekcji plugins, nie css.postcss)
 
           // Preprocessor (Sass/Less/Stylus)
           preprocessorOptions: {

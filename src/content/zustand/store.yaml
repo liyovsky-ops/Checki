@@ -63,7 +63,7 @@ items:
     lang: typescript
 
   - name: get() — odczyt w akcjach
-    desc: get() zwraca aktualny stan store — niezbędne w async akcjach, where stan może się zmienić między wywołaniem a resolve Promisa. Drugie argumenty callbacka obok set.
+    desc: get() zwraca aktualny stan store — niezbędne w async akcjach, gdzie stan może się zmienić między wywołaniem a resolve Promisa. get() to drugi argument callbacka, obok set.
     code: |
       import { create } from 'zustand'
 
@@ -230,5 +230,52 @@ items:
         const total     = useTodoStore((s) => s.todos.length)
         const completed = useTodoStore((s) => s.todos.filter((t) => t.done).length)
         return <p>{completed}/{total} ukończonych</p>
+      }
+    lang: typescript
+
+  - name: Slices pattern — dziel duży store na moduły
+    desc: Gdy store rośnie, podziel go na slice'y — osobne funkcje StateCreator łączone w jednym create(). Każdy slice odpowiada za jeden obszar (auth, cart, ui), ale dzielą jeden store i mogą się odwoływać nawzajem przez get(). Kanoniczny wzorzec skalowania Zustand.
+    code: |
+      import { create, StateCreator } from 'zustand'
+
+      interface AuthSlice {
+        user:  string | null
+        login: (user: string) => void
+        logout: () => void
+      }
+
+      interface CartSlice {
+        items:   string[]
+        addItem: (item: string) => void
+        clear:   () => void
+      }
+
+      type Store = AuthSlice & CartSlice
+
+      // StateCreator<Store, [], [], AuthSlice> — slice zna cały Store, typuje tylko swój kawałek
+      const createAuthSlice: StateCreator<Store, [], [], AuthSlice> = (set) => ({
+        user:  null,
+        login: (user) => set({ user }),
+        // Slice może dotknąć pól z innego slice'a — to jeden wspólny store
+        logout: () => set({ user: null, items: [] }),
+      })
+
+      const createCartSlice: StateCreator<Store, [], [], CartSlice> = (set, get) => ({
+        items:   [],
+        addItem: (item) => set((s) => ({ items: [...s.items, item] })),
+        clear:   () => set({ items: [] }),
+      })
+
+      // Łączymy slice'y w jeden store — spread każdego slice'a
+      export const useStore = create<Store>()((...a) => ({
+        ...createAuthSlice(...a),
+        ...createCartSlice(...a),
+      }))
+
+      // Użycie — jeden hook, selektor na pole z dowolnego slice'a
+      function Header() {
+        const user  = useStore((s) => s.user)
+        const count = useStore((s) => s.items.length)
+        return <span>{user ?? 'Gość'} — koszyk: {count}</span>
       }
     lang: typescript

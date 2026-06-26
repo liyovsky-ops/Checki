@@ -85,7 +85,8 @@ items:
       import iconUrl from './icons/arrow.svg';
 
       // Import SVG jako komponent React (wymaga pluginu vite-plugin-svgr)
-      import { ReactComponent as Arrow } from './icons/arrow.svg?react';
+      // vite-plugin-svgr v3+: sufiks ?react → DEFAULT export (nie ReactComponent!)
+      import Arrow from './icons/arrow.svg?react';
 
       // Import jako raw string (treść pliku)
       import svgContent from './icons/arrow.svg?raw';
@@ -158,7 +159,10 @@ items:
       const apiUrl = import.meta.env.VITE_API_URL;
       const title = import.meta.env.VITE_APP_TITLE;
 
-      // TypeScript — dodaj typy w env.d.ts:
+      // TypeScript — dodaj typy w env.d.ts (lub src/vite-env.d.ts):
+      /// <reference types="vite/client" />
+      // ↑ ta dyrektywa daje typy dla import.meta.env, ?raw, ?url, .svg itd.
+
       interface ImportMetaEnv {
         readonly VITE_API_URL: string;
         readonly VITE_APP_TITLE: string;

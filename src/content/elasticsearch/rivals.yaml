@@ -1,0 +1,66 @@
+title: Elasticsearch vs alternatywy
+
+items:
+  - name: Apache Solr
+    icon: "☀️"
+    color: "#D9411E"
+    tagline: Dojrzała wyszukiwarka na Lucene — faceting, schema.xml, SolrCloud
+    pros:
+      - Starszy i dojrzalszy projekt (2004 vs 2010)
+      - Lepszy out-of-the-box dla klasycznych wyszukiwarek dokumentów
+      - XML/JSON konfig, mocny faceting
+      - SolrCloud dla dystrybucji
+    cons:
+      - Wolniejszy development i mniejsza społeczność
+      - Trudniejszy setup niż Elasticsearch
+      - Słabszy ekosystem narzędzi (brak Kibany)
+      - REST API mniej intuicyjne
+    vs: Solr dla klasycznych enterprise wyszukiwarek. Elasticsearch dla nowoczesnych aplikacji, ELK, real-time analytics.
+
+  - name: Meilisearch
+    icon: "⚡"
+    color: "#FF5CAA"
+    tagline: Błyskawiczna wyszukiwarka dla deweloperów — zero-config, instant search
+    pros:
+      - Typo-tolerant search wbudowany
+      - Zero konfiguracji — działa od razu
+      - Bardzo prosta integracja (REST API)
+      - Rewelacyjna prędkość dla małych/średnich zbiorów
+    cons:
+      - Brak agregacji i analytics
+      - Ograniczona skalowalność (brak dystrybucji jak ES)
+      - Brak ELK-like ecosystem
+      - Mniejsza kontrola nad rankingiem
+    vs: Meilisearch dla search-as-you-type w aplikacjach (sklep, docs). ES gdy potrzebujesz analytics, log aggregation lub dużej skali.
+
+  - name: Typesense
+    icon: "🔤"
+    color: "#E4362D"
+    tagline: Open-source, błyskawiczny, typo-tolerant — prosta alternatywa ES
+    pros:
+      - Typo-tolerant jak Meilisearch, łatwiejszy niż ES
+      - Hosted cloud (Typesense Cloud) lub self-hosted
+      - Schema enforcement (type safety)
+      - Niższe koszty operacyjne niż ES
+    cons:
+      - Brak zaawansowanych aggregacji
+      - Mała społeczność vs ES
+      - Brak log analytics use-case
+      - Mniej elastyczny Query DSL
+    vs: Typesense dla search UX w produktach. ES gdy potrzebujesz pełnego ELK stack lub zaawansowanej analityki.
+
+  - name: PostgreSQL Full-Text Search
+    icon: "🐘"
+    color: "#336791"
+    tagline: FTS wbudowany w PostgreSQL — bez dodatkowej infrastruktury
+    pros:
+      - Zero dodatkowej infrastruktury
+      - ACID transactions z FTS
+      - tsvector/tsquery, GIN indexy
+      - Wystarczający dla milionów dokumentów
+    cons:
+      - Gorszy relevance scoring niż ES
+      - Brak autocomplete/faceting bez customizacji
+      - Skalowanie gorsze niż ES przy dużych zbiorach
+      - Brak analytics/aggregations
+    vs: PostgreSQL FTS gdy dane i tak są w Postgresie i skala nie wymaga ES. ES gdy potrzebujesz lepszego search UX lub log analytics.

@@ -19,7 +19,7 @@ groups:
           how: Przydatne przy debugowaniu problemów z modułami i proxy.
           tips:
             - "go env GOPATH — tylko jedna zmienna"
-            - "go env -w GONOSUMCHECK=* — ustaw zmienną trwale"
+            - "go env -w GOPRIVATE=github.com/mojafirma/* — ustaw zmienną trwale (np. prywatne repo, bez proxy/sumdb)"
 
   - name: Moduły (go mod)
     icon: "📋"
@@ -52,7 +52,7 @@ groups:
         desc: Pobierz wszystkie zależności z go.mod do cache
         detail:
           what: Pobiera i cache'uje wszystkie zależności bez kompilacji. Przydatne w Dockerfile przed kopiowaniem kodu.
-          how: Moduły trafiają do GOMODCACHE (~/.cache/go/mod lub GOPATH/pkg/mod).
+          how: Moduły trafiają do GOMODCACHE (domyślnie $GOPATH/pkg/mod). Build cache to osobny katalog — GOCACHE.
           tips:
             - "W Dockerfile: najpierw COPY go.mod go.sum, RUN go mod download, potem COPY . . — lepszy cache warstw"
             - "go mod verify — sprawdź integralność pobranych modułów"

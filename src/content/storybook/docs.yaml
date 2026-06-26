@@ -1,0 +1,83 @@
+title: Dokumentacja komponentów
+
+items:
+  - name: Autodocs — automatyczna dokumentacja
+    desc: tags:['autodocs'] w meta generuje stronę dokumentacji komponentu. Storybook parsuje TypeScript types i JSDoc — tabela props z typami, opisami, wartościami domyślnymi.
+    code: |
+      import type { Meta, StoryObj } from '@storybook/react'
+
+      interface ButtonProps {
+        /** Treść przycisku */
+        children: React.ReactNode
+        /** Wariant wizualny */
+        variant?: 'primary' | 'secondary' | 'danger'
+        /** Rozmiar przycisku */
+        size?: 'sm' | 'md' | 'lg'
+        /** Wyłącz przycisk */
+        disabled?: boolean
+        /** Callback po kliknięciu */
+        onClick?: (event: React.MouseEvent) => void
+      }
+
+      const meta: Meta<typeof Button> = {
+        title:     'UI/Button',
+        component: Button,
+        tags:      ['autodocs'],  // Włącz auto-dokumentację
+        parameters: {
+          docs: {
+            // Opis komponentu w dokumentacji
+            description: {
+              component: `
+                Podstawowy przycisk akcji. Dostępny w 3 wariantach i 3 rozmiarach.
+                Używaj \`primary\` dla głównych akcji, \`danger\` dla destruktywnych.
+              `,
+            },
+          },
+        },
+      }
+      export default meta
+
+      // Story z opisem — pojawi się w dokumentacji
+      export const Primary: StoryObj<typeof meta> = {
+        args: { children: 'Zatwierdź', variant: 'primary' },
+        parameters: {
+          docs: {
+            description: {
+              story: 'Przycisk głównej akcji — używaj dla CTA.',
+            },
+          },
+        },
+      }
+
+  - name: MDX — własna dokumentacja
+    desc: Pliki .mdx łączą Markdown z komponentami React i Stories. Pisz pełną dokumentację z przykładami kodu, Canvas (interaktywna story) i CustomArgsTable.
+    code: |
+      {/* Button.mdx */}
+      import { Meta, Story, Canvas, Controls, ArgTypes } from '@storybook/blocks'
+      import * as ButtonStories from './Button.stories'
+
+      <Meta of={ButtonStories} />
+
+      # Button
+
+      Podstawowy element interakcji w aplikacji. Obsługuje 3 warianty i 3 rozmiary.
+
+      ## Przykłady użycia
+
+      <Canvas of={ButtonStories.Primary} />
+
+      Powyżej interaktywna story — zmień props w Controls poniżej.
+
+      <Controls of={ButtonStories.Primary} />
+
+      ## Dostępne warianty
+
+      | Wariant | Kiedy używać |
+      |---------|-------------|
+      | primary | Główna akcja na stronie |
+      | secondary | Akcja drugorzędna |
+      | danger | Destruktywne akcje (usuwanie) |
+
+      ## Props
+
+      <ArgTypes of={ButtonStories} />

@@ -1,0 +1,75 @@
+title: Reverse Proxy i Load Balancing
+
+items:
+  - name: Podstawowy reverse proxy
+    desc: Nginx przekazuje requesty do backend serwera. proxy_pass to adres backendu. Nagłówki X-Real-IP i X-Forwarded-For przekazują IP klienta.
+    code: |
+      server {
+          listen 80;
+          server_name api.example.com;
+
+          location / {
+              proxy_pass http://127.0.0.1:3000;
+
+              # Nagłówki dla backendu
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+
+              # Timeouty
+              proxy_connect_timeout 5s;
+              proxy_read_timeout 60s;
+              proxy_send_timeout 60s;
+
+              # Buforowanie odpowiedzi
+              proxy_buffering on;
+              proxy_buffer_size 16k;
+              proxy_buffers 4 32k;
+          }
+      }
+
+  - name: Load Balancing — upstream
+    desc: upstream {} definiuje pulę serwerów. Nginx rozkłada ruch między nie. Algorytmy — round-robin (domyślny), least_conn, ip_hash.
+    code: |
+      upstream backend_pool {
+          least_conn;   # Algorytm — least connections
+
+          server 10.0.0.1:3000 weight=3;   # Waga — więcej ruchu
+          server 10.0.0.2:3000 weight=1;
+          server 10.0.0.3:3000 backup;     # Backup — tylko gdy reszta down
+
+          # Health checking (Nginx Plus lub nginx_upstream_check_module)
+          # keepalive 16;  # Persistent connections do backendu
+      }
+
+      server {
+          listen 80;
+          location / {
+              proxy_pass http://backend_pool;
+          }
+      }
+
+  - name: Rate Limiting
+    desc: Nginx chroni backend przez ograniczenie liczby requestów. limit_req_zone definiuje bucket, limit_req stosuje go. Skuteczna ochrona przed brute-force i DDoS.
+    code: |
+      http {
+          # Zdefiniuj zone — 10m = 10MB memory dla ~160k IP
+          limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+          limit_req_zone $binary_remote_addr zone=login:10m rate=1r/m;
+      }
+
+      server {
+          # API — max 10 req/s z burst 20
+          location /api/ {
+              limit_req zone=api burst=20 nodelay;
+              limit_req_status 429;
+              proxy_pass http://backend;
+          }
+
+          # Login — max 1 req/min (brute force protection)
+          location /auth/login {
+              limit_req zone=login burst=5;
+              proxy_pass http://backend;
+          }
+      }

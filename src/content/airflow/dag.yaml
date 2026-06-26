@@ -1,0 +1,77 @@
+title: DAG i Task — budowanie pipeline'ów
+
+items:
+  - name: Tradycyjny styl z operatorami
+    desc: Klasyczny styl Airflow 1.x — DAG obiekt, Operator instancje, zależności przez >> lub set_upstream/downstream.
+    code: |
+      from datetime import datetime
+      from airflow import DAG
+      from airflow.operators.python import PythonOperator
+      from airflow.operators.bash import BashOperator
+
+      with DAG(
+          dag_id='classic_style',
+          start_date=datetime(2024, 1, 1),
+          schedule='0 6 * * *',    # Codziennie o 6:00
+          catchup=False,
+      ) as dag:
+
+          def process_data(**context):
+              # context['ds'] = data execution date (YYYY-MM-DD)
+              execution_date = context['ds']
+              print(f"Przetwarzam dane za: {execution_date}")
+              return "OK"
+
+          task_extract = BashOperator(
+              task_id='extract',
+              bash_command='python /scripts/extract.py --date {{ ds }}'
+          )
+
+          task_process = PythonOperator(
+              task_id='process',
+              python_callable=process_data,
+          )
+
+          task_notify = BashOperator(
+              task_id='notify',
+              bash_command='echo "Pipeline zakończony"'
+          )
+
+          # Zależności: extract → process → notify
+          task_extract >> task_process >> task_notify
+
+  - name: Dynamiczne tasiki i BranchOperator
+    desc: Generowanie tasków w pętli i warunkowe rozgałęzienie pipeline'u przez BranchPythonOperator.
+    code: |
+      from airflow.decorators import dag, task
+      from airflow.operators.python import BranchPythonOperator
+      from datetime import datetime
+
+      @dag(start_date=datetime(2024, 1, 1), schedule='@weekly', catchup=False)
+      def dynamic_pipeline():
+
+          @task()
+          def check_data_size() -> int:
+              return 1500  # Liczba rekordów
+
+          def choose_branch(ti):
+              size = ti.xcom_pull(task_ids='check_data_size')
+              return 'big_batch' if size > 1000 else 'small_batch'
+
+          branch = BranchPythonOperator(
+              task_id='branch_decision',
+              python_callable=choose_branch,
+          )
+
+          @task()
+          def big_batch():
+              print("Przetwarzam duży batch — równolegle")
+
+          @task()
+          def small_batch():
+              print("Mały batch — sekwencyjnie")
+
+          size_result = check_data_size()
+          size_result >> branch >> [big_batch(), small_batch()]
+
+      dag_instance = dynamic_pipeline()

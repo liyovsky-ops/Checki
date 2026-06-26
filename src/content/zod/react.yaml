@@ -1,0 +1,77 @@
+title: React + React Hook Form
+
+items:
+  - name: Formularz z zodResolver
+    desc: zodResolver łączy Zod ze z React Hook Form. Definiujesz schemat Zod, resolver auto-waliduje pola. Błędy Zod mapowane na errors obiektu formularza.
+    code: |
+      import { z } from 'zod'
+      import { useForm } from 'react-hook-form'
+      import { zodResolver } from '@hookform/resolvers/zod'
+
+      const LoginSchema = z.object({
+        email:    z.string().email("Podaj poprawny email"),
+        password: z.string().min(8, "Hasło min 8 znaków"),
+        remember: z.boolean().default(false),
+      })
+
+      type LoginForm = z.infer<typeof LoginSchema>
+
+      function LoginPage() {
+        const { register, handleSubmit, formState: { errors, isSubmitting } }
+          = useForm<LoginForm>({
+            resolver: zodResolver(LoginSchema),
+            defaultValues: { remember: false },
+          })
+
+        const onSubmit = async (data: LoginForm) => {
+          // data jest typowany jako LoginForm, już zwalidowany
+          await login(data.email, data.password)
+        }
+
+        return (
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <input {...register("email")} />
+            {errors.email && <p>{errors.email.message}</p>}
+
+            <input type="password" {...register("password")} />
+            {errors.password && <p>{errors.password.message}</p>}
+
+            <input type="checkbox" {...register("remember")} />
+
+            <button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Loguję..." : "Zaloguj"}
+            </button>
+          </form>
+        )
+      }
+
+  - name: Next.js Server Actions z Zod
+    desc: Zod w Server Actions waliduje dane formularza po stronie serwera. Bezpieczna walidacja bez klienta — zawsze waliduj po stronie serwera.
+    code: |
+      'use server'
+
+      import { z } from 'zod'
+      import { revalidatePath } from 'next/cache'
+
+      const CreatePostSchema = z.object({
+        title:   z.string().min(5).max(200),
+        content: z.string().min(20),
+        tags:    z.array(z.string()).max(5).default([]),
+      })
+
+      export async function createPost(formData: FormData) {
+        const raw = Object.fromEntries(formData.entries())
+
+        const result = CreatePostSchema.safeParse(raw)
+        if (!result.success) {
+          return {
+            success: false,
+            errors: result.error.flatten().fieldErrors,
+          }
+        }
+
+        // result.data jest w pełni typowany
+        await db.posts.create({ data: result.data })
+        revalidatePath('/posts')
+        return { success: true }
+      }

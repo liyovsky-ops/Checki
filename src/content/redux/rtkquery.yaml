@@ -124,7 +124,12 @@ items:
         } = useGetUsersQuery()
 
         if (isLoading) return <Spinner />
-        if (isError)   return <p>Błąd: {error.toString()}</p>
+        if (isError) {
+          // error to FetchBaseQueryError | SerializedError — toString() da [object Object].
+          // Zawęź typ: FetchBaseQueryError ma 'status', SerializedError ma 'message'.
+          const msg = 'status' in error ? `HTTP ${error.status}` : error.message
+          return <p>Błąd: {msg}</p>
+        }
 
         return (
           <div>
@@ -189,7 +194,9 @@ items:
               {isLoading ? 'Dodawanie...' : 'Dodaj'}
             </button>
             {isSuccess && <p>Dodano pomyślnie!</p>}
-            {isError   && <p>Błąd: {error?.toString()}</p>}
+            {isError && (
+              <p>Błąd: {error && 'status' in error ? `HTTP ${error.status}` : 'nieznany'}</p>
+            )}
           </form>
         )
       }

@@ -1,0 +1,77 @@
+title: XCom — dane między taskami
+
+items:
+  - name: XCom push i pull
+    desc: XCom pozwala taskam przekazywać dane. TaskFlow API robi to automatycznie (return = push, argument = pull). Klasyczny styl używa ti.xcom_push/pull.
+    code: |
+      from airflow.decorators import dag, task
+      from datetime import datetime
+
+      @dag(start_date=datetime(2024, 1, 1), schedule='@daily', catchup=False)
+      def xcom_example():
+
+          # TaskFlow — XCom automatyczny przez return i argumenty
+          @task()
+          def get_user_ids() -> list:
+              return [1, 2, 3, 4, 5]  # Automatycznie push do XCom
+
+          @task()
+          def process_users(user_ids: list) -> dict:
+              # user_ids automatycznie pull z XCom poprzedniego tasku
+              results = {uid: f"processed_{uid}" for uid in user_ids}
+              return results
+
+          @task()
+          def save_results(results: dict) -> None:
+              print(f"Zapisuję {len(results)} wyników")
+
+          ids = get_user_ids()
+          processed = process_users(ids)
+          save_results(processed)
+
+          # Klasyczny styl — ręczny push/pull
+          def push_value(ti, **context):
+              ti.xcom_push(key='my_key', value={'count': 42})
+
+          def pull_value(ti, **context):
+              data = ti.xcom_pull(task_ids='push_task', key='my_key')
+              print(f"Pobrano: {data['count']}")
+
+      dag_instance = xcom_example()
+
+  - name: Ograniczenia XCom i alternatywy
+    desc: XCom przechowywany w bazie metadanych — max kilka MB. Dla dużych danych użyj S3/GCS i przekazuj tylko ścieżkę przez XCom. XComArg do dynamic task mapping.
+    code: |
+      from airflow.decorators import dag, task
+      from datetime import datetime
+
+      @dag(start_date=datetime(2024, 1, 1), schedule='@daily', catchup=False)
+      def large_data_pattern():
+
+          @task()
+          def extract_large_dataset() -> str:
+              """Zapisz do S3, zwróć tylko ścieżkę"""
+              import boto3
+              s3 = boto3.client('s3')
+              data = fetch_millions_of_rows()
+              s3.put_object(
+                  Bucket='my-bucket',
+                  Key=f'pipeline/data.parquet',
+                  Body=data.to_parquet()
+              )
+              return 's3://my-bucket/pipeline/data.parquet'  # Tylko ścieżka!
+
+          @task()
+          def process(data_path: str) -> str:
+              """Pobierz z S3, przetwórz, zapisz wynik"""
+              import pandas as pd
+              df = pd.read_parquet(data_path)
+              result = df.groupby('category').agg({'value': 'sum'})
+              result_path = 's3://my-bucket/pipeline/result.parquet'
+              result.to_parquet(result_path)
+              return result_path
+
+          path = extract_large_dataset()
+          process(path)
+
+      dag_instance = large_data_pattern()

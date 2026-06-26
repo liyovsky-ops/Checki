@@ -196,6 +196,37 @@ items:
       }
     lang: typescript
 
+  - title: base — deploy pod subścieżką + SPA fallback
+    desc: >
+      Domyślnie Vite zakłada deploy w root domeny (/). Jeśli wrzucasz appkę pod
+      subścieżkę (np. GitHub Pages https://user.github.io/repo/), MUSISZ ustawić
+      base — inaczej ścieżki do assetów (/assets/...) będą 404. Dla SPA serwer
+      produkcyjny musi też przekierować wszystkie 404 na index.html (history fallback).
+    code: |
+      import { defineConfig } from 'vite';
+
+      export default defineConfig({
+        // base — prefiks dla wszystkich ścieżek do assetów
+        base: '/repo/',          // GitHub Pages: nazwa repo
+        // base: '/',            // domyślne — deploy w root domeny
+        // base: './',           // relatywne — gdy ścieżka jest nieznana
+      });
+
+      // Z env (różny base dla różnych środowisk):
+      // export default defineConfig(({ mode }) => ({
+      //   base: mode === 'production' ? '/repo/' : '/',
+      // }));
+
+      # SPA fallback — bez tego deep-link (np. /dashboard) daje 404:
+      # Netlify  → public/_redirects:   /*  /index.html  200
+      # Vercel   → działa automatycznie dla SPA (lub vercel.json rewrites)
+      # nginx    → try_files $uri $uri/ /index.html;
+      # Apache   → .htaccess: FallbackResource /index.html
+
+      // W kodzie odczytaj base przez:
+      // import.meta.env.BASE_URL  →  '/repo/'
+    lang: typescript
+
   - title: Optymalizacje produkcyjne
     desc: >
       Vite automatycznie optymalizuje wiele aspektów, ale można to kontrolować ręcznie.

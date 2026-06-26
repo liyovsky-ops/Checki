@@ -1,14 +1,14 @@
 labels:
   concepts: Kluczowe koncepcje
   whenToUse: Kiedy używać Supabase?
-  firstComponent: Twój pierwszy zapytanie
+  firstComponent: Twoje pierwsze zapytanie
   firstComponentLang: typescript
 
 intro:
   title: Czym jest Supabase?
   desc: >
     Supabase to open-source'owa alternatywa dla Firebase zbudowana na PostgreSQL.
-    Zamiast własnej bazy NoSQL dostajasz pełnoprawny PostgreSQL — relacyjny, typowany,
+    Zamiast własnej bazy NoSQL dostajesz pełnoprawny PostgreSQL — relacyjny, typowany,
     z transakcjami, widokami, triggerami i rozszerzeniami (np. pgvector do AI).
     Supabase dokłada do tego Auth, Storage, Realtime i Edge Functions —
     wszystko jako serwis zarządzany lub self-hosted. Założony w 2020,
@@ -42,6 +42,13 @@ concepts:
       Możesz mieć projekt dev, staging i prod. Lokalnie używasz supabase CLI
       który uruchamia Docker z pełnym stackiem Supabase na localhost.
     icon: "🏗️"
+  - title: anon key vs service_role key
+    desc: >
+      Projekt ma dwa klucze. anon key jest publiczny — wkładasz go do frontendu,
+      bo RLS i tak pilnuje dostępu. service_role key OMIJA RLS (pełen dostęp admina) —
+      NIGDY nie umieszczaj go w kodzie klienta ani w zmiennych NEXT_PUBLIC_*.
+      Używaj go tylko na serwerze (Edge Functions, backend, skrypty migracyjne).
+    icon: "🚨"
 
 whenToUse:
   - Aplikacje wymagające relacyjnej bazy z JOINami i transakcjami

@@ -171,6 +171,36 @@ items:
       })
     lang: javascript
 
+  - name: Connection state recovery — odzyskiwanie po rozłączeniu
+    desc: >
+      Od v4.6 Socket.io potrafi odtworzyć sesję po krótkim rozłączeniu (np. tunel,
+      utrata WiFi) — przywraca rooms socketu i dostarcza eventy, które klient
+      przegapił będąc offline. Włączasz opcją connectionStateRecovery na serwerze.
+    code: |
+      // === SERWER — włącz odzyskiwanie stanu ===
+      const io = new Server(httpServer, {
+        connectionStateRecovery: {
+          maxDisconnectionDuration: 2 * 60 * 1000,  // okno odzyskania: 2 min
+          skipMiddlewares: true,                     // pomiń auth przy recovery
+        },
+      })
+
+      io.on('connection', (socket) => {
+        if (socket.recovered) {
+          // Sesja odzyskana — rooms i offset eventów przywrócone
+          console.log('Odzyskano sesję:', socket.id)
+        } else {
+          // Nowe/świeże połączenie — ustaw stan od zera
+          socket.join('powiadomienia')
+        }
+      })
+
+      // === KLIENT — sprawdź czy stan został odzyskany ===
+      socket.on('connect', () => {
+        console.log('recovered:', socket.recovered)
+      })
+    lang: javascript
+
   - name: Timeout na emit — czekaj na odpowiedź
     desc: >
       Socket.io v4.4+ pozwala ustawić timeout na acknowledgement. Jeśli odbiorca
@@ -188,8 +218,9 @@ items:
       })
 
       // Wersja Promise (async/await)
+      // emitWithAck zwraca POJEDYNCZĄ wartość ack — nie tablicę
       try {
-        const [odpowiedz] = await socket.timeout(5000).emitWithAck('krytyczna_akcja', { payload: 'dane' })
+        const odpowiedz = await socket.timeout(5000).emitWithAck('krytyczna_akcja', { payload: 'dane' })
         console.log('Sukces:', odpowiedz)
       } catch (err) {
         console.error('Timeout lub błąd:', err)

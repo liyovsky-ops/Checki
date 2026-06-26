@@ -1,0 +1,202 @@
+title: Komendy GraphQL
+
+groups:
+  - name: Setup serwera
+    icon: "🚀"
+    commands:
+      - cmd: npm install @apollo/server graphql
+        desc: Zainstaluj Apollo Server i core GraphQL
+        detail:
+          what: Instaluje Apollo Server (najpopularniejszy GQL server) i bibliotekę graphql-js.
+          how: graphql-js to reference implementation GraphQL. Apollo Server to HTTP layer na nim.
+          tips:
+            - 'npm install @apollo/server graphql @as-integrations/express — dla Express'
+            - 'npm install graphql-yoga — lżejsza alternatywa'
+      - cmd: npm install @apollo/client graphql
+        desc: Zainstaluj Apollo Client dla React
+        detail:
+          what: Apollo Client to klient GraphQL dla React z wbudowanym cache i hookami.
+          how: InMemoryCache normalizuje dane — entities identyfikowane przez __typename + id.
+          tips:
+            - 'Dodaj "@apollo/client/react" jeśli potrzebujesz importów dla React 19'
+      - cmd: npm install -D @graphql-codegen/cli @graphql-codegen/typescript
+        desc: Zainstaluj GraphQL Code Generator
+        detail:
+          what: Generuje TypeScript typy z GraphQL schematu automatycznie.
+          how: Czyta schema i operations (.graphql pliki), generuje .ts pliki z typami i hookami.
+          flags:
+            - flag: '@graphql-codegen/typescript-operations'
+              desc: Typy dla queries i mutations
+            - flag: '@graphql-codegen/typescript-react-apollo'
+              desc: Generuje useQuery/useMutation hooki z typami
+          tips:
+            - 'npx graphql-codegen init — interaktywna konfiguracja'
+
+  - name: GraphQL Code Generator
+    icon: "🔨"
+    commands:
+      - cmd: npx graphql-codegen init
+        desc: Interaktywnie skonfiguruj code generator
+        detail:
+          what: Wizard który tworzy codegen.yml i instaluje potrzebne pluginy.
+          how: Pyta o framework (React/Vue/Angular), gdzie jest schema, gdzie operations.
+          tips:
+            - 'Wybierz "React with Apollo Client" dla najczęstszego użycia'
+      - cmd: npx graphql-codegen
+        desc: Wygeneruj TypeScript typy z schema i operations
+        detail:
+          what: Czyta schema GraphQL i pliki .graphql, generuje pliki .ts z typami.
+          how: Konfiguracja w codegen.yml lub codegen.ts.
+          flags:
+            - flag: '--watch'
+              desc: Regeneruj automatycznie po zmianie pliku
+            - flag: '--config codegen.yml'
+              desc: Wskaż plik konfiguracyjny
+          tips:
+            - 'npx graphql-codegen --watch — w trakcie development'
+            - 'Generowane pliki dodaj do .gitignore lub commituj (zależy od teamu)'
+      - cmd: npx graphql-codegen --watch
+        desc: Tryb watch — regeneruj typy po każdej zmianie schema
+        detail:
+          what: Nasłuchuje zmian w plikach .graphql i schema, automatycznie regeneruje typy.
+          how: Idealne do development — typy zawsze aktualne.
+          tips:
+            - 'Uruchom razem z dev serverem: concurrently "graphql-codegen --watch" "next dev"'
+
+  - name: Introspekcja i schema
+    icon: "🔍"
+    commands:
+      - cmd: npx graphql-inspector introspect http://localhost:4000/graphql --write schema.graphql
+        desc: Pobierz schema z działającego serwera do pliku
+        detail:
+          what: Wysyła introspection query do serwera i zapisuje schema w pliku SDL.
+          how: Introspection to wbudowana funkcja GraphQL — serwer opisuje sam siebie.
+          tips:
+            - 'npx get-graphql-schema http://localhost:4000 > schema.graphql — prostszy sposób'
+      - cmd: npx graphql-inspector diff schema-old.graphql schema-new.graphql
+        desc: Sprawdź breaking changes między wersjami schematu
+        detail:
+          what: Porównuje dwa pliki schema i raportuje co się zmieniło — breaking vs non-breaking.
+          how: Zmiana typu pola, usunięcie pola = breaking. Dodanie pola = non-breaking.
+          tips:
+            - 'Dodaj do CI: npx graphql-inspector diff --fail-on-breaking origin/schema.graphql schema.graphql'
+      - cmd: npx graphql-inspector validate './src/**/*.graphql' --schema schema.graphql
+        desc: Zwaliduj pliki .graphql z operations względem schematu
+        detail:
+          what: Sprawdza czy wszystkie queries/mutations/fragments w plikach są poprawne względem schema.
+          how: Wykrywa literówki w nazwach pól, brakujące pola, złe typy argumentów.
+          tips:
+            - 'Uruchom w CI przed deploymentem — złap błędy zanim trafią na produkcję'
+
+  - name: Testing GraphQL
+    icon: "🧪"
+    commands:
+      - cmd: npm install -D @apollo/server/testing
+        desc: Zainstaluj narzędzia testowe Apollo Server
+        detail:
+          what: Biblioteka do testowania serwera GraphQL bez uruchamiania HTTP servera.
+          how: executeOperation() wykonuje query/mutation bezpośrednio na instancji serwera.
+          tips:
+            - 'Testuj resolvery osobno — bez serwera, z mockami context'
+      - cmd: npm install -D msw graphql
+        desc: Mock GraphQL API przez MSW (Mock Service Worker)
+        detail:
+          what: MSW pozwala mockować GraphQL queries w testach i Storybook.
+          how: graphql.query('GetUser', resolver) — przechwytuje requesty na poziomie sieci.
+          tips:
+            - 'Idealne do testowania komponentów React bez backendu'
+      - cmd: npx jest --testPathPattern=graphql
+        desc: Uruchom testy GraphQL
+        detail:
+          what: Uruchamia testy w plikach z "graphql" w ścieżce.
+          how: Testy resolvera sprawdzają co resolver zwraca dla danych inputów i kontekstu.
+          tips:
+            - 'Testuj: happy path, unauthorized, not found, validation errors'
+
+  - name: Playground i debugging
+    icon: "🎮"
+    commands:
+      - cmd: npx apollo rover graph introspect http://localhost:4000/graphql
+        desc: Introspectuj schema przez Apollo Rover CLI
+        detail:
+          what: Rover to oficjalne CLI Apollo do zarządzania schema, registry, subgraph.
+          how: Pobiera schema przez introspection i może publikować do Apollo Registry.
+          flags:
+            - flag: '--output schema.graphql'
+              desc: Zapisz schema do pliku
+            - flag: '--header "Authorization: Bearer token"'
+              desc: Dodaj nagłówek autoryzacji
+          tips:
+            - 'rover graph publish --schema schema.graphql — publikuj do Apollo Studio'
+      - cmd: npx altair-graphql-client
+        desc: Uruchom Altair GraphQL Playground (alternatywa dla Apollo Sandbox)
+        detail:
+          what: Altair to zaawansowany desktop/web klient GraphQL — alternatywa dla Postman/Sandbox.
+          how: Obsługuje subscriptions, headers, environments, import/export collections.
+          tips:
+            - 'Dostępny też jako app desktopowa i rozszerzenie Chrome'
+
+  - name: Apollo Federation (microservices)
+    icon: "🕸️"
+    commands:
+      - cmd: npm install @apollo/subgraph
+        desc: Zainstaluj Apollo Subgraph dla Federation
+        detail:
+          what: Federation pozwala budować jeden GraphQL API z wielu niezależnych serwisów (subgraph).
+          how: Każdy subgraph ma własną schema. Apollo Gateway łączy je w jeden supergraph.
+          tips:
+            - 'npm install @apollo/gateway — dla Gateway serwera'
+            - 'Używane przez: Netflix, Airbnb, ExpediaGroup'
+      - cmd: npx rover subgraph check my-graph@prod --schema schema.graphql --name products
+        desc: Sprawdź czy zmiany subgrafu nie psują supergraphu
+        detail:
+          what: Rover sprawdza czy nowa wersja subgrafu jest kompatybilna z całym Federation grafem.
+          how: Porównuje z aktualnym schema w Apollo Registry — wykrywa breaking changes.
+          tips:
+            - 'Dodaj do CI przed deploymentem subgrafu'
+
+  - name: Performance i monitoring
+    icon: "📊"
+    commands:
+      - cmd: npm install @apollo/server-plugin-response-cache
+        desc: Zainstaluj plugin do caching responses
+        detail:
+          what: Cache'uje kompletne odpowiedzi GraphQL w Redis lub memcache.
+          how: "Dyrektywa @cacheControl(maxAge: 300) w schema steruje czasem życia cache."
+          tips:
+            - 'Dodaj plugin: new ApolloServer({ plugins: [responseCachePlugin()] })'
+      - cmd: npx clinic doctor -- node server.js
+        desc: Profiluj wydajność Node.js serwera GraphQL
+        detail:
+          what: Clinic.js analizuje wydajność procesu Node — CPU, memory, event loop lag.
+          how: Zbiera metryki przez 10-60 sekund, generuje interaktywny raport HTML.
+          tips:
+            - 'clinic flame -- node server.js — flame graph CPU profiling'
+            - 'Szukaj powolnych resolverów i N+1 queries'
+      - cmd: npm install graphql-depth-limit
+        desc: Zainstaluj limit głębokości query (ochrona przed atakami)
+        detail:
+          what: Ogranicza maksymalną głębokość zagnieżdżenia query — chroni przed DOS przez zbyt złożone queries.
+          how: depthLimit(7) jako validation rule — query głębsze niż 7 poziomów są odrzucane.
+          tips:
+            - 'server.addValidationRule(depthLimit(7))'
+            - 'Dodaj też queryComplexityLimit dla ochrony przed drogimi queries'
+
+  - name: Deployment
+    icon: "🚀"
+    commands:
+      - cmd: npm run build && node dist/server.js
+        desc: Zbuduj i uruchom GraphQL server w produkcji
+        detail:
+          what: Kompilacja TS → JS, uruchomienie bez tsx/ts-node.
+          how: Produkcja nie używa runtime transpilacji — tylko skompilowany JS.
+          tips:
+            - 'Ustaw NODE_ENV=production — Apollo wyłącza Sandbox w produkcji'
+            - 'introspection: false w produkcji jeśli API nie jest publiczne'
+      - cmd: npx wrangler deploy --compatibility-date 2024-01-01
+        desc: Deploy GraphQL server na Cloudflare Workers (edge)
+        detail:
+          what: Cloudflare Workers uruchamia GraphQL server na edge nodes globalnie.
+          how: GraphQL Yoga działa na Fetch API — kompatybilne z Workers bez modyfikacji.
+          tips:
+            - 'Użyj graphql-yoga — Apollo Server nie działa na Workers'

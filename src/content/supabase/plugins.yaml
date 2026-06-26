@@ -145,9 +145,8 @@ items:
       supabase functions new send-email
 
       // supabase/functions/send-email/index.ts
-      import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-
-      serve(async (req) => {
+      // Deno.serve jest wbudowany — nie importuj już std/http/server
+      Deno.serve(async (req) => {
         const { email, message } = await req.json();
 
         // Wyślij email przez Resend

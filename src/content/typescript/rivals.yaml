@@ -1,0 +1,63 @@
+title: TypeScript vs alternatywy
+
+items:
+  - name: JavaScript (bez typów)
+    icon: "🟨"
+    color: "#f7df1e"
+    tagline: Brak typów — szybszy start, więcej bugów w runtime
+    pros:
+      - Zero konfiguracji — piszesz i uruchamiasz
+      - Brak kroku kompilacji — szybsze iteracje w małych projektach
+      - Mniejszy próg wejścia dla początkujących
+      - Brak type errors podczas development
+    cons:
+      - Bugi typów wykrywane dopiero w runtime (lub u klienta)
+      - Brak autocomplete i nawigacji po kodzie
+      - Refaktoring bez siatki bezpieczeństwa
+      - Trudniejsze onboarding w dużych projektach
+    vs: JavaScript tylko do małych skryptów, szybkich prototypów lub jeśli uczysz się programowania. W każdym innym przypadku TypeScript.
+
+  - name: Flow (Meta)
+    icon: "🌊"
+    color: "#E8BD36"
+    tagline: Alternatywny type checker dla JavaScript od Meta
+    pros:
+      - Głębsza integracja z React (rozwijany razem)
+      - Nullability analysis bardziej precyzyjna w niektórych przypadkach
+      - Działa jako dodatkowy layer (nie nadzbiór)
+    cons:
+      - Znacznie mniejsza społeczność i ekosystem
+      - Mało bibliotek z Flow types (@flow)
+      - Meta stopniowo porzuca Flow na rzecz TypeScript
+      - Gorsze narzędzia (IDE support, tooling)
+    vs: TypeScript dominuje rynek — 98%+ projektów. Flow tylko jeśli pracujesz w istniejącym projekcie Meta/React Native używającym Flow.
+
+  - name: JSDoc + TypeScript
+    icon: "📝"
+    color: "#555555"
+    tagline: Typy w komentarzach JSDoc — TypeScript bez kompilacji
+    pros:
+      - Zero konfiguracji — komentarze w czystym JS
+      - Stopniowe dodawanie typów do JS projektu
+      - Działa z ts-check pragma (@ts-check)
+      - Biblioteki mogą dostarczać typy bez zmiany składni
+    cons:
+      - Verbose — typy w komentarzach zamiast inline
+      - Brak pełnej expressiveness TS (conditional types, mapped types)
+      - Słabsze IDE experience niż natywny TS
+      - Nieczytelne przy złożonych typach
+    vs: JSDoc gdy nie możesz zmienić toolchain ale chcesz trochę type safety. TS zawsze gdy możesz.
+
+  - name: Dart / Kotlin (inne silnie typowane)
+    icon: "🎯"
+    color: "#0175C2"
+    tagline: Inne statycznie typowane języki dla podobnych zastosowań
+    pros:
+      - Projektowane z typami od podstaw — spójniejszy system
+      - Lepsza wydajność (kompilacja do natywnego kodu)
+      - Null safety bardziej rygorystyczna
+    cons:
+      - Nie są JavaScript — inny ekosystem, biblioteki, narzędzia
+      - Mniejsza społeczność webowa
+      - Brak interoperability z JS ekosystemem
+    vs: TypeScript gdy budujesz dla web/Node. Dart (Flutter) gdy budujesz mobile. Kotlin gdy budujesz Android lub backend JVM.

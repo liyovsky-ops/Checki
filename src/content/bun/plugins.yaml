@@ -216,7 +216,7 @@ items:
       WORKDIR /app
 
       # Instalacja zależności (cached layer)
-      COPY package.json bun.lockb ./
+      COPY package.json bun.lock ./
       RUN bun install --frozen-lockfile --production
 
       # Kopiowanie kodu

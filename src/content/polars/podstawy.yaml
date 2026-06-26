@@ -1,0 +1,100 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Polars?
+  firstComponent: Pierwsze DataFrame
+  firstComponentLang: python
+
+intro:
+  title: Czym jest Polars?
+  desc: >
+    Polars to nowoczesna biblioteka DataFrame napisana w Rust, dostępna dla Python i Rust.
+    Zaprojektowana od zera dla wydajności — wielowątkowa, SIMD-optimized, zero-copy.
+    10-100x szybsza od Pandas dla wielu operacji. Lazy API pozwala optymalizować
+    zapytania przed wykonaniem (jak SQL query planner). Apache Arrow jako format wewnętrzny.
+    Expresje (col, lit, when/then) są kompozywalne i type-safe.
+    Używana przez: Hugging Face, Starburst, MotherDuck, duże data teams.
+
+concepts:
+  - title: DataFrame i Series
+    desc: >
+      DataFrame to tabela 2D — kolumny z nazwami i typami. Series to jedna kolumna.
+      W odróżnieniu od Pandas — brak indeksu! Wiersze numerowane od 0, ale index
+      nie ma znaczenia semantycznego. Kolumny mają typy: Int64, Float64, Utf8, Date, List.
+    icon: "📊"
+  - title: Wyrażenia (Expressions)
+    desc: >
+      Polars Expression to lazy obliczenie na kolumnie — col("name"), lit(42),
+      when(condition).then(value).otherwise(other). Wyrażenia składają się:
+      col("price").filter(col("in_stock")).alias("available_price").
+      Nie wykonują się natychmiast — są optymalizowane przez query planner.
+    icon: "🧮"
+  - title: Lazy API (LazyFrame)
+    desc: >
+      LazyFrame = niewykonany plan zapytań. Dodajesz operacje (filter, select, join),
+      a Polars optymalizuje je zanim wykona. collect() wyzwala wykonanie.
+      Jak SQL — piszesz co chcesz, nie jak. Predicate pushdown, projection pushdown,
+      common subexpression elimination automatycznie.
+    icon: "⚡"
+  - title: Typy i null handling
+    desc: >
+      Polars ma silne typowanie — każda kolumna ma jeden typ. Nullable przez Option<T>.
+      Nie ma NaN vs None (jak w Pandas) — tylko null. .is_null(), .fill_null(0),
+      .drop_nulls(). cast() do konwersji typów. Błąd przy niezgodności typów.
+    icon: "🎯"
+  - title: Brak indeksu
+    desc: >
+      Kluczowa różnica od Pandas — Polars nie ma named index.
+      Brak df.loc[], brak df.iloc[] przez label. Zamiast tego: filter(), gather(),
+      row_index() dla numeracji. To upraszcza API i eliminuje typowe błędy Pandas.
+    icon: "🚫"
+  - title: Apache Arrow
+    desc: >
+      Polars przechowuje dane w formacie Apache Arrow — kolumnowy format w pamięci.
+      Zero-copy sharing z innymi bibliotekami (DuckDB, PyArrow, pandas via __arrow__).
+      Idealne dla analityki — operacje na kolumnach = SIMD, cache-friendly.
+    icon: "🏹"
+
+whenToUse:
+  - Przetwarzanie dużych plików CSV/Parquet (GB+) gdy Pandas jest za wolny
+  - ETL pipelines gdzie zależy na wydajności i niskim zużyciu RAM
+  - Lazy processing dużych zbiorów — wczytaj tylko potrzebne kolumny/wiersze
+  - Zastąpienie Pandas w nowych projektach (prostsze API, szybsze)
+  - Analiza danych gdy potrzebujesz wyrażeń kompozywalnych (jak SQL)
+  - Multi-core processing automatycznie bez dodatkowej konfiguracji
+
+firstComponent: |
+  pip install polars
+
+  import polars as pl
+
+  # Utwórz DataFrame
+  df = pl.DataFrame({
+      "name":     ["Alice", "Bob", "Charlie", "Diana"],
+      "age":      [25, 30, 35, 28],
+      "salary":   [5000, 7000, 9000, 6500],
+      "dept":     ["IT", "HR", "IT", "Finance"],
+      "active":   [True, True, False, True],
+  })
+
+  # Podstawowe operacje
+  print(df.shape)        # (4, 5)
+  print(df.dtypes)       # typy kolumn
+  print(df.describe())   # statystyki
+
+  # Filtrowanie i selekcja
+  result = (
+      df
+      .filter(pl.col("active") & (pl.col("salary") > 5500))
+      .select(["name", "dept", "salary"])
+      .sort("salary", descending=True)
+  )
+  print(result)
+  # ┌─────────┬─────────┬────────┐
+  # │ name    ┆ dept    ┆ salary │
+  # │ ---     ┆ ---     ┆ ---    │
+  # │ str     ┆ str     ┆ i64    │
+  # ╞═════════╪═════════╪════════╡
+  # │ Charlie ┆ IT      ┆ 9000   │
+  # │ Diana   ┆ Finance ┆ 6500   │
+  # │ Bob     ┆ HR      ┆ 7000   │
+  # └─────────┴─────────┴────────┘

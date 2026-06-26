@@ -14,7 +14,7 @@ items:
     desc: >
       Bun install pobiera i instaluje wszystkie paczki z package.json.
       Używa globalnego cache na dysku — kolejne instalacje są błyskawiczne.
-      Generuje bun.lockb (binarny lockfile) zamiast package-lock.json.
+      Generuje bun.lock (tekstowy lockfile, domyślny od Bun 1.2) zamiast package-lock.json.
     code: |
       # Instalacja wszystkich zależności
       bun install
@@ -22,8 +22,8 @@ items:
       # Instalacja z pominięciem devDependencies (produkcja)
       bun install --production
 
-      # Wymuś pełną reinstalację (usuń cache)
-      bun install --frozen-lockfile  # CI — fail jeśli lockfile nieaktualny
+      # CI — instaluj dokładnie wg lockfile (nie modyfikuj go)
+      bun install --frozen-lockfile  # fail jeśli lockfile wymagałby zmiany
 
       # Instalacja zależności z cache (domyślne zachowanie)
       # Cache: ~/.bun/install/cache/
@@ -63,26 +63,27 @@ items:
       bun update express zod  # tylko wybrane paczki
     lang: bash
 
-  - title: bun.lockb — binarny lockfile
+  - title: bun.lock — tekstowy lockfile (domyślny od Bun 1.2)
     desc: >
-      Bun generuje bun.lockb zamiast package-lock.json lub yarn.lock.
-      Jest binarny — mniejszy i szybszy do parsowania. Commituj go do repozytorium.
-      Możesz podejrzeć zawartość lub wyeksportować do formatu yarn.
+      Od Bun 1.2 (styczeń 2025) domyślnym lockfile jest tekstowy bun.lock (format JSONC) —
+      czytelny w code review i przyjazny dla git diff. Starszy binarny bun.lockb jest nadal
+      obsługiwany, ale tekstowy format jest zalecany. Commituj lockfile do repozytorium.
     code: |
-      # Podgląd bun.lockb jako tekst (git diff friendly)
-      bun bun.lockb  # wyświetla YAML-like format
+      # bun.lock (tekst, JSONC) — generowany automatycznie przez bun install
+      # Czytelny bezpośrednio w git diff — bez konwersji
 
-      # Lub:
-      git diff HEAD bun.lockb  # Bun konwertuje do czytelnego formatu w git
+      # Migracja istniejącego binarnego bun.lockb na tekstowy bun.lock
+      bun install --save-text-lockfile
+      # lub na stałe w bunfig.toml: [install] saveTextLockfile = true
 
       # Eksport do yarn.lock (interoperability)
       bun install --yarn
 
       # Jeśli masz package-lock.json — Bun go przeczyta przy imporcie
-      # i wygeneruje bun.lockb:
+      # i wygeneruje bun.lock:
       bun install  # (migracja z npm — automatyczna)
 
-      # bun.lockb w .gitignore? NIE — powinien być w repo
+      # Lockfile w .gitignore? NIE — powinien być w repo
       # Zapewnia deterministyczne instalacje w CI i dla innych developerów
     lang: bash
 
@@ -143,38 +144,35 @@ items:
       # bunx: ~0.1-0.3s (cache + szybki start)
     lang: bash
 
-  - title: .bunfig.toml — konfiguracja Bun
+  - title: bunfig.toml — konfiguracja Bun
     desc: >
-      .bunfig.toml to opcjonalny plik konfiguracyjny Bun — odpowiednik .npmrc lub .yarnrc.
-      Pozwala ustawić registry, scope, telemetrię i zachowanie testów.
+      bunfig.toml to opcjonalny plik konfiguracyjny Bun — odpowiednik .npmrc lub .yarnrc.
+      W projekcie to bunfig.toml (bez kropki), globalnie ~/.bunfig.toml.
+      Pozwala ustawić registry, scope, format lockfile i zachowanie testów.
     code: |
-      # .bunfig.toml — w katalogu projektu lub ~/ (globalny)
+      # bunfig.toml — w katalogu projektu (globalnie: ~/.bunfig.toml)
 
-      # Domyślny registry npm
+      # Zachowanie instalacji — jedna sekcja [install]
       [install]
-      registry = "https://registry.npmjs.org"
+      registry = "https://registry.npmjs.org"  # domyślny registry npm
       # Lub prywatny Verdaccio/Nexus:
       # registry = "http://localhost:4873"
+      auto = "auto"               # auto-install brakujących paczek
+      exact = false               # użyj ^ (caret) przy dodawaniu paczek
+      production = false          # instaluj devDependencies w dev
+      saveTextLockfile = true     # tekstowy bun.lock zamiast binarnego bun.lockb
 
       # Scope-specific registry (paczki @firma/*)
       [install.scopes]
-      "@firma" = { registry = "https://npm.firma.pl", token = "$FIRMA_TOKEN" }
-
-      # Zachowanie instalacji
-      [install]
-      auto = "auto"          # auto-install brakujących paczek
-      exact = false          # użyj ^ (caret) przy dodawaniu paczek
-      production = false     # instaluj devDependencies w dev
+      "@firma" = { url = "https://npm.firma.pl", token = "$FIRMA_TOKEN" }
 
       # Konfiguracja testów
       [test]
       coverage = true
-      coverageThreshold = 80
-      timeout = 10000        # 10 sekund timeout per test
+      coverageThreshold = 0.8     # ułamek 0–1 (80% pokrycia)
 
-      # Zaufane skrypty (postinstall)
-      [install.trustedDependencies]
-      # Pakiety których skrypty postinstall są dozwolone
+      # Zaufane skrypty (postinstall) — package.json -> trustedDependencies
+      # lub: bun pm trust <paczka>
     lang: toml
 
   - title: Workspaces — monorepo
@@ -194,7 +192,7 @@ items:
       // Struktura:
       // monorepo/
       // ├── package.json       (root)
-      // ├── bun.lockb
+      // ├── bun.lock
       // ├── packages/
       // │   ├── ui/            (współdzielona biblioteka UI)
       // │   └── utils/         (współdzielone narzędzia)

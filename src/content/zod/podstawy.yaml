@@ -1,0 +1,97 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Zod?
+  firstComponent: Pierwsze schematy
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Zod?
+  desc: >
+    Zod to biblioteka do walidacji danych z automatycznym TypeScript inference.
+    Definiujesz schemat raz — Zod automatycznie wywnioskuje typ TypeScript.
+    Jeden schemat = walidacja runtime + typ statyczny.
+    Zero zależności, działa w Node.js i przeglądarce.
+    Używany z tRPC, React Hook Form, Next.js Server Actions, Prisma.
+    Standard de facto dla walidacji w TypeScript projektach.
+
+concepts:
+  - title: Schema jako źródło prawdy
+    desc: >
+      Zod schema definiuje kształt i reguły danych. Raz definiujesz schemat —
+      Zod wywnioskuje typ TypeScript automatycznie przez z.infer<typeof schema>.
+      Brak duplikacji: nie piszesz interfejsu i validatora osobno.
+    icon: "📋"
+  - title: parse() vs safeParse()
+    desc: >
+      schema.parse(data) — rzuca ZodError jeśli dane niepoprawne.
+      schema.safeParse(data) — zwraca {success: true, data} lub {success: false, error}.
+      Użyj safeParse gdy oczekujesz błędów (formularze), parse gdy błąd = bug.
+    icon: "✅"
+  - title: Type Inference
+    desc: >
+      z.infer<typeof mySchema> — TypeScript typ wywnioskowany ze schematu.
+      type User = z.infer<typeof UserSchema> zamiast pisać interface User ręcznie.
+      Schemat jest autorytatywny — type zawsze zsynchronizowany ze walidacją.
+    icon: "🎯"
+  - title: Error messages
+    desc: >
+      ZodError zawiera listę ZodIssue — każdy błąd ma path (ścieżkę do pola)
+      i message. Niestandardowe komunikaty: z.string().min(3, "Za krótkie!").
+      flatten() konwertuje błędy do prostego obiektu dla formularzy.
+    icon: "❌"
+  - title: Kompozycja schematów
+    desc: >
+      Schematy Zod są kompozywalne — .merge(), .extend(), .pick(), .omit(), .partial().
+      UserSchema.pick({name: true}) = nowy schemat z tylko wybranym polem.
+      UserUpdateSchema = UserSchema.partial() = wszystkie pola opcjonalne.
+    icon: "🧩"
+  - title: Custom validators (.refine)
+    desc: >
+      .refine(val => condition, message) — własna logika walidacji.
+      .superRefine((val, ctx) => {...}) — dodaj błędy przez ctx.addIssue.
+      Używaj do walidacji zależnych od wartości (np. password === confirmPassword).
+    icon: "🔧"
+
+whenToUse:
+  - Walidacja danych z API (request body, query params, response)
+  - Formularze z React Hook Form — integracja przez zodResolver
+  - tRPC — wejście i wyjście procedur definiowane przez Zod
+  - Next.js Server Actions — walidacja danych formularza
+  - Parsowanie zmiennych środowiskowych (process.env)
+  - Walidacja konfiguracji aplikacji przy starcie
+
+firstComponent: |
+  npm install zod
+
+  import { z } from 'zod'
+
+  // Definicja schematu
+  const UserSchema = z.object({
+    id:        z.number().int().positive(),
+    email:     z.string().email("Nieprawidłowy email"),
+    name:      z.string().min(2, "Imię min 2 znaki").max(50),
+    age:       z.number().min(0).max(120).optional(),
+    role:      z.enum(["admin", "user", "moderator"]),
+    createdAt: z.date().default(() => new Date()),
+  })
+
+  // TypeScript typ z schematu (automatyczny)
+  type User = z.infer<typeof UserSchema>
+  // type User = { id: number; email: string; name: string; age?: number; role: "admin" | "user" | "moderator"; createdAt: Date }
+
+  // Walidacja — rzuca błąd jeśli niepoprawne
+  const user = UserSchema.parse({
+    id: 1,
+    email: "jan@example.com",
+    name: "Jan Kowalski",
+    role: "user",
+  })
+
+  // Bezpieczna walidacja — nie rzuca błędu
+  const result = UserSchema.safeParse({ id: "nie-liczba" })
+  if (!result.success) {
+    console.log(result.error.flatten())
+    // { fieldErrors: { id: ["Expected number, received string"] } }
+  } else {
+    console.log(result.data)
+  }

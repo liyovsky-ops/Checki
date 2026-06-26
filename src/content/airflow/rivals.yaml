@@ -1,0 +1,66 @@
+title: Airflow vs alternatywy
+
+items:
+  - name: Prefect
+    icon: "🌊"
+    color: "#024DFD"
+    tagline: Nowoczesna orkiestracja Python-first — flows, tasks, automatyczne retry
+    pros:
+      - Prostszy kod niż Airflow — dekoratory @flow i @task
+      - Dynamiczne DAGi bez ograniczeń Airflow
+      - Lepsza obsługa błędów i retry logic
+      - Prefect Cloud — managed UI bez self-hostingu
+    cons:
+      - Mniejszy ekosystem providerów niż Airflow
+      - Mniejsza społeczność i mniej tutoriali
+      - Prefect Cloud kosztuje przy większej skali
+      - Mniej dojrzały w enterprise niż Airflow
+    vs: Prefect gdy chcesz prostszego kodu i dynamic workflows. Airflow gdy masz duży ekosystem providerów lub już działający klaster.
+
+  - name: Dagster
+    icon: "🧩"
+    color: "#4F43DD"
+    tagline: Asset-oriented orchestration — software-defined assets, data lineage
+    pros:
+      - Asset-centric model — definiujesz co (nie jak)
+      - Data lineage wbudowane — widać co zależy od czego
+      - Świetna integracja z dbt, Spark, Pandas
+      - Silniejsze typowanie i testing niż Airflow
+    cons:
+      - Stroma krzywa uczenia — nowy model myślenia
+      - Mniejsza baza użytkowników niż Airflow
+      - Self-hosting bardziej złożony
+      - Mniej gotowych integracji (providerów)
+    vs: Dagster dla data engineering z silnym naciskiem na jakość danych i lineage. Airflow dla general-purpose workflow orchestration.
+
+  - name: Luigi (Spotify)
+    icon: "🎮"
+    color: "#1DB954"
+    tagline: Prosty pipeline orchestrator od Spotify — zależności przez target files
+    pros:
+      - Bardzo prosty — brak skomplikowanego setupu
+      - Lightweight, minimalny overhead
+      - Zależności definiowane przez output/input plików
+      - Długa historia (2012) — sprawdzony
+    cons:
+      - Brak schedulera — potrzeba zewnętrznego crona
+      - Bardzo ograniczone UI (tylko status tasków)
+      - Brak retry logic wbudowanego
+      - Praktycznie nierozwijany od lat
+    vs: Luigi dla prostych, lokalnych pipeline'ów. Airflow gdy potrzebujesz schedulera, UI, alerting i skalowania.
+
+  - name: Celery
+    icon: "🌿"
+    color: "#A9CC54"
+    tagline: Distributed task queue — asynchroniczne zadania, nie pipeline orchestration
+    pros:
+      - Świetny do asynchronicznych tasków webowych (email, raporty)
+      - Integracja z Django/FastAPI
+      - Flower UI do monitorowania
+      - Wysoka przepustowość dla niezależnych tasków
+    cons:
+      - Nie jest orchestratorem — brak DAGów i zależności
+      - Brak schedulowania złożonych pipeline'ów
+      - Brak wbudowanego retry z backoff dla pipeline'ów
+      - Nie nadaje się do ETL
+    vs: Celery dla asynchronicznych tasków w aplikacjach webowych. Airflow dla złożonych pipeline'ów danych z zależnościami i schedulowaniem.

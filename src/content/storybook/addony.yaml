@@ -1,0 +1,79 @@
+title: Addony — rozszerzenia Storybook
+
+items:
+  - name: Essentials — domyślne addony
+    desc: "@storybook/addon-essentials to zestaw domyślnych addonów. Controls (zmieniaj props), Actions (loguj eventy), Viewport (rozmiary ekranów), Backgrounds (tło komponentu)."
+    code: |
+      // .storybook/main.ts
+      import type { StorybookConfig } from '@storybook/react-vite'
+
+      const config: StorybookConfig = {
+        addons: [
+          '@storybook/addon-essentials',  // Controls, Actions, Viewport, Backgrounds
+          '@storybook/addon-a11y',        // Accessibility audit
+          '@storybook/addon-interactions', // play() support
+        ],
+        framework: {
+          name: '@storybook/react-vite',
+          options: {},
+        },
+      }
+      export default config
+
+      // .storybook/preview.ts — globalna konfiguracja
+      import type { Preview } from '@storybook/react'
+
+      const preview: Preview = {
+        parameters: {
+          // Domyślne tła
+          backgrounds: {
+            default: 'light',
+            values: [
+              { name: 'light', value: '#ffffff' },
+              { name: 'dark',  value: '#1a1a2e' },
+            ],
+          },
+          // Viewporty
+          viewport: {
+            viewports: {
+              mobile:  { name: 'Mobile',  styles: { width: '375px',  height: '812px' }},
+              tablet:  { name: 'Tablet',  styles: { width: '768px',  height: '1024px' }},
+              desktop: { name: 'Desktop', styles: { width: '1440px', height: '900px'  }},
+            },
+          },
+        },
+      }
+      export default preview
+
+  - name: Accessibility (a11y) addon
+    desc: "@storybook/addon-a11y automatycznie sprawdza dostępność każdego komponentu przez axe-core. Raport w panelu Accessibility — które reguły WCAG są naruszone."
+    code: |
+      // Instalacja
+      // npm install @storybook/addon-a11y
+
+      // Story z wymuszonym a11y testem
+      import type { Meta, StoryObj } from '@storybook/react'
+      import { Button } from './Button'
+
+      const meta: Meta<typeof Button> = {
+        component: Button,
+        parameters: {
+          a11y: {
+            // Wyłącz konkretną regułę (z uzasadnieniem!)
+            config: {
+              rules: [
+                {
+                  id: 'color-contrast',
+                  enabled: false,  // Tymczasowo — fix w następnym sprincie
+                }
+              ]
+            }
+          }
+        }
+      }
+      export default meta
+
+      // W panelu Accessibility zobaczysz:
+      // ✓ Passes (reguły spełnione)
+      // ✗ Violations (naruszenia WCAG)
+      // ! Incomplete (wymaga manualnej weryfikacji)

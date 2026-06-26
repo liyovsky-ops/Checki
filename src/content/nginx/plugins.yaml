@@ -1,0 +1,27 @@
+title: Ekosystem Nginx
+
+items:
+  - name: Certbot (Let's Encrypt)
+    desc: Automatyczne SSL certyfikaty od Let's Encrypt. Certbot --nginx konfiguruje Nginx automatycznie, cron odnawia certyfikaty. Standard dla darmowego HTTPS.
+    icon: "🔒"
+  - name: Nginx Amplify
+    desc: SaaS monitoring Nginx od twórców — metryki, alerty, analiza konfiguracji, security recommendations. Agent zbiera metryki i wysyła do chmury Amplify.
+    icon: "📊"
+  - name: ModSecurity (WAF)
+    desc: Web Application Firewall jako moduł Nginx. Wykrywa i blokuje OWASP Top 10 ataki — SQL injection, XSS, CSRF. Reguły OWASP CRS (Core Rule Set).
+    icon: "🛡️"
+  - name: OpenResty
+    desc: Nginx z wbudowanym LuaJIT — skryptowanie logiki serwera w Lua. Używane przez Cloudflare. Pozwala na programowanie warunków proxy, cache, auth bezpośrednio w Nginx.
+    icon: "🌙"
+  - name: ngx_brotli
+    desc: Moduł kompresji Brotli — 15-25% lepsza kompresja niż gzip przy podobnej prędkości. Google opracował dla Chrome. Wymaga kompilacji z modułem lub gotowego pakietu.
+    icon: "🗜️"
+  - name: nginx-proxy-manager
+    desc: GUI do zarządzania Nginx — wizualne dodawanie proxy hosts, SSL, redirecty. Działa jako Docker container. Idealny dla self-hosted bez znajomości konfiguracji Nginx.
+    icon: "🖥️"
+  - name: VTS Module (nginx-module-vts)
+    desc: Virtual host traffic status module — metryki per location, upstream, server. Eksport do Prometheus. Dashboard HTML z wykresami ruchu, latency, status codes.
+    icon: "📈"
+  - name: Lua Module (ngx_lua / lua-nginx-module)
+    desc: Skryptowanie Nginx w Lua — custom logika autentykacji, transformacji requestów, dynamic routing. Redis integration przez cosocket API. Podstawa OpenResty.
+    icon: "📝"

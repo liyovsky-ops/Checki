@@ -1,0 +1,78 @@
+title: Nginx jako serwer WWW
+
+items:
+  - name: Serwowanie plików statycznych
+    desc: Nginx jest doskonałym serwerem plików statycznych — szybszy niż aplikacje Node.js/Python dla plików. root, alias, try_files — podstawowe dyrektywy.
+    code: |
+      server {
+          listen 80;
+          server_name static.example.com;
+
+          # Root — katalog bazowy
+          root /var/www/html;
+          index index.html index.htm;
+
+          # Pliki statyczne z cache headers
+          location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff2)$ {
+              expires 1y;
+              add_header Cache-Control "public, immutable";
+              access_log off;
+          }
+
+          # SPA — React/Vue/Angular
+          location / {
+              try_files $uri $uri/ /index.html;
+          }
+
+          # alias — inna ścieżka niż URL
+          location /uploads/ {
+              alias /data/user-uploads/;
+              autoindex off;
+          }
+      }
+
+  - name: Virtual Hosts — wiele domen
+    desc: Wiele server bloków = wiele wirtualnych hostów. Nginx wybiera blok na podstawie server_name z nagłówka Host. Default server obsługuje niezdefiniowane domeny.
+    code: |
+      # Domena 1 — React app
+      server {
+          listen 80;
+          server_name app.example.com;
+          root /var/www/app/dist;
+          location / { try_files $uri /index.html; }
+      }
+
+      # Domena 2 — API
+      server {
+          listen 80;
+          server_name api.example.com;
+          location / {
+              proxy_pass http://127.0.0.1:4000;
+          }
+      }
+
+      # Default server — catch-all
+      server {
+          listen 80 default_server;
+          server_name _;
+          return 444;  # Drop connection bez odpowiedzi
+      }
+
+  - name: Gzip kompresja
+    desc: Gzip zmniejsza rozmiar odpowiedzi tekstowych (HTML, CSS, JS, JSON) o 60-80%. Klient dekompresuje automatycznie. Włącz globalnie w http {} bloku.
+    code: |
+      http {
+          gzip on;
+          gzip_vary on;
+          gzip_min_length 1024;     # Nie kompresuj plików <1KB
+          gzip_proxied expired no-cache no-store private auth;
+          gzip_types
+              text/plain
+              text/css
+              text/javascript
+              application/javascript
+              application/json
+              application/xml
+              image/svg+xml;
+          gzip_comp_level 6;        # 1-9, 6 = dobry balans
+      }

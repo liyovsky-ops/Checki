@@ -1,0 +1,69 @@
+title: Konsument — czytanie eventów
+
+items:
+  - name: Consumer Group i rebalancing
+    desc: Consumer Group pozwala na równoległe czytanie topica. Kafka automatycznie rebalansuje partycje gdy konsument dołącza lub opuszcza grupę.
+    code: |
+      from confluent_kafka import Consumer, KafkaError
+
+      consumer = Consumer({
+          'bootstrap.servers': 'localhost:9092',
+          'group.id': 'payment-processor',
+          'auto.offset.reset': 'earliest',
+          'enable.auto.commit': False,    # Ręczny commit dla dokładności
+          'max.poll.interval.ms': 300000, # Max czas między pollami
+          'session.timeout.ms': 45000,    # Timeout sesji
+      })
+
+      consumer.subscribe(
+          ['payments'],
+          on_assign=lambda c, ps: print(f'Przypisane partycje: {ps}'),
+          on_revoke=lambda c, ps: print(f'Odebrane partycje: {ps}'),
+      )
+
+      while True:
+          msg = consumer.poll(1.0)
+          if msg is None: continue
+          if msg.error(): continue
+
+          try:
+              process_payment(msg.value())
+              consumer.commit(asynchronous=False)  # Synchroniczny commit
+          except Exception as e:
+              print(f'Błąd przetwarzania: {e}')
+              # Nie commituj — event zostanie przetworyzony ponownie
+
+  - name: Exactly-once semantics
+    desc: Dokładnie raz — event przetworzony dokładnie jeden raz. Wymaga idempotentnego producenta i transakcji Kafka. Kluczowe dla finansów i krytycznych procesów.
+    code: |
+      from confluent_kafka import Producer, Consumer
+
+      # Producent transakcyjny
+      producer = Producer({
+          'bootstrap.servers': 'localhost:9092',
+          'transactional.id': 'payment-processor-1',  # Unikalny ID
+          'enable.idempotence': True,
+      })
+      producer.init_transactions()
+
+      consumer = Consumer({
+          'bootstrap.servers': 'localhost:9092',
+          'group.id': 'payment-group',
+          'isolation.level': 'read_committed',  # Tylko zatwierdzone eventy
+      })
+
+      while True:
+          msg = consumer.poll(1.0)
+          if not msg: continue
+
+          producer.begin_transaction()
+          try:
+              result = process_payment(msg.value())
+              producer.produce('payment-results', value=result)
+              producer.send_offsets_to_transaction(
+                  consumer.position(consumer.assignment()),
+                  consumer.consumer_group_metadata()
+              )
+              producer.commit_transaction()
+          except Exception:
+              producer.abort_transaction()

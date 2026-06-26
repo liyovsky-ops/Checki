@@ -1,0 +1,82 @@
+title: Operatory — gotowe bloki pipeline'u
+
+items:
+  - name: PostgresOperator i HttpOperator
+    desc: Gotowe operatory do SQL i HTTP bez pisania kodu Python. PostgresOperator wykonuje SQL query, SimpleHttpOperator robi HTTP request.
+    code: |
+      from airflow.providers.postgres.operators.postgres import PostgresOperator
+      from airflow.providers.http.operators.http import SimpleHttpOperator
+      from airflow.decorators import dag, task
+      from datetime import datetime
+      import json
+
+      @dag(start_date=datetime(2024, 1, 1), schedule='@daily', catchup=False)
+      def db_pipeline():
+
+          # SQL na bazie zdefiniowanej w Connections jako 'my_postgres'
+          create_table = PostgresOperator(
+              task_id='create_temp_table',
+              postgres_conn_id='my_postgres',
+              sql='''
+                  CREATE TABLE IF NOT EXISTS daily_stats AS
+                  SELECT date, COUNT(*) as count
+                  FROM events WHERE date = '{{ ds }}'
+                  GROUP BY date;
+              '''
+          )
+
+          # HTTP request do zewnętrznego API
+          fetch_rates = SimpleHttpOperator(
+              task_id='fetch_exchange_rates',
+              http_conn_id='exchange_rate_api',
+              endpoint='/api/latest',
+              method='GET',
+              response_filter=lambda r: json.loads(r.text),
+              log_response=True,
+          )
+
+          @task()
+          def process(rates):
+              print(f"Kursy walut: {rates}")
+
+          create_table >> fetch_rates >> process(fetch_rates.output)
+
+      dag_instance = db_pipeline()
+
+  - name: Sensory — czekaj na zdarzenie
+    desc: Sensor czeka aż warunek będzie spełniony — plik pojawi się w S3, tabela będzie gotowa, HTTP endpoint zwróci 200. Poke co N sekund, timeout po X minutach.
+    code: |
+      from airflow.sensors.filesystem import FileSensor
+      from airflow.providers.http.sensors.http import HttpSensor
+      from airflow.decorators import dag, task
+      from datetime import datetime
+
+      @dag(start_date=datetime(2024, 1, 1), schedule='@hourly', catchup=False)
+      def sensor_pipeline():
+
+          # Czekaj na plik CSV
+          wait_for_file = FileSensor(
+              task_id='wait_for_input_file',
+              filepath='/data/input/{{ ds }}/data.csv',
+              poke_interval=60,    # Sprawdzaj co 60 sekund
+              timeout=3600,        # Timeout po 1 godzinie
+              mode='reschedule',   # Zwolnij worker slot między pokami
+          )
+
+          # Czekaj aż API będzie dostępne
+          wait_for_api = HttpSensor(
+              task_id='wait_for_api',
+              http_conn_id='data_api',
+              endpoint='/health',
+              response_check=lambda r: r.json()['status'] == 'ok',
+              poke_interval=30,
+              timeout=600,
+          )
+
+          @task()
+          def process():
+              print("Dane i API gotowe — przetwarzam")
+
+          [wait_for_file, wait_for_api] >> process()
+
+      dag_instance = sensor_pipeline()

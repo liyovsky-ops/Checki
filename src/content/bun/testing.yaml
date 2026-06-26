@@ -143,8 +143,9 @@ items:
       # Pokrycie kodu (coverage)
       bun test --coverage
 
-      # Coverage z progiem minimalnym (fail jeśli poniżej)
-      bun test --coverage --coverage-threshold=80
+      # Próg minimalny ustawiasz w bunfig.toml (fail jeśli poniżej):
+      #   [test]
+      #   coverageThreshold = 0.8   # 80% (ułamek 0–1)
 
       # Uruchom konkretne testy (filtr nazwy)
       bun test --test-name-pattern "UserRepository"

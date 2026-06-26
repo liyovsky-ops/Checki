@@ -28,7 +28,7 @@ items:
     pros:
       - Atomowy model — definiujesz niezależne atomy zamiast jednego store
       - Automatyczna granulacja re-renderów — komponent re-renderuje tylko gdy jego atom się zmienia
-      - Brak selekotrów — atomowy model eliminuje potrzebę createSelector
+      - Brak selektorów — atomowy model eliminuje potrzebę createSelector
       - Świetna integracja z React Suspense i Transitions
       - Prosty DX — atom(initialValue) to wszystko co potrzebujesz na start
     cons:
@@ -52,11 +52,11 @@ items:
       - Fine-grained reaktywność — granularne re-rendery bez pracy
       - Świetna wydajność przy dużych danych
     cons:
-      - Nieprzywidywalność — autorun/reaction mogą wywoływać się niespodziewanie
+      - Nieprzewidywalność — autorun/reaction mogą wywoływać się niespodziewanie
       - Trudniejsze debugowanie niż Redux (brak historii akcji)
       - Mała popularność — mało ofert pracy, mały ekosystem
       - Dekoratory (stara wersja) lub verbose setup (nowa wersja)
-      - Ciężki bundle (~58KB vs RTK ~46KB)
+      - Cięższy bundle niż lekkie rywale (~16KB gzip vs Zustand ~1KB)
     vs: >
       MobX i Redux to różne filozofie: MobX = magiczna reaktywność (jak Vue pod spodem),
       Redux = explicite akcje i stan. MobX szybszy w pisaniu, Redux przewidywalniejszy

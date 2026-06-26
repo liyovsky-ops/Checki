@@ -1,0 +1,72 @@
+title: Testowanie komponentów
+
+items:
+  - name: "@storybook/test — unit testy w Stories"
+    desc: "@storybook/test re-eksportuje Testing Library i Vitest. Możesz importować expect, vi, userEvent bezpośrednio. Play functions = testy interakcji uruchamiane w przeglądarce."
+    code: |
+      // Uruchom testy Storybook jako unit testy
+      // package.json
+      {
+        "scripts": {
+          "test-storybook": "test-storybook"
+        }
+      }
+
+      // npm install @storybook/test @storybook/addon-interactions
+
+      // Story z pełnym testem
+      import { expect, userEvent, within, fn } from '@storybook/test'
+      import type { Meta, StoryObj } from '@storybook/react'
+      import { Counter } from './Counter'
+
+      const meta: Meta<typeof Counter> = {
+        component: Counter,
+        args: { onCountChange: fn() },  // Spy na evencie
+      }
+      export default meta
+
+      export const IncrementTest: StoryObj<typeof meta> = {
+        play: async ({ canvasElement, args }) => {
+          const canvas = within(canvasElement)
+
+          // Sprawdź stan początkowy
+          expect(canvas.getByText('0')).toBeInTheDocument()
+
+          // Kliknij 3 razy
+          const btn = canvas.getByRole('button', { name: '+' })
+          await userEvent.click(btn)
+          await userEvent.click(btn)
+          await userEvent.click(btn)
+
+          // Sprawdź wynik
+          expect(canvas.getByText('3')).toBeInTheDocument()
+
+          // Sprawdź czy callback wywołany 3 razy
+          expect(args.onCountChange).toHaveBeenCalledTimes(3)
+          expect(args.onCountChange).toHaveBeenLastCalledWith(3)
+        },
+      }
+
+  - name: Chromatic — visual regression testing
+    desc: Chromatic przechwytuje screenshoty każdej story i porównuje z poprzednim buildem. Każda zmiana wizualna wymaga zatwierdzenia. Automatycznie w CI.
+    code: |
+      # Instalacja Chromatic
+      npm install chromatic --save-dev
+
+      # Uruchom Chromatic (prześlij stories)
+      npx chromatic --project-token=<twój-token>
+
+      # W CI (GitHub Actions)
+      # .github/workflows/chromatic.yml
+      name: Chromatic
+      on: [push]
+      jobs:
+        chromatic:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@v4
+              with: { fetch-depth: 0 }
+            - uses: actions/setup-node@v4
+            - run: npm ci
+            - run: npx chromatic --project-token=${{ secrets.CHROMATIC_TOKEN }}
+              # Chromatic wyświetli link do przeglądu zmian wizualnych

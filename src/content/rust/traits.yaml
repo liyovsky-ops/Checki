@@ -21,8 +21,10 @@ items:
           // Domyślna implementacja
           fn skrot(&self) -> String {
               let d = self.opis();
-              if d.len() > 20 {
-                  format!("{}...", &d[..20])
+              // chars().take(20) — tnie po znakach, nie po bajtach.
+              // &d[..20] groziłoby panic gdyby bajt 20 wypadł w środku znaku UTF-8!
+              if d.chars().count() > 20 {
+                  format!("{}...", d.chars().take(20).collect::<String>())
               } else {
                   d
               }
@@ -43,8 +45,8 @@ items:
 
       fn main() {
           let p = Produkt { nazwa: "Klawiatura mechaniczna".to_string(), cena: 299.99 };
-          println!("{}", p.opis());
-          println!("{}", p.skrot()); // "Klawiatura mechaniczna..."
+          println!("{}", p.opis());  // "Klawiatura mechaniczna — 299.99 zł"
+          println!("{}", p.skrot()); // "Klawiatura mechanicz..." (20 znaków + ...)
       }
     lang: rust
 
@@ -74,7 +76,9 @@ items:
 
           println!("{:?}", p1);     // Debug: Punkt { x: 0.0, y: 0.0 }
           println!("{}", p1 == p3); // PartialEq: true
-          println!("{}", p1.odleglosc(&p2)); // 5.0
+          // UWAGA: Display dla f64 pomija końcowe .0 — wypisze "5", nie "5.0".
+          // Aby wymusić miejsca po przecinku: {:.1} → "5.0"
+          println!("{:.1}", p1.odleglosc(&p2)); // 5.0
       }
     lang: rust
 
@@ -114,6 +118,45 @@ items:
           najwiekszy(&znaki); // y
 
           wypisz_pare(&"Rust", &42);
+      }
+    lang: rust
+
+  - title: Closures i traity Fn / FnMut / FnOnce
+    desc: >
+      Closure to anonimowa funkcja która może przechwycić zmienne z otoczenia.
+      Kompilator dobiera trait: Fn (pożycza &), FnMut (pożycza &mut), FnOnce (przejmuje własność, move).
+      Słowo move wymusza przeniesienie przechwyconych wartości do closure.
+    code: |
+      // Closure jako argument generyczny — bound Fn(i32) -> i32
+      fn zastosuj<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 {
+          f(x)
+      }
+
+      fn main() {
+          let mnoznik = 3;
+          // Fn — przechwytuje `mnoznik` przez &, tylko czyta
+          let pomnoz = |x| x * mnoznik;
+          println!("{}", zastosuj(pomnoz, 10)); // 30
+
+          // FnMut — przechwytuje przez &mut, modyfikuje stan
+          let mut licznik = 0;
+          let mut zlicz = || { licznik += 1; licznik };
+          println!("{} {}", zlicz(), zlicz()); // 1 2
+
+          // move — przejmuje własność (niezbędne przy wątkach / spawn)
+          let dane = vec![1, 2, 3];
+          let suma_closure = move || dane.iter().sum::<i32>();
+          println!("{}", suma_closure()); // 6
+          // `dane` nie jest już dostępne tutaj — przeniesione do closure
+
+          // Zwracanie closure — impl Fn (closure ma nieznany rozmiar)
+          let dodaj_piec = utworz_dodawacz(5);
+          println!("{}", dodaj_piec(10)); // 15
+      }
+
+      // Zwracanie closure z funkcji — `move` przedłuża życie `n`
+      fn utworz_dodawacz(n: i32) -> impl Fn(i32) -> i32 {
+          move |x| x + n
       }
     lang: rust
 

@@ -1,0 +1,52 @@
+title: Topiki i konfiguracja klastra
+
+items:
+  - name: Tworzenie i konfiguracja topica
+    desc: Topic to kanał eventów. Liczba partycji determinuje paralelizm. Replication factor = niezawodność. Raz ustawione partycje trudno zmienić.
+    code: |
+      # Utwórz topic
+      kafka-topics.sh --bootstrap-server localhost:9092 \
+        --create \
+        --topic user-events \
+        --partitions 6 \        # 6 partycji = 6 równoległych konsumentów
+        --replication-factor 3  # 3 kopie = tolerancja utraty 2 brokerów
+
+      # Topic z custom retention
+      kafka-topics.sh --bootstrap-server localhost:9092 \
+        --create --topic audit-log \
+        --partitions 3 \
+        --replication-factor 3 \
+        --config retention.ms=2592000000 \  # 30 dni
+        --config retention.bytes=10737418240  # 10GB max
+
+      # Topic z kompakcją (tylko ostatnia wartość per klucz)
+      kafka-topics.sh --bootstrap-server localhost:9092 \
+        --create --topic user-profiles \
+        --partitions 6 \
+        --config cleanup.policy=compact
+
+  - name: AdminClient — zarządzanie przez kod
+    desc: Python AdminClient pozwala programatycznie tworzyć topici, sprawdzać metadata, konfigurować. Przydatne w bootstrappingu aplikacji.
+    code: |
+      from confluent_kafka.admin import AdminClient, NewTopic
+
+      admin = AdminClient({'bootstrap.servers': 'localhost:9092'})
+
+      # Stwórz topici
+      topics = [
+          NewTopic('orders',       num_partitions=6, replication_factor=3),
+          NewTopic('notifications', num_partitions=3, replication_factor=3),
+      ]
+
+      futures = admin.create_topics(topics)
+      for topic, future in futures.items():
+          try:
+              future.result()
+              print(f'Stworzono topic: {topic}')
+          except Exception as e:
+              print(f'Błąd tworzenia {topic}: {e}')
+
+      # Listuj topici
+      metadata = admin.list_topics(timeout=10)
+      for topic in metadata.topics.values():
+          print(f'{topic.topic}: {len(topic.partitions)} partycji')

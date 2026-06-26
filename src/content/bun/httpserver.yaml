@@ -44,13 +44,30 @@ items:
       // server.stop();
     lang: typescript
 
-  - title: Routing — wzorzec ręczny
+  - title: Routing natywny (routes) + wzorzec ręczny
     desc: >
-      Bun nie ma wbudowanego routera jak Express — routing budujesz ręcznie lub używasz
-      frameworków ElysiaJS/Hono. Wzorzec z URL i switch/if jest wydajny dla małych API.
+      Od Bun 1.2 Bun.serve() ma wbudowany router w opcji routes — wzorce ścieżek z parametrami
+      (:id), metody HTTP i statyczne Response. fetch() jest fallbackiem dla nietrafionych tras.
+      Bez routes można też routować ręcznie przez URL + if (poniżej) lub użyć ElysiaJS/Hono.
     code: |
-      const server = Bun.serve({
+      // Wbudowany router (Bun 1.2+)
+      const app = Bun.serve({
         port: 3000,
+        routes: {
+          "/": Response.json({ status: "ok", runtime: "bun" }),
+          "/users/:id": (req) => Response.json({ id: req.params.id }),
+          "/users": {
+            GET: () => Response.json([{ id: 1 }]),
+            POST: async (req) => Response.json(await req.json(), { status: 201 }),
+          },
+        },
+        // fetch() obsługuje wszystko, co nie pasuje do routes
+        fetch: () => new Response("404 Not Found", { status: 404 }),
+      });
+
+      // --- Alternatywa: routing ręczny (działa w każdej wersji Bun) ---
+      const server = Bun.serve({
+        port: 3001,
 
         async fetch(req: Request) {
           const url = new URL(req.url);

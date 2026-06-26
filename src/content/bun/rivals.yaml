@@ -13,7 +13,7 @@ items:
       - Natywne addony (C++ N-API) — pełna kontrola wydajności
     cons:
       - Wolniejszy start niż Bun (szczególnie bez --watch)
-      - Brak natywnego TypeScript — potrzebujesz ts-node lub esbuild
+      - TypeScript tylko przez strip types (Node 22.6+/domyślnie od 23.6) — bez enumów, namespace; pełny TS dalej wymaga tsc/tsx
       - npm install jest wolny przy pierwszej instalacji
       - Brak wbudowanego SQLite, password hashing, bundlera
       - Wymaga dotenv dla .env — nie ładuje automatycznie
@@ -33,7 +33,7 @@ items:
       - Słabsza kompatybilność z npm (Deno 2.0 poprawia, ale wciąż problemy)
       - Wolniejszy od Bun w benchmarkach HTTP i instalacji
       - Mniejsza społeczność od Node.js
-      - JSR zamiast npm — dodatkowe bariery wejścia
+      - Promuje własny rejestr JSR — npm działa (npm:), ale ekosystem Deno-first jest mniejszy
     vs: Deno i Bun mają podobne cele (TypeScript, web APIs), ale różne podejście. Deno priorytetyzuje bezpieczeństwo (permissions model), Bun priorytetyzuje szybkość i kompatybilność z npm. Bun wygrywa kompatybilnością z istniejącym kodem Node/npm.
 
   - name: Vite
@@ -66,5 +66,5 @@ items:
       - Wolniejszy od Bun install (5x–10x)
       - Wymaga Node.js — nie zastępuje runtime
       - Strict mode może łamać paczki oczekujące phantom dependencies
-      - Bun.lockb vs pnpm-lock.yaml — musisz wybrać jeden
+      - bun.lock vs pnpm-lock.yaml — musisz wybrać jeden lockfile
     vs: pnpm wygrywa strict mode i izolacją zależności. Bun wygrywa szybkością instalacji i jest jednocześnie runtime. Dla projektów Node.js gdzie zależy Ci na izolacji — pnpm. Dla nowych projektów Bun — naturalny wybór.

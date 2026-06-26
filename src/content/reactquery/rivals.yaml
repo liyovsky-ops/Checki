@@ -11,12 +11,12 @@ items:
       - Natywna integracja z Next.js (od Vercel)
       - Szybki start — zero konfiguracji
     cons:
-      - Brak useMutation — musisz pisać własne POST/PUT/DELETE
-      - Brak invalidateQueries — cache management ograniczony
-      - Brak useInfiniteQuery (jest useSWRInfinite, ale gorsze DX)
-      - Brak devtools
-      - Mniej zaawansowane optimistic updates
-    vs: SWR gdy masz prosty projekt Next.js z głównie GET requests. TanStack Query gdy potrzebujesz mutacji, invalidacji, optimistic UI i devtools.
+      - Mutacje słabsze — useSWRMutation istnieje, ale mniej ergonomiczny niż useMutation
+      - Inwalidacja przez mutate(key) + matchery — brak bogatego invalidateQueries z partial-match
+      - useSWRInfinite zamiast useInfiniteQuery — gorsze DX i typowanie
+      - Brak oficjalnych devtools (TanStack ma rozbudowany panel)
+      - Mniej zaawansowane optimistic updates (brak onMutate/rollback z context)
+    vs: SWR gdy masz prosty projekt Next.js z głównie GET requests. TanStack Query gdy potrzebujesz mutacji, granularnej invalidacji, optimistic UI z rollbackiem i devtools.
 
   - name: RTK Query (Redux Toolkit)
     icon: "🔴"

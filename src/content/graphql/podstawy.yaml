@@ -1,0 +1,129 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać GraphQL?
+  firstComponent: Pierwszy GraphQL server
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest GraphQL?
+  desc: >
+    GraphQL to język zapytań dla API i runtime do ich wykonywania — alternatywa dla REST.
+    Zamiast wielu endpointów (/users, /users/1/posts, /users/1/friends) — jeden endpoint
+    i klient deklaruje dokładnie jakich danych potrzebuje. Zero over-fetching (za dużo danych)
+    i under-fetching (za mało, potrzeba kolejnego requestu). Stworzony przez Meta w 2012,
+    otwarty w 2015. Używany przez GitHub, Shopify, Twitter, Airbnb, Netflix.
+    Silnie typowany — schema definiuje kontrakt API z pełnymi typami.
+
+concepts:
+  - title: Schema
+    desc: >
+      Schema to serce GraphQL — definiuje wszystkie typy, queries, mutations i subscriptions
+      dostępne w API. Napisana w SDL (Schema Definition Language). Schema jest kontraktem
+      między klientem a serwerem — zmiana schematu to zmiana API.
+    icon: "📐"
+  - title: Query
+    desc: >
+      Query to operacja odczytu danych w GraphQL. Klient wysyła dokładnie taką strukturę
+      jaką chce otrzymać — zagnieżdżone pola, konkretne właściwości. Serwer zwraca
+      dane w identycznej strukturze. Jeden request może pobrać dane z wielu zasobów.
+    icon: "🔍"
+  - title: Mutation
+    desc: >
+      Mutation to operacja modyfikacji danych — create, update, delete.
+      Analogicznie do Query — deklarujesz co chcesz zmienić i jakie dane
+      chcesz otrzymać w odpowiedzi. Mutacje mogą zwracać zmieniony obiekt.
+    icon: "✏️"
+  - title: Resolver
+    desc: >
+      Resolver to funkcja która pobiera dane dla konkretnego pola w schemie.
+      GraphQL wykonuje resolver dla każdego pola w query. Resolvery mogą pobierać
+      dane z bazy, cache, innego API — klient nie wie skąd pochodzi dane.
+    icon: "⚙️"
+  - title: N+1 Problem i DataLoader
+    desc: >
+      Klasyczny problem GraphQL: query o 100 użytkowników → 100 osobnych requestów
+      do bazy żeby pobrać post każdego użytkownika. DataLoader rozwiązuje to przez
+      batching (grupowanie requestów) i caching w ramach jednego requestu.
+    icon: "⚡"
+  - title: Subscriptions
+    desc: >
+      Subscriptions to real-time komunikacja przez WebSocket. Klient subskrybuje
+      zdarzenia i otrzymuje aktualizacje gdy dane się zmienią. Idealne do chat,
+      live feeds, notyfikacji, dashboardów z danymi na żywo.
+    icon: "🔔"
+
+whenToUse:
+  - Aplikacje mobilne — oszczędność danych, pobierasz dokładnie to co potrzebujesz
+  - Złożone relacje między danymi — jeden query pobiera głęboko zagnieżdżone obiekty
+  - Wiele różnych klientów (web, mobile, third-party) z różnymi potrzebami danych
+  - Rapid prototyping — schema jako dokumentacja i kontrakt od pierwszego dnia
+  - BFF (Backend for Frontend) — jeden GraphQL layer agreguje wiele microservices
+  - Real-time funkcjonalności — subscriptions przez WebSocket
+
+firstComponent: |
+  # Instalacja (Apollo Server + TypeScript)
+  npm install @apollo/server graphql
+  npm install -D typescript tsx @types/node
+
+  // schema.ts — definicja typów
+  export const typeDefs = `#graphql
+    type User {
+      id: ID!
+      name: String!
+      email: String!
+      posts: [Post!]!
+    }
+
+    type Post {
+      id: ID!
+      title: String!
+      body: String!
+      author: User!
+    }
+
+    type Query {
+      user(id: ID!): User
+      users: [User!]!
+      post(id: ID!): Post
+    }
+
+    type Mutation {
+      createUser(name: String!, email: String!): User!
+      createPost(title: String!, body: String!, authorId: ID!): Post!
+    }
+  `;
+
+  // resolvers.ts
+  export const resolvers = {
+    Query: {
+      user: (_: any, { id }: { id: string }) =>
+        users.find(u => u.id === id),
+      users: () => users,
+    },
+    Mutation: {
+      createUser: (_: any, { name, email }: { name: string; email: string }) => {
+        const user = { id: String(users.length + 1), name, email, posts: [] };
+        users.push(user);
+        return user;
+      }
+    },
+    User: {
+      posts: (parent: { id: string }) =>
+        posts.filter(p => p.authorId === parent.id),
+    }
+  };
+
+  // server.ts
+  import { ApolloServer } from '@apollo/server';
+  import { startStandaloneServer } from '@apollo/server/standalone';
+  import { typeDefs } from './schema';
+  import { resolvers } from './resolvers';
+
+  const server = new ApolloServer({ typeDefs, resolvers });
+
+  const { url } = await startStandaloneServer(server, {
+    listen: { port: 4000 },
+  });
+
+  console.log(`GraphQL server ready at ${url}`);
+  // Otwórz http://localhost:4000 — Apollo Sandbox do testowania

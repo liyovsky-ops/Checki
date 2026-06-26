@@ -16,8 +16,8 @@ items:
   - name: "zustand/middleware — combine"
     desc: Wbudowany helper. Dzieli store na dwie funkcje — initialState (obiekt) i actions (set/get). Upraszcza TypeScript — nie musisz pisać interface dla całości.
     icon: "🔗"
-  - name: zustand-persist-migrate
-    desc: Zarządzanie migracją wersji persist. Gdy zmienisz kształt stanu, stary localStorage spowoduje błąd. version + migrate w persist config — Zustand automatycznie uruchamia migrację.
+  - name: "persist — migracje wersji (wbudowane)"
+    desc: "Nie potrzebujesz osobnego pakietu — migracja jest w persist. Gdy zmienisz kształt stanu, stary JSON w localStorage spowoduje błąd. Ustaw version: N i migrate: (old, ver) => newState w configu persist — Zustand uruchomi migrację automatycznie przy rehydracji."
     icon: "🔄"
   - name: zustand-computed
     desc: Middleware społeczności do computed/derived values z automatycznym memoizowaniem. Alternatywa dla ręcznego liczenia w selektorach — definiujesz computed raz w store.

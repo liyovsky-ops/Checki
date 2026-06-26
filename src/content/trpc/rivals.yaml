@@ -1,0 +1,66 @@
+title: tRPC vs alternatywy
+
+items:
+  - name: REST API (Fetch/Axios)
+    icon: "🌐"
+    color: "#005571"
+    tagline: Klasyczne REST — HTTP verbs, OpenAPI, language-agnostic
+    pros:
+      - Działa między różnymi językami (Python BE + TypeScript FE)
+      - Publiczne API — dokumentacja przez OpenAPI/Swagger
+      - Każdy HTTP klient działa (curl, Postman, inne języki)
+      - Cachowanie przez HTTP (CDN, browser cache)
+    cons:
+      - Brak type safety — ręczne typy lub codegen
+      - Boilerplate — ręczne fetch, error handling, loading states
+      - Brak auto-invalidacji cache jak React Query
+      - Bez narzędzi: brak walidacji input, brak middleware
+    vs: REST gdy API jest publiczne lub służy wielu klientom w różnych językach. tRPC gdy masz TypeScript po obu stronach i chcesz type safety bez generowania kodu.
+
+  - name: GraphQL
+    icon: "🔷"
+    color: "#E10098"
+    tagline: Query language dla API — elastyczne zapytania, jeden endpoint
+    pros:
+      - Klient pyta dokładnie o potrzebne dane (underfetching/overfetching solved)
+      - Świetne dla złożonych, powiązanych danych (social network, CMS)
+      - Działa między językami — codegen dla TypeScript
+      - Subscriptions wbudowane (real-time)
+    cons:
+      - Duży setup — schema, resolvers, codegen pipeline
+      - N+1 problem bez DataLoadera
+      - Overhead dla prostych CRUD API
+      - Nie tak type-safe jak tRPC bez konfiguracji
+    vs: GraphQL gdy API jest złożone, wieloklientowe lub publiczne. tRPC dla wewnętrznych fullstack TypeScript projektów — 5x mniej konfiguracji.
+
+  - name: ts-rest
+    icon: "📄"
+    color: "#1E293B"
+    tagline: Contract-first REST z TypeScript — pełny type-safety, kompatybilny z REST
+    pros:
+      - Generuje prawdziwe REST endpoints (nie RPC)
+      - Kompatybilny z OpenAPI/Swagger
+      - Działa z istniejącymi REST klientami (curl, Postman)
+      - Bardziej przewidywalny routing (nie batch HTTP)
+    cons:
+      - Więcej boilerplate niż tRPC (kontrakt + router + klient)
+      - Mniej automatyzacji niż tRPC (ręczny status codes)
+      - Mniejsza społeczność i ekosystem
+      - Brak pierwszoklasowej integracji z React Query
+    vs: ts-rest gdy potrzebujesz prawdziwego REST (np. API dla innych klientów) z type safety. tRPC dla wewnętrznego TypeScript API z minimalnym boilerplate.
+
+  - name: Hono + OpenAPI
+    icon: "🔥"
+    color: "#E36002"
+    tagline: Ultraszybki web framework + OpenAPI spec — Edge-first, multi-runtime
+    pros:
+      - Działa na Edge (Cloudflare Workers, Vercel Edge)
+      - Prawdziwe REST z OpenAPI dokumentacją
+      - Bardzo szybki (C-core na Bun/Cloudflare)
+      - Walidacja przez Zod + @hono/zod-openapi
+    cons:
+      - Więcej konfiguracji niż tRPC
+      - Ręczne typy na frontendzie lub codegen
+      - Mniej integracji z React Query
+      - Brak automatic batch requests
+    vs: Hono gdy potrzebujesz Edge deployment lub publicznego API. tRPC dla fullstack Next.js z minimalnym setup.

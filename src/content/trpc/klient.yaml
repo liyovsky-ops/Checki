@@ -1,0 +1,91 @@
+title: Klient React — useQuery i useMutation
+
+items:
+  - name: useQuery i useMutation
+    desc: trpc.procedure.useQuery() i useMutation() to opakowania React Query. Full DX — autocomplete nazw procedur, typowane data, isLoading, error, refetch.
+    code: |
+      import { trpc } from '@/utils/trpc'
+
+      function PostsPage() {
+        // Query — GET
+        const { data, isLoading, error, refetch } = trpc.posts.list.useQuery(
+          { limit: 10 },           // Input — typowany!
+          {
+            staleTime: 30_000,     // Cache 30 sekund
+            enabled: true,         // Warunek uruchomienia
+            refetchOnWindowFocus: false,
+          }
+        )
+
+        // Mutation — POST/PUT/DELETE
+        const createPost = trpc.posts.create.useMutation({
+          onSuccess: (data) => {
+            console.log('Utworzono post:', data)
+            // Invalidate cache list
+            trpc.useUtils().posts.list.invalidate()
+          },
+          onError: (error) => {
+            console.error('Błąd:', error.message)
+          },
+        })
+
+        const handleCreate = () => {
+          createPost.mutate({
+            title:   "Nowy post",
+            content: "Treść posta...",
+          })
+        }
+
+        if (isLoading) return <div>Ładowanie...</div>
+        if (error)     return <div>Błąd: {error.message}</div>
+
+        return (
+          <div>
+            {data?.items.map(post => (
+              <div key={post.id}>{post.title}</div>
+            ))}
+            <button onClick={handleCreate} disabled={createPost.isPending}>
+              {createPost.isPending ? "Tworzę..." : "Dodaj post"}
+            </button>
+          </div>
+        )
+      }
+
+  - name: Optimistic Updates i Invalidation
+    desc: React Query pod tRPC — optimistic updates zmieniają UI przed odpowiedzią serwera. useUtils() do invalidacji cache i ręcznego ustawiania danych.
+    code: |
+      import { trpc } from '@/utils/trpc'
+
+      function LikeButton({ postId }: { postId: number }) {
+        const utils = trpc.useUtils()
+
+        const likePost = trpc.posts.like.useMutation({
+          // Optimistic update — zmień UI natychmiast
+          onMutate: async ({ postId }) => {
+            await utils.posts.byId.cancel({ id: postId })
+            const prev = utils.posts.byId.getData({ id: postId })
+
+            utils.posts.byId.setData(
+              { id: postId },
+              old => old ? { ...old, likes: old.likes + 1 } : old
+            )
+
+            return { prev }  // Rollback data
+          },
+          onError: (err, vars, ctx) => {
+            // Rollback jeśli błąd
+            if (ctx?.prev) {
+              utils.posts.byId.setData({ id: vars.postId }, ctx.prev)
+            }
+          },
+          onSettled: () => {
+            utils.posts.byId.invalidate({ id: postId })
+          },
+        })
+
+        return (
+          <button onClick={() => likePost.mutate({ postId })}>
+            ❤️ Like
+          </button>
+        )
+      }

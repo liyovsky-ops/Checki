@@ -225,6 +225,7 @@ items:
       package math
 
       import (
+          "fmt"
           "testing"
       )
 
@@ -257,11 +258,10 @@ items:
       }
 
       // Przykład — pojawia się w dokumentacji i jest testowany
+      // go test porównuje stdout z komentarzem // Output:
       func ExampleAdd() {
-          result := Add(2, 3)
-          _ = result
-          // Output:
-          // 5  <- go test sprawdza ten output!
+          fmt.Println(Add(2, 3))
+          // Output: 5
       }
 
       // Uruchamianie:

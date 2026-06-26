@@ -1,0 +1,88 @@
+title: Middleware i autoryzacja
+
+items:
+  - name: isAuthed middleware — ochrona procedur
+    desc: Middleware sprawdza warunki i rzuca TRPCError jeśli nie spełnione. protectedProcedure = procedura wymagająca zalogowania. Middleware mogą też wzbogacać context.
+    code: |
+      import { initTRPC, TRPCError } from '@trpc/server'
+      import { getServerSession } from 'next-auth'
+
+      type Context = {
+        session: { userId: string; role: string } | null
+        db: Database
+      }
+
+      const t = initTRPC.context<Context>().create()
+
+      // Middleware — weryfikacja zalogowania
+      const isAuthed = t.middleware(({ ctx, next }) => {
+        if (!ctx.session?.userId) {
+          throw new TRPCError({
+            code:    'UNAUTHORIZED',
+            message: 'Musisz być zalogowany',
+          })
+        }
+        return next({
+          ctx: {
+            ...ctx,
+            session: ctx.session,  // Teraz session gwarantowanie nie-null
+          },
+        })
+      })
+
+      // Middleware — weryfikacja roli admin
+      const isAdmin = t.middleware(({ ctx, next }) => {
+        if (!ctx.session?.userId) {
+          throw new TRPCError({ code: 'UNAUTHORIZED' })
+        }
+        if (ctx.session.role !== 'admin') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Brak uprawnień' })
+        }
+        return next({ ctx: { ...ctx, session: ctx.session } })
+      })
+
+      // Rate limiting middleware
+      const rateLimiter = t.middleware(async ({ ctx, next, path }) => {
+        const key = `ratelimit:${ctx.session?.userId}:${path}`
+        const requests = await redis.incr(key)
+        if (requests === 1) await redis.expire(key, 60)
+        if (requests > 30) {
+          throw new TRPCError({ code: 'TOO_MANY_REQUESTS' })
+        }
+        return next()
+      })
+
+      export const publicProcedure    = t.procedure
+      export const protectedProcedure = t.procedure.use(isAuthed)
+      export const adminProcedure     = t.procedure.use(isAdmin)
+
+  - name: createContext — budowanie kontekstu
+    desc: createContext() wywoływany dla każdego requesta — tworzy ctx z sesją, bazą, loggerem. Procedury dostają ctx i mają dostęp do danych usera bez dodatkowego kodu.
+    code: |
+      import { type CreateNextContextOptions } from '@trpc/server/adapters/next'
+      import { getServerSession } from 'next-auth'
+      import { authOptions } from '@/lib/auth'
+      import { prisma } from '@/lib/prisma'
+
+      export async function createContext({ req, res }: CreateNextContextOptions) {
+        const session = await getServerSession(req, res, authOptions)
+
+        return {
+          session,
+          db: prisma,
+          req,
+        }
+      }
+
+      export type Context = Awaited<ReturnType<typeof createContext>>
+
+      // Użycie w procedurze:
+      const userRouter = router({
+        me: protectedProcedure
+          .query(async ({ ctx }) => {
+            // ctx.session.userId gwarantowanie istnieje (middleware sprawdziło)
+            return ctx.db.user.findUnique({
+              where: { id: ctx.session.userId },
+            })
+          }),
+      })

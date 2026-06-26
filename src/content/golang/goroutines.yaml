@@ -229,6 +229,60 @@ items:
       }
     lang: go
 
+  - title: Worker pool — pula workerów
+    desc: >
+      Worker pool ogranicza liczbę równolegle działających goroutines — kontrola zasobów.
+      N workerów czyta zadania z jednego channelu, wyniki piszą do drugiego.
+      Klasyczny wzorzec do przetwarzania wsadowego bez zalewania systemu (np. limit połączeń DB/HTTP).
+    code: |
+      package main
+
+      import (
+          "fmt"
+          "sync"
+      )
+
+      // Worker czyta zadania aż do zamknięcia channelu jobs
+      func worker(id int, jobs <-chan int, results chan<- int, wg *sync.WaitGroup) {
+          defer wg.Done()
+          for j := range jobs {
+              results <- j * j // przetwórz zadanie i wyślij wynik
+          }
+      }
+
+      func main() {
+          const numJobs = 9
+          jobs := make(chan int, numJobs)
+          results := make(chan int, numJobs)
+
+          var wg sync.WaitGroup
+
+          // Uruchom 3 workerów — max 3 zadania naraz
+          for w := 1; w <= 3; w++ {
+              wg.Add(1)
+              go worker(w, jobs, results, &wg)
+          }
+
+          // Wyślij zadania, potem zamknij — sygnał "koniec"
+          for j := 1; j <= numJobs; j++ {
+              jobs <- j
+          }
+          close(jobs)
+
+          // Zamknij results dopiero gdy wszyscy workerzy skończą
+          go func() {
+              wg.Wait()
+              close(results)
+          }()
+
+          sum := 0
+          for r := range results { // range kończy się na close(results)
+              sum += r
+          }
+          fmt.Println("Suma kwadratów 1..9:", sum) // 285
+      }
+    lang: go
+
   - title: sync.Mutex i sync.RWMutex
     desc: >
       Mutex (mutual exclusion) chroni shared data przed równoczesnym dostępem.

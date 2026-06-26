@@ -1,0 +1,66 @@
+title: GraphQL vs alternatywy
+
+items:
+  - name: REST API
+    icon: "🌐"
+    color: "#0088cc"
+    tagline: Klasyczny styl API — zasoby, HTTP metody, prosty i powszechny
+    pros:
+      - Prostota — każdy zna HTTP GET/POST/PUT/DELETE
+      - HTTP caching out of the box (GET jest cacheable)
+      - Łatwiejszy debugging — sprawdź URL w przeglądarce
+      - Świetne dla publicznych API i prostych CRUD operacji
+    cons:
+      - Over-fetching — endpoint zwraca więcej niż potrzebujesz
+      - Under-fetching — potrzebujesz N+1 requestów po zagnieżdżone dane
+      - Wersjonowanie API (/v1/, /v2/) staje się kłopotliwe
+      - Brak standaryzacji — każde REST API wygląda inaczej
+    vs: REST dla prostych, publicznych API i mikroserwisów z małą ilością relacji. GraphQL gdy klienci mają różne potrzeby i dane są mocno powiązane.
+
+  - name: tRPC
+    icon: "🔗"
+    color: "#398ccb"
+    tagline: Type-safe RPC dla TypeScript monorepo — zero generowania kodu
+    pros:
+      - Pełna type safety end-to-end bez SDL i generowania kodu
+      - Prostszy setup niż GraphQL (no schema, no resolvers boilerplate)
+      - Automatyczny inference typów — zmiana w API widoczna natychmiast
+      - Idealne dla monorepo TypeScript (Next.js + Express)
+    cons:
+      - Tylko TypeScript — brak wsparcia dla innych języków klienta
+      - Brak introspekcji i Playground jak GraphQL Sandbox
+      - Trudniejsze do udostępnienia zewnętrznym klientom
+      - Mniejszy ekosystem niż GraphQL
+    vs: tRPC gdy budujesz fullstack TypeScript monorepo (Next.js). GraphQL gdy masz wielu klientów (mobile, web, third-party) lub różne technologie.
+
+  - name: gRPC
+    icon: "⚡"
+    color: "#244c5a"
+    tagline: Szybki, binarny RPC — Protocol Buffers, streaming, microservices
+    pros:
+      - Bardzo szybki — binarny protokół, znacznie mniejszy payload niż JSON
+      - Dwukierunkowy streaming
+      - Code generation z .proto — klient i serwer zawsze spójne
+      - Idealne dla komunikacji między mikroserwisami
+    cons:
+      - Trudny w przeglądarce (wymaga grpc-web proxy)
+      - Binarny format — trudniejszy debugging
+      - Steeper learning curve (Protocol Buffers, .proto pliki)
+      - Nie zastąpi REST/GraphQL dla zewnętrznych API
+    vs: gRPC dla komunikacji backend-backend (microservices). GraphQL dla klienta webowego/mobilnego.
+
+  - name: OpenAPI / Swagger
+    icon: "📄"
+    color: "#49cc90"
+    tagline: Standard dokumentacji REST API z generowaniem klientów
+    pros:
+      - Standard branżowy dla REST — narzędzia wszędzie
+      - Generowanie klientów w dowolnym języku
+      - Swagger UI — dokumentacja i testowanie w jednym
+      - Backward compatible z istniejącymi REST API
+    cons:
+      - To dokumentacja REST — nie rozwiązuje over/under-fetching
+      - Specyfikacja bywa rozbieżna z implementacją
+      - Generowane klienty są verbose i trudne w utrzymaniu
+      - Nie obsługuje real-time (subscriptions)
+    vs: OpenAPI gdy masz REST API i potrzebujesz dokumentacji/klientów. GraphQL gdy projektujesz API od zera dla złożonych danych.

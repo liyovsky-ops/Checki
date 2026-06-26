@@ -1,0 +1,120 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać tRPC?
+  firstComponent: Pierwszy router i klient
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest tRPC?
+  desc: >
+    tRPC pozwala budować w pełni typowane API między backendem a frontendem TypeScript
+    bez generowania kodu (OpenAPI, GraphQL codegen). Backend definiuje procedury,
+    frontend używa ich z pełnym autocomplete i type-safety przez wspólny typ.
+    Pod spodem używa React Query (lub SWR) do cachowania i zarządzania stanem.
+    Idealne dla fullstack TypeScript (Next.js, Remix, SvelteKit + Express/Fastify).
+    Używany przez Ping.gg, Cal.com, Papermark.
+
+concepts:
+  - title: Router i Procedure
+    desc: >
+      Router grupuje procedury (endpointy). Procedura to query (GET) lub mutation (POST/PUT/DELETE).
+      Każda procedura może mieć input (walidacja Zod) i output (opcjonalnie).
+      createTRPCRouter() tworzy router, publicProcedure.query/mutation definiuje endpoint.
+    icon: "🛣️"
+  - title: Shared Types (AppRouter)
+    desc: >
+      AppRouter to typ eksportowany z backendu — frontend importuje tylko TYP, nie kod.
+      createTRPCReact<AppRouter>() tworzy klienta z pełną type safety.
+      TypeScript wie jakie procedury istnieją i jakie zwracają bez runtime overhead.
+    icon: "🔗"
+  - title: Context
+    desc: >
+      Context to obiekt przekazywany do każdej procedury — zawiera np. sesję użytkownika,
+      połączenie z bazą, logger. createContext() wywoływany dla każdego requesta.
+      Procedury odczytują context.session do autoryzacji.
+    icon: "🎯"
+  - title: Middleware
+    desc: >
+      Middleware to funkcja pomiędzy requestem a procedurą. enforceUserIsAuthed()
+      sprawdza czy użytkownik jest zalogowany i rzuca UNAUTHORIZED jeśli nie.
+      protectedProcedure = publicProcedure.use(enforceUserIsAuthed).
+    icon: "🔒"
+  - title: Input Validation (Zod)
+    desc: >
+      Każda procedura może mieć .input(ZodSchema) — Zod waliduje dane przed procedurą.
+      Input jest automatycznie typowany jako z.infer<typeof schema>.
+      Błędy walidacji zwracane jako TRPCError z kodem BAD_REQUEST.
+    icon: "✅"
+  - title: React Query integracja
+    desc: >
+      tRPC 11 używa @tanstack/react-query v5. trpc.users.list.useQuery() = useQuery.
+      trpc.posts.create.useMutation() = useMutation. Cache, invalidation, optimistic updates
+      — wszystko działa natywnie przez React Query.
+    icon: "⚡"
+
+whenToUse:
+  - Fullstack TypeScript — Next.js, SvelteKit, Remix + Node.js backend
+  - Szybka iteracja gdy backend i frontend to jeden team lub jedna osoba
+  - Wewnętrzne API gdzie nie potrzebujesz publicznej dokumentacji
+  - Zastąpienie REST API gdy obie strony to TypeScript
+  - Gdy GraphQL jest za duży a REST API za mało typowany
+  - T3 Stack (Next.js + tRPC + Prisma + NextAuth + Tailwind)
+
+firstComponent: |
+  # Instalacja
+  npm install @trpc/server @trpc/client @trpc/react-query @tanstack/react-query zod
+
+  # === Backend: server/trpc.ts ===
+  import { initTRPC } from '@trpc/server'
+  import { z } from 'zod'
+
+  const t = initTRPC.create()
+
+  export const router = t.router
+  export const publicProcedure = t.procedure
+
+  # === Backend: server/router.ts ===
+  import { router, publicProcedure } from './trpc'
+
+  const userRouter = router({
+    list: publicProcedure
+      .query(async () => {
+        return [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }]
+      }),
+
+    byId: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return { id: input.id, name: 'Alice' }
+      }),
+
+    create: publicProcedure
+      .input(z.object({ name: z.string().min(2) }))
+      .mutation(async ({ input }) => {
+        return { id: 3, name: input.name }
+      }),
+  })
+
+  export const appRouter = router({ users: userRouter })
+  export type AppRouter = typeof appRouter
+
+  # === Frontend: utils/trpc.ts ===
+  import { createTRPCReact } from '@trpc/react-query'
+  import type { AppRouter } from '../server/router'
+
+  export const trpc = createTRPCReact<AppRouter>()
+
+  # === Frontend: Component.tsx ===
+  import { trpc } from '../utils/trpc'
+
+  function UserList() {
+    const { data, isLoading } = trpc.users.list.useQuery()
+
+    if (isLoading) return <div>Ładowanie...</div>
+
+    return (
+      <ul>
+        {data?.map(user => <li key={user.id}>{user.name}</li>)}
+      </ul>
+    )
+  }

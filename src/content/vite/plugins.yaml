@@ -20,7 +20,7 @@ items:
     desc: Import i transformacja obrazów — resize, format conversion (WebP, AVIF), blur, optymalizacja. Wszystko przez query string w imporcie (image.png?w=200&format=webp).
     icon: "🖼️"
   - name: "vite-plugin-svgr"
-    desc: Import SVG jako React komponenty — import { ReactComponent as Logo } from './logo.svg'. Automatyczna konwersja SVG → React component z pełnym TypeScript support.
+    desc: "Import SVG jako React komponenty — import Logo from './logo.svg?react' (v3+: sufiks ?react, default export). Automatyczna konwersja SVG → React component z pełnym TypeScript support."
     icon: "🎨"
   - name: "unplugin-auto-import"
     desc: Auto-import API — eliminuje ręczne importy React hooks, Vue refs, utility functions. Generuje automatycznie import { useState, useEffect } from 'react' w tle.
@@ -38,7 +38,7 @@ items:
     desc: Interaktywna mapa bundle — treemap/sunburst HTML pokazujący z czego składa się bundle. Wykrywaj zbyt duże biblioteki i duplikacje. Otwiera po vite build.
     icon: "📊"
   - name: "Next.js"
-    desc: React metaframework od Vercel — SSR, SSG, ISR, API routes, App Router. Od Next.js 12 używa Vite opcjonalnie, od Next.js 13 Turbopack. Domyślny ekosystem dla React production apps.
+    desc: React metaframework od Vercel — SSR, SSG, ISR, API routes, App Router. NIE używa Vite — bundler to Webpack, a od Next.js 13+ Turbopack. To główny "konkurent" stacku Vite po stronie React.
     icon: "▲"
   - name: "Nuxt"
     desc: Vue metaframework — SSR, SSG, auto-routing, auto-imports, hybrid rendering. Nuxt 3 używa Vite (lub Nitro) jako dev serwera. Pełny stack Vue.
@@ -46,8 +46,8 @@ items:
   - name: "SvelteKit"
     desc: Svelte metaframework — SSR, SSG, file-based routing, adapters (Vercel, Netlify, Node). Używa Vite jako dev server i bundler. Najszybszy DX w ekosystemie.
     icon: "🧡"
-  - name: "Remix"
-    desc: React metaframework od Shopify — progressive enhancement, web standards (fetch, FormData), SSR. Od wersji 2 Vite jest oficjalnym pluginem (vite-plugin-remix).
+  - name: "Remix / React Router 7"
+    desc: React metaframework od Shopify — progressive enhancement, web standards (fetch, FormData), SSR. Od Remix v2 Vite jest oficjalnym buildem (plugin z @remix-run/dev). W 2025 Remix scalił się z React Router v7, który również stoi na Vite.
     icon: "💿"
   - name: "Astro"
     desc: Framework do stron statycznych — Islands Architecture (hydratuj tylko interaktywne części), multi-framework (React/Vue/Svelte w jednym projekcie). Używa Vite wewnętrznie.

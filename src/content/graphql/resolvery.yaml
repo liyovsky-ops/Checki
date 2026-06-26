@@ -1,0 +1,96 @@
+title: Resolvery i DataLoader
+
+items:
+  - name: Struktura resolvera
+    desc: >
+      Resolver to funkcja (parent, args, context, info) => data.
+      parent — wynik resolvera pola nadrzędnego.
+      args — argumenty przekazane w query.
+      context — współdzielony obiekt requestu (auth, db, dataloaders).
+      info — metadata o query (nazwy pól, schema, itd.).
+    code: |
+      import { GraphQLResolveInfo } from 'graphql';
+
+      interface Context {
+        db: Database;
+        user: User | null;
+        dataloaders: DataLoaders;
+      }
+
+      const resolvers = {
+        Query: {
+          // (parent, args, context, info)
+          user: async (
+            _parent: unknown,
+            { id }: { id: string },
+            context: Context,
+            _info: GraphQLResolveInfo
+          ) => {
+            // Autoryzacja
+            if (!context.user) throw new Error('Unauthorized');
+
+            return context.db.users.findById(id);
+          },
+
+          users: async (
+            _: unknown,
+            { limit = 20, offset = 0 }: { limit?: number; offset?: number },
+            { db }: Context
+          ) => {
+            return db.users.findMany({ limit, offset });
+          },
+        },
+
+        // Field resolver — wykona się dla każdego User.posts
+        User: {
+          posts: (parent: User, _args: unknown, { dataloaders }: Context) => {
+            // Używamy DataLoader żeby uniknąć N+1
+            return dataloaders.postsByUserId.load(parent.id);
+          }
+        }
+      };
+
+  - name: DataLoader — rozwiązanie N+1
+    desc: >
+      DataLoader grupuje (batching) wiele osobnych requestów w jeden.
+      Ładujesz 100 userów → 100 razy wywołasz loader.load(userId).
+      DataLoader zbiera wszystkie ID i wywołuje jeden request do bazy.
+      Automatyczne deduplication i per-request caching.
+    code: |
+      import DataLoader from 'dataloader';
+
+      // Funkcja batch — dostaje tablicę ID, zwraca tablicę wyników
+      const batchLoadPosts = async (userIds: readonly string[]) => {
+        // Jeden request do bazy dla wszystkich userIds
+        const posts = await db.posts.findMany({
+          where: { authorId: { in: [...userIds] } }
+        });
+
+        // Musimy zwrócić wyniki w tej samej kolejności co userIds
+        return userIds.map(userId =>
+          posts.filter(post => post.authorId === userId)
+        );
+      };
+
+      // Tworzenie DataLoadera per request (ważne — nie globalnie!)
+      function createDataLoaders(db: Database) {
+        return {
+          postsByUserId: new DataLoader(batchLoadPosts),
+          userById: new DataLoader(async (ids: readonly string[]) => {
+            const users = await db.users.findMany({
+              where: { id: { in: [...ids] } }
+            });
+            return ids.map(id => users.find(u => u.id === id) ?? null);
+          }),
+        };
+      }
+
+      // W serverze — nowy DataLoader per request
+      const server = new ApolloServer({
+        typeDefs, resolvers,
+        context: ({ req }) => ({
+          user: getUserFromToken(req.headers.authorization),
+          db,
+          dataloaders: createDataLoaders(db),  // per-request!
+        })
+      });

@@ -1,0 +1,46 @@
+title: Połączenia i zmienne konfiguracyjne
+
+items:
+  - name: Connections — zarządzanie danymi połączeń
+    desc: Connection przechowuje credentials do zewnętrznych systemów — baz, API, cloud. Tworzone przez UI, CLI lub env variables. Nie hardcode credentials w kodzie DAGa.
+    code: |
+      # Przez kod — pobranie connection
+      from airflow.hooks.base import BaseHook
+
+      conn = BaseHook.get_connection('my_postgres')
+      print(conn.host, conn.port, conn.login)
+
+      # Przez zmienną środowiskową (nie potrzeba UI)
+      # AIRFLOW_CONN_MY_POSTGRES=postgresql://user:pass@host:5432/db
+
+      # Własny Hook z Connection
+      from airflow.providers.postgres.hooks.postgres import PostgresHook
+
+      @task()
+      def run_query():
+          hook = PostgresHook(postgres_conn_id='my_postgres')
+          records = hook.get_records("SELECT id, name FROM users LIMIT 10")
+          return records
+
+  - name: Variables — konfiguracja pipeline'u
+    desc: Variable to klucz-wartość w bazie Airflow. Przechowuj konfigurację pipeline'u — URL endpointów, flagi feature, limity. Zmienialne przez UI bez redeploy kodu.
+    code: |
+      from airflow.models import Variable
+
+      # Pobierz zmienną (z wartością domyślną)
+      api_url = Variable.get("data_api_url", default_var="http://localhost:8080")
+      batch_size = int(Variable.get("batch_size", default_var="100"))
+
+      # JSON Variable
+      config = Variable.get("pipeline_config", deserialize_json=True)
+      # config = {"env": "prod", "notify_email": "team@company.com"}
+
+      # Ustaw zmienną przez kod (np. w setup tasku)
+      Variable.set("last_run_date", "2024-01-15")
+
+      # Przez CLI
+      # airflow variables set data_api_url "http://api.example.com"
+      # airflow variables get data_api_url
+
+      # Przez env (nie wymaga DB)
+      # AIRFLOW_VAR_DATA_API_URL=http://api.example.com

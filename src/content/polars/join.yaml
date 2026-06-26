@@ -1,0 +1,67 @@
+title: Join i zaawansowane operacje
+
+items:
+  - name: Join — łączenie DataFrame'ów
+    desc: Polars obsługuje wszystkie typy join — inner, left, right, full, cross, semi, anti. Join na wielu kolumnach, join z tolerancją (asof join) dla szeregów czasowych.
+    code: |
+      import polars as pl
+
+      orders = pl.DataFrame({
+          "order_id":   [1, 2, 3, 4],
+          "customer_id":[101, 102, 101, 103],
+          "amount":     [500, 300, 750, 200],
+      })
+
+      customers = pl.DataFrame({
+          "customer_id": [101, 102, 104],
+          "name":        ["Alice", "Bob", "Charlie"],
+          "country":     ["PL", "DE", "FR"],
+      })
+
+      # Inner join — tylko dopasowane wiersze
+      inner = orders.join(customers, on="customer_id", how="inner")
+
+      # Left join — wszystkie zamówienia, nawet bez klienta
+      left = orders.join(customers, on="customer_id", how="left")
+
+      # Anti join — zamówienia których klienci nie są w customers
+      anti = orders.join(customers, on="customer_id", how="anti")
+
+      # Join na wielu kolumnach
+      result = orders.join(
+          customers,
+          left_on=["customer_id"],
+          right_on=["customer_id"],
+          how="left",
+          suffix="_customer",
+      )
+
+  - name: Window Functions i rolling
+    desc: Window functions (over) — oblicz metryki w kontekście grupy bez zwijania DataFrame. Rolling averages, rank, percent_rank per partycja.
+    code: |
+      import polars as pl
+
+      df = pl.DataFrame({
+          "dept":   ["IT", "IT", "IT", "HR", "HR"],
+          "name":   ["Alice", "Bob", "Carol", "Dave", "Eve"],
+          "salary": [5000, 7000, 6000, 4000, 5500],
+          "month":  [1, 2, 3, 1, 2],
+      })
+
+      result = df.with_columns([
+          # Ranking w obrębie departmentu
+          pl.col("salary").rank("dense", descending=True)
+            .over("dept")
+            .alias("dept_rank"),
+
+          # Średnia departmentu (window)
+          pl.col("salary").mean().over("dept").alias("dept_avg"),
+
+          # Suma kumulatywna po miesiącu
+          pl.col("salary").cum_sum().over("dept").alias("cumsum"),
+
+          # Procent w stosunku do maks w depcie
+          (pl.col("salary") / pl.col("salary").max().over("dept"))
+            .alias("pct_of_max"),
+      ])
+      print(result)

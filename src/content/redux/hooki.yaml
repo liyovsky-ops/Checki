@@ -88,17 +88,22 @@ items:
     code: |
       // store/hooks.ts — stwórz raz, używaj wszędzie
       import { useDispatch, useSelector, useStore } from 'react-redux'
-      import type { TypedUseSelectorHook } from 'react-redux'
       import type { RootState, AppDispatch, AppStore } from './index'
 
+      // RTK 2.x / react-redux 9 — oficjalnie zalecane .withTypes()
       // Typowany dispatch — obsługuje thunki bez ręcznego podawania AppDispatch
-      export const useAppDispatch: () => AppDispatch = useDispatch
+      export const useAppDispatch = useDispatch.withTypes<AppDispatch>()
 
       // Typowany selector — RootState wbudowany, nie trzeba podawać
-      export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
+      export const useAppSelector = useSelector.withTypes<RootState>()
 
       // Typowany store (rzadziej potrzebny)
-      export const useAppStore: () => AppStore = useStore
+      export const useAppStore = useStore.withTypes<AppStore>()
+
+      // Starszy wariant (react-redux 8) — nadal działa, ale .withTypes() jest preferowane:
+      //   import type { TypedUseSelectorHook } from 'react-redux'
+      //   export const useAppDispatch: () => AppDispatch = useDispatch
+      //   export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
 
       // -----------------------------------------------
       // Użycie w komponencie — BEZ ręcznego typowania

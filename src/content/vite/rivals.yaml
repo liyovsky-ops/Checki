@@ -55,6 +55,24 @@ items:
       - Produkcyjny build dopiero dojrzewa
     vs: Turbopack dla projektów Next.js (Vercel stack). Vite dla pozostałych — React, Vue, Svelte bez Next.js. Vite ma dojrzalszy ekosystem pluginów.
 
+  - name: Rspack
+    icon: "🦀"
+    color: "#FF6B35"
+    tagline: Webpack napisany w Rust — drop-in replacement, 5-10× szybszy
+    pros:
+      - Kompatybilny z konfiguracją i pluginami Webpacka (loadery, większość pluginów)
+      - Napisany w Rust — wielokrotnie szybszy build i HMR niż Webpack
+      - Wspiera Module Federation (mikrofrontendy) jak Webpack
+      - Rozwijany przez ByteDance — bazuje pod meta-framework Rsbuild
+      - Ścieżka migracji z Webpacka bez przepisywania configu
+    cons:
+      - Dev nadal bundluje (jak Webpack) — Vite w dev nie bundluje (ESM native)
+      - Młodszy, mniejszy ekosystem niż Webpack/Vite
+      - Nie ma natywnego ESM dev servera — inny model niż Vite
+      - Część egzotycznych pluginów Webpacka wciąż niekompatybilna
+      - Mniejsza społeczność poza ekosystemem ByteDance/Rsbuild
+    vs: Rspack gdy masz duży projekt na Webpacku i chcesz prędkości bez przepisywania configu. Vite dla nowych projektów — szybszy cold start dzięki natywnemu ESM w dev.
+
   - name: esbuild (standalone)
     icon: "⚡"
     color: "#FFCF00"

@@ -1,0 +1,102 @@
+title: Komendy Elasticsearch
+
+groups:
+  - name: REST API — curl
+    icon: "🌐"
+    commands:
+      - cmd: curl -X GET "localhost:9200/_cluster/health?pretty"
+        desc: Sprawdź zdrowie klastra (green/yellow/red)
+        detail:
+          what: Status klastra — green (OK), yellow (brak replik), red (utracone primary shardy).
+          tips:
+            - 'yellow = replica shardy nieprzypisane (np. single-node) — OK dla dev'
+      - cmd: curl -X GET "localhost:9200/_cat/indices?v"
+        desc: Listuj wszystkie indeksy z rozmiarami i liczbą dokumentów
+        detail:
+          what: Tabela indeksów — health, status, docs.count, store.size.
+          tips:
+            - '?h=index,docs.count,store.size — tylko wybrane kolumny'
+      - cmd: curl -X GET "localhost:9200/_cat/nodes?v"
+        desc: Listuj nody klastra
+        detail:
+          what: Wyświetla nody — IP, rola, heap.percent, CPU, ram.percent.
+      - cmd: 'curl -X POST "localhost:9200/products/_search?pretty" -H "Content-Type: application/json" -d''{"query":{"match":{"name":"laptop"}}}'''
+        desc: Wyszukaj dokumenty przez REST API
+        detail:
+          what: Wykonuje search query przez HTTP POST. Wyniki w _hits.hits[].
+      - cmd: curl -X DELETE "localhost:9200/my-index"
+        desc: Usuń indeks (nieodwracalne!)
+        detail:
+          what: Usuwa cały indeks z dokumentami.
+          tips:
+            - 'Sprawdź dwa razy! Brak potwierdzenia — dane znikają.'
+
+  - name: Python — elasticsearch client
+    icon: "🐍"
+    commands:
+      - cmd: pip install elasticsearch
+        desc: Zainstaluj oficjalny klient Python
+        detail:
+          what: Wersja 8.x dla ES 8.x. pip install elasticsearch==7.17.0 dla starszych.
+      - cmd: python -c "from elasticsearch import Elasticsearch; es=Elasticsearch('http://localhost:9200'); print(es.ping())"
+        desc: Sprawdź połączenie z ES
+        detail:
+          what: Zwraca True jeśli połączenie działa.
+      - cmd: pip install elasticsearch-dsl
+        desc: Zainstaluj elasticsearch-dsl — ORM-style queries
+        detail:
+          what: elasticsearch-dsl umożliwia pisanie queries przez obiekty Python zamiast dict.
+
+  - name: Docker i środowisko
+    icon: "🐳"
+    commands:
+      - cmd: docker run -d --name elasticsearch -p 9200:9200 -e "discovery.type=single-node" -e "xpack.security.enabled=false" docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        desc: Uruchom Elasticsearch single-node w Docker
+        detail:
+          what: ES 8.11 bez security (dev mode). Port 9200 dla HTTP REST API.
+          tips:
+            - 'Dodaj -e "ES_JAVA_OPTS=-Xms512m -Xmx512m" żeby ograniczyć RAM'
+      - cmd: docker run -d --name kibana --link elasticsearch -p 5601:5601 docker.elastic.co/kibana/kibana:8.11.0
+        desc: Uruchom Kibana połączoną z Elasticsearch
+        detail:
+          what: Kibana UI na http://localhost:5601. Discover, Visualize, Dashboard.
+      - cmd: docker exec -it elasticsearch elasticsearch-setup-passwords interactive
+        desc: Ustaw hasła dla użytkowników ES (gdy security=true)
+        detail:
+          what: Interaktywna konfiguracja haseł dla elastic, kibana, logstash.
+
+  - name: Zarządzanie indeksami
+    icon: "📁"
+    commands:
+      - cmd: curl -X PUT "localhost:9200/my-index/_settings" -H "Content-Type:application/json" -d '{"index":{"number_of_replicas":0}}'
+        desc: Zmień ustawienia indeksu (np. wyłącz repliki na dev)
+        detail:
+          what: Dynamicznie zmienia ustawienia — number_of_replicas można zmieniać live.
+          tips:
+            - 'number_of_shards nie można zmienić po utworzeniu!'
+      - cmd: curl -X POST "localhost:9200/my-index/_forcemerge?max_num_segments=1"
+        desc: Force merge segmentów (dla read-only indeksów)
+        detail:
+          what: Scala segmenty Lucene — przyspiesza wyszukiwanie w historycznych indeksach.
+      - cmd: curl -X PUT "localhost:9200/_index_template/logs-template" -H "Content-Type:application/json" -d '{"index_patterns":["logs-*"],"template":{"settings":{"number_of_shards":1}}}'
+        desc: Utwórz template dla dynamicznie tworzonych indeksów
+        detail:
+          what: Template aplikowany automatycznie do nowych indeksów pasujących do wzorca.
+
+  - name: Diagnostyka i monitorowanie
+    icon: "📊"
+    commands:
+      - cmd: curl "localhost:9200/_cat/shards?v&h=index,shard,prirep,state,unassigned.reason"
+        desc: Sprawdź stan shardów — dlaczego unassigned?
+        detail:
+          what: Pokazuje każdy shard — PRIMARY/REPLICA, STARTED/UNASSIGNED i powód.
+          tips:
+            - 'UNASSIGNED shard = health yellow/red — sprawdź powód!'
+      - cmd: curl "localhost:9200/_nodes/stats/indices?pretty"
+        desc: Statystyki per node — indexing rate, search rate, heap usage
+        detail:
+          what: Szczegółowe metryki każdego noda — przydatne do diagnozowania bottlenecków.
+      - cmd: curl "localhost:9200/_tasks?actions=*search*&detailed=true"
+        desc: Listuj aktualnie wykonywane zadania (np. wolne query)
+        detail:
+          what: Pokazuje aktywne taski — możesz anulować długo działający query przez DELETE /_tasks/<id>.

@@ -5,7 +5,7 @@ labels:
 intro:
   title: System typów Go
   desc: >
-    Go ma statyczny, silny system typów z wnioskowanie typów przez :=.
+    Go ma statyczny, silny system typów z wnioskowaniem typów przez :=.
     Struktury (struct) zamiast klas — kompozycja zamiast dziedziczenia.
     Wskaźniki (pointers) dają kontrolę nad pamięcią bez ręcznego zarządzania.
     Generics od Go 1.18 — piszesz kod dla wielu typów bez powtarzania.
@@ -234,6 +234,66 @@ items:
           if dog, ok := a.(Dog); ok {
               fmt.Println("To pies:", dog.Name)
           }
+      }
+    lang: go
+
+  - title: iota i typy wyliczeniowe (enums)
+    desc: >
+      Go nie ma słowa kluczowego enum — idiom to własny typ na bazie int + iota.
+      iota to licznik startujący od 0, inkrementowany w każdej kolejnej linii bloku const.
+      Metoda String() (interfejs fmt.Stringer) daje czytelny wydruk zamiast gołej liczby.
+    code: |
+      package main
+
+      import "fmt"
+
+      // Własny typ — czytelniej i bezpieczniej niż goły int
+      type Status int
+
+      // iota — automatyczne numerowanie 0, 1, 2, 3...
+      const (
+          Pending   Status = iota // 0
+          Active                  // 1
+          Suspended               // 2
+          Deleted                 // 3
+      )
+
+      // String() implementuje fmt.Stringer — kontroluje wydruk
+      func (s Status) String() string {
+          switch s {
+          case Pending:
+              return "pending"
+          case Active:
+              return "active"
+          case Suspended:
+              return "suspended"
+          case Deleted:
+              return "deleted"
+          default:
+              return "unknown"
+          }
+      }
+
+      // iota z przesunięciem bitowym — rozmiary, flagi
+      type ByteSize float64
+
+      const (
+          _           = iota             // pomiń wartość 0
+          KB ByteSize = 1 << (10 * iota) // 1 << 10 = 1024
+          MB                             // 1 << 20
+          GB                             // 1 << 30
+      )
+
+      func main() {
+          s := Active
+          fmt.Println(s)        // active  (dzięki String())
+          fmt.Printf("%d\n", s) // 1
+
+          var unknown Status = 99
+          fmt.Println(unknown) // unknown
+
+          fmt.Printf("%.0f %.0f %.0f\n", KB, MB, GB)
+          // 1024 1048576 1073741824
       }
     lang: go
 

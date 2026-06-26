@@ -1,0 +1,200 @@
+title: Komendy Apache Kafka
+
+groups:
+  - name: Zarządzanie topicami
+    icon: "📬"
+    commands:
+      - cmd: kafka-topics.sh --bootstrap-server localhost:9092 --list
+        desc: Listuj wszystkie topici w klastrze
+        detail:
+          what: Wyświetla nazwy wszystkich topicow na klastrze Kafka.
+          tips:
+            - 'Pomiń topici wewnętrzne: --list | grep -v "^__"'
+      - cmd: kafka-topics.sh --bootstrap-server localhost:9092 --create --topic my-topic --partitions 6 --replication-factor 3
+        desc: Utwórz nowy topic z 6 partycjami i replikacją 3
+        detail:
+          what: Tworzy topic o podanej liczbie partycji i faktorze replikacji.
+          how: Partycje determinują paralelizm. Replication factor = tolerancja awarii.
+          flags:
+            - flag: '--partitions 6'
+              desc: Liczba partycji (= max parallelism konsumentów)
+            - flag: '--replication-factor 3'
+              desc: Liczba kopii każdej partycji
+            - flag: '--config retention.ms=86400000'
+              desc: Retention 1 dzień
+          tips:
+            - 'Reguła: partitions >= liczba konsumentów w grupie'
+      - cmd: kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic my-topic
+        desc: Pokaż szczegóły topica — partycje, repliki, lider
+        detail:
+          what: Wyświetla konfigurację topica, przypisanie partycji do brokerów i aktualnego lidera.
+          tips:
+            - 'Sprawdź czy wszystkie repliki są In-Sync (ISR = repliki)'
+      - cmd: kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic my-topic
+        desc: Usuń topic
+        detail:
+          what: Usuwa topic i wszystkie jego dane z klastra.
+          tips:
+            - 'Wymaga delete.topic.enable=true w konfiguracji brokera'
+      - cmd: kafka-topics.sh --bootstrap-server localhost:9092 --alter --topic my-topic --partitions 12
+        desc: Zwiększ liczbę partycji w topicu
+        detail:
+          what: Dodaje partycje do istniejącego topica. Uwaga — tylko zwiększanie, nie zmniejszanie.
+          how: Istniejące eventy nie są redystrybowane — nowe partycje dostają nowe eventy.
+          tips:
+            - 'Ostrożnie z topicami z kluczem — zmiana partycji psuje ordering per klucz'
+      - cmd: kafka-configs.sh --bootstrap-server localhost:9092 --alter --entity-type topics --entity-name my-topic --add-config retention.ms=604800000
+        desc: Zmień konfigurację topica (retention 7 dni)
+        detail:
+          what: Dynamicznie modyfikuje konfigurację topica bez restartowania klastra.
+          tips:
+            - 'kafka-configs.sh --describe — pokaż bieżącą konfigurację topica'
+
+  - name: Producent i konsument CLI
+    icon: "📤"
+    commands:
+      - cmd: kafka-console-producer.sh --bootstrap-server localhost:9092 --topic my-topic
+        desc: Wyślij wiadomości przez konsolę (interaktywnie)
+        detail:
+          what: Otwiera interaktywny producer — każda linia = jeden event.
+          flags:
+            - flag: '--property "key.separator=:"'
+              desc: Oddziel klucz od wartości dwukropkiem (key:value)
+            - flag: '--property "parse.key=true"'
+              desc: Parsuj klucz z każdej linii
+          tips:
+            - 'echo "hello world" | kafka-console-producer.sh ... — z pipe'
+      - cmd: kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic my-topic --from-beginning
+        desc: Czytaj eventy z topica od początku
+        detail:
+          what: Wyświetla wszystkie eventy z topica (lub od bieżącej pozycji bez --from-beginning).
+          flags:
+            - flag: '--from-beginning'
+              desc: Zacznij od pierwszego eventu w topicu
+            - flag: '--max-messages 10'
+              desc: Czytaj tylko 10 eventów i zakończ
+            - flag: '--partition 0'
+              desc: Czytaj tylko z konkretnej partycji
+            - flag: '--offset 100'
+              desc: Zacznij od konkretnego offsetu
+          tips:
+            - 'Dodaj --property print.key=true żeby widzieć klucz eventu'
+      - cmd: kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic my-topic --group my-group
+        desc: Czytaj jako consumer group (z commitowaniem offsetów)
+        detail:
+          what: Czytanie z consumer group — offset jest trackowany, możliwy resume po restarcie.
+          tips:
+            - 'Uruchom wiele instancji z tym samym --group — Kafka rozdzieli partycje'
+
+  - name: Consumer Groups
+    icon: "👥"
+    commands:
+      - cmd: kafka-consumer-groups.sh --bootstrap-server localhost:9092 --list
+        desc: Listuj wszystkie consumer groups
+        detail:
+          what: Wyświetla wszystkie zarejestrowane consumer groups w klastrze.
+          tips:
+            - 'Pomiń wewnętrzne: --list | grep -v "console-consumer"'
+      - cmd: kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group my-group
+        desc: Sprawdź lag konsumenta i stan grupy
+        detail:
+          what: Pokazuje offset per partycja, aktualny log-end-offset i lag (ile eventów do przetworzenia).
+          how: LAG = Log-End-Offset - Consumer-Offset. Rosnący lag = problem z przetwarzaniem.
+          tips:
+            - 'Monitoruj LAG — wzrost = konsument nie nadąża z przetwarzaniem'
+      - cmd: kafka-consumer-groups.sh --bootstrap-server localhost:9092 --reset-offsets --group my-group --topic my-topic --to-earliest --execute
+        desc: Resetuj offset grupy do początku (replay wszystkich eventów)
+        detail:
+          what: Przesuwa offset grupy do wybranej pozycji — pozwala przetworzyć eventy ponownie.
+          flags:
+            - flag: '--to-earliest'
+              desc: Wróć do pierwszego eventu
+            - flag: '--to-latest'
+              desc: Przesuń do końca (pomij historyczne)
+            - flag: '--to-offset 1000'
+              desc: Ustaw konkretny offset
+            - flag: '--to-datetime 2024-01-01T00:00:00.000'
+              desc: Resetuj do konkretnej daty
+          tips:
+            - 'Konsument musi być zatrzymany przed resetem offsetu'
+
+  - name: Monitoring i diagnostyka
+    icon: "📊"
+    commands:
+      - cmd: kafka-log-dirs.sh --bootstrap-server localhost:9092 --topic-list my-topic --describe
+        desc: Sprawdź rozmiar danych na dysku per partycja
+        detail:
+          what: Wyświetla rozmiar logu per partycja na każdym brokerze.
+          tips:
+            - 'Monitoruj żeby przewidzieć kiedy skończy się dysk'
+      - cmd: kafka-run-class.sh kafka.tools.GetOffsetShell --bootstrap-server localhost:9092 --topic my-topic --time -1
+        desc: Pobierz aktualny (latest) offset dla topica
+        detail:
+          what: -1 = latest offset (end), -2 = earliest offset (beginning).
+          tips:
+            - 'Różnica latest-earliest = łączna liczba eventów w topicu'
+      - cmd: kafka-dump-log.sh --files /var/kafka-logs/my-topic-0/00000000000000000000.log --print-data-log
+        desc: Podejrzyj zawartość segmentu logu na dysku
+        detail:
+          what: Drukuje eventy bezpośrednio z pliku logu Kafka — bez brokera.
+          how: Kafka przechowuje dane w segmentach (.log pliki) na dysku brokera.
+          tips:
+            - 'Używaj do diagnostyki gdy broker nie działa'
+      - cmd: kafka-producer-perf-test.sh --topic test --num-records 1000000 --record-size 1024 --throughput -1 --producer-props bootstrap.servers=localhost:9092
+        desc: Test wydajności producenta
+        detail:
+          what: Wysyła 1M eventów po 1KB i mierzy throughput (msg/s, MB/s) i latency.
+          flags:
+            - flag: '--throughput -1'
+              desc: Bez limitu prędkości (max throughput)
+            - flag: '--throughput 1000'
+              desc: Ogranicz do 1000 msg/s
+          tips:
+            - 'kafka-consumer-perf-test.sh — analogiczny test dla konsumenta'
+
+  - name: Administracja klastra
+    icon: "⚙️"
+    commands:
+      - cmd: kafka-broker-api-versions.sh --bootstrap-server localhost:9092
+        desc: Sprawdź dostępne API wersje brokera
+        detail:
+          what: Lista wszystkich API requests które broker obsługuje z ich wersjami.
+          tips:
+            - 'Przydatne do diagnozowania problemów z kompatybilnością klienta'
+      - cmd: kafka-metadata-quorum.sh --bootstrap-server localhost:9092 describe --status
+        desc: Sprawdź stan KRaft metadata quorum (bez Zookeeper)
+        detail:
+          what: Kafka 3.x używa KRaft (własny Raft) zamiast Zookeeper do metadata.
+          tips:
+            - 'kafka-metadata-quorum.sh --describe --replication — repliki quorum'
+      - cmd: kafka-reassign-partitions.sh --bootstrap-server localhost:9092 --reassignment-json-file reassign.json --execute
+        desc: Przenieś partycje między brokerami (rebalancing)
+        detail:
+          what: Przenosi partycje do innych brokerów — po dodaniu brokera lub awarii.
+          how: Wymaga JSON pliku z nowym przypisaniem. Sprawdź postęp przez --verify.
+          tips:
+            - 'kafka-reassign-partitions.sh --verify — sprawdź postęp przenoszenia'
+
+  - name: Docker i lokalne środowisko
+    icon: "🐳"
+    commands:
+      - cmd: docker run -d --name kafka -p 9092:9092 -e KAFKA_PROCESS_ROLES=broker,controller -e KAFKA_NODE_ID=1 -e KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093 apache/kafka:latest
+        desc: Uruchom Kafka w Docker (KRaft, bez Zookeeper)
+        detail:
+          what: Apache Kafka 3.7+ z KRaft — bez Zookeeper, wszystko w jednym kontenerze.
+          how: KAFKA_PROCESS_ROLES=broker,controller — jeden node jako broker i controller.
+          tips:
+            - 'Dodaj -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 dla lokalnego dostępu'
+      - cmd: docker compose up -d kafka kafka-ui
+        desc: Uruchom Kafka z UI przez Docker Compose
+        detail:
+          what: Kafka + provectuslabs/kafka-ui w Docker Compose. UI dostępne na :8080.
+          how: Przykład compose.yml na hub.docker.com/r/provectuslabs/kafka-ui.
+          tips:
+            - 'Dodaj schema-registry do compose dla Avro wsparcia'
+      - cmd: pip install confluent-kafka faust-streaming aiokafka
+        desc: Zainstaluj popularne klienty Kafka dla Python
+        detail:
+          what: confluent-kafka — oficjalny klient C-oparty. faust — stream processing. aiokafka — async.
+          tips:
+            - 'confluent-kafka jest najszybszy (C librdkafka pod spodem)'

@@ -1,0 +1,59 @@
+title: Optymalizacja wydajności Nginx
+
+items:
+  - name: Worker processes i connections
+    desc: Dostosuj liczbę workerów do liczby CPU cores. worker_connections to max połączeń na worker. Zwiększ open files limit w systemie.
+    code: |
+      # /etc/nginx/nginx.conf
+      worker_processes auto;        # Automatycznie = liczba CPU cores
+      worker_rlimit_nofile 65535;   # Max open files per worker
+
+      events {
+          worker_connections 4096;  # Max connections per worker
+          use epoll;                # Linux event model (szybszy)
+          multi_accept on;          # Przyjmij wiele connections naraz
+      }
+
+      http {
+          keepalive_timeout 65;
+          keepalive_requests 1000;
+
+          # Optymalizacja dla plików statycznych
+          sendfile on;
+          tcp_nopush on;
+          tcp_nodelay on;
+      }
+
+  - name: Caching proxy responses
+    desc: Nginx może cache'ować odpowiedzi backendu — redukuje obciążenie aplikacji. proxy_cache_path definiuje storage, proxy_cache stosuje cache.
+    code: |
+      http {
+          # Zdefiniuj cache storage (1GB)
+          proxy_cache_path /var/cache/nginx
+              levels=1:2
+              keys_zone=api_cache:10m
+              max_size=1g
+              inactive=60m
+              use_temp_path=off;
+      }
+
+      server {
+          location /api/ {
+              proxy_pass http://backend;
+              proxy_cache api_cache;
+
+              # Cache GET przez 5 minut
+              proxy_cache_methods GET;
+              proxy_cache_valid 200 5m;
+              proxy_cache_valid 404 1m;
+
+              # Klucz cache — URL + nagłówki auth
+              proxy_cache_key "$scheme$request_method$host$request_uri";
+
+              # Header informujący o stanie cache
+              add_header X-Cache-Status $upstream_cache_status;
+
+              # Bypass cache gdy nagłówek ustawiony
+              proxy_cache_bypass $http_pragma;
+          }
+      }

@@ -192,15 +192,14 @@ items:
           : false,  // wyłącz całkowicie w produkcji
       })
 
-      // Time-travel debugging przez kod (zaawansowane)
-      // Dispatch specjalnej akcji do DevTools
-      store.dispatch({
-        type: '@@redux-devtools/DISPATCH',
-        payload: { type: 'JUMP_TO_ACTION', actionId: 5 },
-      })
+      // Time-travel debugging robisz w panelu DevTools (nie z kodu):
+      //  - klik na akcji w historii → skok stanu do tego momentu
+      //  - slider na dole → przewijanie akcji w przód/tył
+      //  - "Pause"/"Lock" → zatrzymanie rejestrowania nowych akcji
 
-      // Eksport snapshot stanu do pliku JSON (przez UI DevTools)
-      // Import: Ctrl+S w panelu DevTools → wczytaj stan z pliku
+      // Eksport/import snapshotu stanu przez UI DevTools:
+      //  - Export → zapis bieżącego stanu i historii do pliku JSON
+      //  - Import → wczytanie zapisanego stanu (przydatne przy zgłaszaniu buga)
     lang: typescript
 
   - title: Serializability check i niestandardowe wartości

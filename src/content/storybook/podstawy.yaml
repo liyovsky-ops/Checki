@@ -1,0 +1,117 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Storybook?
+  firstComponent: Pierwsza Story
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Storybook?
+  desc: >
+    Storybook to narzędzie do tworzenia komponentów UI w izolacji — bez uruchamiania
+    całej aplikacji. Każdy komponent ma swoje "stories" — scenariusze stanu.
+    Developerzy, designerzy i QA mogą eksplorować komponenty bez setupu backend/auth.
+    Storybook 8.x — wsparcie dla React, Vue, Angular, Svelte, Web Components.
+    Integracja z Chromatic (visual regression testing), @storybook/test (unit tests),
+    MSW (mock API). Używany przez Airbnb, IBM, BBC, Shopify, Microsoft.
+
+concepts:
+  - title: Story
+    desc: >
+      Story to jeden stan komponentu — jak przycisk wyłączony, jak karta z błędem.
+      Plik .stories.tsx zawiera wiele stories dla jednego komponentu.
+      CSF (Component Story Format) — eksportuj default (meta) i named exports (stories).
+    icon: "📖"
+  - title: Args i ArgTypes
+    desc: >
+      Args to props komponentu w Storybook — możesz je zmieniać przez Controls panel.
+      ArgTypes definiują typ kontrolki (text, boolean, select, color).
+      Każda story dostaje args i może je override'ować.
+    icon: "🎛️"
+  - title: Addony
+    desc: >
+      Addony rozszerzają Storybook — @storybook/addon-controls (zmieniaj props),
+      addon-actions (loguj eventy), addon-a11y (accessibility), addon-viewport (responsywność).
+      Panel addonu pokazuje się w dole UI Storybook.
+    icon: "🔌"
+  - title: Decorators
+    desc: >
+      Decorator to wrapper komponentu w Storybook — dodaj providers (ThemeProvider,
+      QueryClientProvider, Router) do wszystkich stories w pliku lub globalnie.
+      Global decorators w preview.ts, lokalne w meta lub story.
+    icon: "🎭"
+  - title: play() function — Interactions
+    desc: >
+      play() symuluje interakcje użytkownika — click, type, expect.
+      @storybook/test eksportuje userEvent, within, expect (Testing Library).
+      Story z play() = interaktywny test komponentu.
+    icon: "▶️"
+  - title: Autodocs
+    desc: >
+      tags: ['autodocs'] w meta generuje automatyczną dokumentację dla komponentu.
+      Storybook parsuje JSDoc komentarze i PropTypes/TypeScript dla dokumentacji.
+      Tabela props, interaktywne stories, opis w jednym miejscu.
+    icon: "📄"
+
+whenToUse:
+  - Design System — dokumentuj i testuj komponenty design systemu
+  - Component library — biblioteka komponentów dla wielu projektów
+  - UI development w izolacji — bez backend lub auth
+  - Visual regression testing z Chromatic
+  - Onboarding nowych deweloperów — katalog UI aplikacji
+  - Współpraca z designerami — interaktywny playground dla QA i design
+
+firstComponent: |
+  # Instalacja
+  npx storybook@latest init
+
+  # Plik: src/components/Button/Button.stories.tsx
+  import type { Meta, StoryObj } from '@storybook/react'
+  import { Button } from './Button'
+
+  // Metadane komponentu
+  const meta: Meta<typeof Button> = {
+    title:     'UI/Button',
+    component: Button,
+    tags:      ['autodocs'],   // Automatyczna dokumentacja
+    argTypes: {
+      variant: {
+        control: 'select',
+        options: ['primary', 'secondary', 'danger'],
+      },
+      size: {
+        control: 'radio',
+        options: ['sm', 'md', 'lg'],
+      },
+      disabled: { control: 'boolean' },
+      onClick:  { action: 'clicked' },  // Loguj kliknięcia
+    },
+  }
+
+  export default meta
+  type Story = StoryObj<typeof meta>
+
+  // Stories — różne stany komponentu
+  export const Primary: Story = {
+    args: {
+      children: 'Kliknij mnie',
+      variant: 'primary',
+      size: 'md',
+    },
+  }
+
+  export const Disabled: Story = {
+    args: {
+      children: 'Wyłączony',
+      disabled: true,
+    },
+  }
+
+  export const AllVariants: Story = {
+    render: () => (
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <Button variant="primary">Primary</Button>
+        <Button variant="secondary">Secondary</Button>
+        <Button variant="danger">Danger</Button>
+      </div>
+    ),
+  }

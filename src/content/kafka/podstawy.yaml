@@ -1,0 +1,115 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Apache Kafka?
+  firstComponent: Pierwszy producent i konsument
+  firstComponentLang: python
+
+intro:
+  title: Czym jest Apache Kafka?
+  desc: >
+    Apache Kafka to rozproszona platforma event streamingu — log zdarzeń który jest
+    jednocześnie message broker, event store i stream processing system.
+    Stworzony przez LinkedIn w 2011 do przetwarzania aktywności użytkowników w czasie rzeczywistym.
+    Kafka nie jest zwykłą kolejką — eventy są przechowywane na dysku i można je czytać wielokrotnie.
+    Obsługuje miliony zdarzeń na sekundę z latency poniżej 10ms. Używany przez Netflix,
+    Uber, LinkedIn, Airbnb, Twitter do event-driven architecture, ETL pipelines, monitoring.
+
+concepts:
+  - title: Topic i Partition
+    desc: >
+      Topic to kanał do którego producenci wysyłają eventy. Każdy topic dzieli się na
+      partycje — niezależne, uporządkowane logi. Partycje pozwalają na paralelizm
+      i skalowanie. Eventy w obrębie jednej partycji mają gwarantowaną kolejność.
+    icon: "📬"
+  - title: Producer (Producent)
+    desc: >
+      Producent wysyła eventy do topica. Może wybierać partycję przez klucz —
+      eventy z tym samym kluczem zawsze trafiają do tej samej partycji (gwarantowana
+      kolejność per klucz). Asynchroniczne wysyłanie z potwierdzeniem (ack).
+    icon: "📤"
+  - title: Consumer i Consumer Group
+    desc: >
+      Konsument czyta eventy z topica. Consumer Group — wiele konsumentów czyta
+      ten sam topic równolegle, każda partycja obsługiwana przez jednego konsumenta
+      w grupie. Wiele grup = wiele niezależnych odbiorców tego samego strumienia.
+    icon: "📥"
+  - title: Offset
+    desc: >
+      Offset to pozycja eventu w partycji — unikalny, sekwencyjny numer.
+      Konsument śledzi swój offset — wie gdzie skończył czytać.
+      Reset offsetu pozwala "przewinąć" i przetworzyć eventy ponownie.
+      Kafka przechowuje eventy przez konfigurowalny czas (domyślnie 7 dni).
+    icon: "🔖"
+  - title: Broker i Cluster
+    desc: >
+      Broker to jeden serwer Kafka. Cluster to wiele brokerów — replikacja
+      danych między nimi. Replication factor 3 = każda partycja ma 3 kopie
+      na 3 różnych brokerach. Jeden broker jest liderem partycji, reszta to repliki.
+    icon: "🖧"
+  - title: Retention Policy
+    desc: >
+      Kafka przechowuje eventy przez określony czas lub do rozmiaru.
+      log.retention.hours=168 (7 dni) domyślnie. Retention by size: log.retention.bytes.
+      Kompakcja topica (log.cleanup.policy=compact) — zachowaj tylko ostatnią wartość per klucz.
+    icon: "💾"
+
+whenToUse:
+  - Event-driven microservices — asynchroniczna komunikacja między serwisami
+  - Real-time data pipelines — streaming danych z bazy do data warehouse
+  - Activity tracking — user events, clickstream, audit logs
+  - Metrics i monitoring — agregacja metryk z wielu źródeł
+  - Log aggregation — centralne zbieranie logów z wielu aplikacji
+  - Stream processing — analityka w czasie rzeczywistym, fraud detection
+
+firstComponent: |
+  # Instalacja klienta Python
+  pip install confluent-kafka
+
+  # Producent — wysyłanie eventów
+  from confluent_kafka import Producer
+
+  producer = Producer({
+      'bootstrap.servers': 'localhost:9092',
+      'acks': 'all',  # Czekaj na potwierdzenie od wszystkich replik
+  })
+
+  def delivery_report(err, msg):
+      if err:
+          print(f'Błąd dostarczenia: {err}')
+      else:
+          print(f'Event dostarczony do {msg.topic()} [{msg.partition()}] offset {msg.offset()}')
+
+  # Wyślij event
+  producer.produce(
+      topic='user-events',
+      key='user-123',             # Klucz → partycja
+      value='{"action": "login", "userId": 123}',
+      callback=delivery_report
+  )
+  producer.flush()  # Poczekaj na potwierdzenie
+
+  # Konsument — odbieranie eventów
+  from confluent_kafka import Consumer
+
+  consumer = Consumer({
+      'bootstrap.servers': 'localhost:9092',
+      'group.id': 'my-consumer-group',
+      'auto.offset.reset': 'earliest',  # Zacznij od początku
+  })
+  consumer.subscribe(['user-events'])
+
+  try:
+      while True:
+          msg = consumer.poll(timeout=1.0)
+          if msg is None:
+              continue
+          if msg.error():
+              print(f'Błąd: {msg.error()}')
+              continue
+
+          print(f'Otrzymano: {msg.value().decode()} '
+                f'[partition {msg.partition()}, offset {msg.offset()}]')
+          consumer.commit()  # Zatwierdź offset
+
+  finally:
+      consumer.close()

@@ -201,7 +201,13 @@ items:
       Przechowuje dane w postaci { ids: [], entities: {} } — wydajne operacje CRUD
       bez ręcznego zarządzania tablicami. Idealne dla list użytkowników, postów, produktów.
     code: |
-      import { createSlice, createEntityAdapter, createAsyncThunk } from '@reduxjs/toolkit'
+      import {
+        createSlice,
+        createEntityAdapter,
+        createAsyncThunk,
+        type PayloadAction,
+      } from '@reduxjs/toolkit'
+      import type { RootState } from '../store'
 
       interface Todo {
         id:        number
@@ -223,7 +229,7 @@ items:
         reducers: {
           todoAdded:   todosAdapter.addOne,
           todoRemoved: todosAdapter.removeOne,
-          todoToggled: (state, action) => {
+          todoToggled: (state, action: PayloadAction<number>) => {
             const todo = state.entities[action.payload]
             if (todo) todo.completed = !todo.completed
           },

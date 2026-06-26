@@ -1,0 +1,67 @@
+title: Operacje na DataFrame
+
+items:
+  - name: with_columns — nowe kolumny i transformacje
+    desc: with_columns dodaje lub nadpisuje kolumny przez wyrażenia. Wszystkie wyrażenia wykonują się równolegle. Pełna siła wyrażeń Polars — when/then, str.slice, dt.year.
+    code: |
+      import polars as pl
+
+      df = pl.DataFrame({
+          "price":     [100.0, 200.0, 150.0, None],
+          "quantity":  [5, 3, 8, 2],
+          "category":  ["A", "B", "A", "C"],
+          "date":      ["2024-01-15", "2024-02-20", "2024-01-30", "2024-03-01"],
+      })
+
+      result = df.with_columns([
+          # Nowa kolumna: total
+          (pl.col("price") * pl.col("quantity")).alias("total"),
+
+          # Warunkowe — when/then/otherwise
+          pl.when(pl.col("price") > 150)
+            .then(pl.lit("premium"))
+            .otherwise(pl.lit("standard"))
+            .alias("tier"),
+
+          # Null handling
+          pl.col("price").fill_null(0.0).alias("price_safe"),
+
+          # String operations
+          pl.col("category").str.to_lowercase(),
+
+          # Date parsing
+          pl.col("date").str.to_date().dt.year().alias("year"),
+      ])
+
+  - name: Grupowanie i agregacje
+    desc: group_by + agg — agregacje po kolumnach. Multiple aggregations na raz, różne kolumny różne agregacje. Szybszy niż Pandas dla dużych zbiorów.
+    code: |
+      import polars as pl
+
+      df = pl.DataFrame({
+          "dept":   ["IT", "IT", "HR", "HR", "Finance"],
+          "salary": [5000, 7000, 4000, 5500, 8000],
+          "years":  [2, 5, 1, 3, 7],
+          "active": [True, True, True, False, True],
+      })
+
+      stats = (
+          df
+          .group_by("dept")
+          .agg([
+              pl.col("salary").mean().alias("avg_salary"),
+              pl.col("salary").max().alias("max_salary"),
+              pl.col("salary").count().alias("headcount"),
+              pl.col("years").sum().alias("total_years"),
+              pl.col("active").sum().alias("active_count"),
+          ])
+          .sort("avg_salary", descending=True)
+      )
+      print(stats)
+      # ┌─────────┬────────────┬────────────┬───────────┐
+      # │ dept    ┆ avg_salary ┆ max_salary ┆ headcount │
+      # ╞═════════╪════════════╪════════════╪═══════════╡
+      # │ Finance ┆ 8000.0     ┆ 8000       ┆ 1         │
+      # │ IT      ┆ 6000.0     ┆ 7000       ┆ 2         │
+      # │ HR      ┆ 4750.0     ┆ 5500       ┆ 2         │
+      # └─────────┴────────────┴────────────┴───────────┘

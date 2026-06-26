@@ -1,0 +1,109 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Elasticsearch?
+  firstComponent: Pierwsze indeksowanie i wyszukiwanie
+  firstComponentLang: python
+
+intro:
+  title: Czym jest Elasticsearch?
+  desc: >
+    Elasticsearch to rozproszony silnik wyszukiwania i analityki oparty na Apache Lucene.
+    Przechowuje dane jako dokumenty JSON i udostępnia REST API.
+    Pełnotekstowe wyszukiwanie, relevance scoring, faceted search, geosearch,
+    aggregations, percolate queries — wszystko dostępne przez proste API.
+    Część ELK Stack (Elasticsearch + Logstash + Kibana) — standard do log analytics.
+    Używany przez GitHub, Netflix, Airbnb, Shopify, Stack Overflow.
+    Dane replikowane automatycznie, skalowanie horyzontalne przez sharding.
+
+concepts:
+  - title: Index i Shard
+    desc: >
+      Index to zbiór dokumentów — odpowiednik tabeli w SQL.
+      Każdy index dzieli się na shardy (primary + replica). Primary shard
+      obsługuje zapisy, replica shard — odczyty (i failover). Liczba primary shardów
+      ustalana przy tworzeniu indeksu (niezmienialny).
+    icon: "📁"
+  - title: Dokument i Mapping
+    desc: >
+      Dokument to rekord JSON przechowywany w indexie. Mapping definiuje typy pól
+      (text, keyword, integer, date, geo_point). text → analizowane i indeksowane
+      dla FTS. keyword → dokładne dopasowanie i sortowanie.
+    icon: "📄"
+  - title: Inverted Index
+    desc: >
+      Elasticsearch używa odwróconego indeksu (inverted index) — mapuje tokeny
+      do dokumentów które je zawierają. "quick brown fox" → {quick: [doc1], brown: [doc1], fox: [doc1]}.
+      To umożliwia błyskawiczne wyszukiwanie pełnotekstowe.
+    icon: "🔍"
+  - title: Relevance Scoring (BM25)
+    desc: >
+      ES oblicza relevance score dla każdego dopasowanego dokumentu.
+      BM25 (Best Match 25) — algorytm bazujący na TF (term frequency)
+      i IDF (inverse document frequency). Możesz boostować pola i wyniki.
+    icon: "⭐"
+  - title: Analyzers
+    desc: >
+      Analyzer przetwarza tekst przed indeksowaniem — tokenizacja, lowercase,
+      usuwanie stop words, stemming. standard analyzer domyślnie.
+      Custom analyzery dla specyficznych języków (pl_analyzer dla polskiego).
+    icon: "🔬"
+  - title: Cluster i Node
+    desc: >
+      Cluster = wiele nodes (serwerów ES) współpracujących. Typy nodów:
+      master (zarządza klastrem), data (przechowuje dane), coordinating (routuje requesty).
+      Shard allocation — ES automatycznie rozkłada shardy między nody.
+    icon: "🕸️"
+
+whenToUse:
+  - Pełnotekstowe wyszukiwanie z relevance scoring i autocomplete
+  - Wyszukiwanie z filtrami (faceted search) — sklep, katalog produktów
+  - Log analytics i monitoring (ELK Stack, logi aplikacji)
+  - Wyszukiwanie geograficzne (sklepy w pobliżu, mapa)
+  - Analityka w czasie rzeczywistym — dashboardy, metryki
+  - Wyszukiwanie gdy PostgreSQL LIKE lub ILIKE nie wystarczają
+
+firstComponent: |
+  # Instalacja klienta Python
+  pip install elasticsearch
+
+  from elasticsearch import Elasticsearch
+
+  # Połączenie
+  es = Elasticsearch("http://localhost:9200")
+
+  # Sprawdź czy działa
+  print(es.info())
+
+  # Zaindeksuj dokument
+  es.index(
+      index="products",
+      id="1",
+      document={
+          "name": "Laptop Dell XPS 15",
+          "description": "Wydajny laptop do pracy i rozrywki z ekranem OLED",
+          "price": 5999.99,
+          "category": "laptopy",
+          "brand": "Dell",
+          "in_stock": True,
+          "created_at": "2024-01-15"
+      }
+  )
+
+  # Odśwież indeks (dla natychmiastowej widoczności)
+  es.indices.refresh(index="products")
+
+  # Proste wyszukiwanie pełnotekstowe
+  result = es.search(
+      index="products",
+      body={
+          "query": {
+              "multi_match": {
+                  "query": "laptop wydajny",
+                  "fields": ["name^2", "description"]  # name ważniejszy 2x
+              }
+          }
+      }
+  )
+
+  for hit in result["hits"]["hits"]:
+      print(f"{hit['_source']['name']} — score: {hit['_score']}")

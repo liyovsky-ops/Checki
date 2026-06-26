@@ -1,0 +1,67 @@
+title: Indeksy i mapowanie
+
+items:
+  - name: Tworzenie indeksu z mappingiem
+    desc: Mapping definiuje typy pól. text dla FTS, keyword dla filtrów/sortowania, date, integer, float, boolean, geo_point. Definiuj przed indeksowaniem.
+    code: |
+      es.indices.create(
+          index="products",
+          body={
+              "settings": {
+                  "number_of_shards": 3,
+                  "number_of_replicas": 1,
+                  "analysis": {
+                      "analyzer": {
+                          "pl_analyzer": {
+                              "type": "custom",
+                              "tokenizer": "standard",
+                              "filter": ["lowercase", "stop"]
+                          }
+                      }
+                  }
+              },
+              "mappings": {
+                  "properties": {
+                      "name": {"type": "text", "analyzer": "pl_analyzer",
+                               "fields": {"keyword": {"type": "keyword"}}},
+                      "description": {"type": "text"},
+                      "price":    {"type": "float"},
+                      "category": {"type": "keyword"},  # Dokładne dopasowanie
+                      "brand":    {"type": "keyword"},
+                      "tags":     {"type": "keyword"},
+                      "in_stock": {"type": "boolean"},
+                      "location": {"type": "geo_point"},
+                      "created_at": {"type": "date", "format": "yyyy-MM-dd"}
+                  }
+              }
+          }
+      )
+
+  - name: Bulk indexing
+    desc: Indeksuj tysiące dokumentów naraz. helpers.bulk() obsługuje batch, retry i błędy automatycznie. Znacznie szybszy niż jeden dokument na raz.
+    code: |
+      from elasticsearch.helpers import bulk
+
+      def generate_actions(products):
+          for product in products:
+              yield {
+                  "_index": "products",
+                  "_id": product["id"],
+                  "_source": product,
+              }
+
+      # Dane do indeksowania
+      products = [
+          {"id": "1", "name": "Laptop A", "price": 3999, "category": "laptopy"},
+          {"id": "2", "name": "Telefon B", "price": 1999, "category": "telefony"},
+          # ... tysiące produktów
+      ]
+
+      success, errors = bulk(
+          es,
+          generate_actions(products),
+          chunk_size=500,        # 500 dokumentów per request
+          request_timeout=30,
+          raise_on_error=False,
+      )
+      print(f"Zindeksowano: {success}, błędy: {len(errors)}")

@@ -1,0 +1,141 @@
+title: Generyki i zaawansowane wzorce
+
+items:
+  - name: Generyki funkcji
+    desc: >
+      Generyki pozwalają pisać funkcje działające z dowolnymi typami zachowując bezpieczeństwo.
+      Parametr typowy T jest jak zmienna dla typów — TypeScript wywnioskuje go z argumentów.
+      Constraints (extends) ograniczają co T może być — np. T extends object.
+    code: |
+      // Podstawowy generyk
+      function identity<T>(value: T): T {
+        return value;
+      }
+      const n = identity(42);       // T = number
+      const s = identity('hello');  // T = string
+
+      // Constraint — T musi mieć .length
+      function longest<T extends { length: number }>(a: T, b: T): T {
+        return a.length >= b.length ? a : b;
+      }
+
+      // Wiele parametrów typowych
+      function map<T, U>(arr: T[], fn: (item: T) => U): U[] {
+        return arr.map(fn);
+      }
+
+      // Generyk z domyślnym typem
+      function createState<T = string>(initial: T) {
+        let state = initial;
+        return {
+          get: () => state,
+          set: (val: T) => { state = val; },
+        };
+      }
+
+  - name: Generyczne interfejsy i klasy
+    desc: >
+      Interfejsy i klasy mogą mieć parametry typowe — tworzy reużywalne struktury
+      działające z różnymi typami danych. Repository<T>, EventEmitter<T>, Result<T>.
+    code: |
+      // Generyczny interfejs
+      interface Repository<T> {
+        findById(id: number): Promise<T | null>;
+        findAll(): Promise<T[]>;
+        save(entity: T): Promise<T>;
+        delete(id: number): Promise<void>;
+      }
+
+      // Generyczna klasa
+      class Stack<T> {
+        private items: T[] = [];
+
+        push(item: T): void { this.items.push(item); }
+        pop(): T | undefined { return this.items.pop(); }
+        peek(): T | undefined { return this.items[this.items.length - 1]; }
+        isEmpty(): boolean { return this.items.length === 0; }
+      }
+
+      // Generyczny Result type
+      class Result<T, E extends Error = Error> {
+        private constructor(
+          private readonly _value: T | null,
+          private readonly _error: E | null
+        ) {}
+
+        static ok<T>(value: T): Result<T, never> {
+          return new Result(value, null);
+        }
+        static err<E extends Error>(error: E): Result<never, E> {
+          return new Result(null, error);
+        }
+
+        map<U>(fn: (val: T) => U): Result<U, E> {
+          if (this._value !== null) return Result.ok(fn(this._value));
+          return Result.err(this._error!);
+        }
+      }
+
+  - name: Mapped types i transformacje
+    desc: >
+      Mapped types tworzą nowy typ przez iterowanie po kluczach istniejącego.
+      Modyfikatory +readonly, -readonly, +?, -? dodają lub usuwają readonly i opcjonalność.
+      Podstawa utility types: Partial, Required, Readonly, Record.
+    code: |
+      // Własny Partial
+      type MyPartial<T> = {
+        [K in keyof T]?: T[K];
+      };
+
+      // Deep Partial (rekurencyjny)
+      type DeepPartial<T> = {
+        [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
+      };
+
+      // Rename keys
+      type Prefixed<T, P extends string> = {
+        [K in keyof T as `${P}${Capitalize<string & K>}`]: T[K];
+      };
+      type PrefixedUser = Prefixed<User, 'get'>;
+      // { getId: number, getName: string, ... }
+
+      // Filter keys by value type
+      type PickByType<T, V> = {
+        [K in keyof T as T[K] extends V ? K : never]: T[K];
+      };
+      type StringFields = PickByType<User, string>;
+      // tylko pola typu string
+
+  - name: Wzorzec Builder z generykami
+    desc: >
+      Builder pattern w TypeScript z generykami — każda metoda zwraca this z zaktualizowanym typem.
+      Kompilator śledzi które pola zostały ustawione — wymagane pola przed build() sprawdzane typowo.
+    code: |
+      // Type-safe Builder
+      type BuilderState = {
+        name?: string;
+        age?: number;
+        email?: string;
+      };
+
+      class UserBuilder<State extends BuilderState = {}> {
+        private state: State = {} as State;
+
+        setName<S extends string>(name: S): UserBuilder<State & { name: S }> {
+          return Object.assign(new UserBuilder(), { ...this.state, name }) as any;
+        }
+
+        setAge(age: number): UserBuilder<State & { age: number }> {
+          return Object.assign(new UserBuilder(), { ...this.state, age }) as any;
+        }
+
+        // build() dostępne tylko gdy name i email są ustawione
+        build(this: UserBuilder<{ name: string; email: string } & Record<string, any>>) {
+          return this.state as Required<BuilderState>;
+        }
+      }
+
+      const user = new UserBuilder()
+        .setName('Alice')
+        .setAge(30)
+        .build(); // OK

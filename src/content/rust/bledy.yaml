@@ -40,8 +40,14 @@ items:
           println!("{}", imie); // "Gość"
 
           // map — transformuj wartość wewnątrz Option
-          let dlugosc: Option<usize> = znajdz_uzytkownika(1).map(|s| s.len());
-          println!("{:?}", dlugosc); // Some(6)
+          // UWAGA: str::len() zwraca długość w BAJTACH UTF-8, nie w znakach!
+          // "Łukasz" ma 6 znaków, ale 7 bajtów (Ł zajmuje 2 bajty).
+          let bajty: Option<usize> = znajdz_uzytkownika(1).map(|s| s.len());
+          println!("{:?}", bajty); // Some(7)
+
+          // Liczba znaków (code points) — przez .chars().count()
+          let znaki: Option<usize> = znajdz_uzytkownika(1).map(|s| s.chars().count());
+          println!("{:?}", znaki); // Some(6)
       }
     lang: rust
 

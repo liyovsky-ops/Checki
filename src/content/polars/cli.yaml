@@ -1,0 +1,96 @@
+title: Komendy Polars (Python)
+
+groups:
+  - name: Instalacja i import
+    icon: "📦"
+    commands:
+      - cmd: pip install polars
+        desc: Zainstaluj Polars
+        detail:
+          what: Instaluje najnowszą wersję Polars — czysta instalacja bez zależności.
+          tips:
+            - 'pip install polars[all] — z opcjonalnymi zależnościami (Excel, cloud, itp.)'
+      - cmd: pip install polars[xlsx2csv,openpyxl,fsspec]
+        desc: Zainstaluj Polars z obsługą Excel i cloud storage
+        detail:
+          what: Dodaje obsługę Excel (.xlsx), S3, GCS i innych zewnętrznych systemów.
+      - cmd: python -c "import polars as pl; print(pl.__version__)"
+        desc: Sprawdź wersję Polars
+        detail:
+          what: Wypisuje zainstalowaną wersję.
+      - cmd: pip install polars --upgrade
+        desc: Zaktualizuj Polars do najnowszej wersji
+        detail:
+          what: Polars wydaje nowe wersje co tydzień — warto aktualizować.
+
+  - name: Tworzenie i inspekcja DataFrame
+    icon: "📊"
+    commands:
+      - cmd: python -c "import polars as pl; df = pl.read_csv('data.csv'); print(df.head())"
+        desc: Wczytaj CSV i wyświetl pierwsze wiersze
+        detail:
+          what: Szybki podgląd danych — head() domyślnie 5 wierszy.
+          tips:
+            - 'df.tail(10) — ostatnie 10 wierszy'
+      - cmd: python -c "import polars as pl; print(pl.scan_csv('data.csv').schema)"
+        desc: Sprawdź schemat CSV bez wczytywania danych
+        detail:
+          what: scan_csv() tworzy LazyFrame — odczytuje tylko schemat, nie dane. Szybkie dla dużych plików.
+      - cmd: python -c "import polars as pl; df = pl.read_csv('data.csv'); print(df.describe())"
+        desc: Statystyki opisowe DataFrame
+        detail:
+          what: Wyświetla count, null_count, mean, std, min, max, quartiles dla każdej kolumny.
+      - cmd: python -c "import polars as pl; df = pl.read_csv('data.csv'); print(df.dtypes)"
+        desc: Wyświetl typy wszystkich kolumn
+        detail:
+          what: Lista typów Polars dla każdej kolumny — Int64, Float64, Utf8, Boolean, Date.
+
+  - name: Konwersja formatów
+    icon: "🔄"
+    commands:
+      - cmd: python -c "import polars as pl; pl.read_csv('data.csv').write_parquet('data.parquet')"
+        desc: Konwertuj CSV na Parquet
+        detail:
+          what: Parquet jest 5-10x szybszy do odczytu i 3-5x mniejszy niż CSV.
+          tips:
+            - 'Dodaj compression="zstd" dla lepszej kompresji'
+      - cmd: python -c "import polars as pl; pl.read_csv('data.csv').write_json('data.json')"
+        desc: Konwertuj CSV na JSON
+        detail:
+          what: Zapisuje DataFrame jako JSON array.
+          tips:
+            - 'write_ndjson() dla JSON Lines (jeden rekord per linia)'
+      - cmd: python -c "import polars as pl; import pandas as pd; df = pl.from_pandas(pd.read_csv('data.csv')); print(df)"
+        desc: Konwertuj Pandas DataFrame na Polars
+        detail:
+          what: from_pandas() konwertuje przez Apache Arrow — zero-copy gdy możliwe.
+
+  - name: Szybkie operacje jednolinijkowe
+    icon: "⚡"
+    commands:
+      - cmd: python -c "import polars as pl; df=pl.read_csv('d.csv'); print(df.filter(pl.col('price')>100).select(['name','price']).sort('price'))"
+        desc: Filtruj, wybierz kolumny, posortuj — w jednej linii
+        detail:
+          what: Chaining operacji Polars — filter → select → sort.
+      - cmd: python -c "import polars as pl; df=pl.read_csv('d.csv'); print(df.group_by('category').agg(pl.col('revenue').sum()))"
+        desc: Grupuj i sumuj przez kategorię
+        detail:
+          what: group_by + agg — szybkie agregacje per kategoria.
+      - cmd: python -c "import polars as pl; print(pl.scan_parquet('*.parquet').filter(pl.col('date')>'2024-01-01').collect())"
+        desc: Wczytaj wiele plików Parquet z filtrem
+        detail:
+          what: Glob pattern + scan_parquet = lazy wczytanie wielu plików. Tylko pasujące wiersze w pamięci.
+
+  - name: DuckDB integracja
+    icon: "🦆"
+    commands:
+      - cmd: python -c "import polars as pl; import duckdb; df=pl.read_csv('d.csv'); print(duckdb.sql('SELECT * FROM df WHERE price > 100').pl())"
+        desc: Uruchom SQL na Polars DataFrame przez DuckDB
+        detail:
+          what: DuckDB widzi Polars DataFrame jako tabelę. .pl() zwraca wynik jako Polars DataFrame.
+          tips:
+            - 'Zero-copy transfer między DuckDB a Polars przez Apache Arrow'
+      - cmd: pip install duckdb polars
+        desc: Zainstaluj DuckDB i Polars razem
+        detail:
+          what: Idealna kombinacja — Polars do transformacji Python, DuckDB do SQL queries.

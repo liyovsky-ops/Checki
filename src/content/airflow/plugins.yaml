@@ -1,0 +1,27 @@
+title: Ekosystem Apache Airflow
+
+items:
+  - name: Providers (oficjalne)
+    desc: Airflow Providers to oficjalne paczki z operatorami i hookami dla zewnętrznych systemów. apache-airflow-providers-postgres, -amazon, -google, -databricks, -dbt-cloud.
+    icon: "🔌"
+  - name: Apache Airflow Helm Chart
+    desc: Oficjalny Helm chart do deploymentu Airflow na Kubernetes. Scheduler, webserver, workers (KubernetesExecutor lub CeleryExecutor), Redis, Postgres — wszystko w k8s.
+    icon: "⛵"
+  - name: Astronomer (Managed Airflow)
+    desc: Enterprise platforma do managed Apache Airflow. Astronomer Cloud = Airflow as a Service. Astro CLI do lokalnego developmentu. Runtime z popularnymi providerami wbudowanymi.
+    icon: "🚀"
+  - name: dbt (data build tool)
+    desc: airflow-provider-dbt uruchamia modele dbt jako taski Airflow. DbtRunOperator, DbtTestOperator, DbtSeedOperator. Kombinacja dbt (transformacje) + Airflow (orchestracja) = standard.
+    icon: "🔧"
+  - name: Great Expectations
+    desc: Data quality framework — definiuj expectations (oczekiwania) co do danych i waliduj w pipeline. GreatExpectationsOperator dla Airflow. Automatyczne raporty jakości.
+    icon: "✅"
+  - name: Airflow Triggerer (Deferrable Operators)
+    desc: Deferrable Operators nie zajmują worker slotu podczas czekania — sensor odkłada się do Triggerfera i wraca gdy warunek spełniony. Kluczowe dla efektywności.
+    icon: "⏸️"
+  - name: OpenLineage / Marquez
+    desc: Lineage tracking dla Airflow — automatyczne śledzenie skąd dane przyszły i dokąd poszły. Wizualizacja grafu przepływu danych przez wszystkie pipeline'y.
+    icon: "🗺️"
+  - name: Airflow 3.0 (AIP-72)
+    desc: Airflow 3.0 wprowadza asset-based triggering (jak Dagster), REST API v2, UI w React, lepsze zarządzanie zależnościami między DAGami przez assets.
+    icon: "🆕"

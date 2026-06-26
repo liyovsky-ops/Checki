@@ -1,0 +1,98 @@
+title: Pisanie Stories — CSF3
+
+items:
+  - name: Component Story Format (CSF3)
+    desc: CSF3 — obecny standard. default export = meta (komponent, title, argTypes, decorators). Named exports = stories. args dziedziczone z meta, story może override'ować.
+    code: |
+      import type { Meta, StoryObj } from '@storybook/react'
+      import { fn } from '@storybook/test'
+      import { ProductCard } from './ProductCard'
+
+      const meta: Meta<typeof ProductCard> = {
+        title:     'Shop/ProductCard',
+        component: ProductCard,
+        tags:      ['autodocs'],
+        // Domyślne args dla wszystkich stories
+        args: {
+          onAddToCart: fn(),  // Spy — rejestruje wywołania
+          currency:    'PLN',
+        },
+        // Definicja kontrolek
+        argTypes: {
+          discount: {
+            control: { type: 'range', min: 0, max: 50, step: 5 },
+          },
+          category: {
+            control: 'select',
+            options: ['electronics', 'clothing', 'food'],
+          },
+          imageUrl: { control: 'text' },
+        },
+        // Wrapper dla stories — dostarczaj Context
+        decorators: [
+          (Story) => (
+            <CartProvider>
+              <Story />
+            </CartProvider>
+          ),
+        ],
+      }
+      export default meta
+
+      type Story = StoryObj<typeof meta>
+
+      export const Default: Story = {
+        args: {
+          name:     "iPhone 15 Pro",
+          price:    4999,
+          discount: 0,
+          category: 'electronics',
+          inStock:  true,
+        },
+      }
+
+      export const OnSale: Story = {
+        args: { ...Default.args, discount: 20 },  // Inherit + override
+        name: 'On Sale (20% off)',
+      }
+
+      export const OutOfStock: Story = {
+        args: { ...Default.args, inStock: false },
+      }
+
+  - name: play() — interaktywne testy w Story
+    desc: play() symuluje akcje użytkownika — kliknięcia, wypełnianie formularza. @storybook/test daje userEvent, within, expect (jak Testing Library). Story = test wizualny + interakcja.
+    code: |
+      import type { Meta, StoryObj } from '@storybook/react'
+      import { expect, userEvent, within } from '@storybook/test'
+      import { LoginForm } from './LoginForm'
+
+      const meta: Meta<typeof LoginForm> = {
+        title: 'Auth/LoginForm',
+        component: LoginForm,
+      }
+      export default meta
+
+      export const SuccessfulLogin: StoryObj<typeof meta> = {
+        play: async ({ canvasElement }) => {
+          const canvas = within(canvasElement)
+
+          // Wypełnij formularz
+          await userEvent.type(
+            canvas.getByLabelText('Email'),
+            'user@example.com',
+          )
+          await userEvent.type(
+            canvas.getByLabelText('Hasło'),
+            'password123',
+          )
+
+          // Kliknij przycisk
+          await userEvent.click(canvas.getByRole('button', { name: /zaloguj/i }))
+
+          // Sprawdź rezultat
+          await expect(
+            canvas.getByText('Zalogowano pomyślnie!')
+          ).toBeInTheDocument()
+        },
+      }

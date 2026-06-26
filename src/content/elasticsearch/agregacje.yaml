@@ -1,0 +1,37 @@
+title: Agregacje i analityka
+
+items:
+  - name: Bucket i Metric aggregations
+    desc: Agregacje to analityka w ES — grupowanie (bucket) i obliczenia (metric). Jeden query = wyszukiwanie + wiele agregacji jednocześnie.
+    code: |
+      # Faceted search — filtry + agregacje w jednym query
+      result = es.search(index="products", body={
+          "query": {
+              "bool": {"filter": [{"term": {"in_stock": True}}]}
+          },
+          "size": 20,  # Dokumenty do zwrócenia
+          "aggs": {
+              # Liczba produktów per kategoria
+              "by_category": {
+                  "terms": {"field": "category", "size": 20}
+              },
+              # Ceny — min, max, avg, histogram
+              "price_stats": {
+                  "stats": {"field": "price"}
+              },
+              "price_histogram": {
+                  "histogram": {"field": "price", "interval": 500}
+              },
+              # Liczba produktów per brand (top 10)
+              "top_brands": {
+                  "terms": {"field": "brand", "size": 10}
+              }
+          }
+      })
+
+      # Wyniki
+      for bucket in result["aggregations"]["by_category"]["buckets"]:
+          print(f"{bucket['key']}: {bucket['doc_count']} produktów")
+
+      stats = result["aggregations"]["price_stats"]
+      print(f"Ceny: min={stats['min']}, max={stats['max']}, avg={stats['avg']:.2f}")

@@ -81,8 +81,8 @@ items:
   - name: INSERT — wstaw jeden lub wiele rekordów
     desc: >
       db.insert(tabela).values(dane) — wstawia jeden rekord lub tablicę rekordów.
-      .returning() zwraca wstawione rekordy (PostgreSQL/SQLite). MySQL nie wspiera returning —
-      tam używasz .returning() tylko z id. Typy danych są sprawdzane przez TypeScript.
+      .returning() zwraca wstawione rekordy (PostgreSQL/SQLite). MySQL nie ma .returning() —
+      wygenerowane auto-increment id pobierasz przez .$returningId(). Typy danych są sprawdzane przez TypeScript.
     code: |
       // Insert jednego rekordu
       const [newUser] = await db.insert(users)
@@ -101,7 +101,8 @@ items:
         ])
         .returning()
 
-      // Upsert — insert or update on conflict
+      // Upsert — insert or update on conflict (PostgreSQL / SQLite)
+      // MySQL: zamiast onConflictDoUpdate użyj .onDuplicateKeyUpdate({ set: {...} })
       await db.insert(users)
         .values({ email: 'jan@x.com', name: 'Jan K.' })
         .onConflictDoUpdate({

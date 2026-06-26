@@ -23,7 +23,7 @@ concepts:
   - title: Goroutines — tania współbieżność
     desc: >
       Goroutine to lekki wątek zarządzany przez runtime Go — nie przez OS.
-      Można uruchomić milion goroutines zużywając kilka MB RAM.
+      Stack startuje od ~2KB (vs ~1MB dla wątku OS) — tysiące goroutines kosztują tyle co kilka MB RAM.
       Komunikacja przez channels zamiast shared memory i locków.
     icon: "⚡"
   - title: Interfaces — duck typing
@@ -132,7 +132,7 @@ items:
       )
 
       func main() {
-          // Krótka deklaracja z wnioskaniem typu
+          // Krótka deklaracja z wnioskowaniem typu
           name := "Alice"        // string
           age  := 30             // int
           score := 9.8           // float64

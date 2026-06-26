@@ -1,0 +1,97 @@
+title: Narzędzia ekosystemu TypeScript
+
+items:
+  - name: tsx i ts-node — uruchamianie TS
+    desc: >
+      tsx to szybki runner TypeScript (oparty na esbuild) — uruchamia .ts bez kompilacji do pliku.
+      ts-node to klasyczny runner, wolniejszy ale pełna integracja z tsconfig.
+      W produkcji zawsze kompiluj do JS — runnery do dev i skryptów.
+    code: |
+      # tsx — szybki, polecany
+      npm install -D tsx
+      npx tsx src/index.ts
+      npx tsx --watch src/index.ts  # watch mode
+
+      # ts-node — klasyczny
+      npm install -D ts-node
+      npx ts-node src/index.ts
+
+      # package.json scripts
+      {
+        "scripts": {
+          "dev": "tsx watch src/index.ts",
+          "build": "tsc",
+          "start": "node dist/index.js"
+        }
+      }
+
+  - name: tsc — kompilator i type-checker
+    desc: >
+      tsc to oficjalny kompilator TypeScript. Może kompilować do JS lub tylko sprawdzać typy (--noEmit).
+      W projektach z Vite/esbuild używaj tsc --noEmit do type-checking — bundler robi transpilację szybciej.
+    code: |
+      # Kompilacja do JS
+      npx tsc
+
+      # Tylko sprawdzanie typów (bez generowania plików)
+      npx tsc --noEmit
+
+      # Watch mode
+      npx tsc --watch
+
+      # Kompilacja z inline source maps
+      npx tsc --inlineSourceMap
+
+      # Sprawdź konfigurację
+      npx tsc --showConfig
+
+  - name: ESLint + TypeScript
+    desc: >
+      typescript-eslint to parser i zestaw reguł ESLint dla TypeScript.
+      Sprawdza nie tylko styl ale też bezpieczeństwo typów (type-aware rules).
+      Wolniejszy niż zwykły ESLint bo wymaga informacji o typach.
+    code: |
+      npm install -D eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin
+
+      // eslint.config.js (flat config)
+      import tseslint from '@typescript-eslint/eslint-plugin';
+      import tsParser from '@typescript-eslint/parser';
+
+      export default [
+        {
+          files: ['**/*.ts', '**/*.tsx'],
+          languageOptions: { parser: tsParser },
+          plugins: { '@typescript-eslint': tseslint },
+          rules: {
+            '@typescript-eslint/no-explicit-any': 'warn',
+            '@typescript-eslint/no-unused-vars': 'error',
+            '@typescript-eslint/prefer-nullish-coalescing': 'error',
+          }
+        }
+      ];
+
+  - name: Zod — walidacja z typami
+    desc: >
+      Zod parsuje i waliduje dane w runtime, jednocześnie generując typy TypeScript.
+      z.infer<typeof schema> daje statyczny typ pasujący do schematu.
+      Idealne do walidacji API responses, form inputs, env zmiennych.
+    code: |
+      import { z } from 'zod';
+
+      const UserSchema = z.object({
+        id: z.number().positive(),
+        name: z.string().min(1).max(100),
+        email: z.string().email(),
+        role: z.enum(['admin', 'user', 'guest']),
+        age: z.number().int().min(0).max(150).optional(),
+      });
+
+      type User = z.infer<typeof UserSchema>; // TypeScript type
+
+      // Walidacja w runtime
+      const result = UserSchema.safeParse(unknownData);
+      if (result.success) {
+        console.log(result.data); // User — type-safe
+      } else {
+        console.error(result.error.issues);
+      }

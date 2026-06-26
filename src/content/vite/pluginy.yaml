@@ -50,7 +50,13 @@ items:
       export default defineConfig({
         plugins: [
           vue({
-            reactivityTransform: true, // eksperymentalne
+            // reactivityTransform USUNIĘTE w Vue 3.3 / plugin-vue 5 — nie używaj.
+            // Przykład realnej opcji: traktuj wybrane tagi jako custom elements
+            template: {
+              compilerOptions: {
+                isCustomElement: (tag) => tag.startsWith('my-'),
+              },
+            },
           }),
         ],
       });

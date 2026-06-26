@@ -33,7 +33,17 @@ concepts:
       Na produkcję Vite używa Rollup do bundlowania. Rollup daje doskonały tree-shaking,
       code splitting (dynamiczne importy), optymalizację CSS. Output: zoptymalizowane pliki
       z hashami w nazwach (cache busting). Rollup plugins są w pełni kompatybilne z Vite.
+      Uwaga (2025+): Vite migruje wewnętrzny bundler na Rolldown — port Rollup w Rust,
+      docelowo jeden szybki bundler dla dev i prod (pakiet rolldown-vite).
     icon: "📦"
+  - title: Dependency Pre-Bundling
+    desc: >
+      Przy pierwszym starcie Vite pre-bundluje zależności z node_modules przez esbuild.
+      Dwa powody: (1) konwersja CommonJS/UMD → ESM (przeglądarka rozumie tylko ESM),
+      (2) wydajność — biblioteka jak lodash-es ma setki plików; bez pre-bundlingu
+      przeglądarka zrobiłaby setki żądań HTTP. Esbuild łączy je w jeden moduł.
+      Wynik jest cachowany w node_modules/.vite. Konfiguracja: optimizeDeps.
+    icon: "📚"
   - title: HMR — Hot Module Replacement
     desc: >
       Zmiana pliku → tylko ten moduł jest zastępowany w przeglądarce. Stan aplikacji

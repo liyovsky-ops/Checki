@@ -37,11 +37,11 @@ concepts:
     icon: "⏱️"
   - title: Status zapytania
     desc: >
-      isPending — brak danych w cache, trwa pierwsze pobieranie.
-      isLoading — alias dla isPending && isFetching (stara API v4).
+      isPending — status === 'pending', brak danych w cache (w v4 nazywał się isLoading).
+      isLoading — w v5 to isPending && isFetching, czyli pierwszy fetch w locie (nie alias isPending!).
       isError — zapytanie zakończyło się błędem.
       isSuccess — dane dostępne, status === 'success'.
-      isFetching — trwa jakiekolwiek pobieranie (tle lub pierwsze).
+      isFetching — trwa jakiekolwiek pobieranie (w tle lub pierwsze).
     icon: "📊"
   - title: QueryClientProvider
     desc: >

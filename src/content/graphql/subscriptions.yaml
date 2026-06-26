@@ -1,0 +1,60 @@
+title: Subscriptions i real-time GraphQL
+
+items:
+  - name: Subscriptions — real-time przez WebSocket
+    desc: >
+      Subscriptions utrzymują połączenie WebSocket i wysyłają dane gdy nastąpi zdarzenie.
+      Serwer emituje event przez PubSub — klient otrzymuje aktualizację.
+      Idealne do chat, live feed, powiadomień, dashboardów.
+    code: |
+      // Schema
+      type Subscription {
+        messageAdded(roomId: ID!): Message!
+        userStatusChanged(userId: ID!): UserStatus!
+        orderUpdated(orderId: ID!): Order!
+      }
+
+      // Resolver z PubSub
+      import { PubSub } from 'graphql-subscriptions';
+      const pubsub = new PubSub();
+
+      const resolvers = {
+        Mutation: {
+          sendMessage: async (_: any, { roomId, content }: any, { user }: any) => {
+            const message = await db.messages.create({
+              data: { roomId, content, authorId: user.id }
+            });
+
+            // Emit zdarzenie — wszyscy subskrybenci pokoju je dostaną
+            await pubsub.publish(`MESSAGE_ADDED_${roomId}`, {
+              messageAdded: message
+            });
+
+            return message;
+          }
+        },
+
+        Subscription: {
+          messageAdded: {
+            // subscribe zwraca AsyncIterator
+            subscribe: (_: any, { roomId }: { roomId: string }) =>
+              pubsub.asyncIterator(`MESSAGE_ADDED_${roomId}`),
+          }
+        }
+      };
+
+      // Klient React
+      const MESSAGE_SUBSCRIPTION = gql`
+        subscription OnMessageAdded($roomId: ID!) {
+          messageAdded(roomId: $roomId) {
+            id content author { name }
+          }
+        }
+      `;
+
+      function ChatRoom({ roomId }: { roomId: string }) {
+        const { data } = useSubscription(MESSAGE_SUBSCRIPTION, {
+          variables: { roomId }
+        });
+        // data.messageAdded — nowa wiadomość w czasie rzeczywistym
+      }

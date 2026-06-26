@@ -1,0 +1,65 @@
+title: Wczytywanie i zapisywanie danych
+
+items:
+  - name: CSV i JSON
+    desc: read_csv wczytuje wszystko do pamięci. scan_csv = LazyFrame (wczytaj na collect). Automatyczne wykrywanie typów, własne schematy, obsługa dat.
+    code: |
+      import polars as pl
+
+      # Wczytaj CSV — pełna kontrola typów
+      df = pl.read_csv(
+          "data/sales.csv",
+          dtypes={
+              "id":       pl.Int64,
+              "price":    pl.Float64,
+              "date":     pl.Date,
+              "category": pl.Categorical,
+          },
+          null_values=["N/A", "", "null"],
+          separator=";",
+      )
+
+      # Lazy (nie wczytuje — do collect)
+      lf = pl.scan_csv("data/big_sales.csv", infer_schema_length=1000)
+
+      # Zapis CSV
+      df.write_csv("output/result.csv")
+
+      # JSON
+      df = pl.read_json("data/records.json")
+      df.write_json("output/result.json")
+
+      # NDJSON (JSON Lines — jeden rekord per linia)
+      df = pl.read_ndjson("data/events.ndjson")
+
+  - name: Parquet — wydajny format kolumnowy
+    desc: Parquet = standardowy format dla danych analitycznych. Kolumnowy, skompresowany, szybki odczyt. Polars + Parquet = najszybsza kombinacja.
+    code: |
+      import polars as pl
+
+      # Zapis Parquet z kompresją
+      df.write_parquet(
+          "output/data.parquet",
+          compression="snappy",     # snappy, gzip, lz4, zstd
+          row_group_size=10_000,
+      )
+
+      # Wczytaj Parquet
+      df = pl.read_parquet("data/sales.parquet")
+
+      # Lazy scan — tylko potrzebne kolumny z dysku
+      result = (
+          pl.scan_parquet("data/sales.parquet")
+          .select(["product_id", "revenue"])  # Wczytaj tylko 2 kolumny!
+          .filter(pl.col("revenue") > 1000)
+          .collect()
+      )
+
+      # Wiele plików (glob)
+      df = pl.read_parquet("data/2024-*.parquet")
+
+      # Konwersja Pandas → Polars i z powrotem
+      import pandas as pd
+      pandas_df = pd.read_csv("data.csv")
+      polars_df = pl.from_pandas(pandas_df)
+      back_to_pandas = polars_df.to_pandas()

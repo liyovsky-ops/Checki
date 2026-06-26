@@ -1,0 +1,27 @@
+title: Ekosystem Apache Kafka
+
+items:
+  - name: Kafka Connect
+    desc: Framework do integracji Kafka z zewnętrznymi systemami. Source connectors importują dane (baza → Kafka), sink connectors eksportują (Kafka → data warehouse). 200+ gotowych connectorów.
+    icon: "🔌"
+  - name: Schema Registry (Confluent)
+    desc: Centralne repozytorium schematów Avro/Protobuf/JSON. Producent rejestruje schemat, konsument pobiera do deserializacji. Ewolucja schematu z kompatybilnością wsteczną.
+    icon: "📋"
+  - name: ksqlDB
+    desc: SQL-owe zapytania na strumieniach Kafka. SELECT, JOIN, GROUP BY na żywych danych. Twórz materialized views z topicami jako tabelami. Bez pisania kodu Java/Python.
+    icon: "🗃️"
+  - name: Kafka UI (provectuslabs)
+    desc: Open-source web UI do zarządzania klastrem Kafka. Przeglądaj topici, grupy konsumentów, messagi. Monitoruj lag konsumentów. Alter topic config przez UI.
+    icon: "🖥️"
+  - name: Faust (Robinhood)
+    desc: Python stream processing library na Kafka. Agenty, tabele (stateful), windows, cron-like timers. Używany przez Robinhood do przetwarzania transakcji giełdowych.
+    icon: "🐍"
+  - name: Kafka Exporter (Prometheus)
+    desc: Eksportuje metryki Kafka do Prometheus — consumer group lag, topic throughput, broker health. Gotowy dashboard Grafana. Alerty na rosnący lag konsumenta.
+    icon: "📊"
+  - name: Debezium
+    desc: Change Data Capture (CDC) — przechwytuje każdą zmianę w bazie danych (MySQL, PostgreSQL, MongoDB) i wysyła jako event do Kafka. Zero impaktu na aplikację.
+    icon: "🔍"
+  - name: Confluent Platform
+    desc: Enterprise dystrybucja Kafka od firmy założonej przez twórców Kafki. Schema Registry, ksqlDB, Kafka Connect z 200+ connectorami, monitoring, support SLA. Cloud lub on-prem.
+    icon: "🏢"

@@ -1,0 +1,66 @@
+title: Kafka vs alternatywy
+
+items:
+  - name: RabbitMQ
+    icon: "🐰"
+    color: "#f60"
+    tagline: Klasyczny message broker — routing, exchanges, queues
+    pros:
+      - Prostszy setup i zarządzanie niż Kafka
+      - Zaawansowany routing (exchanges: direct, fanout, topic, headers)
+      - Dead letter queues wbudowane
+      - Lepsza obsługa krótkotrwałych wiadomości
+    cons:
+      - Wiadomości usuwane po konsumpcji — brak replay
+      - Trudniej skalować do milionów msg/sec
+      - Brak trwałego logu — nie można cofnąć
+      - Consumer musi obsłużyć wiadomość zanim zostanie usunięta
+    vs: RabbitMQ dla task queues i complex routing (job processing). Kafka dla event streaming, audit log i gdy potrzebujesz replay.
+
+  - name: Amazon SQS / SNS
+    icon: "☁️"
+    color: "#ff9900"
+    tagline: Managed queue/pub-sub od AWS — zero operacji
+    pros:
+      - Zero zarządzania infrastrukturą
+      - Automatyczne skalowanie
+      - Natywna integracja z AWS Lambda, ECS
+      - SQS FIFO dla ordered delivery
+    cons:
+      - Vendor lock-in — AWS only
+      - Brak trwałego logu i replay
+      - Wyższy koszt przy dużej skali vs self-hosted Kafka
+      - SQS max 14 dni retention, max 256KB per wiadomość
+    vs: SQS/SNS gdy jesteś na AWS i chcesz managed service. Kafka gdy potrzebujesz replay, wysokiej przepustowości lub multi-cloud.
+
+  - name: Apache Pulsar
+    icon: "💫"
+    color: "#188FFF"
+    tagline: Cloud-native messaging — wielopoziomowy storage, multi-tenancy
+    pros:
+      - Oddzielenie compute od storage (tiered storage)
+      - Multi-tenancy i namespace isolation wbudowane
+      - Geo-replication łatwiejsza niż Kafka
+      - Funkcje (Pulsar Functions) jak Lambda inline
+    cons:
+      - Mniejsza społeczność i ekosystem niż Kafka
+      - Bardziej złożona architektura (BookKeeper + ZooKeeper/Etcd)
+      - Mniej narzędzi i integracji
+      - Wolniejszy development i adopcja
+    vs: Pulsar gdy potrzebujesz wielochmurowego, multi-tenant systemu z tiered storage. Kafka dla większości enterprise use-cases.
+
+  - name: Redis Streams
+    icon: "🔴"
+    color: "#DC382D"
+    tagline: Lekkie streaming w Redis — proste, szybkie, bez operacji
+    pros:
+      - Zero dodatkowej infrastruktury (już masz Redis)
+      - Bardzo niskie latency (sub-millisecond)
+      - Consumer groups jak w Kafka
+      - Prosty API (XADD, XREAD, XGROUP)
+    cons:
+      - Ograniczona przepustowość (RAM-bound)
+      - Brak partycjonowania per-topic
+      - Brak długotrwałego retention (RAM kosztuje)
+      - Brak ekosystemu narzędzi jak Kafka Connect
+    vs: Redis Streams dla małej skali (do kilkuset tys. msg/s) gdy już używasz Redis. Kafka dla masowego event streamingu.

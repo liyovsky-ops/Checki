@@ -1,0 +1,66 @@
+title: Zod vs alternatywy
+
+items:
+  - name: Yup
+    icon: "✔️"
+    color: "#9B59B6"
+    tagline: Klasyczny validator JS — schema-based, popularne z Formik
+    pros:
+      - Długa historia — starsze tutoriale i StackOverflow odpowiedzi
+      - Dobra integracja z Formik (popularna starsza library)
+      - Async walidacja wbudowana
+      - Znany deweloperom React sprzed ery TypeScript
+    cons:
+      - Gorszy TypeScript support niż Zod
+      - Wolniejszy od Zod
+      - API mniej spójne (różne metody dla różnych typów)
+      - Mniejszy ekosystem integracji (brak tRPC)
+    vs: Yup gdy masz legacy Formik setup. Zod dla nowych projektów TypeScript — lepszy type inference i szybszy.
+
+  - name: Joi
+    icon: "🔍"
+    color: "#E74C3C"
+    tagline: Node.js validator — dojrzały, feature-rich, server-side
+    pros:
+      - Dojrzały (od 2012) — sprawdzony w produkcji
+      - Bogaty API do walidacji złożonych struktur
+      - Dobry dla API backend (Express, Hapi)
+      - Szczegółowe error messages wbudowane
+    cons:
+      - Brak TypeScript inference — typy ręcznie
+      - Nie działa dobrze w przeglądarce (Node.js focus)
+      - API bardziej verbose niż Zod
+      - Nieaktywnie rozwijany
+    vs: Joi dla legacy Node.js aplikacji bez TypeScript. Zod gdy masz TypeScript — jeden schemat zastępuje typ + walidację.
+
+  - name: io-ts
+    icon: "🔡"
+    color: "#2C3E50"
+    tagline: Functional TypeScript codecs — fp-ts, Either, dekodery
+    pros:
+      - Silnie typowany, matematycznie poprawny
+      - Integracja z fp-ts i Either (functional programming)
+      - Runtime i compile-time types są jedno
+      - Dobry dla FP purystów
+    cons:
+      - Bardzo stroma krzywa uczenia (fp-ts wymagany)
+      - Verbose API — dużo boilerplate
+      - Mała społeczność vs Zod
+      - Trudne w onboardingu teamów
+    vs: io-ts dla projektów używających fp-ts i FP. Zod dla większości projektów — prostszy, szybszy, lepszy DX.
+
+  - name: Valibot
+    icon: "🔒"
+    color: "#3B82F6"
+    tagline: Modularny validator — tree-shakeable, mikro-rozmiar
+    pros:
+      - Bardzo mały rozmiar bundle (tree-shaking per function)
+      - Porównywalny API do Zod
+      - Szybszy od Zod dla prostych schematów
+      - Aktywnie rozwijany, rosnąca popularność
+    cons:
+      - Mniejszy ekosystem niż Zod (mniej integracji)
+      - Mniej stabilne API — częstsze breaking changes
+      - Mniej tutoriali i przykładów
+      - tRPC i RHF integracje mniej dojrzałe
+    vs: Valibot gdy bundle size jest krytyczny (np. edge functions). Zod dla stabilności i ekosystemu integracji.

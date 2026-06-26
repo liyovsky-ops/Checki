@@ -1,0 +1,49 @@
+title: Producent — wysyłanie eventów
+
+items:
+  - name: Konfiguracja producenta
+    desc: Kluczowe ustawienia producenta — acks, retries, batching, compression. Balans między wydajnością a gwarancją dostarczenia.
+    code: |
+      from confluent_kafka import Producer
+
+      producer = Producer({
+          'bootstrap.servers': 'broker1:9092,broker2:9092,broker3:9092',
+          'acks': 'all',             # 0=fire-forget, 1=leader, all=wszystkie repliki
+          'retries': 5,
+          'retry.backoff.ms': 300,
+          'batch.size': 16384,       # Batch eventy (bytes)
+          'linger.ms': 5,            # Poczekaj 5ms na więcej eventów do batcha
+          'compression.type': 'snappy',  # Kompresja batchy
+          'max.in.flight.requests.per.connection': 5,
+          'enable.idempotence': True,    # Exactly-once delivery
+      })
+
+  - name: Serializacja z Avro i Schema Registry
+    desc: Schema Registry przechowuje schematy Avro — ewolucja schema bez breaking changes. Producent serializuje eventy przez Avro.
+    code: |
+      from confluent_kafka.avro import AvroProducer
+      from confluent_kafka import avro
+
+      value_schema_str = '''
+      {
+        "namespace": "events",
+        "type": "record",
+        "name": "UserEvent",
+        "fields": [
+          {"name": "userId", "type": "string"},
+          {"name": "action", "type": "string"},
+          {"name": "timestamp", "type": "long"}
+        ]
+      }
+      '''
+
+      avro_producer = AvroProducer({
+          'bootstrap.servers': 'localhost:9092',
+          'schema.registry.url': 'http://localhost:8081',
+      }, default_value_schema=avro.loads(value_schema_str))
+
+      avro_producer.produce(
+          topic='user-events',
+          value={'userId': '123', 'action': 'login', 'timestamp': 1700000000}
+      )
+      avro_producer.flush()

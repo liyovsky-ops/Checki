@@ -4,7 +4,7 @@ categories:
   - name: Adaptery (skalowanie)
     items:
       - name: socket.io-redis-adapter
-        desc: Skaluje Socket.io na wiele instancji (klaster Node.js, wiele serwerów) przez Redis Pub/Sub. Eventy broadcastowane między instancjami — klient połączony z serwerem A dostaje event od serwera B.
+        desc: "Skaluje Socket.io na wiele instancji (klaster Node.js, wiele serwerów) przez Redis Pub/Sub. Eventy broadcastowane między instancjami — klient połączony z serwerem A dostaje event od serwera B. WAŻNE: przy wielu instancjach i transporcie polling load balancer musi mieć włączone sticky sessions (kierować klienta zawsze do tej samej instancji), inaczej handshake się rozpada."
         npm: "@socket.io/redis-adapter"
         url: https://socket.io/docs/v4/redis-adapter/
 

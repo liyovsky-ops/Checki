@@ -1,0 +1,59 @@
+title: SSL/TLS i HTTPS
+
+items:
+  - name: Let's Encrypt z Certbot
+    desc: Certbot automatycznie wydaje i odnawia bezpłatne certyfikaty Let's Encrypt. Najszybszy sposób na HTTPS — konfiguruje Nginx automatycznie.
+    code: |
+      # Instalacja Certbot (Ubuntu)
+      sudo apt install certbot python3-certbot-nginx
+
+      # Wydaj certyfikat i skonfiguruj Nginx automatycznie
+      sudo certbot --nginx -d example.com -d www.example.com
+
+      # Odnów wszystkie certyfikaty (auto przez cron)
+      sudo certbot renew --dry-run  # Test odnawiania
+
+      # Certbot dodaje do nginx.conf:
+      server {
+          listen 443 ssl;
+          ssl_certificate /etc/letsencrypt/live/example.com/fullchain.pem;
+          ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+          include /etc/letsencrypt/options-ssl-nginx.conf;
+          ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+      }
+
+      # Redirect HTTP → HTTPS
+      server {
+          listen 80;
+          server_name example.com www.example.com;
+          return 301 https://$server_name$request_uri;
+      }
+
+  - name: Manualna konfiguracja SSL
+    desc: Ręczna konfiguracja SSL z własnym certyfikatem lub certyfikatem CA. Nowoczesne ustawienia szyfrów — TLS 1.2/1.3, HSTS, OCSP Stapling.
+    code: |
+      server {
+          listen 443 ssl http2;
+          server_name example.com;
+
+          ssl_certificate     /etc/ssl/certs/example.com.pem;
+          ssl_certificate_key /etc/ssl/private/example.com.key;
+
+          # Nowoczesne protokoły
+          ssl_protocols TLSv1.2 TLSv1.3;
+          ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+          ssl_prefer_server_ciphers off;  # TLS 1.3 sam wybiera
+
+          # Session cache — przyspiesza reconnects
+          ssl_session_cache shared:SSL:10m;
+          ssl_session_timeout 1d;
+          ssl_session_tickets off;
+
+          # OCSP Stapling — szybsza weryfikacja certyfikatu
+          ssl_stapling on;
+          ssl_stapling_verify on;
+          resolver 8.8.8.8 8.8.4.4 valid=300s;
+
+          # HSTS — przeglądarka zawsze używa HTTPS przez rok
+          add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+      }

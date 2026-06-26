@@ -1,0 +1,62 @@
+title: ELK Stack — logi i monitoring
+
+items:
+  - name: Logstash — zbieranie logów
+    desc: Logstash zbiera, przetwarza i wysyła dane do Elasticsearch. Input → Filter → Output pipeline. Beats to lekkie agenty zbierające dane na serwerach.
+    code: |
+      # logstash.conf
+      input {
+        beats {
+          port => 5044  # Filebeat wysyła tu
+        }
+      }
+
+      filter {
+        # Parsuj logi Nginx
+        grok {
+          match => { "message" => "%{COMBINEDAPACHELOG}" }
+        }
+        # Konwertuj timestamp
+        date {
+          match => [ "timestamp", "dd/MMM/yyyy:HH:mm:ss Z" ]
+        }
+        # Dodaj geolocation z IP
+        geoip {
+          source => "clientip"
+        }
+      }
+
+      output {
+        elasticsearch {
+          hosts => ["localhost:9200"]
+          index => "nginx-logs-%{+YYYY.MM.dd}"
+        }
+      }
+
+  - name: Kibana — wizualizacja
+    desc: Kibana to dashboardy i eksplorer danych dla Elasticsearch. Discover do eksploracji, Visualize do wykresów, Dashboard do kompozycji, Alerts do powiadomień.
+    code: |
+      # Kibana config (kibana.yml)
+      server.host: "0.0.0.0"
+      elasticsearch.hosts: ["http://localhost:9200"]
+      kibana.index: ".kibana"
+
+      # Docker — pełny ELK Stack
+      # docker-compose.yml
+      services:
+        elasticsearch:
+          image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+          environment:
+            - discovery.type=single-node
+            - xpack.security.enabled=false
+          ports: ["9200:9200"]
+
+        kibana:
+          image: docker.elastic.co/kibana/kibana:8.11.0
+          ports: ["5601:5601"]
+          depends_on: [elasticsearch]
+
+        logstash:
+          image: docker.elastic.co/logstash/logstash:8.11.0
+          volumes:
+            - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf

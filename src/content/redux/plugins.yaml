@@ -158,7 +158,9 @@ items:
       // createSelectorCreator dla własnego porównania
       import { createSelectorCreator, lruMemoize } from 'reselect'
 
-      const createLruSelector = createSelectorCreator(lruMemoize, 10) // cache 10 wyników
+      const createLruSelector = createSelectorCreator(lruMemoize, {
+        maxSize: 10,  // cache 10 ostatnich wyników (reselect 5 / RTK 2.x)
+      })
 
   - name: RTK Query Codegen
     desc: >

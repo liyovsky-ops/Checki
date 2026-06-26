@@ -44,8 +44,8 @@ sections:
         desc: Testuj połączenie WebSocket przez wscat (npm install -g wscat)
       - cmd: "curl 'http://localhost:3001/socket.io/?EIO=4&transport=polling'"
         desc: Testuj transport polling przez curl
-      - cmd: npx socket.io-benchmark
-        desc: Benchmark wydajności serwera Socket.io
+      - cmd: npx artillery run socket-load.yml
+        desc: "Load test serwera (Artillery + engine socketio-v3 — npm i -g artillery)"
 
   - title: Konfiguracja serwera — przykłady opcji
     commands:

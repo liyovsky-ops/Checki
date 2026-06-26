@@ -1,0 +1,99 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Nginx?
+  firstComponent: Pierwsza konfiguracja Nginx
+  firstComponentLang: bash
+
+intro:
+  title: Czym jest Nginx?
+  desc: >
+    Nginx (wymawiane "engine-x") to asynchroniczny web server, reverse proxy i load balancer.
+    Zaprojektowany do obsługi wielu tysięcy jednoczesnych połączeń przy minimalnym zużyciu pamięci —
+    architektura event-driven zamiast thread-per-request jak Apache.
+    Serwuje ponad 40% stron internetowych. Używany jako: serwer plików statycznych,
+    reverse proxy przed aplikacją (Node.js, Python, Ruby), load balancer dla wielu instancji,
+    SSL termination point, bramka API. Nginx Plus to komercyjna wersja z dashboardem.
+
+concepts:
+  - title: Event-driven architecture
+    desc: >
+      Nginx używa jednego procesu master i kilku worker processes. Każdy worker
+      obsługuje tysiące połączeń asynchronicznie — bez tworzenia nowego wątku/procesu
+      per request. Znacznie mniejsze zużycie RAM niż Apache (thread per request).
+    icon: "⚡"
+  - title: server block (virtual host)
+    desc: >
+      server {} to konfiguracja jednego wirtualnego hosta — odpowiednik VirtualHost
+      w Apache. Możesz mieć wiele server bloków dla różnych domen lub portów.
+      Nginx wybiera blok na podstawie listen i server_name.
+    icon: "🖥️"
+  - title: location block
+    desc: >
+      location /path {} definiuje jak obsłużyć requesty pasujące do ścieżki.
+      Cztery typy: = (dokładne), ^~ (prefiks priorytetowy), ~ (regex),
+      /prefix (prefiks). Kolejność dopasowania determinuje priorytety.
+    icon: "📍"
+  - title: Reverse Proxy
+    desc: >
+      Nginx jako reverse proxy przyjmuje requesty od klientów i przekazuje
+      je do backend serwera (Node.js, Python, PHP). Klient nie widzi backendu —
+      widzi tylko Nginx. Dodaje SSL, caching, load balancing, kompresję.
+    icon: "🔀"
+  - title: upstream
+    desc: >
+      upstream {} definiuje grupę backend serwerów dla load balancingu.
+      Nginx rozkłada requesty między serwery — round-robin domyślnie,
+      ale też least-connections, ip_hash (sticky sessions), weighted.
+    icon: "⚖️"
+  - title: SSL Termination
+    desc: >
+      Nginx obsługuje HTTPS i odkodowuje SSL — backend serwer dostaje czysty HTTP.
+      Certyfikaty konfigurowane przez ssl_certificate i ssl_certificate_key.
+      Let's Encrypt + Certbot automatyzuje certyfikaty.
+    icon: "🔒"
+
+whenToUse:
+  - Serwowanie plików statycznych (React build, images, CSS, JS)
+  - Reverse proxy przed Node.js/Python/Ruby aplikacją
+  - Load balancing między wieloma instancjami aplikacji
+  - SSL termination — jeden punkt dla wszystkich certyfikatów
+  - Rate limiting i podstawowe zabezpieczenia
+  - Bramka API w architekturze microservices
+
+firstComponent: |
+  # Instalacja (Ubuntu/Debian)
+  sudo apt update && sudo apt install nginx
+
+  # Instalacja (macOS)
+  brew install nginx
+
+  # Sprawdź status
+  sudo systemctl status nginx
+  sudo nginx -t  # sprawdź konfigurację
+
+  # Podstawowa konfiguracja — /etc/nginx/sites-available/myapp
+  server {
+      listen 80;
+      server_name example.com www.example.com;
+
+      # Serwuj pliki statyczne React/Vue/Angular build
+      root /var/www/myapp/dist;
+      index index.html;
+
+      # SPA — wszystkie ścieżki → index.html
+      location / {
+          try_files $uri $uri/ /index.html;
+      }
+
+      # API → backend
+      location /api/ {
+          proxy_pass http://localhost:3000;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      }
+  }
+
+  # Włącz konfigurację
+  sudo ln -s /etc/nginx/sites-available/myapp /etc/nginx/sites-enabled/
+  sudo nginx -t && sudo systemctl reload nginx

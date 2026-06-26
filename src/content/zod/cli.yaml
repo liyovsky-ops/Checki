@@ -1,0 +1,74 @@
+title: Komendy Zod (npm i wzorce)
+
+groups:
+  - name: Instalacja
+    icon: "📦"
+    commands:
+      - cmd: npm install zod
+        desc: Zainstaluj Zod
+        detail:
+          what: Zod ma zero zależności — tylko jedna paczka.
+          tips:
+            - 'npm install zod@^3 — stabilna wersja 3.x'
+      - cmd: npm install zod @hookform/resolvers react-hook-form
+        desc: Zainstaluj Zod z React Hook Form
+        detail:
+          what: Kompletny stack do formularzy w React — walidacja przez Zod.
+      - cmd: npm install zod-to-json-schema
+        desc: Konwertuj Zod schematy na JSON Schema
+        detail:
+          what: Przydatne do generowania dokumentacji OpenAPI lub używania schematów w zewnętrznych systemach.
+      - cmd: npm install @t3-oss/env-nextjs
+        desc: Type-safe zmienne środowiskowe w Next.js
+        detail:
+          what: Pakiet T3 Stack do walidacji env przez Zod w Next.js.
+
+  - name: Walidacja — wzorce
+    icon: "✅"
+    commands:
+      - cmd: "node -e \"const {z}=require('zod'); const s=z.string().email(); console.log(s.safeParse('test@example.com'))\""
+        desc: Szybki test schematu Zod w terminalu
+        detail:
+          what: Testuj schematy bez pisania pliku. safeParse zwraca {success, data} lub {success, error}.
+      - cmd: "node -e \"const {z}=require('zod'); const s=z.object({name:z.string(),age:z.number()}); console.log(JSON.stringify(s.safeParse({name:'Jan',age:'30'}),null,2))\""
+        desc: Test obiektu z błędem typu
+        detail:
+          what: Pokazuje ZodError gdy age jest stringiem zamiast number.
+      - cmd: "node -e \"const {z}=require('zod'); const E=z.object({DB:z.string().url(),PORT:z.string().transform(Number)}); console.log(E.safeParse(process.env))\""
+        desc: Waliduj process.env przez Zod
+        detail:
+          what: Sprawdź czy zmienne środowiskowe są poprawnie skonfigurowane.
+
+  - name: Generowanie JSON Schema
+    icon: "📄"
+    commands:
+      - cmd: "node -e \"const {z}=require('zod'); const {zodToJsonSchema}=require('zod-to-json-schema'); const s=z.object({name:z.string()}); console.log(JSON.stringify(zodToJsonSchema(s),null,2))\""
+        desc: Konwertuj Zod schema na JSON Schema
+        detail:
+          what: Generuje standardowy JSON Schema do użycia w OpenAPI, dokumentacji, walidatorach zewnętrznych.
+
+  - name: Debugging błędów
+    icon: "🔍"
+    commands:
+      - cmd: "node -e \"const {z}=require('zod'); try{z.object({email:z.string().email()}).parse({email:'nie-email'})}catch(e){console.log(JSON.stringify(e.flatten(),null,2))}\""
+        desc: Pokaż spłaszczone błędy Zod (fieldErrors)
+        detail:
+          what: "error.flatten() konwertuje ZodError na {fieldErrors: {}, formErrors: []} — format dla formularzy."
+      - cmd: "node -e \"const {z}=require('zod'); const s=z.string().email(); const r=s.safeParse('bad'); if(!r.success) r.error.issues.forEach(i=>console.log(i.path, i.message))\""
+        desc: Iteruj przez ZodIssue z path i message
+        detail:
+          what: Każdy ZodIssue ma path (ścieżka do pola), code (typ błędu), message.
+
+  - name: TypeScript — typy ze schematów
+    icon: "🎯"
+    commands:
+      - cmd: "npx tsc --noEmit src/schemas.ts"
+        desc: Sprawdź typy TypeScript (bez kompilacji)
+        detail:
+          what: Weryfikuje że z.infer<typeof Schema> jest poprawnie używany w kodzie TypeScript.
+      - cmd: "node -e \"const {z}=require('zod'); const s=z.object({name:z.string()}); console.log(s._def.typeName, Object.keys(s.shape))\""
+        desc: Introspekcja schematu Zod — sprawdź definicję
+        detail:
+          what: _def zawiera wewnętrzną strukturę schematu. shape dla z.object() to mapa pól.
+          tips:
+            - 'Przydatne do debugowania złożonych schematów'

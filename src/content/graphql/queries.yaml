@@ -1,0 +1,129 @@
+title: Queries i Mutations od strony klienta
+
+items:
+  - name: Query — pobieranie danych
+    desc: >
+      Klient wysyła query deklarując dokładnie jakich pól potrzebuje.
+      Zagnieżdżanie pozwala pobrać relacje w jednym requeście.
+      Fragmenty (fragment) pozwalają reużywać zestawy pól.
+    code: |
+      # Podstawowa query
+      query GetUser($id: ID!) {
+        user(id: $id) {
+          id
+          name
+          email
+          role
+          posts {
+            id
+            title
+            createdAt
+          }
+        }
+      }
+
+      # Fragment — reużywalny zestaw pól
+      fragment UserFields on User {
+        id
+        name
+        email
+        role
+      }
+
+      query GetUsers {
+        users(limit: 10) {
+          ...UserFields
+          posts {
+            id
+            title
+          }
+        }
+      }
+
+      # Aliases — pobierz to samo z różnymi argumentami
+      query ComparePlans {
+        basic: plan(id: "basic") { price features }
+        pro:   plan(id: "pro")   { price features }
+      }
+
+  - name: Mutation — modyfikacja danych
+    desc: >
+      Mutation deklaruje co zmienić i co zwrócić.
+      Mutations wykonują się sekwencyjnie (w przeciwieństwie do queries).
+      Zawsze zwracaj zmieniony obiekt — klient może zaktualizować cache.
+    code: |
+      # Tworzenie
+      mutation CreateUser($input: CreateUserInput!) {
+        createUser(input: $input) {
+          id
+          name
+          email
+          createdAt
+        }
+      }
+
+      # Zmienne do mutation
+      {
+        "input": {
+          "name": "Alice",
+          "email": "alice@example.com",
+          "role": "USER"
+        }
+      }
+
+      # Wiele mutations w jednym requeście (sekwencyjnie)
+      mutation Setup {
+        createOrg: createOrganization(name: "Acme") {
+          id
+        }
+        inviteUser: createUser(input: { name: "Bob", email: "bob@acme.com" }) {
+          id
+        }
+      }
+
+  - name: Klient Apollo (React)
+    desc: >
+      Apollo Client to najpopularniejszy klient GraphQL dla React.
+      useQuery, useMutation, useSubscription — hooki do każdego rodzaju operacji.
+      Wbudowany cache normalizujący dane — automatyczne aktualizacje UI.
+    code: |
+      // setup.tsx
+      import { ApolloClient, InMemoryCache, ApolloProvider } from '@apollo/client';
+
+      const client = new ApolloClient({
+        uri: 'https://api.example.com/graphql',
+        cache: new InMemoryCache(),
+      });
+
+      // App.tsx
+      function App() {
+        return (
+          <ApolloProvider client={client}>
+            <UserList />
+          </ApolloProvider>
+        );
+      }
+
+      // UserList.tsx
+      import { useQuery, gql } from '@apollo/client';
+
+      const GET_USERS = gql`
+        query GetUsers {
+          users { id name email role }
+        }
+      `;
+
+      function UserList() {
+        const { loading, error, data } = useQuery(GET_USERS);
+
+        if (loading) return <p>Loading...</p>;
+        if (error)   return <p>Error: {error.message}</p>;
+
+        return (
+          <ul>
+            {data.users.map((user: User) => (
+              <li key={user.id}>{user.name} — {user.email}</li>
+            ))}
+          </ul>
+        );
+      }

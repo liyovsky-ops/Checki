@@ -125,10 +125,13 @@ items:
       // unsubscribe() // wywołaj przy unmount lub cleanup
     lang: typescript
 
-  - name: Custom equality function
-    desc: Trzeci argument useStore() to custom comparator — pełna kontrola nad tym kiedy komponent się re-renderuje. Przydatne dla głębokich struktur lub gdy chcesz ignorować część pól.
+  - name: Custom equality — createWithEqualityFn (Zustand v5)
+    desc: "UWAGA v5: hook z create() NIE przyjmuje już drugiego argumentu equalityFn (był w v4). Dla własnego comparatora użyj createWithEqualityFn z zustand/traditional — wtedy hook znów akceptuje (selektor, equalityFn). W większości przypadków wystarczy useShallow."
     code: |
-      import { useProductStore } from '../store/productStore'
+      // ⚠️ To NIE działa w Zustand v5 — drugi argument hooka został usunięty:
+      //    useProductStore((s) => ..., (a, b) => ...)   ← błąd w v5
+      // Rozwiązanie: createWithEqualityFn z zustand/traditional.
+      import { createWithEqualityFn } from 'zustand/traditional'
 
       interface Product {
         id:       string
@@ -138,28 +141,34 @@ items:
         stock:    number
       }
 
+      interface ProductStore {
+        products: Product[]
+        setProducts: (p: Product[]) => void
+      }
+
+      // createWithEqualityFn odblokowuje equalityFn w hooku. Object.is = domyślny.
+      const useProductStore = createWithEqualityFn<ProductStore>(
+        (set) => ({
+          products: [],
+          setProducts: (products) => set({ products }),
+        }),
+        Object.is,
+      )
+
       // Re-render tylko gdy zmieni się id lub price — ignoruj name, category, stock
       function ProductPriceTag({ productId }: { productId: string }) {
         const product = useProductStore(
           (s) => s.products.find((p) => p.id === productId),
           // Custom comparator — tylko id i price mają znaczenie
-          (a, b) => a?.id === b?.id && a?.price === b?.price
+          (a, b) => a?.id === b?.id && a?.price === b?.price,
         )
 
         if (!product) return null
         return <span className="price">{product.price} PLN</span>
       }
 
-      // Inny przykład — ignoruj timestamp, porównuj tylko dane
-      function DataPanel() {
-        const data = useDataStore(
-          (s) => ({ items: s.items, total: s.total }),
-          (prev, next) =>
-            prev.total === next.total &&
-            prev.items.length === next.items.length
-        )
-        return <div>{data.total} wyników ({data.items.length} na stronie)</div>
-      }
+      // Najczęściej NIE potrzebujesz custom comparatora — useShallow (patrz wyżej)
+      // pokrywa 95% przypadków wyciągania kilku pól naraz.
     lang: typescript
 
   - name: Selektor poza hookiem — reużywalność

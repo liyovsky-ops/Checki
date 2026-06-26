@@ -1,0 +1,89 @@
+title: Komendy tRPC i narzędzia
+
+groups:
+  - name: Instalacja i setup
+    icon: "📦"
+    commands:
+      - cmd: npm create t3-app@latest
+        desc: Utwórz nowy projekt T3 Stack (Next.js + tRPC + Prisma + Tailwind)
+        detail:
+          what: Interaktywny kreator T3 Stack — wybierz jakie pakiety chcesz. Najszybszy start z tRPC.
+          tips:
+            - 'Wybierz: TypeScript + tRPC + Prisma + NextAuth + Tailwind'
+      - cmd: npm install @trpc/server @trpc/client @trpc/react-query @tanstack/react-query zod
+        desc: Zainstaluj tRPC ręcznie (bez T3)
+        detail:
+          what: Minimalne zależności dla tRPC z React Query i Zod.
+          flags:
+            - flag: superjson
+              desc: Dodaj dla Date/BigInt serialization
+      - cmd: npm install @trpc/next
+        desc: Zainstaluj adapter tRPC dla Next.js (Pages Router)
+        detail:
+          what: Adapter Pages Router — createNextApiHandler() dla /api/trpc endpoint.
+          tips:
+            - 'App Router: użyj @trpc/server/adapters/fetch zamiast'
+
+  - name: Struktura projektu
+    icon: "📁"
+    commands:
+      - cmd: mkdir -p src/server/routers && touch src/server/trpc.ts src/server/router.ts src/utils/trpc.ts
+        desc: Utwórz strukturę plików tRPC
+        detail:
+          what: Standardowa struktura — trpc.ts (init), router.ts (procedury), utils/trpc.ts (klient React).
+      - cmd: "cat src/server/trpc.ts"
+        desc: Sprawdź plik inicjalizacji tRPC
+        detail:
+          what: Powinien zawierać initTRPC.context<Context>().create() i eksportować procedure, router.
+      - cmd: npx tsc --noEmit
+        desc: Sprawdź typy TypeScript — wykryj błędy w procedurach i kliencie
+        detail:
+          what: tRPC bazuje na TypeScript — brak błędów TS = brak błędów typów między BE i FE.
+          tips:
+            - 'Uruchom po każdej zmianie AppRouter żeby zweryfikować spójność'
+
+  - name: Debugging i development
+    icon: "🔍"
+    commands:
+      - cmd: npm install @trpc/devtools
+        desc: Zainstaluj tRPC devtools (panel w przeglądarce)
+        detail:
+          what: Devtools pokazują aktywne queries, mutations, cache state — jak React Query Devtools.
+      - cmd: npm install trpc-panel
+        desc: Zainstaluj tRPC Panel — Swagger-like playground
+        detail:
+          what: Automatyczny UI do testowania procedur tRPC bez pisania kodu klienta.
+          tips:
+            - 'Dodaj endpoint: app.use("/panel", renderTrpcPanel(appRouter, {url: "/api/trpc"}))'
+      - cmd: "curl -X POST http://localhost:3000/api/trpc/users.list -H 'Content-Type: application/json' -d '{\"json\": {}}'"
+        desc: Wywołaj procedurę tRPC przez curl (format batch)
+        detail:
+          what: "tRPC serializuje dane przez JSON lub superjson. Format: {\"json\": <input>}."
+
+  - name: React Query — cache management
+    icon: "⚡"
+    commands:
+      - cmd: "node -e \"console.log('trpc.useUtils().posts.list.invalidate()')\""
+        desc: Wzorzec invalidacji cache po mutation
+        detail:
+          what: useUtils() daje dostęp do QueryClient — invalidate() odświeża cache per procedura.
+          tips:
+            - 'trpc.useUtils().invalidate() — invaliduje WSZYSTKIE queries tRPC'
+      - cmd: npx @tanstack/react-query-devtools
+        desc: React Query Devtools (podgląd cache tRPC)
+        detail:
+          what: tRPC używa React Query pod spodem — devtools pokazują cache, status, queries.
+
+  - name: Błędy i kody
+    icon: "❌"
+    commands:
+      - cmd: "node -e \"const {TRPCError}=require('@trpc/server'); throw new TRPCError({code:'NOT_FOUND', message:'Post nie istnieje'})\""
+        desc: Przykład rzucania TRPCError w procedurze
+        detail:
+          what: TRPCError z kodem mapuje na HTTP status — NOT_FOUND=404, UNAUTHORIZED=401, etc.
+          tips:
+            - 'Kody: PARSE_ERROR, BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, INTERNAL_SERVER_ERROR'
+      - cmd: "node -e \"console.log('if(error.data?.code === \"NOT_FOUND\") ...')\""
+        desc: Wzorzec obsługi błędu na kliencie tRPC
+        detail:
+          what: error.data.code na kliencie odpowiada kodowi TRPCError z serwera.

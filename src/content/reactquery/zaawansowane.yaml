@@ -315,3 +315,47 @@ items:
       // Zatrzymaj obserwację
       // unsubscribe()
     lang: typescript
+
+  - title: queryOptions — reużywalne, typowane definicje (v5)
+    desc: >
+      queryOptions to helper z v5 — definiujesz queryKey + queryFn raz, w jednym miejscu.
+      Tę samą definicję podajesz do useQuery, useSuspenseQuery, prefetchQuery, setQueryData
+      czy getQueryData — z pełnym wnioskowaniem typów (klucz i dane są powiązane).
+      Koniec z literówkami w queryKey rozsianych po całym kodzie.
+    code: |
+      import {
+        queryOptions,
+        useQuery,
+        useQueryClient,
+      } from '@tanstack/react-query'
+
+      interface User {
+        id:   number
+        name: string
+      }
+
+      // Jedna definicja — reużywalna w całej aplikacji
+      function userQuery(id: number) {
+        return queryOptions({
+          queryKey: ['user', id] as const,
+          queryFn:  async (): Promise<User> => {
+            const res = await fetch(`/api/users/${id}`)
+            if (!res.ok) throw new Error('Brak użytkownika')
+            return res.json()
+          },
+          staleTime: 60_000,
+        })
+      }
+
+      function UserName({ id }: { id: number }) {
+        // useQuery dostaje gotową, typowaną definicję
+        const { data } = useQuery(userQuery(id))
+        return <span>{data?.name}</span>
+      }
+
+      function usePrefetchUser() {
+        const queryClient = useQueryClient()
+        // ta sama definicja w prefetchu — typy się zgadzają
+        return (id: number) => queryClient.prefetchQuery(userQuery(id))
+      }
+    lang: typescript

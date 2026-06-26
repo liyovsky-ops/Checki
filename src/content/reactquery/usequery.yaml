@@ -274,3 +274,39 @@ items:
         )
       }
     lang: typescript
+
+  - title: Anulowanie zapytań — signal (AbortController)
+    desc: >
+      queryFn dostaje kontekst z polem signal — AbortSignal.
+      Przekaż go do fetch/axios, a TanStack Query anuluje request gdy klucz
+      się zmieni, komponent się odmontuje lub wywołasz cancelQueries.
+      Eliminuje race conditions i niepotrzebne requesty przy szybkim wpisywaniu (search).
+    code: |
+      import { useQuery } from '@tanstack/react-query'
+
+      interface SearchResult {
+        id:    number
+        title: string
+      }
+
+      function SearchResults({ term }: { term: string }) {
+        const { data, isFetching } = useQuery({
+          queryKey: ['search', term],
+          // signal pochodzi z kontekstu queryFn
+          queryFn: async ({ signal }) => {
+            const res = await fetch(`/api/search?q=${term}`, { signal })
+            if (!res.ok) throw new Error('Błąd wyszukiwania')
+            return res.json() as Promise<SearchResult[]>
+          },
+          enabled: term.length > 2,
+          // przy każdej zmianie 'term' poprzedni request jest anulowany (abort)
+        })
+
+        return (
+          <ul>
+            {isFetching && <li>Szukam...</li>}
+            {data?.map(r => <li key={r.id}>{r.title}</li>)}
+          </ul>
+        )
+      }
+    lang: typescript

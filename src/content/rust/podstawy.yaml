@@ -44,11 +44,6 @@ whenToUse:
   - Kryptografia i systemy bezpieczeństwa
 
 firstComponent: |
-  // Hello World w Rust
-  fn main() {
-      println!("Cześć, Rust! 🦀");
-  }
-
   // Struct z implementacją
   #[derive(Debug)]
   struct Uzytkownik {
@@ -58,10 +53,11 @@ firstComponent: |
   }
 
   impl Uzytkownik {
+      // Konstruktor — w Rust to konwencja, nie słowo kluczowe
       fn nowy(imie: &str, wiek: u32) -> Self {
           Uzytkownik {
               imie: imie.to_string(),
-              wiek,
+              wiek,            // skrót od `wiek: wiek` (field init shorthand)
               aktywny: true,
           }
       }
@@ -72,6 +68,8 @@ firstComponent: |
   }
 
   fn main() {
+      println!("Cześć, Rust! 🦀");
+
       let user = Uzytkownik::nowy("Łukasz", 30);
       println!("{}", user.powitanie());
       println!("{:?}", user); // Debug print dzięki #[derive(Debug)]

@@ -102,6 +102,38 @@ items:
       }
     lang: rust
 
+  - title: Arc + Mutex — współdzielony stan między taskami
+    desc: >
+      Arc (Atomic Reference Counted) pozwala wielu taskom posiadać te same dane.
+      Mutex chroni dostęp — tylko jeden task naraz może modyfikować. W kodzie async używaj
+      tokio::sync::Mutex (a nie std::sync::Mutex) gdy trzymasz blokadę przez .await.
+    code: |
+      use std::sync::Arc;
+      use tokio::sync::Mutex;
+
+      #[tokio::main]
+      async fn main() {
+          // Arc — współdzielona własność; Mutex — bezpieczna modyfikacja
+          let licznik = Arc::new(Mutex::new(0));
+          let mut uchwyty = Vec::new();
+
+          for _ in 0..10 {
+              let licznik = Arc::clone(&licznik); // tani clone — zwiększa refcount
+              uchwyty.push(tokio::spawn(async move {
+                  let mut n = licznik.lock().await; // blokada
+                  *n += 1;
+              })); // blokada zwalniana tu (n wychodzi ze scope)
+          }
+
+          for u in uchwyty {
+              u.await.unwrap();
+          }
+
+          // Brak data race — kompilator wymusił Arc<Mutex<_>>
+          println!("Licznik: {}", *licznik.lock().await); // 10
+      }
+    lang: rust
+
   - title: reqwest — HTTP client
     desc: >
       reqwest to najpopularniejszy async HTTP client dla Rusta. Opiera się na Tokio.

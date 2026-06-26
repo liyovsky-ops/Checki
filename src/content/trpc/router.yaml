@@ -1,0 +1,82 @@
+title: Router i procedury
+
+items:
+  - name: Nested routers i procedury
+    desc: Routers można zagnieżdżać — appRouter.users.posts.list. Każdy sub-router to moduł. mergeRouters() łączy routery dla dużych aplikacji.
+    code: |
+      import { initTRPC, TRPCError } from '@trpc/server'
+      import { z } from 'zod'
+
+      type Context = { userId?: string; db: Database }
+      const t = initTRPC.context<Context>().create()
+
+      const { router, procedure } = t
+
+      // Sub-router dla postów
+      const postsRouter = router({
+        list: procedure
+          .input(z.object({
+            limit:  z.number().min(1).max(100).default(20),
+            cursor: z.number().optional(),
+          }))
+          .query(async ({ input, ctx }) => {
+            const posts = await ctx.db.post.findMany({
+              take: input.limit + 1,
+              cursor: input.cursor ? { id: input.cursor } : undefined,
+            })
+            const hasMore = posts.length > input.limit
+            return {
+              items:      hasMore ? posts.slice(0, -1) : posts,
+              nextCursor: hasMore ? posts[posts.length - 1].id : undefined,
+            }
+          }),
+
+        create: procedure
+          .input(z.object({
+            title:   z.string().min(5).max(200),
+            content: z.string().min(10),
+          }))
+          .mutation(async ({ input, ctx }) => {
+            if (!ctx.userId) throw new TRPCError({ code: 'UNAUTHORIZED' })
+            return ctx.db.post.create({ data: { ...input, userId: ctx.userId } })
+          }),
+      })
+
+      // Główny router
+      export const appRouter = router({
+        posts: postsRouter,
+        // users: usersRouter,
+        // comments: commentsRouter,
+      })
+
+      export type AppRouter = typeof appRouter
+
+  - name: Output validation i transformer
+    desc: .output() waliduje co procedura zwraca. superjson transformer pozwala przesyłać Date, BigInt, Map, Set między backendem a frontendem — nie tylko JSON primitives.
+    code: |
+      import { initTRPC } from '@trpc/server'
+      import superjson from 'superjson'
+      import { z } from 'zod'
+
+      // Transformer — Date/BigInt przez sieć
+      const t = initTRPC.create({
+        transformer: superjson,
+      })
+
+      const PostOutputSchema = z.object({
+        id:        z.number(),
+        title:     z.string(),
+        createdAt: z.date(),  // Date przekazywane dzięki superjson!
+        views:     z.bigint(),
+      })
+
+      const router = t.router({
+        latestPost: t.procedure
+          .output(PostOutputSchema)  // Waliduj output!
+          .query(async () => ({
+            id:        1,
+            title:     "Hello World",
+            createdAt: new Date(),   // Automatycznie serializowane
+            views:     BigInt(1000),
+          })),
+      })
