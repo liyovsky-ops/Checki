@@ -1,0 +1,317 @@
+title: Ansible — Zmienne & Vault
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Ansible Vault to narzędzie do szyfrowania wrażliwych danych — haseł, kluczy API,
+  certyfikatów SSL. Szyfruje pliki lub pojedyncze wartości przy użyciu AES-256.
+  Zaszyfrowane pliki możesz bezpiecznie commitować do git — bez odszyfrowania
+  są bezużyteczne. Vault password file lub vault ID pozwalają na automatyzację
+  w CI/CD bez interaktywnego podawania hasła.
+
+items:
+  - name: ansible-vault — podstawowe operacje
+    desc: >
+      ansible-vault create tworzy nowy zaszyfrowany plik. edit otwiera w edytorze,
+      view pokazuje zawartość bez edycji. Vault używa AES-256-CBC z hasłem podanym
+      interaktywnie lub z pliku. Wymaganie hasła przy każdym playbooku można automatyzować.
+    code: |
+      # Utwórz nowy zaszyfrowany plik
+      ansible-vault create secrets.yml
+      # Pyta o hasło vault, otwiera edytor
+
+      # Edytuj istniejący zaszyfrowany plik
+      ansible-vault edit group_vars/production/vault.yml
+      # Deszyfruje, otwiera w edytorze, szyfruje po zapisaniu
+
+      # Podejrzyj zawartość bez edycji
+      ansible-vault view group_vars/production/vault.yml
+
+      # Zaszyfruj istniejący plik
+      ansible-vault encrypt plaintext_secrets.yml
+      # Uwaga: nadpisuje plik zaszyfrowaną wersją
+
+      # Odszyfruj plik do postaci jawnej
+      ansible-vault decrypt secrets.yml
+      # Uwaga: nadpisuje plik jawną wersją (nigdy nie commituj!)
+
+      # Sprawdź czy plik jest zaszyfrowany
+      head -1 secrets.yml
+      # Zaszyfrowany: $ANSIBLE_VAULT;1.1;AES256
+      # Niezaszyfrowany: cokolwiek innego
+
+  - name: encrypt_string — szyfrowanie pojedynczych wartości
+    desc: >
+      encrypt_string pozwala zaszyfrować pojedynczą wartość inline — zamiast szyfrować
+      cały plik, możesz mieć normalny YAML z kilkoma zaszyfrowanymi wartościami.
+      Zaszyfrowana wartość zaczyna się od !vault i jest wieloliniowa.
+    code: |
+      # Zaszyfruj wartość (pyta o hasło)
+      ansible-vault encrypt_string 'moje_tajne_haslo' --name 'db_password'
+
+      # Zaszyfruj bez pytania (hasło z env)
+      echo -n 'moje_tajne_haslo' | ansible-vault encrypt_string \
+        --vault-password-file ~/.vault_pass \
+        --name 'db_password'
+
+      # Wynik:
+      # db_password: !vault |
+      #   $ANSIBLE_VAULT;1.1;AES256
+      #   61343035353764383566376131363233623362...
+      #   ...
+
+      # Użycie w group_vars/production/main.yml
+      # ---
+      # db_host: db.production.example.com
+      # db_name: production_db
+      # db_password: !vault |
+      #   $ANSIBLE_VAULT;1.1;AES256
+      #   61343035353764383566376131363233623362...
+
+      # Wielokrotne szyfrowanie
+      ansible-vault encrypt_string \
+        --vault-password-file ~/.vault_pass \
+        'admin@example.com' --name 'smtp_user'
+      ansible-vault encrypt_string \
+        --vault-password-file ~/.vault_pass \
+        'smtp_pass_123' --name 'smtp_password'
+
+  - name: vault-password-file — automatyzacja
+    desc: >
+      Plik z hasłem vault pozwala na uruchamianie playbooka bez interaktywnego pytania
+      o hasło. Hasło może być też zwracane przez skrypt (np. z AWS Secrets Manager).
+      Plik hasła NIE powinien być commitowany do git — dodaj do .gitignore.
+    code: |
+      # Utwórz plik z hasłem (tylko właściciel może czytać)
+      echo "moje_super_tajne_haslo_vault" > ~/.vault_pass
+      chmod 600 ~/.vault_pass
+
+      # Dodaj do .gitignore!
+      echo ".vault_pass" >> .gitignore
+
+      # Użyj przy uruchamianiu playbooka
+      ansible-playbook site.yml --vault-password-file ~/.vault_pass
+
+      # Konfiguracja w ansible.cfg (nie trzeba podawać przy każdej komendzie)
+      # [defaults]
+      # vault_password_file = ~/.vault_pass
+
+      # Skrypt zwracający hasło (dynamiczne — np. z AWS SSM)
+      # vault_password.sh:
+      #!/bin/bash
+      # aws ssm get-parameter \
+      #   --name "/ansible/vault-password" \
+      #   --with-decryption \
+      #   --query "Parameter.Value" \
+      #   --output text
+
+      ansible-playbook site.yml --vault-password-file ./vault_password.sh
+
+      # Pytanie o hasło interaktywnie (brak automatyzacji)
+      ansible-playbook site.yml --ask-vault-pass
+
+  - name: Multiple Vault IDs
+    desc: >
+      Vault IDs pozwalają używać różnych haseł dla różnych środowisk lub typów sekretów.
+      Możesz mieć oddzielne hasło dla produkcji, stagingu i developmentu. Każdy zaszyfrowany
+      plik jest oznaczony ID do deszyfrowania.
+    code: |
+      # Szyfruj z konkretnym vault ID
+      ansible-vault encrypt_string 'prod_password' \
+        --vault-id prod@~/.vault_prod_pass \
+        --name db_password
+
+      ansible-vault encrypt_string 'dev_password' \
+        --vault-id dev@~/.vault_dev_pass \
+        --name db_password
+
+      # Utwórz zaszyfrowany plik z ID
+      ansible-vault create \
+        --vault-id prod@prompt \
+        group_vars/production/vault.yml
+
+      # Uruchom playbook z wieloma vault IDs
+      ansible-playbook site.yml \
+        --vault-id prod@~/.vault_prod_pass \
+        --vault-id dev@~/.vault_dev_pass
+
+      # Lub interaktywnie
+      ansible-playbook site.yml \
+        --vault-id prod@prompt \
+        --vault-id dev@prompt
+
+      # Struktura z wieloma środowiskami
+      # group_vars/
+      # ├── production/
+      # │   └── vault.yml   # zaszyfrowane hasłem 'prod'
+      # └── staging/
+      #     └── vault.yml   # zaszyfrowane hasłem 'staging'
+
+  - name: Vault w playbooku — vars_files
+    desc: >
+      vars_files pozwala załadować zmienne z pliku do playbooka. Jeśli plik jest
+      zaszyfrowany Vaultem, Ansible automatycznie go odszyfrowuje jeśli podano
+      hasło vault. Możesz mieszać zaszyfrowane i niezaszyfrowane pliki.
+    code: |
+      # Playbook z vars_files
+      - name: Deploy application
+        hosts: production
+        vars_files:
+          - vars/common.yml         # niezaszyfrowane
+          - vars/{{ environment }}.yml     # per-środowisko
+          - "{{ inventory_dir }}/group_vars/all/vault.yml"  # zaszyfrowane
+
+        vars:
+          app_name: myapp
+          deploy_path: /opt/myapp
+
+        tasks:
+          - name: Configure database
+            ansible.builtin.template:
+              src: database.conf.j2
+              dest: /etc/myapp/database.conf
+            # Użyj zmiennej z zaszyfrowanego pliku
+            # vault.yml zawiera: vault_db_password: supersecret
+            # Konwencja: zmienne vault zaczynają się od vault_
+
+          - name: Set app password
+            ansible.builtin.lineinfile:
+              path: /etc/myapp/config
+              line: "DB_PASSWORD={{ vault_db_password }}"
+
+      # Konwencja nazewnictwa (best practice):
+      # vars/
+      # ├── main.yml          # zmienne jawne: db_host, db_name
+      # └── vault.yml         # zmienne tajne: vault_db_password
+
+      # W szablonach używaj "wrappera":
+      # db_password: "{{ vault_db_password }}"
+      # Dzięki temu main.yml dokumentuje wszystkie zmienne
+
+  - name: ansible-vault rekey — zmiana hasła
+    desc: >
+      ansible-vault rekey pozwala zmienić hasło dla zaszyfrowanego pliku bez
+      jego odszyfrowywania i ponownego szyfrowania w dwóch krokach.
+      Używaj regularnie jako rotacja haseł — szczególnie gdy ktoś opuścił zespół.
+    code: |
+      # Zmień hasło interaktywnie
+      ansible-vault rekey secrets.yml
+      # Pyta o stare hasło, potem nowe
+
+      # Zmień hasło używając pliku
+      ansible-vault rekey \
+        --vault-password-file ~/.vault_old_pass \
+        --new-vault-password-file ~/.vault_new_pass \
+        secrets.yml
+
+      # Rekey wielu plików na raz
+      ansible-vault rekey \
+        --vault-password-file ~/.vault_old_pass \
+        --new-vault-password-file ~/.vault_new_pass \
+        group_vars/production/vault.yml \
+        group_vars/staging/vault.yml \
+        host_vars/db1.example.com/vault.yml
+
+      # Rekey wszystkich plików vault w projekcie
+      find . -name "vault.yml" -exec \
+        ansible-vault rekey \
+        --vault-password-file ~/.vault_old_pass \
+        --new-vault-password-file ~/.vault_new_pass \
+        {} \;
+
+      # Po zmianie hasła zaktualizuj wszystkie miejsca gdzie hasło jest przechowywane:
+      # - ~/.vault_pass
+      # - CI/CD secrets (GitHub Actions, Jenkins, GitLab CI)
+      # - Dokumentacja zespołu (w zabezpieczonym miejscu)
+
+  - name: Zmienne w Ansible — kompletny przegląd
+    desc: >
+      Ansible ma wiele źródeł zmiennych z określonym priorytetem. Znajomość
+      priorytetu zmiennych jest kluczowa do debugowania nieoczekiwanego zachowania.
+      Extra vars (-e) zawsze wygrywają — używaj do nadpisywania w CI/CD.
+    code: |
+      # Zmienne w playbooku (vars:)
+      - name: Example play
+        hosts: all
+        vars:
+          app_name: myapp
+          app_port: 8080
+          db_config:
+            host: localhost
+            port: 5432
+            name: mydb
+
+        tasks:
+          - name: Use variable
+            ansible.builtin.debug:
+              msg: "App: {{ app_name }} on port {{ app_port }}"
+
+          - name: Access nested variable
+            ansible.builtin.debug:
+              msg: "DB: {{ db_config.host }}:{{ db_config.port }}"
+              # lub: {{ db_config['host'] }}
+
+      # set_fact — ustaw zmienną podczas play
+      - name: Compute derived value
+        ansible.builtin.set_fact:
+          full_url: "https://{{ ansible_fqdn }}:{{ app_port }}"
+          deploy_timestamp: "{{ ansible_date_time.iso8601 }}"
+
+      # vars_prompt — pytaj użytkownika
+      vars_prompt:
+        - name: admin_password
+          prompt: "Enter admin password"
+          private: true    # nie pokazuj wpisywanego hasła
+
+      # Extra vars (najwyższy priorytet)
+      # ansible-playbook site.yml -e "environment=prod version=1.2.3"
+      # ansible-playbook site.yml -e "@extra_vars.yml"
+
+  - name: Najlepsze praktyki — bezpieczny Vault
+    desc: >
+      Nie szyfruj całych plików vars jeśli możesz szyfrować tylko wartości.
+      Przechowuj tylko tajne wartości w vault.yml, resztę w jawnych plikach.
+      Konwencja vault_ prefix ułatwia identyfikację zaszyfrowanych zmiennych.
+      Zawsze weryfikuj że .vault_pass i tajne pliki są w .gitignore.
+    code: |
+      # DOBRA praktyka — szyfruj tylko to co tajne
+
+      # vars/main.yml (jawny — commituj do git)
+      # ---
+      # db_host: db.example.com
+      # db_port: 5432
+      # db_name: production
+      # db_user: app_user
+      # db_password: "{{ vault_db_password }}"   # ref do vault zmiennej
+
+      # vars/vault.yml (zaszyfrowany — commituj do git)
+      # ---
+      # vault_db_password: tajne_haslo_bazy
+      # vault_api_key: sk-abc123...
+      # vault_ssl_private_key: |
+      #   -----BEGIN PRIVATE KEY-----
+      #   ...
+
+      # ZLA praktyka — szyfrowanie całego pliku
+      # ansible-vault encrypt vars/main.yml   # trudne w code review
+
+      # .gitignore — upewnij się że hasła nie są commitowane
+      # .vault_pass
+      # *.vault_pass
+      # vault_password.sh   # jeśli zawiera hasło hardcoded
+
+      # Weryfikacja — sprawdź czy żaden jawny plik nie zawiera sekretów
+      grep -r "password:" inventory/ vars/ --include="*.yml" | grep -v "vault_"
+      # Jeśli znajdzie wynik — zaszyfruj lub użyj vault ref
+
+      # CI/CD — hasło vault z secrets managera
+      # GitHub Actions:
+      # - name: Run playbook
+      #   env:
+      #     ANSIBLE_VAULT_PASSWORD: ${{ secrets.VAULT_PASSWORD }}
+      #   run: |
+      #     echo "$ANSIBLE_VAULT_PASSWORD" > .vault_pass
+      #     ansible-playbook -i inventory/ site.yml --vault-password-file .vault_pass
+      #     rm .vault_pass

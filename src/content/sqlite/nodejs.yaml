@@ -1,0 +1,243 @@
+title: SQLite — Node.js API
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Najlepszym driverem SQLite dla Node.js jest better-sqlite3 — synchroniczny, szybki, bezpieczny typowo.
+  W odróżnieniu od node-sqlite3 (callback-based), better-sqlite3 działa synchronicznie co eliminuje
+  callback hell i ułatwia obsługę transakcji. Dla Bun dostępne jest natywne bun:sqlite.
+  Dla aplikacji wymagających async — node-sqlite3/wasm lub @sqlite.org/sqlite-wasm.
+
+items:
+  - name: Instalacja i pierwsze połączenie
+    desc: >
+      better-sqlite3 kompiluje natywne binaria przez node-gyp — wymaga build tools (gcc/MSVC).
+      Inicjalizacja jest synchroniczna i natychmiastowa — nie ma callbacków ani Promisów.
+    code: |
+      // Instalacja
+      // npm install better-sqlite3
+      // npm install -D @types/better-sqlite3  (TypeScript)
+
+      import Database from 'better-sqlite3';
+
+      // Otwórz lub utwórz bazę
+      const db = new Database('myapp.db');
+
+      // Baza w RAM
+      const db = new Database(':memory:');
+
+      // Opcje połączenia
+      const db = new Database('myapp.db', {
+        verbose: console.log,   // loguj każde zapytanie
+        readonly: false,
+        fileMustExist: false,   // throw jeśli plik nie istnieje
+      });
+
+      // Zawsze zamknij po użyciu
+      process.on('exit', () => db.close());
+      process.on('SIGINT', () => { db.close(); process.exit(); });
+
+  - name: prepare() — skompilowane zapytania
+    desc: >
+      prepare() kompiluje zapytanie SQL do wewnętrznego statement — gotowe do wielokrotnego wywołania.
+      Kluczowa optymalizacja: kompiluj raz, wykonuj wiele razy. Dużo szybsze niż exec() za każdym razem.
+    code: |
+      import Database from 'better-sqlite3';
+      const db = new Database('myapp.db');
+
+      // Skompiluj zapytanie raz
+      const getUser = db.prepare('SELECT * FROM users WHERE id = ?');
+      const insertUser = db.prepare('INSERT INTO users (name, email) VALUES (?, ?)');
+
+      // Wykonaj wiele razy — szybko!
+      const user = getUser.get(1);          // jeden wiersz
+      const users = getUser.all();          // wszystkie
+      insertUser.run('Alice', 'a@test.com'); // bez zwracania danych
+
+      // TypeScript — typuj wyniki
+      interface User { id: number; name: string; email: string; }
+      const stmt = db.prepare<[], User>('SELECT * FROM users');
+      const all: User[] = stmt.all();
+
+  - name: run() — INSERT, UPDATE, DELETE
+    desc: >
+      run() wykonuje zapytania bez zwracania wierszy danych. Zwraca obiekt z lastInsertRowid
+      i changes — liczba dotkniętych wierszy. Idealne do INSERT/UPDATE/DELETE.
+    code: |
+      import Database from 'better-sqlite3';
+      const db = new Database('myapp.db');
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS users (
+          id    INTEGER PRIMARY KEY AUTOINCREMENT,
+          name  TEXT NOT NULL,
+          email TEXT UNIQUE NOT NULL,
+          age   INTEGER DEFAULT 0
+        )
+      `);
+
+      const insert = db.prepare('INSERT INTO users (name, email, age) VALUES (?, ?, ?)');
+      const result = insert.run('Alice', 'alice@example.com', 30);
+
+      console.log(result.lastInsertRowid);  // 1
+      console.log(result.changes);          // 1
+
+      const update = db.prepare('UPDATE users SET age = ? WHERE id = ?');
+      const upd = update.run(31, 1);
+      console.log(upd.changes);             // 1
+
+      const del = db.prepare('DELETE FROM users WHERE id = ?');
+      del.run(99);  // changes = 0 jeśli nie istnieje
+
+  - name: get() i all() — pobieranie danych
+    desc: >
+      get() zwraca pierwszy pasujący wiersz lub undefined. all() zwraca tablicę wszystkich wyników.
+      iterate() daje iterator — idealne przy dużych zbiorach (nie ładuje wszystkiego do RAM).
+    code: |
+      import Database from 'better-sqlite3';
+      const db = new Database('myapp.db');
+
+      const getById = db.prepare('SELECT * FROM users WHERE id = ?');
+      const getAll  = db.prepare('SELECT * FROM users ORDER BY name');
+      const search  = db.prepare('SELECT * FROM users WHERE name LIKE ?');
+
+      // get — jeden wiersz lub undefined
+      const user = getById.get(1);
+      if (!user) console.log('Nie znaleziono');
+
+      // all — tablica obiektów
+      const users = getAll.all();
+      console.log(users.length);
+
+      // Wzorzec LIKE
+      const found = search.all('%ali%');
+
+      // iterate() — generator, nie ładuje wszystkiego
+      for (const row of getAll.iterate()) {
+        console.log(row.name);
+      }
+
+      // Skalarne zapytanie
+      const count = db.prepare('SELECT COUNT(*) AS cnt FROM users').get();
+      console.log(count.cnt);
+
+  - name: Nazwane parametry (:name)
+    desc: >
+      better-sqlite3 obsługuje trzy style parametrów: ? (pozycyjne), :name (nazwane), @name (named alternatywne).
+      Nazwane parametry przekazujesz jako obiekt — czytelniejsze przy wielu parametrach.
+    code: |
+      import Database from 'better-sqlite3';
+      const db = new Database('myapp.db');
+
+      // Styl :name
+      const insert = db.prepare(`
+        INSERT INTO users (name, email, age)
+        VALUES (:name, :email, :age)
+      `);
+
+      insert.run({ name: 'Bob', email: 'bob@example.com', age: 25 });
+
+      // Styl @name (alternatywa)
+      const search = db.prepare('SELECT * FROM users WHERE age > @minAge AND role = @role');
+      const admins = search.all({ minAge: 18, role: 'admin' });
+
+      // Mix pozycyjnych i nazwanych — nie rób tak
+      // Pozycyjne — dla prostych zapytań
+      const byId = db.prepare('SELECT * FROM users WHERE id = ?');
+      byId.get(1);
+
+      // Batch insert z nazwaną składnią
+      const batchInsert = db.prepare('INSERT OR IGNORE INTO users (name, email) VALUES (:name, :email)');
+      const users = [
+        { name: 'Carol', email: 'carol@example.com' },
+        { name: 'Dave',  email: 'dave@example.com' },
+      ];
+      for (const u of users) batchInsert.run(u);
+
+  - name: "db.transaction() — transakcje"
+    desc: >
+      db.transaction() owija funkcję w transakcję — jeśli funkcja rzuci wyjątek, automatyczny rollback.
+      To najlepsza praktyka dla bulk insertów — 100-1000x szybsze niż auto-commit per wiersz.
+    code: |
+      import Database from 'better-sqlite3';
+      const db = new Database('myapp.db');
+
+      const insert = db.prepare('INSERT INTO users (name, email) VALUES (?, ?)');
+
+      // Opakuj w transakcję
+      const insertMany = db.transaction((users) => {
+        for (const u of users) {
+          insert.run(u.name, u.email);
+        }
+      });
+
+      // Wywołaj — automatyczny commit lub rollback
+      insertMany([
+        { name: 'Alice', email: 'alice@example.com' },
+        { name: 'Bob',   email: 'bob@example.com' },
+      ]);
+
+      // Zagnieżdżone transakcje (savepoints)
+      const outer = db.transaction(() => {
+        insert.run('Outer', 'outer@example.com');
+        try {
+          const inner = db.transaction(() => {
+            insert.run('Inner', 'inner@example.com');
+            throw new Error('Rollback inner!');
+          });
+          inner();
+        } catch {}
+        // Outer nadal trwa
+      });
+      outer();
+
+  - name: WAL mode i konfiguracja przez pragma
+    desc: >
+      WAL (Write-Ahead Logging) to tryb dziennika który pozwala na równoczesne odczyty i jeden zapis.
+      better-sqlite3 udostępnia metodę pragma() dla prostego ustawiania PRAGMów.
+    code: |
+      import Database from 'better-sqlite3';
+      const db = new Database('myapp.db');
+
+      // Włącz WAL — lepsza współbieżność (zrób zaraz po otwarciu)
+      db.pragma('journal_mode = WAL');
+
+      // Pozostałe pragmy wydajnościowe
+      db.pragma('synchronous = NORMAL');
+      db.pragma('cache_size = -64000');   // 64MB cache
+      db.pragma('foreign_keys = ON');     // włącz FK (domyślnie OFF!)
+      db.pragma('busy_timeout = 5000');   // ms czekania na lock
+
+      // Odczyt wartości pragma
+      const mode = db.pragma('journal_mode', { simple: true });
+      console.log(mode);  // 'wal'
+
+      const fk = db.pragma('foreign_keys', { simple: true });
+      console.log(fk);    // 1
+
+  - name: "Async alternatywa — node-sqlite3 / @sqlite.org/sqlite-wasm"
+    desc: >
+      better-sqlite3 jest synchroniczny — idealny dla większości zastosowań Node.js.
+      Jeśli potrzebujesz async (np. edge runtime, Cloudflare Workers), użyj sqlite-wasm
+      lub oficjalnego node:sqlite (eksperymentalnego od Node 22.5).
+    code: |
+      // Opcja 1: node:sqlite (Node.js >= 22.5, eksperymentalne)
+      import { DatabaseSync } from 'node:sqlite';
+      const db = new DatabaseSync('myapp.db');
+      const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
+      const user = stmt.get(1);
+
+      // Opcja 2: @sqlite.org/sqlite-wasm (WASM, async, działa w przeglądarce)
+      // npm install @sqlite.org/sqlite-wasm
+      import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
+      const sqlite3 = await sqlite3InitModule();
+      const db2 = new sqlite3.oo1.DB('/myapp.sqlite3', 'ct');
+      db2.exec('CREATE TABLE IF NOT EXISTS t(v)');
+
+      // Opcja 3: bun:sqlite (wbudowane w Bun, bardzo szybkie)
+      // import { Database } from 'bun:sqlite';
+      // const db3 = new Database('myapp.db');
+      // const query = db3.query('SELECT * FROM users WHERE id = $id');
+      // const user3 = query.get({ $id: 1 });

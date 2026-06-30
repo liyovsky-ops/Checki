@@ -1,0 +1,489 @@
+title: Ansible — CLI Commands
+
+groups:
+  - name: Instalacja
+    icon: "🚀"
+    commands:
+      - cmd: pip install ansible
+        desc: Zainstaluj Ansible przez pip (zalecane)
+        detail:
+          what: "Instaluje Ansible i wszystkie zależności Python. Wymaga Python 3.8+."
+          how: "Zalecane w virtualenv (python -m venv venv && source venv/bin/activate). Na macOS: brew install ansible."
+          tips:
+            - "pip install ansible-core  # tylko core bez collections"
+            - "pip install ansible==10.0  # konkretna wersja"
+
+      - cmd: pip install ansible-core
+        desc: Zainstaluj tylko Ansible Core (bez bundled collections)
+        detail:
+          what: "Instaluje minimalną wersję Ansible bez bundled kolekcji community. Lżejszy pakiet."
+          how: "Następnie doinstaluj potrzebne kolekcje: ansible-galaxy collection install community.general"
+          tips:
+            - "Polecane dla CI/CD — mniejszy image, tylko potrzebne kolekcje"
+
+      - cmd: brew install ansible
+        desc: Zainstaluj Ansible przez Homebrew (macOS)
+        detail:
+          what: "Instaluje Ansible przez menedżer pakietów macOS. Alternatywa dla pip na Macu."
+          how: "Wymaga zainstalowanego Homebrew (brew.sh). Ansible ląduje w /opt/homebrew/bin/."
+          tips:
+            - "brew upgrade ansible  # aktualizacja do najnowszej wersji"
+
+      - cmd: ansible --version
+        desc: Sprawdź zainstalowaną wersję Ansible
+        detail:
+          what: "Wyświetla wersję Ansible, Python, lokalizację pliku konfiguracji i domyślny moduł."
+          how: "Uruchom po instalacji żeby zweryfikować poprawność i zobaczyć aktywny ansible.cfg."
+          tips:
+            - "ansible --version | head -2  # tylko wersja"
+            - "Sprawdź python version — Ansible 2.15+ wymaga Python 3.9+"
+
+  - name: "ansible — ad-hoc commands"
+    icon: "⚡"
+    commands:
+      - cmd: ansible all -m ping
+        desc: Ping wszystkich hostów z inventory
+        detail:
+          what: "Sprawdza łączność SSH z wszystkimi hostami. Nie jest prawdziwym pingiem ICMP — testuje SSH + Python."
+          how: "Wymaga skonfigurowanego inventory. Zielone ok = połączenie działa."
+          tips:
+            - "ansible all -m ping -i inventory/hosts.yml  # podaj inventory jawnie"
+            - "ansible webservers -m ping  # tylko grupa webservers"
+
+      - cmd: "ansible all -m command -a 'uptime'"
+        desc: Uruchom komendę uptime na wszystkich hostach
+        detail:
+          what: "Wykonuje komendę uptime na każdym hoście i wyświetla output. Moduł command — bez shell features."
+          how: "Przydatne do szybkiego sprawdzenia stanu serwerów bez playbooka."
+          tips:
+            - "ansible webservers -m command -a 'df -h'  # wolne miejsce"
+            - "ansible all -m command -a 'free -m'  # pamięć RAM"
+
+      - cmd: "ansible all -m shell -a 'cat /etc/os-release | grep VERSION'"
+        desc: Uruchom komendę shell (z potokami i zmiennymi)
+        detail:
+          what: "Moduł shell uruchamia komendę przez /bin/sh — obsługuje potoki, zmienne środowiskowe, przekierowania."
+          how: "Używaj shell zamiast command gdy potrzebujesz potoków (|), globbing (*), zmiennych ($VAR)."
+          tips:
+            - "Preferuj dedykowane moduły (package, file) nad shell — są idempotentne"
+            - "ansible all -m shell -a 'ps aux | grep nginx | wc -l'"
+
+      - cmd: "ansible webservers -m copy -a 'src=./config.conf dest=/etc/app/config.conf' -b"
+        desc: Skopiuj plik na serwery (z sudo)
+        detail:
+          what: "Kopiuje plik lokalny na zdalne serwery. -b = become (sudo). Idempotentne — nie kopiuje jeśli plik taki sam."
+          how: "src = ścieżka lokalna, dest = ścieżka zdalna. Używaj cudzysłowów jeśli ścieżka zawiera spacje."
+          tips:
+            - "Dodaj mode='0644' dla uprawnień: -a 'src=file dest=/path mode=0644'"
+
+      - cmd: "ansible all -m file -a 'path=/opt/myapp state=directory mode=0755' -b"
+        desc: Utwórz katalog na zdalnych hostach
+        detail:
+          what: "Tworzy katalog z podanymi uprawnieniami. state=directory — utwórz katalog. Idempotentne."
+          how: "state: directory/file/absent/link/touch. Możesz też ustawić owner i group."
+          tips:
+            - "state=absent usuwa katalog: -a 'path=/opt/old state=absent'"
+
+      - cmd: "ansible webservers -m service -a 'name=nginx state=restarted' -b"
+        desc: Zrestartuj serwis nginx (z sudo)
+        detail:
+          what: "Restartuje serwis systemd/init.d na serwerach. state: started/stopped/restarted/reloaded."
+          how: "Używaj state=reloaded dla graceful reload bez downtime (gdy serwis obsługuje SIGHUP)."
+          tips:
+            - "state=started uruchamia jeśli zatrzymany, nie restartuje jeśli już działa"
+
+      - cmd: "ansible webservers -m package -a 'name=nginx state=present' -b"
+        desc: Zainstaluj pakiet nginx
+        detail:
+          what: "Instaluje pakiet przez menedżer pakietów OS (apt/yum/dnf automatycznie wykryte). Idempotentne."
+          how: "state=present instaluje, state=absent usuwa, state=latest aktualizuje."
+          tips:
+            - "ansible.builtin.apt lub ansible.builtin.yum dla specyficznych opcji"
+            - "Instalacja wielu: -a 'name=[nginx,git,curl] state=present'"
+
+      - cmd: "ansible all -m user -a 'name=deploy state=present groups=sudo' -b"
+        desc: Utwórz użytkownika deploy z grupą sudo
+        detail:
+          what: "Tworzy użytkownika systemowego. state=present tworzy, state=absent usuwa."
+          how: "Parametry: name, uid, groups, shell, home, password, system, remove."
+          tips:
+            - "append=yes dodaje do grup zamiast zastępować: -a 'name=user groups=docker append=yes'"
+
+      - cmd: "ansible all -m cron -a 'name=backup minute=0 hour=2 job=/opt/backup.sh' -b"
+        desc: Dodaj zadanie cron (backup o 2:00 w nocy)
+        detail:
+          what: "Zarządza wpisami cron. name jest wymaganym identyfikatorem — pozwala usunąć lub zaktualizować wpis."
+          how: "Pola: minute, hour, day, month, weekday, job, user. state=absent usuwa."
+          tips:
+            - "state=absent + name=backup usuwa konkretne zadanie cron"
+
+      - cmd: ansible all -m setup
+        desc: Zbierz fakty o hoście (system, OS, IP, CPU, RAM)
+        detail:
+          what: "Zbiera wszystkie fakty systemowe — dystrybucja, wersja, interfejsy sieciowe, dyski, CPU, RAM."
+          how: "Output to duży JSON ze wszystkimi zmiennymi ansible_*. Używaj filter dla konkretnych faktów."
+          tips:
+            - "ansible all -m setup -a 'filter=ansible_distribution*'"
+            - "ansible all -m setup -a 'filter=ansible_default_ipv4'"
+
+  - name: ansible-playbook
+    icon: "📋"
+    commands:
+      - cmd: ansible-playbook site.yml
+        desc: Uruchom playbook site.yml
+        detail:
+          what: "Główna komenda do uruchamiania playbooków. Wykonuje wszystkie play i task z pliku YAML."
+          how: "Wymaga inventory (z ansible.cfg lub -i). Wyświetla output dla każdego taska per host."
+          tips:
+            - "ansible-playbook site.yml -i inventory/production  # konkretne inventory"
+            - "Zawsze uruchom --check przed pierwszym apply na produkcji"
+
+      - cmd: ansible-playbook site.yml --check
+        desc: Dry-run — symulacja bez wykonywania zmian
+        detail:
+          what: "Symuluje wykonanie playbooka bez wprowadzania żadnych zmian na serwerach."
+          how: "Jak 'terraform plan'. Wyświetla co zostałoby zmienione. Nie wszystkie moduły obsługują check mode."
+          tips:
+            - "ansible-playbook site.yml --check --diff  # pokaż też diffs w plikach"
+
+      - cmd: ansible-playbook site.yml --diff
+        desc: Pokaż różnice w plikach (jak git diff)
+        detail:
+          what: "Wyświetla unified diff dla każdego pliku który zostanie zmieniony przez moduły copy/template."
+          how: "Bardzo pomocne przy review zmian konfiguracji przed wdrożeniem na produkcję."
+          tips:
+            - "Łącz z --check dla bezpiecznego podglądu: ansible-playbook site.yml --check --diff"
+
+      - cmd: "ansible-playbook site.yml --tags deploy"
+        desc: Uruchom tylko zadania z tagiem deploy
+        detail:
+          what: "Wykonuje tylko taski oznaczone podanym tagiem. Przydatne do częściowego uruchomienia playbooka."
+          how: "Taski z tagiem 'always' uruchamiają się zawsze. Taski bez tagu są pomijane."
+          tips:
+            - "ansible-playbook site.yml --tags 'deploy,config'  # wiele tagów"
+
+      - cmd: "ansible-playbook site.yml --skip-tags setup"
+        desc: Pomiń zadania z tagiem setup
+        detail:
+          what: "Wykonuje wszystkie taski oprócz oznaczonych podanym tagiem. Odwrotność --tags."
+          how: "Przydatne gdy chcesz pominąć część playbooka (np. --skip-tags packages po pierwszej instalacji)."
+          tips:
+            - "ansible-playbook site.yml --skip-tags 'setup,packages'  # pomiń wiele tagów"
+
+      - cmd: "ansible-playbook site.yml --limit webservers"
+        desc: Uruchom tylko na serwerach z grupy webservers
+        detail:
+          what: "Ogranicza wykonanie playbooka do podanego hosta lub grupy. Nadpisuje hosts: w play."
+          how: "Przyjmuje wzorce inventory: group, host, 'group1:group2', 'all:!dbservers'."
+          tips:
+            - "ansible-playbook site.yml --limit web1.example.com  # jeden host"
+            - "ansible-playbook site.yml --limit 'webservers:!web3'  # wyklucz web3"
+
+      - cmd: "ansible-playbook site.yml -e 'env=production version=2.1'"
+        desc: Przekaż extra zmienne z CLI
+        detail:
+          what: "Ustawia zmienne z linii komend — mają najwyższy priorytet (nadpisują wszystko inne)."
+          how: "Możesz podać jako key=value lub JSON. Plik z zmiennymi: -e @extra_vars.yml."
+          tips:
+            - "ansible-playbook site.yml -e @vars/production.yml  # zmienne z pliku"
+            - "ansible-playbook site.yml -e '{\"env\": \"prod\", \"debug\": false}'"
+
+      - cmd: ansible-playbook site.yml --vault-password-file ~/.vault_pass
+        desc: Uruchom playbook z plikiem hasła Vault
+        detail:
+          what: "Podaje hasło Vault automatycznie z pliku — bez interaktywnego pytania. Idealne dla CI/CD."
+          how: "Plik powinien zawierać tylko hasło jako tekst. chmod 600 ~/.vault_pass dla bezpieczeństwa."
+          tips:
+            - "Ustaw w ansible.cfg: vault_password_file = ~/.vault_pass  (wygodniejsze)"
+
+      - cmd: ansible-playbook site.yml --ask-vault-pass
+        desc: Pytaj o hasło Vault interaktywnie
+        detail:
+          what: "Pyta o hasło Vault podczas uruchamiania playbooka. Przydatne dla lokalnego developmentu."
+          how: "Hasło jest wpisywane interaktywnie i nie jest zapisywane w historii shella."
+          tips:
+            - "Alternatywa: --vault-password-file dla automatyzacji"
+
+      - cmd: ansible-playbook site.yml --list-tasks
+        desc: Wylistuj wszystkie taski bez wykonywania
+        detail:
+          what: "Pokazuje listę wszystkich tasków które zostałyby wykonane. Przydatne do planowania."
+          how: "Output: numer taska, nazwa taska, tagi. Nie łączy się z logiką warunkową (when)."
+          tips:
+            - "ansible-playbook site.yml --list-tasks --tags deploy  # tylko tagged"
+
+      - cmd: ansible-playbook site.yml --list-hosts
+        desc: Wylistuj hosty na których zadziała playbook
+        detail:
+          what: "Pokazuje które hosty z inventory zostaną dotknięte przez playbook. Bez wykonywania."
+          how: "Przydatne do weryfikacji że limit/inventory jest poprawne przed uruchomieniem."
+          tips:
+            - "ansible-playbook site.yml --list-hosts --limit production"
+
+      - cmd: ansible-playbook site.yml --step
+        desc: Interaktywne wykonanie — pytaj przed każdym taskiem
+        detail:
+          what: "Pyta przed każdym taskiem: (y)es / (n)o / (c)ontinue (bez dalszego pytania)."
+          how: "Przydatne przy debugowaniu lub przy pierwszym uruchomieniu na nowym środowisku."
+          tips:
+            - "Naciśnij 'c' żeby kontynuować bez pytania o kolejne taski"
+
+      - cmd: ansible-playbook site.yml -v
+        desc: Verbose output (poziom 1)
+        detail:
+          what: "Wyświetla szczegółowy output tasków — argumenty modułów i ich wyniki."
+          how: "-v = argumenty modułów, -vv = skrypty modułów, -vvv = SSH debug, -vvvv = transport debug."
+          tips:
+            - "-vvv to zwykle optymalny poziom do debugowania problemów SSH"
+
+      - cmd: "ansible-playbook site.yml --forks 20"
+        desc: Uruchom równolegle na 20 hostach jednocześnie
+        detail:
+          what: "Ansible domyślnie wykonuje równolegle na 5 hostach (forks=5). Zwiększenie przyspiesza dla dużych inventories."
+          how: "Zwiększaj ostrożnie — każdy fork to osobny proces. Ogranicz zasoby kontrolera."
+          tips:
+            - "Ustaw na stałe w ansible.cfg: forks = 20"
+
+  - name: ansible-galaxy
+    icon: "🌌"
+    commands:
+      - cmd: ansible-galaxy role install geerlingguy.nginx
+        desc: Zainstaluj rolę z Ansible Galaxy
+        detail:
+          what: "Pobiera rolę z galaxy.ansible.com i instaluje lokalnie (domyślnie ~/.ansible/roles/)."
+          how: "Format: <autor>.<rola>. Używaj requirements.yml dla wersjonowanych zależności."
+          tips:
+            - "ansible-galaxy role install geerlingguy.nginx,3.2.0  # konkretna wersja"
+
+      - cmd: ansible-galaxy collection install community.docker
+        desc: Zainstaluj kolekcję z Ansible Galaxy
+        detail:
+          what: "Pobiera kolekcję (zestaw ról + modułów) z galaxy.ansible.com. Instaluje do ~/.ansible/collections/."
+          how: "Format FQCN: <namespace>.<kolekcja>. Kolekcje zastąpiły luźne role w nowoczesnym Ansible."
+          tips:
+            - "ansible-galaxy collection install community.docker:3.4.0  # z wersją"
+            - "ansible-galaxy collection install -r requirements.yml  # z pliku"
+
+      - cmd: ansible-galaxy role init myrole
+        desc: Utwórz szkielet nowej roli
+        detail:
+          what: "Tworzy strukturę katalogów roli: tasks/, handlers/, templates/, files/, vars/, defaults/, meta/."
+          how: "Uruchom w katalogu roles/ projektu. Edytuj tasks/main.yml jako punkt startowy."
+          tips:
+            - "ansible-galaxy role init --role-skeleton skeleton/ myrole  # własny szablon"
+
+      - cmd: ansible-galaxy role list
+        desc: Wylistuj zainstalowane role
+        detail:
+          what: "Pokazuje wszystkie zainstalowane role z ich ścieżkami i wersjami."
+          how: "Szuka ról w ścieżkach z roles_path z ansible.cfg."
+          tips:
+            - "Weryfikuj po ansible-galaxy role install że rola jest widoczna"
+
+      - cmd: ansible-galaxy role remove geerlingguy.nginx
+        desc: Usuń zainstalowaną rolę
+        detail:
+          what: "Usuwa rolę z lokalnej instalacji."
+          how: "Podaj pełną nazwę: autor.rola"
+          tips:
+            - "Sprawdź requirements.yml — usuń wpis żeby nie zainstalować ponownie"
+
+      - cmd: ansible-galaxy role search nginx
+        desc: Szukaj ról na Ansible Galaxy
+        detail:
+          what: "Wyszukuje role na galaxy.ansible.com po nazwie. Pokazuje popularność i liczbę pobrań."
+          how: "Lepiej szukać bezpośrednio na galaxy.ansible.com — ładniejszy UI i filtrowanie."
+          tips:
+            - "ansible-galaxy role search nginx --author geerlingguy  # filtr po autorze"
+
+      - cmd: ansible-galaxy collection list
+        desc: Wylistuj zainstalowane kolekcje
+        detail:
+          what: "Pokazuje wszystkie zainstalowane kolekcje z wersjami."
+          how: "Kolekcje są w ~/.ansible/collections/ lub w collections/ w projekcie."
+          tips:
+            - "Sprawdzaj po instalacji że wersja jest poprawna"
+
+      - cmd: ansible-galaxy install -r requirements.yml
+        desc: Zainstaluj role i kolekcje z pliku requirements.yml
+        detail:
+          what: "Instaluje wszystkie zależności zdefiniowane w requirements.yml — zarówno role jak i kolekcje."
+          how: "Standardowy sposób zarządzania zależnościami Ansible w projekcie. Commituj requirements.yml do git."
+          tips:
+            - "ansible-galaxy install -r requirements.yml --force  # wymuś reinstalację"
+            - "ansible-galaxy install -r requirements.yml -p ./roles  # lokalnie w projekcie"
+
+  - name: ansible-vault
+    icon: "🔐"
+    commands:
+      - cmd: ansible-vault create secrets.yml
+        desc: Utwórz nowy zaszyfrowany plik
+        detail:
+          what: "Tworzy nowy plik YAML zaszyfrowany AES-256. Pyta o hasło i otwiera edytor."
+          how: "Zaszyfrowany plik możesz bezpiecznie commitować do git. Plik jest nieczytelny bez hasła."
+          tips:
+            - "EDITOR=nano ansible-vault create secrets.yml  # wybierz edytor"
+
+      - cmd: ansible-vault edit secrets.yml
+        desc: Edytuj zaszyfrowany plik
+        detail:
+          what: "Odszyfrowuje do pamięci, otwiera w edytorze, po zapisaniu automatycznie szyfruje ponownie."
+          how: "Pyta o hasło jeśli nie skonfigurowano vault_password_file."
+          tips:
+            - "Ustaw EDITOR w środowisku lub ansible.cfg"
+
+      - cmd: ansible-vault view secrets.yml
+        desc: Podejrzyj zawartość zaszyfrowanego pliku
+        detail:
+          what: "Wyświetla odszyfrowaną zawartość pliku bez otwierania edytora i bez zapisywania."
+          how: "Bezpieczniejsze niż decrypt gdy tylko chcesz sprawdzić wartości."
+          tips:
+            - "ansible-vault view secrets.yml --vault-password-file ~/.vault_pass"
+
+      - cmd: ansible-vault encrypt secrets.yml
+        desc: Zaszyfruj istniejący plik
+        detail:
+          what: "Szyfruje istniejący plik YAML w miejscu. Nadpisuje plik zaszyfrowaną wersją."
+          how: "Plik musi być wcześniej plaintext (niezaszyfrowany). Nie można zaszyfrować już zaszyfrowanego."
+          tips:
+            - "ansible-vault encrypt vars/main.yml vars/secrets.yml  # wiele plików"
+
+      - cmd: ansible-vault decrypt secrets.yml
+        desc: Odszyfruj plik do postaci jawnej
+        detail:
+          what: "Odszyfrowuje plik w miejscu do plaintext. Uwaga — nie commituj odszyfrowanego pliku!"
+          how: "Używaj tylko lokalnie do edycji manualnej. Po edycji zaszyfruj ponownie."
+          tips:
+            - "Dodaj do .gitignore chwilowe odszyfrowane pliki żeby nie commitować przez pomyłkę"
+
+      - cmd: "ansible-vault encrypt_string 'my_password' --name 'db_password'"
+        desc: Zaszyfruj pojedynczy string inline
+        detail:
+          what: "Szyfruje pojedynczą wartość — output wklej bezpośrednio do pliku YAML jako wartość zmiennej."
+          how: "Output zaczyna się od !vault i jest wieloliniowy. Pozostała część pliku pozostaje plaintext."
+          tips:
+            - "ansible-vault encrypt_string --stdin-name 'api_key'  # wpisz wartość interaktywnie"
+
+      - cmd: "ansible-vault rekey --new-vault-password-file new_pass.txt secrets.yml"
+        desc: Zmień hasło Vault dla zaszyfrowanego pliku
+        detail:
+          what: "Zmienia hasło szyfrowania pliku bez odszyfrowywania go manualnie. Przydatne przy rotacji haseł."
+          how: "Pyta o stare hasło, nowe hasło (lub z pliku --new-vault-password-file)."
+          tips:
+            - "Uruchom na wszystkich plikach vault przy rotacji hasła"
+
+      - cmd: "ansible-vault encrypt --vault-id prod@~/.vault_pass_prod secrets.yml"
+        desc: Zaszyfruj plik z konkretnym Vault ID (dla multi-środowisk)
+        detail:
+          what: "Szyfruje plik z oznaczeniem vault ID — pozwala mieć różne hasła dla dev/staging/prod."
+          how: "Przy odszyfrowaniu Ansible automatycznie dobiera właściwy vault ID."
+          tips:
+            - "ansible-playbook site.yml --vault-id dev@dev_pass.txt --vault-id prod@prod_pass.txt"
+
+  - name: ansible-inventory
+    icon: "📦"
+    commands:
+      - cmd: ansible-inventory --list
+        desc: Wylistuj całe inventory jako JSON
+        detail:
+          what: "Pokazuje pełne inventory jako JSON — hosty, grupy, zmienne. Działa ze statycznym i dynamic inventory."
+          how: "Użyj -i podając inventory: ansible-inventory -i inventory/ --list"
+          tips:
+            - "ansible-inventory --list | jq '.webservers.hosts'  # filtruj przez jq"
+
+      - cmd: "ansible-inventory --host web1.example.com"
+        desc: Pokaż zmienne konkretnego hosta
+        detail:
+          what: "Wyświetla wszystkie zmienne dla podanego hosta po mergowaniu group_vars i host_vars."
+          how: "Pomocne do debugowania jakie wartości zmiennych otrzyma konkretny host."
+          tips:
+            - "Użyj gdy nie wiesz dlaczego host ma nieoczekiwaną wartość zmiennej"
+
+      - cmd: ansible-inventory --graph
+        desc: Pokaż drzewo grup inventory
+        detail:
+          what: "Wyświetla hierarchię grup jako drzewo ASCII. Pomocne do zrozumienia struktury inventory."
+          how: "ansible-inventory -i inventory/ --graph  (z konkretnym inventory)"
+          tips:
+            - "ansible-inventory --graph --vars  # pokaż też zmienne przy każdym hoście"
+
+      - cmd: "ansible-inventory -i aws_ec2.yml --list"
+        desc: Testuj dynamic inventory plugin (AWS EC2)
+        detail:
+          what: "Pobiera dynamiczne inventory z AWS EC2 i wyświetla jako JSON. Sprawdza czy plugin działa poprawnie."
+          how: "Wymaga skonfigurowanych credentials AWS i kolekcji amazon.aws."
+          tips:
+            - "ansible-inventory -i aws_ec2.yml --graph  # widok drzewa dynamic inventory"
+
+      - cmd: "ansible-inventory --vars --graph"
+        desc: Pokaż drzewo grup z przypisanymi zmiennymi
+        detail:
+          what: "Rozszerzona wersja --graph — przy każdym hoście wyświetla wszystkie jego zmienne."
+          how: "Może być bardzo długi dla dużych inventory. Używaj --limit żeby ograniczyć."
+          tips:
+            - "Przydatne do szybkiego audytu zmiennych w inventory"
+
+  - name: ansible-config
+    icon: "⚙️"
+    commands:
+      - cmd: ansible-config list
+        desc: Wylistuj wszystkie dostępne opcje konfiguracji
+        detail:
+          what: "Pokazuje wszystkie parametry konfiguracyjne Ansible — nazwa, opis, typ, domyślna wartość, zmienna środowiskowa."
+          how: "Bardzo długi output. Szukaj konkretnej opcji: ansible-config list | grep FORKS"
+          tips:
+            - "ansible-config list | grep -A5 DEFAULT_FORKS  # szczegóły opcji FORKS"
+
+      - cmd: ansible-config dump
+        desc: Pokaż aktywną konfigurację z wartościami
+        detail:
+          what: "Wyświetla aktualnie aktywną konfigurację — z ansible.cfg, zmiennych środowiskowych i defaultów."
+          how: "Pokazuje też skąd pochodzi każda wartość (z pliku/env/default). Pomocne do debugowania."
+          tips:
+            - "ansible-config dump --only-changed  # tylko wartości inne niż domyślne"
+
+      - cmd: ansible-config view
+        desc: Pokaż zawartość aktywnego ansible.cfg
+        detail:
+          what: "Wyświetla zawartość aktywnego pliku ansible.cfg (ten który Ansible aktualnie używa)."
+          how: "Priorytety ansible.cfg: ANSIBLE_CONFIG env > ./ansible.cfg > ~/.ansible.cfg > /etc/ansible/ansible.cfg"
+          tips:
+            - "Sprawdź który plik jest aktywny: ansible --version (pokazuje config file)"
+
+      - cmd: ansible-config init
+        desc: Generuj szablonowy ansible.cfg ze wszystkimi opcjami
+        detail:
+          what: "Tworzy pełny ansible.cfg z domyślnymi wartościami i komentarzami do każdej opcji."
+          how: "ansible-config init --disabled -t all > ansible.cfg (--disabled komentuje wszystko)"
+          tips:
+            - "Dobry punkt startowy dla nowego projektu — odkomentuj tylko co potrzebujesz"
+
+  - name: ansible-doc
+    icon: "📚"
+    commands:
+      - cmd: ansible-doc -l
+        desc: Wylistuj wszystkie dostępne moduły
+        detail:
+          what: "Pokazuje listę wszystkich zainstalowanych modułów Ansible z krótkim opisem."
+          how: "Bardzo długi output. Szukaj: ansible-doc -l | grep docker"
+          tips:
+            - "ansible-doc -l -t lookup  # wylistuj lookup plugins"
+            - "ansible-doc -l -t callback  # wylistuj callback plugins"
+
+      - cmd: ansible-doc ansible.builtin.copy
+        desc: Pokaż dokumentację modułu copy
+        detail:
+          what: "Wyświetla pełną dokumentację modułu — opis, parametry, przykłady, wartości zwracane."
+          how: "Możesz użyć skróconej nazwy (copy) lub FQCN (ansible.builtin.copy). FQCN zalecane."
+          tips:
+            - "ansible-doc ansible.builtin.template  # dokumentacja template"
+            - "ansible-doc community.docker.docker_container  # moduł z kolekcji"
+
+      - cmd: "ansible-doc -t lookup file"
+        desc: Pokaż dokumentację lookup plugin file
+        detail:
+          what: "Wyświetla dokumentację dla pluginów typu lookup (różne od modułów tasks)."
+          how: "Typy: -t module (default), -t lookup, -t callback, -t connection, -t inventory."
+          tips:
+            - "ansible-doc -t lookup env  # lookup dla zmiennych środowiskowych"
+            - "ansible-doc -t connection ssh  # dokumentacja połączenia SSH"

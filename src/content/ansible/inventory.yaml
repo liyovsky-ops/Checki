@@ -1,0 +1,381 @@
+title: Ansible — Inventory & Grupy Hostów
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Inventory definiuje listę zarządzanych hostów i ich organizację w grupy.
+  Ansible obsługuje statyczne inventory w formacie INI lub YAML, dynamiczne
+  inventory generowane przez skrypty lub pluginy (AWS EC2, GCP, Azure).
+  Zmienne per-host i per-grupa pozwalają parametryzować konfigurację bez
+  kopiowania kodu. Właściwa organizacja inventory to fundament skalowalnego Ansible.
+
+items:
+  - name: Inventory INI format
+    desc: >
+      Format INI to tradycyjny format inventory Ansible — prosty i czytelny.
+      Grupy definiuje się przez nawiasy kwadratowe. Zmienne hostów inline po adresie IP.
+      Grupy grup przez sufiks :children. Zmienne grupy przez sufiks :vars.
+    code: |
+      # inventory/hosts.ini
+
+      # Niezgrupowane hosty (domyślnie w grupie 'ungrouped')
+      standalone.example.com
+
+      # Prosta lista hostów
+      [webservers]
+      web1.example.com
+      web2.example.com
+      192.168.1.101
+      192.168.1.102
+
+      # Hosty z numerami (range)
+      [dbservers]
+      db[1:3].example.com    # db1, db2, db3
+      worker[a:c].local      # workera, workerb, workerc
+
+      # Hosty z zmiennymi inline
+      [loadbalancers]
+      lb1.example.com ansible_user=admin ansible_port=2222
+      lb2.example.com ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/lb.pem
+
+      # Grupy grup
+      [datacenter:children]
+      webservers
+      dbservers
+      loadbalancers
+
+      # Zmienne grupy
+      [webservers:vars]
+      http_port=80
+      https_port=443
+      nginx_worker_processes=4
+
+      [dbservers:vars]
+      db_port=5432
+      db_name=production
+
+  - name: Inventory YAML format
+    desc: >
+      Format YAML jest bardziej ekspresywny od INI — lepiej obsługuje zagnieżdżone grupy,
+      złożone zmienne i struktury danych. Preferowany dla większych projektów i gdy
+      inventory jest generowane programatycznie.
+    code: |
+      # inventory/hosts.yml
+      ---
+      all:
+        children:
+          webservers:
+            hosts:
+              web1.example.com:
+                http_port: 80
+                nginx_worker_processes: 4
+              web2.example.com:
+                http_port: 8080
+            vars:
+              # Zmienne wspólne dla webservers
+              nginx_version: "1.24"
+              deploy_user: deploy
+
+          dbservers:
+            hosts:
+              db1.example.com:
+                postgresql_port: 5432
+                postgresql_max_connections: 200
+              db2.example.com:
+                postgresql_port: 5432
+                postgresql_max_connections: 100
+                postgresql_standby: true
+            vars:
+              postgresql_version: "16"
+              backup_enabled: true
+
+          # Grupy grup
+          datacenter:
+            children:
+              webservers:
+              dbservers:
+            vars:
+              # Wspólne dla całego datacenter
+              ntp_server: "ntp.example.com"
+              timezone: "Europe/Warsaw"
+
+          # Hosty niezgrupowane
+          ungrouped:
+            hosts:
+              bastion.example.com:
+                ansible_user: admin
+
+  - name: Grupy hostów i wzorce
+    desc: >
+      Ansible oferuje elastyczne wzorce do targetowania hostów i grup w komendach.
+      Możesz łączyć grupy przez AND (&), OR (,), NOT (!), używać wildcard (*) i regex.
+      Wzorce stosuje się zarówno w ansible, ansible-playbook jak i w playbooku hosts:.
+    code: |
+      # Wzorce w komendach ad-hoc
+      ansible all -m ping                       # wszyscy hosty
+      ansible webservers -m ping                # konkretna grupa
+      ansible "web1.example.com" -m ping        # konkretny host
+      ansible "web*.example.com" -m ping        # wildcard
+
+      # AND — hosty w obu grupach
+      ansible "webservers:&production" -m ping
+
+      # OR — hosty w którejś z grup
+      ansible "webservers:dbservers" -m ping
+
+      # NOT — wykluczenie grupy
+      ansible "all:!dbservers" -m ping
+
+      # Kombinacje
+      ansible "webservers:&production:!lb" -m ping
+
+      # Indeksowanie (1. host z grupy)
+      ansible "webservers[0]" -m ping
+
+      # Zakres hostów z grupy
+      ansible "webservers[0:2]" -m ping
+
+      # W playbooku
+      - name: Play for web and db
+        hosts: "webservers:dbservers"
+
+      - name: Play for prod web only
+        hosts: "webservers:&production"
+
+      - name: Play excluding staging
+        hosts: "all:!staging"
+
+  - name: "[all] i [ungrouped] — wbudowane grupy"
+    desc: >
+      Ansible ma dwie wbudowane grupy. all zawiera wszystkie hosty z inventory.
+      ungrouped zawiera hosty które nie należą do żadnej grupy użytkownika.
+      group_vars/all/ stosuje zmienne do wszystkich hostów — idealne dla wspólnych ustawień.
+    code: |
+      # Wbudowane grupy w Ansible:
+      # all      - wszyscy hosty
+      # ungrouped - hosty bez grupy
+
+      # Użycie w playbooku
+      - name: Run on ALL hosts
+        hosts: all
+        tasks:
+          - name: Check connectivity
+            ansible.builtin.ping:
+
+      - name: Configure ungrouped hosts
+        hosts: ungrouped
+        tasks:
+          - name: Basic setup
+            ansible.builtin.package:
+              name: curl
+              state: present
+
+      # group_vars/all.yml — zmienne dla WSZYSTKICH hostów
+      # ---
+      # ntp_servers:
+      #   - "0.pool.ntp.org"
+      #   - "1.pool.ntp.org"
+      # timezone: "Europe/Warsaw"
+      # ansible_python_interpreter: /usr/bin/python3
+
+      # Hierarchia zmiennych:
+      # group_vars/all/          ← najniższy priorytet dla grup
+      # group_vars/parent_group/
+      # group_vars/child_group/
+      # host_vars/<hostname>/    ← nadpisuje zmienne grupy
+
+  - name: host_vars i group_vars
+    desc: >
+      host_vars/ i group_vars/ to katalogi z plikami YAML zawierającymi zmienne.
+      Możesz użyć pojedynczego pliku (host_vars/web1.yml) lub katalogu z wieloma plikami
+      (host_vars/web1/main.yml, web1/secrets.yml). Plik secrets.yml możesz zaszyfrować Vaultem.
+    code: |
+      # Struktura katalogów
+      inventory/
+      ├── hosts.yml              # lista hostów
+      ├── group_vars/
+      │   ├── all.yml            # zmienne dla wszystkich
+      │   ├── all/               # lub katalog
+      │   │   ├── main.yml
+      │   │   └── vault.yml      # zaszyfrowane zmienne
+      │   ├── webservers.yml     # zmienne grupy webservers
+      │   └── production/        # katalog dla grupy production
+      │       ├── main.yml
+      │       └── secrets.yml    # ansible-vault encrypt
+      └── host_vars/
+          ├── web1.example.com.yml   # zmienne konkretnego hosta
+          └── db1.example.com/       # lub katalog
+              ├── main.yml
+              └── vault.yml
+
+      # group_vars/webservers.yml
+      # ---
+      # nginx_port: 80
+      # app_deploy_path: /var/www/html
+      # max_upload_size: "10M"
+
+      # host_vars/web1.example.com.yml
+      # ---
+      # nginx_port: 8080          # nadpisuje zmienną grupy
+      # server_id: web1
+      # backup_enabled: true
+
+  - name: Zmienne połączenia SSH
+    desc: >
+      Ansible używa specjalnych zmiennych (magic variables) do konfiguracji połączenia SSH.
+      Możesz je ustawić w inventory, host_vars lub group_vars. ansible_host pozwala
+      użyć przyjaznej nazwy dla hosta z innym adresem IP.
+    code: |
+      # W inventory YAML
+      ---
+      all:
+        hosts:
+          prod-web-1:
+            ansible_host: 10.0.1.101        # prawdziwy IP
+            ansible_user: ubuntu             # user SSH
+            ansible_port: 22                 # port SSH (default: 22)
+            ansible_ssh_private_key_file: ~/.ssh/prod.pem
+
+          legacy-server:
+            ansible_host: 192.168.50.10
+            ansible_user: root
+            ansible_password: "{{ vault_legacy_password }}"  # nie zalecane!
+            ansible_python_interpreter: /usr/bin/python3.8
+
+          windows-server:
+            ansible_host: 10.0.2.50
+            ansible_user: Administrator
+            ansible_password: "{{ vault_win_password }}"
+            ansible_connection: winrm      # WinRM zamiast SSH
+            ansible_winrm_server_cert_validation: ignore
+
+        vars:
+          # Wspólne dla wszystkich
+          ansible_user: ubuntu
+          ansible_python_interpreter: /usr/bin/python3
+          ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+      # Przydatne zmienne połączenia:
+      # ansible_host           - IP/hostname do połączenia
+      # ansible_user           - user SSH
+      # ansible_port           - port SSH
+      # ansible_password       - hasło SSH (lepiej: klucz)
+      # ansible_ssh_private_key_file - klucz prywatny
+      # ansible_become_password - hasło sudo
+      # ansible_connection     - ssh / winrm / local / docker
+      # ansible_python_interpreter - ścieżka do Python na serwerze
+
+  - name: Dynamic inventory — pluginy
+    desc: >
+      Dynamic inventory generuje listę hostów dynamicznie z zewnętrznych źródeł —
+      AWS EC2, GCP, Azure, Kubernetes, VMware. Pluginy inventory są konfigurowalne przez YAML.
+      Zastępuje starsze podejście ze skryptami inventory.
+    code: |
+      # inventory/aws_ec2.yml — plugin AWS EC2
+      ---
+      plugin: amazon.aws.aws_ec2
+      regions:
+        - eu-west-1
+        - eu-central-1
+
+      # Filtruj instancje
+      filters:
+        instance-state-name: running
+        "tag:Environment": production
+        "tag:ManagedBy": ansible
+
+      # Grupuj po tagach
+      keyed_groups:
+        - key: tags.Role
+          prefix: role
+          separator: "_"
+        - key: tags.Environment
+          prefix: env
+        - key: placement.region
+          prefix: aws_region
+
+      # Zmienne z tagów
+      hostnames:
+        - tag:Name
+        - private-ip-address
+
+      compose:
+        ansible_host: private_ip_address
+        ansible_user: "ubuntu"
+
+      # Użycie
+      # ansible-inventory -i inventory/aws_ec2.yml --list
+      # ansible-playbook -i inventory/aws_ec2.yml site.yml
+
+  - name: Dynamic inventory — GCP i inne
+    desc: >
+      Plugin GCP compute i inne cloud pluginy działają podobnie do AWS EC2.
+      Możesz łączyć wiele źródeł inventory (statyczne + dynamiczne) w jednym katalogu
+      lub przez parametr -i wiele razy. Ansible merguje wyniki.
+    code: |
+      # inventory/gcp_compute.yml — Google Cloud Platform
+      ---
+      plugin: google.cloud.gcp_compute
+      projects:
+        - my-gcp-project-id
+      zones:
+        - europe-west1-b
+        - europe-west1-c
+
+      auth_kind: serviceaccount
+      service_account_file: /etc/ansible/gcp-credentials.json
+
+      filters:
+        - status = RUNNING
+        - labels.env = production
+
+      keyed_groups:
+        - key: labels.role
+          prefix: role
+        - key: zone
+          prefix: gcp_zone
+
+      compose:
+        ansible_host: networkInterfaces[0].accessConfigs[0].natIP
+
+      # Łączenie wielu źródeł
+      # ansible-playbook -i inventory/hosts.yml -i inventory/aws_ec2.yml site.yml
+
+      # Lub: inventory/ jako katalog (Ansible ładuje wszystkie pliki)
+      # inventory/
+      # ├── hosts.yml          <- statyczne
+      # ├── aws_ec2.yml        <- dynamic AWS
+      # └── gcp_compute.yml    <- dynamic GCP
+      # ansible-playbook -i inventory/ site.yml
+
+  - name: Inventory plugins — konfiguracja i testowanie
+    desc: >
+      ansible-inventory pozwala debugować i testować inventory bez uruchamiania playbooka.
+      Możesz wylistować wszystkie hosty, zobaczyć zmienne konkretnego hosta, podejrzeć
+      graf grup. Niezbędne przy pracy z dynamic inventory.
+    code: |
+      # Pokaż wszystkich hostów jako JSON
+      ansible-inventory -i inventory/ --list
+
+      # Pokaż wszystkich hostów jako graf
+      ansible-inventory -i inventory/ --graph
+
+      # Pokaż zmienne konkretnego hosta
+      ansible-inventory -i inventory/ --host web1.example.com
+
+      # Ładniejszy output z jq
+      ansible-inventory -i inventory/ --list | jq '.webservers.hosts'
+
+      # Testuj dynamic inventory
+      ansible-inventory -i inventory/aws_ec2.yml --graph
+
+      # Sprawdź faktyczne zmienne hosta (po mergowaniu)
+      ansible -i inventory/ web1.example.com -m debug -a "var=hostvars[inventory_hostname]"
+
+      # Pobierz hosty z grupy
+      ansible-inventory -i inventory/ --list | jq '.webservers.hosts[]'
+
+      # ansible_inventory_sources — lista aktywnych inventory
+      ansible -i inventory/ all -m debug -a "var=ansible_inventory_sources"

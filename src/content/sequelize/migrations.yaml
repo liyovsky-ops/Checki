@@ -1,0 +1,379 @@
+title: Sequelize — Migracje i seedery
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Migracje to kontrolowane zmiany schematu bazy danych z możliwością cofania (rollback).
+  sequelize-cli generuje pliki migracji z metodami up() i down(). queryInterface
+  udostępnia metody do tworzenia i modyfikowania tabel, kolumn, indeksów.
+  Seedery wypełniają bazę danymi testowymi lub początkowymi. W produkcji zawsze
+  używaj migracji zamiast Model.sync() — migracje wersjonują historię schematu.
+
+items:
+  - name: sequelize-cli init — inicjalizacja projektu
+    desc: >
+      sequelize-cli init tworzy standardową strukturę katalogów — config/ z plikiem
+      konfiguracyjnym bazy, models/ dla modeli, migrations/ dla plików migracji
+      i seeders/ dla seederów. Konfigurujesz połączenie w config/config.json
+      lub config/config.js dla zmiennych środowiskowych.
+    code: |
+      // Zainstaluj sequelize-cli
+      npm install --save-dev sequelize-cli
+
+      // Inicjalizuj projekt
+      npx sequelize-cli init
+
+      // Tworzy strukturę:
+      // config/
+      //   config.json        -- konfiguracja DB (development/test/production)
+      // models/
+      //   index.js           -- ładuje i łączy wszystkie modele
+      // migrations/          -- pliki migracji
+      // seeders/             -- pliki seederów
+
+      // config/config.js — używając zmiennych środowiskowych
+      require('dotenv').config();
+      module.exports = {
+        development: {
+          username: process.env.DB_USER,
+          password: process.env.DB_PASS,
+          database: process.env.DB_NAME,
+          host: process.env.DB_HOST,
+          dialect: 'postgres',
+        },
+        production: {
+          use_env_variable: 'DATABASE_URL',  // connection string z env
+          dialect: 'postgres',
+          dialectOptions: {
+            ssl: { require: true, rejectUnauthorized: false },
+          },
+        },
+      };
+
+  - name: Tworzenie migracji — migration:generate
+    desc: >
+      Polecenie migration:generate tworzy pusty plik migracji z metodami up() i down().
+      Plik jest automatycznie nazwany z timestampem (YYYYMMDDHHMMSS-name.js).
+      Timestamp gwarantuje wykonanie migracji w kolejności chronologicznej.
+      Możesz też użyć model:generate który tworzy model i migrację jednocześnie.
+    code: |
+      // Generuj pustą migrację
+      npx sequelize-cli migration:generate --name create-users-table
+
+      // Generuj model + migrację razem
+      npx sequelize-cli model:generate \
+        --name User \
+        --attributes username:string,email:string,age:integer,isActive:boolean
+
+      // Wygenerowany plik migracji (np. 20240115120000-create-users-table.js):
+      'use strict';
+
+      module.exports = {
+        async up(queryInterface, Sequelize) {
+          // Logika tworzenia/modyfikacji schematu
+          await queryInterface.createTable('Users', {
+            id: {
+              type: Sequelize.INTEGER,
+              primaryKey: true,
+              autoIncrement: true,
+              allowNull: false,
+            },
+            username: {
+              type: Sequelize.STRING,
+              allowNull: false,
+            },
+            email: {
+              type: Sequelize.STRING,
+              allowNull: false,
+              unique: true,
+            },
+            createdAt: {
+              type: Sequelize.DATE,
+              allowNull: false,
+            },
+            updatedAt: {
+              type: Sequelize.DATE,
+              allowNull: false,
+            },
+          });
+        },
+
+        async down(queryInterface, Sequelize) {
+          // Logika cofnięcia — rollback
+          await queryInterface.dropTable('Users');
+        },
+      };
+
+  - name: queryInterface.createTable i dropTable
+    desc: >
+      createTable tworzy nową tabelę z podanymi kolumnami. dropTable usuwa tabelę.
+      Zawsze implementuj down() jako odwrotność up() — jest to wymagane do rollbacku.
+      queryInterface jest dostępne jako pierwszy argument funkcji up() i down().
+    code: |
+      'use strict';
+
+      module.exports = {
+        async up(queryInterface, Sequelize) {
+          await queryInterface.createTable('Products', {
+            id: {
+              type: Sequelize.UUID,
+              defaultValue: Sequelize.UUIDV4,
+              primaryKey: true,
+              allowNull: false,
+            },
+            name: {
+              type: Sequelize.STRING(200),
+              allowNull: false,
+            },
+            price: {
+              type: Sequelize.DECIMAL(10, 2),
+              allowNull: false,
+              defaultValue: 0,
+            },
+            categoryId: {
+              type: Sequelize.INTEGER,
+              references: {
+                model: 'Categories',   // tabela (nie model!)
+                key: 'id',
+              },
+              onUpdate: 'CASCADE',
+              onDelete: 'SET NULL',
+            },
+            isActive: {
+              type: Sequelize.BOOLEAN,
+              defaultValue: true,
+            },
+            createdAt: { type: Sequelize.DATE, allowNull: false },
+            updatedAt: { type: Sequelize.DATE, allowNull: false },
+            deletedAt: { type: Sequelize.DATE },  // dla paranoid
+          });
+        },
+
+        async down(queryInterface, Sequelize) {
+          await queryInterface.dropTable('Products');
+        },
+      };
+
+  - name: addColumn i removeColumn
+    desc: >
+      addColumn dodaje nową kolumnę do istniejącej tabeli. removeColumn usuwa kolumnę.
+      Parametry to nazwa tabeli, nazwa kolumny i definicja (ta sama co w createTable).
+      down() dla addColumn to removeColumn i odwrotnie.
+    code: |
+      'use strict';
+
+      module.exports = {
+        async up(queryInterface, Sequelize) {
+          // Dodaj kolumnę do istniejącej tabeli
+          await queryInterface.addColumn('Users', 'phoneNumber', {
+            type: Sequelize.STRING(20),
+            allowNull: true,
+            after: 'email',            // MySQL — umieść po kolumnie email
+          });
+
+          await queryInterface.addColumn('Users', 'lastLoginAt', {
+            type: Sequelize.DATE,
+            allowNull: true,
+          });
+
+          // Możesz dodać wiele kolumn sekwencyjnie
+          await queryInterface.addColumn('Products', 'stock', {
+            type: Sequelize.INTEGER,
+            defaultValue: 0,
+            allowNull: false,
+          });
+        },
+
+        async down(queryInterface, Sequelize) {
+          // Rollback — usuń dodane kolumny
+          await queryInterface.removeColumn('Users', 'phoneNumber');
+          await queryInterface.removeColumn('Users', 'lastLoginAt');
+          await queryInterface.removeColumn('Products', 'stock');
+        },
+      };
+
+  - name: changeColumn — zmiana definicji kolumny
+    desc: >
+      changeColumn modyfikuje istniejącą kolumnę — zmienia typ, dopuszczalność NULL,
+      wartość domyślną. Ważne: w MySQL changeColumn wymaga podania pełnej definicji
+      kolumny (nie tylko zmienionych pól). W PostgreSQL można zmieniać typ tylko
+      jeśli jest kompatybilny lub używając USING.
+    code: |
+      'use strict';
+
+      module.exports = {
+        async up(queryInterface, Sequelize) {
+          // Zmień typ kolumny
+          await queryInterface.changeColumn('Users', 'username', {
+            type: Sequelize.STRING(100),   // było VARCHAR(255), teraz VARCHAR(100)
+            allowNull: false,
+            unique: true,                  // dodaj unikalność
+          });
+
+          // Zmień domyślną wartość
+          await queryInterface.changeColumn('Products', 'isActive', {
+            type: Sequelize.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,           // zmień default z true na false
+          });
+
+          // Zmień kolumnę nullable → not null (wymagane wypełnienie danych!)
+          // Najpierw backfill, potem zmień constraint
+          await queryInterface.sequelize.query(
+            "UPDATE Users SET email = CONCAT('unknown_', id, '@example.com') WHERE email IS NULL"
+          );
+          await queryInterface.changeColumn('Users', 'email', {
+            type: Sequelize.STRING,
+            allowNull: false,
+          });
+        },
+
+        async down(queryInterface, Sequelize) {
+          await queryInterface.changeColumn('Users', 'username', {
+            type: Sequelize.STRING(255),
+            allowNull: true,
+            unique: false,
+          });
+        },
+      };
+
+  - name: addIndex i removeIndex
+    desc: >
+      addIndex tworzy indeks na kolumnie lub zestawie kolumn. Możesz tworzyć
+      indeksy unique, indeksy na wyrażeniach (PostgreSQL) i indeksy złożone.
+      Indeksy znacząco przyspieszają zapytania na indeksowanych kolumnach.
+      removeIndex usuwa indeks po nazwie lub kolumnach.
+    code: |
+      'use strict';
+
+      module.exports = {
+        async up(queryInterface, Sequelize) {
+          // Prosty indeks
+          await queryInterface.addIndex('Users', ['email'], {
+            unique: true,
+            name: 'users_email_unique',
+          });
+
+          // Indeks złożony
+          await queryInterface.addIndex('Posts', ['authorId', 'createdAt'], {
+            name: 'posts_author_date_idx',
+          });
+
+          // Indeks z warunkiem (PostgreSQL partial index)
+          await queryInterface.addIndex('Orders', ['status'], {
+            name: 'orders_pending_idx',
+            where: { status: 'pending' },
+          });
+
+          // Indeks FULLTEXT (MySQL)
+          await queryInterface.addIndex('Articles', ['title', 'content'], {
+            type: 'FULLTEXT',
+            name: 'articles_fulltext_idx',
+          });
+        },
+
+        async down(queryInterface, Sequelize) {
+          await queryInterface.removeIndex('Users', 'users_email_unique');
+          await queryInterface.removeIndex('Posts', 'posts_author_date_idx');
+          await queryInterface.removeIndex('Orders', 'orders_pending_idx');
+        },
+      };
+
+  - name: Seedery — bulkInsert i bulkDelete
+    desc: >
+      Seedery wypełniają bazę danymi początkowymi lub testowymi. bulkInsert
+      wstawia wiele rekordów naraz. bulkDelete usuwa rekordy pasujące do warunków.
+      Seedery są przydatne do danych konfiguracyjnych (role, kategorie) i danych
+      testowych w środowisku development.
+    code: |
+      // Wygeneruj seeder
+      // npx sequelize-cli seed:generate --name demo-users
+
+      'use strict';
+
+      module.exports = {
+        async up(queryInterface, Sequelize) {
+          const now = new Date();
+
+          await queryInterface.bulkInsert('Users', [
+            {
+              username: 'admin',
+              email: 'admin@firma.pl',
+              role: 'admin',
+              isActive: true,
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              username: 'jan_kowalski',
+              email: 'jan@firma.pl',
+              role: 'user',
+              isActive: true,
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              username: 'anna_nowak',
+              email: 'anna@firma.pl',
+              role: 'user',
+              isActive: false,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ], {});
+        },
+
+        async down(queryInterface, Sequelize) {
+          await queryInterface.bulkDelete('Users', {
+            email: {
+              [Sequelize.Op.in]: ['admin@firma.pl', 'jan@firma.pl', 'anna@firma.pl'],
+            },
+          }, {});
+        },
+      };
+
+  - name: Uruchamianie i rollback migracji
+    desc: >
+      db:migrate wykonuje wszystkie pending migracje. db:migrate:undo cofa ostatnią
+      migrację wywołując jej metodę down(). db:migrate:undo:all cofa wszystkie.
+      Sequelize śledzi wykonane migracje w tabeli SequelizeMeta. Możesz też
+      uruchamiać migracje programowo w kodzie aplikacji.
+    code: |
+      // Uruchom wszystkie pending migracje
+      npx sequelize-cli db:migrate
+
+      // Cofnij ostatnią migrację (wywołuje down())
+      npx sequelize-cli db:migrate:undo
+
+      // Cofnij do konkretnej migracji
+      npx sequelize-cli db:migrate:undo:all --to 20240101120000-create-users-table.js
+
+      // Cofnij wszystkie migracje
+      npx sequelize-cli db:migrate:undo:all
+
+      // Sprawdź status migracji
+      npx sequelize-cli db:migrate:status
+
+      // Uruchom seedery
+      npx sequelize-cli db:seed:all
+
+      // Cofnij ostatni seeder
+      npx sequelize-cli db:seed:undo
+
+      // Cofnij wszystkie seedery
+      npx sequelize-cli db:seed:undo:all
+
+      // Programowe migracje (umzug library)
+      const { Umzug, SequelizeStorage } = require('umzug');
+
+      const umzug = new Umzug({
+        migrations: { glob: 'migrations/*.js' },
+        context: sequelize.getQueryInterface(),
+        storage: new SequelizeStorage({ sequelize }),
+        logger: console,
+      });
+
+      await umzug.up();   // run all pending
+      await umzug.down(); // undo last

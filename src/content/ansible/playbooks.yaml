@@ -1,0 +1,489 @@
+title: Ansible — Playbooki & Taski
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Playbook to plik YAML definiujący co Ansible ma zrobić — na jakich hostach, jakimi
+  zadaniami i w jakiej kolejności. Składa się z jednego lub więcej play, każdy play
+  targetuje grupę hostów i zawiera listę tasks. Playbooki są deklaratywne i idempotentne —
+  możesz je uruchamiać wielokrotnie bezpiecznie. Handlers pozwalają na warunkowe akcje
+  (restart serwisu) tylko gdy coś naprawdę się zmieniło.
+
+items:
+  - name: Struktura playbooka
+    desc: >
+      Playbook to lista play w YAML. Każdy play definiuje: hosts (na jakich serwerach),
+      vars (zmienne), tasks (lista zadań), handlers (obsługiwacze zdarzeń).
+      Nazwa playbooka i każdego taska powinna jasno opisywać co robi.
+    code: |
+      # site.yml — główny playbook
+      ---
+      - name: Configure web servers
+        hosts: webservers        # grupa z inventory
+        become: true             # uruchom jako sudo
+        vars:
+          app_port: 8080
+          app_name: myapp
+
+        pre_tasks:
+          - name: Update apt cache
+            ansible.builtin.apt:
+              update_cache: true
+              cache_valid_time: 3600
+
+        tasks:
+          - name: Install nginx
+            ansible.builtin.package:
+              name: nginx
+              state: present
+
+          - name: Deploy config
+            ansible.builtin.template:
+              src: nginx.conf.j2
+              dest: /etc/nginx/nginx.conf
+            notify: Restart nginx
+
+          - name: Ensure nginx is running
+            ansible.builtin.service:
+              name: nginx
+              state: started
+              enabled: true
+
+        post_tasks:
+          - name: Verify nginx responds
+            ansible.builtin.uri:
+              url: "http://localhost:{{ app_port }}"
+              status_code: 200
+
+        handlers:
+          - name: Restart nginx
+            ansible.builtin.service:
+              name: nginx
+              state: restarted
+
+  - name: become — eskalacja uprawnień
+    desc: >
+      become: true pozwala uruchamiać zadania jako inny użytkownik (domyślnie root przez sudo).
+      Można ustawić globalnie dla play lub per-task. become_user pozwala uruchomić
+      jako konkretny użytkownik (nie tylko root) — przydatne dla deploymentu aplikacji.
+    code: |
+      # Globalnie dla całego play
+      - name: Configure system
+        hosts: all
+        become: true            # wszystkie taski jako sudo
+        become_method: sudo     # sudo (default) / su / doas / pbrun / pfexec
+        become_user: root       # default: root
+
+        tasks:
+          - name: Install package
+            ansible.builtin.package:
+              name: nginx
+              state: present
+
+      # Per-task — eskaluj tylko wybrane zadania
+      - name: Deploy application
+        hosts: all
+        become: false           # domyślnie nie sudo
+
+        tasks:
+          - name: Checkout code (bez sudo)
+            ansible.builtin.git:
+              repo: "https://github.com/myorg/myapp.git"
+              dest: /home/deploy/myapp
+
+          - name: Set file permissions (z sudo)
+            ansible.builtin.file:
+              path: /etc/myapp
+              owner: deploy
+              mode: '0755'
+            become: true        # tylko to zadanie jako sudo
+            become_user: root
+
+          - name: Run app as deploy user
+            ansible.builtin.command: /home/deploy/myapp/start.sh
+            become: true
+            become_user: deploy  # jako inny użytkownik (nie root)
+
+  - name: notify i handlers
+    desc: >
+      Handler to specjalne zadanie uruchamiane po notify z innego taska.
+      Uruchamia się raz na końcu play — nawet jeśli wiele tasków go notyfikowało.
+      Idealny do restartowania serwisów tylko gdy konfiguracja faktycznie się zmieniła.
+    code: |
+      tasks:
+        - name: Deploy nginx main config
+          ansible.builtin.template:
+            src: nginx.conf.j2
+            dest: /etc/nginx/nginx.conf
+          notify: Reload nginx      # wyślij powiadomienie
+
+        - name: Deploy nginx site config
+          ansible.builtin.template:
+            src: site.conf.j2
+            dest: /etc/nginx/sites-available/mysite.conf
+          notify: Reload nginx      # to samo notify — handler uruchomi się raz
+
+        - name: Enable nginx site
+          ansible.builtin.file:
+            src: /etc/nginx/sites-available/mysite.conf
+            dest: /etc/nginx/sites-enabled/mysite.conf
+            state: link
+          notify:
+            - Reload nginx          # lista notyfikacji
+            - Log deployment        # możesz notyfikować wiele handlerów
+
+      handlers:
+        - name: Reload nginx
+          ansible.builtin.service:
+            name: nginx
+            state: reloaded        # graceful reload (nie restart)
+
+        - name: Log deployment
+          ansible.builtin.command: >
+            logger -t ansible "nginx config deployed at {{ ansible_date_time.iso8601 }}"
+
+      # Wymuś uruchomienie handlerów przed końcem play
+      # (normalnie uruchamiają się na końcu play)
+        - name: Force handlers now
+          ansible.builtin.meta: flush_handlers
+
+  - name: when — wyrażenia warunkowe
+    desc: >
+      Dyrektywa when pozwala warunkować wykonanie taska — na podstawie zmiennych,
+      faktów systemowych, wyników poprzednich tasków lub zmiennych inventory.
+      Obsługuje operatory Python — and, or, not, in, is defined.
+    code: |
+      tasks:
+        # Warunek na podstawie faktu OS
+        - name: Install apache (Debian)
+          ansible.builtin.apt:
+            name: apache2
+            state: present
+          when: ansible_os_family == "Debian"
+
+        - name: Install apache (RedHat)
+          ansible.builtin.yum:
+            name: httpd
+            state: present
+          when: ansible_os_family == "RedHat"
+
+        # Warunek na podstawie zmiennej
+        - name: Deploy to prod only
+          ansible.builtin.template:
+            src: prod.conf.j2
+            dest: /etc/app/prod.conf
+          when: environment == "production"
+
+        # Złożone warunki
+        - name: Install security patches
+          ansible.builtin.package:
+            name: "{{ item }}"
+            state: latest
+          loop: "{{ security_packages }}"
+          when:
+            - ansible_os_family == "Debian"
+            - apply_security_patches | bool
+            - ansible_distribution_major_version | int >= 20
+
+        # Warunek na podstawie wyniku poprzedniego taska
+        - name: Check if app exists
+          ansible.builtin.stat:
+            path: /opt/myapp/app.py
+          register: app_file
+
+        - name: Start app (only if exists)
+          ansible.builtin.command: /opt/myapp/start.sh
+          when: app_file.stat.exists
+
+        # Sprawdź czy zmienna jest zdefiniowana
+        - name: Configure proxy
+          ansible.builtin.template:
+            src: proxy.conf.j2
+            dest: /etc/proxy.conf
+          when: proxy_url is defined
+
+  - name: loop — iteracja po liście
+    desc: >
+      loop pozwala wykonać jeden task wielokrotnie dla różnych wartości.
+      Zastępuje przestarzałe with_items. Wspiera listy, słowniki, dict2items
+      i inne transformacje. Aktualny element jest dostępny jako item.
+    code: |
+      # Prosta pętla po liście
+      - name: Install packages
+        ansible.builtin.package:
+          name: "{{ item }}"
+          state: present
+        loop:
+          - nginx
+          - python3
+          - git
+          - curl
+
+      # Pętla po słownikach
+      - name: Create users
+        ansible.builtin.user:
+          name: "{{ item.name }}"
+          groups: "{{ item.groups }}"
+          shell: "{{ item.shell | default('/bin/bash') }}"
+        loop:
+          - { name: alice, groups: sudo, shell: /bin/bash }
+          - { name: bob,   groups: docker }
+          - { name: carol, groups: sudo,docker }
+
+      # Pętla po zmiennej
+      - name: Create directories
+        ansible.builtin.file:
+          path: "{{ item }}"
+          state: directory
+          mode: '0755'
+        loop: "{{ app_directories }}"
+
+      # loop_control — zmień nazwę zmiennej i etykietę
+      - name: Configure vhosts
+        ansible.builtin.template:
+          src: vhost.conf.j2
+          dest: "/etc/nginx/sites-available/{{ vhost.name }}.conf"
+        loop: "{{ vhosts }}"
+        loop_control:
+          loop_var: vhost        # zamiast item
+          label: "{{ vhost.name }}"  # etykieta w output
+
+      # with_items (deprecated, ale wciąż działa)
+      - name: Old style loop
+        ansible.builtin.debug:
+          msg: "{{ item }}"
+        with_items:
+          - one
+          - two
+
+  - name: register — zapisanie wyniku
+    desc: >
+      register zapisuje wynik wykonania taska do zmiennej — możesz sprawdzić
+      czy polecenie się powiodło, przeczytać stdout/stderr, użyć wartości w kolejnych taskach.
+      Zarejestrowane zmienne zawierają rc (return code), stdout, stderr, changed, failed.
+    code: |
+      # Zapisz wynik komendy
+      - name: Check Java version
+        ansible.builtin.command: java -version
+        register: java_version
+        failed_when: false        # nie fail jeśli Java nie zainstalowana
+
+      - name: Show Java version
+        ansible.builtin.debug:
+          msg: "Java: {{ java_version.stdout }}"
+        when: java_version.rc == 0
+
+      # Zapisz wynik stat
+      - name: Check if config exists
+        ansible.builtin.stat:
+          path: /etc/myapp/config.yml
+        register: config_stat
+
+      - name: Create default config (if missing)
+        ansible.builtin.copy:
+          src: default_config.yml
+          dest: /etc/myapp/config.yml
+        when: not config_stat.stat.exists
+
+      # Zapisz wynik shell (multiline)
+      - name: Get running containers
+        ansible.builtin.shell: docker ps --format "{{ '{{' }}.Names{{ '}}' }}"
+        register: containers
+        changed_when: false       # nie oznaczaj jako changed
+
+      - name: Show containers
+        ansible.builtin.debug:
+          msg: "Running: {{ containers.stdout_lines }}"
+
+      # Fail na podstawie wyniku
+      - name: Run tests
+        ansible.builtin.command: python -m pytest /opt/tests/
+        register: test_result
+        failed_when: test_result.rc != 0
+
+  - name: Moduł debug
+    desc: >
+      ansible.builtin.debug wypisuje wartości zmiennych i komunikaty do konsoli.
+      Niezbędny do debugowania — sprawdź co jest w zmiennej, jaki jest wynik registera,
+      jakie fakty zebrał Ansible. Może też failować playbook z wiadomością.
+    code: |
+      # Wypisz zmienną
+      - name: Debug variable
+        ansible.builtin.debug:
+          var: my_variable          # automatycznie wypisuje jako YAML
+
+      # Wypisz komunikat z interpolacją
+      - name: Show server info
+        ansible.builtin.debug:
+          msg: "Server {{ inventory_hostname }} runs {{ ansible_distribution }}"
+
+      # Wypisz wszystkie fakty
+      - name: Show all facts
+        ansible.builtin.debug:
+          var: ansible_facts
+
+      # Wypisz wynik registera
+      - name: Run command
+        ansible.builtin.command: uptime
+        register: uptime_result
+
+      - name: Show uptime
+        ansible.builtin.debug:
+          msg: "{{ uptime_result.stdout }}"
+
+      # Wypisz tylko przy verbosity >= 1
+      - name: Debug only with -v
+        ansible.builtin.debug:
+          msg: "Detailed info: {{ some_var }}"
+          verbosity: 1    # 0=zawsze, 1=tylko z -v, 2=tylko z -vv itd.
+
+      # Fail z wiadomością (użyj zamiast command: false)
+      - name: Validate config
+        ansible.builtin.fail:
+          msg: "ERROR: app_env must be 'dev' or 'prod', got: {{ app_env }}"
+        when: app_env not in ['dev', 'prod']
+
+  - name: block, rescue, always
+    desc: >
+      block grupuje zadania w blok — możesz zastosować when, become, tags do całego bloku.
+      rescue to obsługa błędów (jak except w Pythonie) — wykonuje się gdy zadanie w block zawiedzie.
+      always wykonuje się zawsze — niezależnie od sukcesu lub błędu (jak finally).
+    code: |
+      - name: Deploy application
+        block:
+          - name: Pull latest image
+            ansible.builtin.command: docker pull myapp:latest
+
+          - name: Stop old container
+            ansible.builtin.command: docker stop myapp
+            ignore_errors: true
+
+          - name: Start new container
+            ansible.builtin.command: >
+              docker run -d --name myapp
+              -p 8080:8080
+              myapp:latest
+
+        rescue:
+          # Wykonuje się gdy JAKIKOLWIEK task w block zawiedzie
+          - name: Log failure
+            ansible.builtin.debug:
+              msg: "Deployment failed! Error: {{ ansible_failed_result }}"
+
+          - name: Rollback to previous version
+            ansible.builtin.command: docker start myapp-prev
+
+          - name: Send alert
+            ansible.builtin.uri:
+              url: "https://hooks.slack.com/services/xxx"
+              method: POST
+              body_format: json
+              body:
+                text: "Deploy failed on {{ inventory_hostname }}!"
+
+        always:
+          # Wykonuje się ZAWSZE (cleanup)
+          - name: Remove temp files
+            ansible.builtin.file:
+              path: /tmp/deploy_temp
+              state: absent
+
+          - name: Log completion
+            ansible.builtin.command: logger "Deploy completed on {{ inventory_hostname }}"
+
+  - name: tags — etykiety zadań
+    desc: >
+      Tags pozwalają uruchamiać lub pomijać wybrane zadania podczas wykonania playbooka.
+      Możesz tagować pojedyncze taski, bloki, całe role. Przydatne gdy chcesz uruchomić
+      tylko część playbooka np. tylko deployment aplikacji bez konfiguracji systemu.
+    code: |
+      tasks:
+        - name: Install packages
+          ansible.builtin.package:
+            name: nginx
+            state: present
+          tags:
+            - setup
+            - packages
+
+        - name: Deploy config
+          ansible.builtin.template:
+            src: nginx.conf.j2
+            dest: /etc/nginx/nginx.conf
+          tags:
+            - deploy
+            - config
+
+        - name: Run migrations
+          ansible.builtin.command: python manage.py migrate
+          tags:
+            - deploy
+            - migrations
+            - never          # specjalny tag — uruchom tylko gdy jawnie podany
+
+        - name: Always run this
+          ansible.builtin.debug:
+            msg: "This always runs"
+          tags:
+            - always         # specjalny tag — uruchom zawsze (nawet z --tags)
+
+      # Uruchomienie z tagami
+      # ansible-playbook site.yml --tags deploy
+      # ansible-playbook site.yml --tags "deploy,config"
+      # ansible-playbook site.yml --skip-tags packages
+      # ansible-playbook site.yml --tags migrations  # uruchomi 'never' tag
+
+  - name: pre_tasks i post_tasks
+    desc: >
+      pre_tasks uruchamiają się PRZED rolami i tasks playbooka — dobre do przygotowania
+      środowiska, sprawdzenia warunków wstępnych. post_tasks uruchamiają się PO rolach
+      i tasks — dobre do weryfikacji i powiadomień. Handlery z pre_tasks flush się przed tasks.
+    code: |
+      - name: Full deployment
+        hosts: webservers
+        become: true
+
+        pre_tasks:
+          - name: Check free disk space
+            ansible.builtin.assert:
+              that:
+                - ansible_mounts | selectattr('mount', 'equalto', '/') |
+                  map(attribute='size_available') | first > 1073741824
+              fail_msg: "Not enough disk space (< 1GB free)"
+
+          - name: Update apt cache
+            ansible.builtin.apt:
+              update_cache: true
+              cache_valid_time: 3600
+            when: ansible_os_family == "Debian"
+
+          - name: Notify deploy start
+            ansible.builtin.uri:
+              url: "https://api.status.io/maintenance"
+              method: POST
+              body_format: json
+              body:
+                status: "deploying"
+
+        roles:
+          - role: nginx
+          - role: myapp
+
+        tasks:
+          - name: Final configuration
+            ansible.builtin.debug:
+              msg: "Main tasks run after roles"
+
+        post_tasks:
+          - name: Smoke test
+            ansible.builtin.uri:
+              url: "http://localhost:8080/health"
+              status_code: 200
+            retries: 5
+            delay: 10
+
+          - name: Notify success
+            ansible.builtin.debug:
+              msg: "Deployment completed successfully on {{ inventory_hostname }}"

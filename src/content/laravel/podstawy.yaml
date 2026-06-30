@@ -1,0 +1,318 @@
+title: Laravel — Podstawy
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Laravel to elegancki, pełnostackowy framework PHP stworzony przez Taylora Otwella w 2011 roku.
+  Filozofia "beautiful code" — Laravel wierzy, że programowanie powinno być przyjemne.
+  Zawiera wszystko czego potrzebujesz: ORM (Eloquent), szablony (Blade), CLI (Artisan),
+  kolejki, cache, auth, broadcasting. Najpopularniejszy framework PHP na świecie —
+  używany przez Twitch, Laracasts, Alison i tysiące aplikacji SaaS na całym świecie.
+
+items:
+  - name: Instalacja i struktura projektu
+    desc: >
+      Laravel instaluje się przez Composer lub Laravel Installer. Struktura katalogów jest
+      konwencjonalna — app/ to serce aplikacji, routes/ definiuje URL-e, resources/ zawiera widoki
+      i assety, database/ to migracje i seedery. Każdy katalog ma jasną odpowiedzialność.
+    code: |
+      // Instalacja przez Composer
+      composer create-project laravel/laravel myapp
+      cd myapp
+
+      // Lub przez Laravel Installer
+      composer global require laravel/installer
+      laravel new myapp
+
+      // Struktura katalogów
+      // app/           — Models, Controllers, Middleware, Providers
+      // bootstrap/     — Uruchamianie frameworka
+      // config/        — Konfiguracja (app.php, database.php, mail.php...)
+      // database/      — Migracje, Fabryki, Seedery
+      // public/        — Web root — index.php, assety publiczne
+      // resources/     — Widoki Blade, CSS, JS (surowe)
+      // routes/        — web.php, api.php, console.php
+      // storage/       — Logi, cache, pliki uploadowane
+      // tests/         — Testy Feature i Unit
+      // vendor/        — Zależności Composera (nie commituj)
+
+  - name: Service Container (IoC)
+    desc: >
+      Service Container to serce Laravela — zarządza zależnościami klas i wstrzykuje je automatycznie.
+      Zamiast tworzyć obiekty ręcznie, definiujesz jak je tworzyć (binding), a kontener
+      dostarcza instancje (resolving). Dependency Injection przez konstruktor działa automatycznie
+      w kontrolerach, middleware, job-ach i komendach Artisan.
+    code: |
+      // Binding w Service Provider
+      $this->app->bind(PaymentGateway::class, StripeGateway::class);
+
+      // Singleton — jedna instancja przez cały request
+      $this->app->singleton(Cache::class, function ($app) {
+          return new RedisCache($app['config']['cache.redis']);
+      });
+
+      // Automatyczne wstrzykiwanie — Laravel sam rozwiązuje zależności
+      class OrderController extends Controller
+      {
+          public function __construct(
+              private PaymentGateway $payment,
+              private OrderRepository $orders,
+          ) {}
+
+          public function store(CreateOrderRequest $request)
+          {
+              $order = $this->orders->create($request->validated());
+              $this->payment->charge($order->total);
+              return redirect()->route('orders.show', $order);
+          }
+      }
+
+      // Ręczne pobranie z kontenera
+      $gateway = app(PaymentGateway::class);
+      $gateway = resolve(PaymentGateway::class);
+
+  - name: Service Providers
+    desc: >
+      Service Providers to punkty startowe aplikacji Laravel — tutaj rejestrujesz bindingi,
+      nasłuchujesz zdarzeń, definiujesz komendy. Każdy provider ma dwie metody: register()
+      (tylko bindingi) i boot() (po zarejestrowaniu wszystkiego). Wszystkie providery
+      listowane są w config/app.php pod kluczem providers.
+    code: |
+      // Stwórz własny provider
+      // php artisan make:provider PaymentServiceProvider
+
+      namespace App\Providers;
+
+      use Illuminate\Support\ServiceProvider;
+
+      class PaymentServiceProvider extends ServiceProvider
+      {
+          public function register(): void
+          {
+              // Tylko bindingi — nie używaj innych serwisów tutaj
+              $this->app->singleton(PaymentGateway::class, function ($app) {
+                  return new StripeGateway(
+                      config('services.stripe.key'),
+                      config('services.stripe.secret'),
+                  );
+              });
+          }
+
+          public function boot(): void
+          {
+              // Tu możesz używać innych serwisów
+              // Rejestracja routes, views, policies, validators...
+              $this->loadRoutesFrom(__DIR__.'/../routes/payment.php');
+              $this->loadViewsFrom(__DIR__.'/../resources/views', 'payment');
+          }
+      }
+
+      // config/app.php — zarejestruj provider
+      // 'providers' => [
+      //     ...
+      //     App\Providers\PaymentServiceProvider::class,
+      // ]
+
+  - name: Facades
+    desc: >
+      Facades dają statyczny interfejs do klas z kontenera — elegancka składnia bez utraty
+      testowalności. Pod spodem to proxy do kontenera (nie prawdziwe statyczne metody).
+      Cache::get() to tak naprawdę app('cache')->get(). Facades można mockować w testach.
+      Laravel dostarcza dziesiątki gotowych Facades: Cache, DB, Log, Mail, Queue, Route, Storage.
+    code: |
+      use Illuminate\Support\Facades\Cache;
+      use Illuminate\Support\Facades\DB;
+      use Illuminate\Support\Facades\Log;
+      use Illuminate\Support\Facades\Mail;
+      use Illuminate\Support\Facades\Storage;
+
+      // Cache Facade
+      Cache::put('user.1', $user, now()->addHour());
+      $user = Cache::get('user.1');
+      Cache::remember('stats', 3600, fn() => DB::table('orders')->count());
+
+      // Storage Facade — lokalnie i S3
+      Storage::put('photos/avatar.jpg', $file);
+      $url = Storage::url('photos/avatar.jpg');
+      Storage::disk('s3')->put('backups/db.sql', $dump);
+
+      // Log Facade
+      Log::info('Order created', ['order_id' => $order->id, 'user' => $user->email]);
+      Log::error('Payment failed', ['exception' => $e->getMessage()]);
+
+      // DB Facade — query builder
+      $users = DB::table('users')->where('active', true)->get();
+      DB::statement('ALTER TABLE orders ADD COLUMN notes TEXT');
+
+      // Własna Facade
+      class PaymentFacade extends Facade
+      {
+          protected static function getFacadeAccessor(): string
+          {
+              return PaymentGateway::class;
+          }
+      }
+
+  - name: "Konfiguracja i .env"
+    desc: >
+      Laravel używa pliku .env do konfiguracji środowiskowej — klucz tajny, połączenie z bazą,
+      SMTP, API keys. Nigdy nie commituj .env do repozytorium. Funkcja env() odczytuje zmienne,
+      config() odczytuje pliki z katalogu config/. Na produkcji cachuj konfigurację przez
+      php artisan config:cache dla lepszej wydajności.
+    code: |
+      // .env — plik środowiskowy (nie commitować!)
+      APP_NAME="My Laravel App"
+      APP_ENV=local
+      APP_KEY=base64:...
+      APP_DEBUG=true
+      APP_URL=http://localhost
+
+      DB_CONNECTION=mysql
+      DB_HOST=127.0.0.1
+      DB_PORT=3306
+      DB_DATABASE=myapp
+      DB_USERNAME=root
+      DB_PASSWORD=secret
+
+      MAIL_MAILER=smtp
+      MAIL_HOST=smtp.gmail.com
+      MAIL_PORT=587
+      MAIL_USERNAME=noreply@myapp.pl
+      MAIL_PASSWORD=app_password
+
+      // Odczyt w kodzie
+      $debug = env('APP_DEBUG', false);    // env() z wartością domyślną
+      $name  = config('app.name');         // odczyt przez config()
+      $host  = config('database.connections.mysql.host');
+
+      // config/services.php — własna konfiguracja
+      return [
+          'stripe' => [
+              'key'    => env('STRIPE_KEY'),
+              'secret' => env('STRIPE_SECRET'),
+          ],
+      ];
+      // Użycie: config('services.stripe.key')
+
+  - name: Request Lifecycle
+    desc: >
+      Każdy request HTTP przechodzi przez: public/index.php (web root) → bootstrap/app.php
+      (tworzy kontener) → HTTP Kernel → Middleware stack → Router → Controller →
+      Response → Middleware (na wyjściu) → klient. Zrozumienie tego cyklu jest kluczowe
+      do efektywnego debugowania i projektowania middleware.
+    code: |
+      // 1. public/index.php — entry point
+      $app = require_once __DIR__.'/../bootstrap/app.php';
+      $kernel = $app->make(Kernel::class);
+      $response = $kernel->handle($request = Request::capture());
+      $response->send();
+      $kernel->terminate($request, $response);
+
+      // 2. bootstrap/app.php — konfiguracja kontenera
+      $app = new Application($_ENV['APP_BASE_PATH'] ?? dirname(__DIR__));
+      $app->singleton(HttpKernelContract::class, \App\Http\Kernel::class);
+      $app->singleton(ConsoleKernelContract::class, \App\Console\Kernel::class);
+
+      // 3. app/Http/Kernel.php — middleware stack
+      protected $middleware = [
+          \App\Http\Middleware\TrustProxies::class,
+          \Illuminate\Http\Middleware\HandleCors::class,
+          \App\Http\Middleware\PreventRequestsDuringMaintenance::class,
+          \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
+          \App\Http\Middleware\TrimStrings::class,
+      ];
+
+      // 4. routes/web.php — routing
+      Route::get('/orders', [OrderController::class, 'index']);
+
+      // 5. Controller zwraca Response
+      return response()->json($data);
+      return view('orders.index', compact('orders'));
+      return redirect()->route('home');
+
+  - name: Artisan CLI — podstawy
+    desc: >
+      Artisan to wbudowane CLI Laravela — generuje kod, uruchamia migracje, czyści cache,
+      zarządza kolejkami. php artisan list pokazuje wszystkie dostępne komendy.
+      Możesz tworzyć własne komendy przez php artisan make:command NazwaKomendy.
+      Artisan jest odpowiednikiem manage.py w Django.
+    code: |
+      // Najczęściej używane komendy
+      php artisan list                         // lista wszystkich komend
+      php artisan help migrate                 // pomoc dla komendy
+      php artisan serve                        // serwer deweloperski :8000
+      php artisan tinker                       // interaktywna konsola PHP/Laravel
+
+      // Generowanie kodu
+      php artisan make:model Post -mfsc        // Model + Migration + Factory + Seeder + Controller
+      php artisan make:controller PostController --resource
+      php artisan make:migration create_posts_table
+      php artisan make:middleware CheckAge
+      php artisan make:request StorePostRequest
+
+      // Migracje
+      php artisan migrate
+      php artisan migrate:fresh --seed         // wyczyść i zasiej
+      php artisan migrate:rollback
+
+      // Cache
+      php artisan optimize                     // cachuj config + routes + views
+      php artisan optimize:clear               // wyczyść wszystkie cache
+      php artisan config:cache
+      php artisan route:cache
+      php artisan view:cache
+
+  - name: "Własna komenda Artisan"
+    desc: >
+      Własne komendy Artisan pozwalają automatyzować zadania — importy danych, raporty,
+      czyszczenie, synchronizacja. Komendy rejestrują się automatycznie przez discovery
+      lub ręcznie w app/Console/Kernel.php. Można je harmonogramować przez Laravel Scheduler.
+    code: |
+      // php artisan make:command SendWeeklyReport
+
+      namespace App\Console\Commands;
+
+      use Illuminate\Console\Command;
+
+      class SendWeeklyReport extends Command
+      {
+          // Definicja komendy i argumentów
+          protected $signature = 'reports:weekly
+                                  {--users=all : Którzy użytkownicy — all/premium/free}
+                                  {--dry-run : Nie wysyłaj, tylko pokaż co by zostało wysłane}';
+
+          protected $description = 'Wyślij tygodniowe raporty do użytkowników';
+
+          public function handle(ReportService $reports, MailService $mail): int
+          {
+              $type = $this->option('users');
+              $dryRun = $this->option('dry-run');
+
+              $this->info("Generating {$type} reports...");
+
+              $users = User::query()
+                  ->when($type !== 'all', fn($q) => $q->where('plan', $type))
+                  ->get();
+
+              $bar = $this->output->createProgressBar($users->count());
+
+              foreach ($users as $user) {
+                  $report = $reports->generate($user);
+                  if (!$dryRun) {
+                      $mail->sendReport($user, $report);
+                  }
+                  $bar->advance();
+              }
+
+              $bar->finish();
+              $this->newLine();
+              $this->info("Done! Processed {$users->count()} users.");
+
+              return Command::SUCCESS;
+          }
+      }
+
+      // Harmonogram w app/Console/Kernel.php
+      $schedule->command('reports:weekly --users=premium')->weeklyOn(1, '8:00');

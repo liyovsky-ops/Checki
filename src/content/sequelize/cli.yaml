@@ -1,0 +1,411 @@
+title: Sequelize — CLI i API
+
+groups:
+  - name: Instalacja
+    icon: "📦"
+    commands:
+      - cmd: npm install sequelize sequelize-cli
+        desc: Zainstaluj Sequelize i narzędzie CLI
+        detail:
+          what: "Instaluje ORM i CLI. sequelize-cli najlepiej jako devDependency. Potrzebny też driver bazy."
+          how: "Uruchom w katalogu projektu. Następnie zainstaluj odpowiedni driver."
+          tips:
+            - "npm install --save-dev sequelize-cli  # CLI jako devDependency"
+            - "Bez CLI nie masz dostępu do db:migrate i model:generate"
+      - cmd: npm install pg pg-hstore
+        desc: Driver dla PostgreSQL (wymagany oprócz Sequelize)
+        detail:
+          what: "pg to klient PostgreSQL, pg-hstore obsługuje serializację hstore."
+          how: "Potrzebny zawsze gdy dialect to 'postgres'. Zainstaluj obok sequelize."
+          tips:
+            - "pg-hstore wymagany nawet jeśli nie używasz HSTORE — Sequelize go importuje"
+      - cmd: npm install mysql2
+        desc: Driver dla MySQL i MariaDB
+        detail:
+          what: "Szybki, Promise-based driver MySQL2. Obsługuje MySQL 5.7+ i MariaDB."
+          how: "Ustaw dialect: 'mysql' lub 'mariadb' w konfiguracji Sequelize."
+          tips:
+            - "mysql2 jest szybszy od mysql — zawsze używaj mysql2"
+      - cmd: npm install sqlite3
+        desc: Driver dla SQLite (baza danych w pliku)
+        detail:
+          what: "SQLite to plik .db — zero konfiguracji serwera. Idealne do testów i dev."
+          how: "Ustaw dialect: 'sqlite' i storage: './db.sqlite' w konfiguracji."
+          tips:
+            - "storage: ':memory:'  # baza w pamięci (resetuje się przy restarcie)"
+            - "Nie używaj SQLite na produkcji — brak concurrent writes"
+      - cmd: npm install tedious
+        desc: Driver dla Microsoft SQL Server
+        detail:
+          what: "Oficjalny Microsoft driver dla Node.js do SQL Server i Azure SQL."
+          how: "Ustaw dialect: 'mssql' w konfiguracji Sequelize."
+          tips:
+            - "dialectOptions: { options: { encrypt: true } }  # dla Azure"
+      - cmd: npm install sequelize-typescript reflect-metadata
+        desc: TypeScript support — dekoratory dla modeli
+        detail:
+          what: "sequelize-typescript dodaje dekoratory @Table, @Column, @HasMany. reflect-metadata wymagany przez dekoratory."
+          how: "Dodaj emitDecoratorMetadata i experimentalDecorators do tsconfig.json."
+          tips:
+            - "import 'reflect-metadata'  # na początku entry point"
+            - "@Table({ tableName: 'users' }) class User extends Model {}"
+
+  - name: sequelize-cli — inicjalizacja projektu
+    icon: "🏗️"
+    commands:
+      - cmd: npx sequelize-cli init
+        desc: Inicjalizuj strukturę projektu Sequelize
+        detail:
+          what: "Tworzy katalogi config/, models/, migrations/, seeders/ oraz config/config.json."
+          how: "Jednorazowe — uruchom na początku projektu po instalacji sequelize-cli."
+          tips:
+            - "Zmień config/config.json na config/config.js jeśli chcesz używać env vars"
+            - "Dodaj migrations/ i seeders/ do git (NIE node_modules)"
+      - cmd: npx sequelize-cli init:config
+        desc: Inicjalizuj tylko plik konfiguracyjny
+        detail:
+          what: "Tworzy tylko config/config.json z konfigurami dla development/test/production."
+          how: "Przydatne gdy chcesz dodać CLI do istniejącego projektu."
+          tips:
+            - "Zmień username/password na process.env.DB_USER, process.env.DB_PASS"
+      - cmd: npx sequelize-cli init:migrations
+        desc: Inicjalizuj tylko katalog migrations
+        detail:
+          what: "Tworzy pusty katalog migrations/ jeśli nie istnieje."
+          how: "Przydatne do selektywnej inicjalizacji poszczególnych elementów."
+          tips:
+            - "Dostępne też init:models i init:seeders"
+
+  - name: sequelize-cli — migracje
+    icon: "🔄"
+    commands:
+      - cmd: npx sequelize-cli db:migrate
+        desc: Uruchom wszystkie pending migracje
+        detail:
+          what: "Wykonuje wszystkie niewykonane jeszcze migracje w kolejności chronologicznej."
+          how: "Sequelize śledzi wykonane migracje w tabeli SequelizeMeta."
+          tips:
+            - "npx sequelize-cli db:migrate --env production  # specyfikuj środowisko"
+            - "Automatycznie tworzy tabelę SequelizeMeta jeśli nie istnieje"
+      - cmd: npx sequelize-cli db:migrate:undo
+        desc: Cofnij ostatnią migrację (wywołuje down())
+        detail:
+          what: "Wywołuje metodę down() ostatniej zastosowanej migracji i usuwa ją z SequelizeMeta."
+          how: "Przydatne w development gdy chcesz poprawić ostatnią migrację."
+          tips:
+            - "Zawsze implementuj down() jako pełne odwrócenie up()"
+      - cmd: npx sequelize-cli db:migrate:undo:all
+        desc: Cofnij wszystkie migracje
+        detail:
+          what: "Wywołuje down() dla każdej migracji w odwrotnej kolejności chronologicznej."
+          how: "OSTROŻNIE — resetuje cały schemat bazy."
+          flags:
+            - flag: "--to 20240101-create-users.js"
+              desc: Cofnij tylko do podanej migracji
+          tips:
+            - "npx sequelize-cli db:migrate:undo:all --to 20240101120000-init.js"
+      - cmd: npx sequelize-cli db:migrate:status
+        desc: Sprawdź status migracji (które wykonane, które pending)
+        detail:
+          what: "Wyświetla które migracje są wykonane (up) a które oczekujące (down)."
+          how: "Porównuje pliki z migrations/ z tabelą SequelizeMeta."
+          tips:
+            - "Uruchom przed i po db:migrate żeby sprawdzić co zostało wykonane"
+      - cmd: "npx sequelize-cli migration:generate --name create-users-table"
+        desc: Generuj pusty plik migracji z timestampem
+        detail:
+          what: "Tworzy plik migracji z timestampem i nazwą — YYYYMMDDHHMMSS-create-users-table.js."
+          how: "Wygenerowany plik ma puste up() i down() — wypełnij je sam."
+          tips:
+            - "Używaj opisowych nazw: add-email-to-users, create-orders-table"
+            - "Alias: npx sequelize-cli migration:create --name ..."
+      - cmd: "npx sequelize-cli migration:create --name add-phone-to-users"
+        desc: Alias migration:create — generuj migrację (alter table)
+        detail:
+          what: "Identyczny skutek jak migration:generate. Tworzy pusty plik migracji."
+          how: "Używaj nazw opisujących ZMIANĘ: add-column-X, remove-table-Y, rename-Z."
+          tips:
+            - "Każda migracja = jedna atomowa zmiana schematu"
+      - cmd: npx sequelize-cli db:seed:all
+        desc: Uruchom wszystkie seedery
+        detail:
+          what: "Wykonuje wszystkie pliki z katalogu seeders/ w kolejności alfabetycznej."
+          how: "Seedery dodają dane testowe lub konfiguracyjne do bazy."
+          tips:
+            - "npx sequelize-cli db:seed:all --env test  # seed testowej bazy"
+      - cmd: npx sequelize-cli db:seed:undo:all
+        desc: Cofnij wszystkie seedery
+        detail:
+          what: "Wywołuje down() dla wszystkich seederów w odwrotnej kolejności."
+          how: "Czyści wszystkie dane testowe dodane przez seedery."
+          tips:
+            - "npx sequelize-cli db:seed:undo  # cofnij tylko ostatni seeder"
+
+  - name: sequelize-cli — modele
+    icon: "📋"
+    commands:
+      - cmd: "npx sequelize-cli model:generate --name User --attributes username:string,email:string,age:integer,isActive:boolean"
+        desc: Generuj model i migrację razem
+        detail:
+          what: "Tworzy plik modelu w models/ i plik migracji w migrations/ z podanymi polami."
+          how: "Typy atrybutów: string, integer, boolean, date, text, float, decimal, uuid."
+          tips:
+            - "Wygenerowany model używa sequelize.define — dostosuj do Model.init()"
+            - "id, createdAt, updatedAt są dodawane automatycznie"
+      - cmd: "npx sequelize-cli model:generate --name Product --attributes name:string,price:decimal,stock:integer,categoryId:integer"
+        desc: Generuj model produktu z kluczem obcym
+        detail:
+          what: "Tworzy model Product z klucz obcym categoryId. Po wygenerowaniu dodaj references w migracji."
+          how: "CLI nie dodaje references automatycznie — edytuj migrację ręcznie po wygenerowaniu."
+          tips:
+            - "W migracji dodaj: references: { model: 'Categories', key: 'id' }"
+      - cmd: "npx sequelize-cli seed:generate --name demo-users"
+        desc: Generuj plik seedera
+        detail:
+          what: "Tworzy pusty plik seedera YYYYMMDDHHMMSS-demo-users.js z up() i down()."
+          how: "Wypełnij up() metodą bulkInsert, down() metodą bulkDelete."
+          tips:
+            - "Seedery NIE są śledzone — ponowne uruchomienie doda duplikaty"
+      - cmd: "npx sequelize-cli --help"
+        desc: Wyświetl pomoc CLI z listą wszystkich komend
+        detail:
+          what: "Lista dostępnych komend, opcji i flag sequelize-cli."
+          how: "Przydatne do sprawdzenia składni bez szukania w dokumentacji."
+          tips:
+            - "npx sequelize-cli db:migrate --help  # pomoc dla konkretnej komendy"
+
+  - name: API — połączenie i konfiguracja
+    icon: "🔌"
+    commands:
+      - cmd: "const sequelize = new Sequelize(process.env.DATABASE_URL, { dialect: 'postgres' })"
+        desc: Utwórz instancję Sequelize z connection string (env var)
+        detail:
+          what: "Connection string z DATABASE_URL. Bezpieczny sposób — dane logowania w zmiennych środowiskowych."
+          how: "Format: postgres://user:pass@host:5432/db lub mysql://user:pass@host:3306/db."
+          tips:
+            - "Dodaj dialectOptions: { ssl: { require: true } } dla połączeń SSL (Neon, Supabase)"
+      - cmd: "const sequelize = new Sequelize({ dialect: 'postgres', host, database, username, password, pool: { max: 10, min: 0 } })"
+        desc: Utwórz instancję z obiektem konfiguracyjnym
+        detail:
+          what: "Zalecany sposób — wszystkie opcje jawnie podane. Łatwy do czytania i testowania."
+          how: "dialect jest wymagany. Pozostałe mają wartości domyślne (localhost, 5432)."
+          tips:
+            - "logging: false  # wyłącz logi SQL w produkcji"
+            - "pool.max: 10  # maks. jednoczesnych połączeń — dostosuj do serwera DB"
+      - cmd: await sequelize.authenticate()
+        desc: Przetestuj połączenie z bazą danych
+        detail:
+          what: "Wykonuje prostą query (SELECT 1) żeby sprawdzić czy połączenie działa."
+          how: "Wywołaj przy starcie aplikacji — szybko wykrywa błędy konfiguracji."
+          tips:
+            - "Zawiń w try/catch i zakończ proces (process.exit(1)) jeśli połączenie nie działa"
+      - cmd: "await sequelize.sync({ alter: true })"
+        desc: Synchronizuj modele z bazą (tylko development)
+        detail:
+          what: "Tworzy lub modyfikuje tabele żeby pasowały do definicji modeli."
+          how: "TYLKO development. W produkcji używaj migracji (sequelize-cli)."
+          flags:
+            - flag: "{ force: true }"
+              desc: "DROP + CREATE (niszczy dane!)"
+            - flag: "{ alter: true }"
+              desc: "ALTER TABLE — dostosuj istniejące tabele"
+          tips:
+            - "if (NODE_ENV === 'development') await sequelize.sync({ alter: true })"
+      - cmd: await sequelize.close()
+        desc: Zamknij connection pool
+        detail:
+          what: "Zamyka wszystkie otwarte połączenia z bazą danych."
+          how: "Wywołaj w SIGTERM handler lub na końcu skryptów jednorazowych."
+          tips:
+            - "process.on('SIGTERM', async () => { await sequelize.close(); })"
+
+  - name: API — CRUD operacje
+    icon: "✏️"
+    commands:
+      - cmd: "await User.create({ username: 'jan', email: 'jan@firma.pl' })"
+        desc: Utwórz nowy rekord (INSERT)
+        detail:
+          what: "Wstawia nowy wiersz do tabeli i zwraca instancję modelu z wygenerowanym ID."
+          how: "Walidacja uruchamia się przed INSERT. Błędy walidacji rzucają ValidationError."
+          tips:
+            - "await User.create(data, { transaction: t })  # w transakcji"
+            - "User.build({...}).save()  # alternatywa — build nie zapisuje od razu"
+      - cmd: await User.findByPk(42)
+        desc: Pobierz rekord po kluczu głównym
+        detail:
+          what: "Najszybsze wyszukiwanie — używa indeksu primary key. Zwraca null gdy nie znaleziono."
+          how: "id może być number, string lub UUID — zależy od definicji modelu."
+          tips:
+            - "await User.findByPk(id, { include: [Profile] })  # z eager loading"
+      - cmd: "await User.findAll({ where: { isActive: true }, order: [['createdAt', 'DESC']] })"
+        desc: Pobierz listę rekordów z filtrem i sortowaniem
+        detail:
+          what: "Zwraca tablicę instancji modelu. Bez where pobiera wszystkie rekordy."
+          how: "where przyjmuje obiekty z wartościami lub operatorami Op."
+          tips:
+            - "findAll() bez where i limit to SELECT * — uważaj na duże tabele"
+      - cmd: "await User.findOne({ where: { email: 'jan@firma.pl' } })"
+        desc: Pobierz pierwszy pasujący rekord
+        detail:
+          what: "Zwraca jedną instancję modelu lub null. Nie wymaga unique field."
+          how: "Dodaj order żeby mieć deterministyczny wynik gdy jest więcej pasujących."
+          tips:
+            - "findOne() z rejectOnEmpty: true rzuca Error zamiast zwracać null"
+      - cmd: "await User.update({ isActive: false }, { where: { role: 'guest' } })"
+        desc: Zaktualizuj wiele rekordów (bulk UPDATE)
+        detail:
+          what: "Aktualizuje wszystkie rekordy pasujące do where. Zwraca [liczba_zmienionych]."
+          how: "Metoda statyczna — działa na wielu rekordach. Dla jednego rekordu: instance.update()."
+          tips:
+            - "await user.update({ username: 'nowa' })  # aktualizuj instancję"
+            - "instance.set({ field: value }); await instance.save()  # alternatywa"
+      - cmd: "await User.destroy({ where: { isActive: false } })"
+        desc: Usuń rekordy z bazy (bulk DELETE)
+        detail:
+          what: "Usuwa wszystkie rekordy pasujące do where. Zwraca liczbę usuniętych."
+          how: "W paranoid mode ustawia deletedAt zamiast fizycznego usunięcia."
+          tips:
+            - "await user.destroy()  # usuń konkretną instancję"
+            - "await user.destroy({ force: true })  # trwałe usunięcie w paranoid mode"
+      - cmd: "await User.bulkCreate([{ username: 'jan' }, { username: 'anna' }], { ignoreDuplicates: true })"
+        desc: Wstaw wiele rekordów jednym zapytaniem (bulk INSERT)
+        detail:
+          what: "Szybsze niż wiele create(). Jeden INSERT z wieloma wartościami."
+          how: "Domyślnie pomija walidację — dodaj { validate: true } jeśli potrzebna."
+          flags:
+            - flag: "{ ignoreDuplicates: true }"
+              desc: Ignoruj duplikaty (MySQL/PostgreSQL)
+            - flag: "{ updateOnDuplicate: ['username'] }"
+              desc: UPDATE przy duplikacie (UPSERT bulk)
+          tips:
+            - "{ returning: true }  # zwróć wygenerowane ID (PostgreSQL)"
+      - cmd: "await Product.upsert({ sku: 'PROD-001', name: 'Produkt A', price: 99.99 })"
+        desc: Utwórz lub zaktualizuj rekord (INSERT ON CONFLICT)
+        detail:
+          what: "Jeśli rekord istnieje (po unique key) — aktualizuje go. Jeśli nie — tworzy."
+          how: "Zwraca [instance, created]. Wymaga unique constraint na polu identyfikacyjnym."
+          tips:
+            - "Przydatne do sync danych z zewnętrznych API"
+            - "upsert używa ON CONFLICT DO UPDATE w PostgreSQL"
+      - cmd: "const [user, created] = await User.findOrCreate({ where: { email }, defaults: { username } })"
+        desc: Znajdź lub utwórz rekord
+        detail:
+          what: "Szuka rekordu pasującego do where. Jeśli nie istnieje, tworzy z where + defaults."
+          how: "Zwraca [instance, boolean]. created = true gdy rekord był nowo tworzony."
+          tips:
+            - "Atomowe — bezpieczne przy race conditions (np. równoległe requesty)"
+      - cmd: "const { count, rows } = await User.findAndCountAll({ where: { isActive: true }, limit: 10, offset: 0, distinct: true })"
+        desc: Pobierz rekordy i całkowitą liczbę (paginacja API)
+        detail:
+          what: "Zwraca count (łączna liczba pasujących) i rows (strona). Jeden lub dwa queries."
+          how: "Używaj distinct: true gdy masz include z relacjami — zapobiega błędnym count."
+          tips:
+            - "const totalPages = Math.ceil(count / limit)"
+
+  - name: API — Queries, operatory i zaawansowane wzorce
+    icon: "🔍"
+    commands:
+      - cmd: "where: { age: { [Op.gt]: 18, [Op.lt]: 65 } }"
+        desc: "Op.gt / Op.gte / Op.lt / Op.lte / Op.between — porównania"
+        detail:
+          what: "Operatory: Op.gt (>), Op.gte (>=), Op.lt (<), Op.lte (<=), Op.between ([min, max])."
+          how: "Importuj Op z sequelize: const { Op } = require('sequelize')."
+          tips:
+            - "Op.between: { age: { [Op.between]: [18, 65] } }  # BETWEEN 18 AND 65"
+      - cmd: "where: { name: { [Op.like]: '%jan%' } }"
+        desc: "Op.like / Op.iLike / Op.notLike — wyszukiwanie tekstowe"
+        detail:
+          what: "Op.like to LIKE SQL. Op.iLike (PostgreSQL) — case-insensitive LIKE."
+          how: "% to wildcard (dowolne znaki), _ to jeden dowolny znak."
+          tips:
+            - "Op.iLike to PostgreSQL only — w MySQL LIKE jest domyślnie case-insensitive"
+      - cmd: "where: { role: { [Op.in]: ['admin', 'moderator'] } }"
+        desc: "Op.in / Op.notIn — wartości z listy"
+        detail:
+          what: "Op.in generuje WHERE role IN (...). Op.notIn generuje NOT IN."
+          how: "Tablica może być pusta — Sequelize obsługuje to poprawnie."
+          tips:
+            - "Op.notIn: { status: { [Op.notIn]: ['banned', 'deleted'] } }"
+      - cmd: "where: { [Op.or]: [{ role: 'admin' }, { isVerified: true }] }"
+        desc: "Op.or / Op.and — operatory logiczne"
+        detail:
+          what: "Op.or łączy warunki przez OR. Op.and przez AND (domyślne zachowanie obiektu)."
+          how: "Op.or przyjmuje tablicę obiektów warunków lub obiekt."
+          tips:
+            - "where: { isActive: true, [Op.or]: [{ age: { [Op.lt]: 25 } }, { plan: 'premium' }] }"
+      - cmd: "where: { deletedAt: { [Op.is]: null } }"
+        desc: "Op.is / Op.not — NULL checks"
+        detail:
+          what: "Op.is: null generuje IS NULL. Op.not: null generuje IS NOT NULL."
+          how: "Użyj do sprawdzenia czy pole jest NULL lub nie."
+          tips:
+            - "Op.ne (!=), Op.eq (=) — dla wartości nie-NULL"
+      - cmd: "order: [['createdAt', 'DESC'], ['username', 'ASC']]"
+        desc: Sortowanie po wielu kolumnach
+        detail:
+          what: "order przyjmuje tablicę par [kolumna, kierunek]. Wiele par = wielopoziomowe sortowanie."
+          how: "Dla powiązanych modeli: [{ model: User, as: 'author' }, 'username', 'ASC']."
+          tips:
+            - "order: sequelize.literal('RANDOM()')  # losowa kolejność (PostgreSQL/SQLite)"
+      - cmd: "limit: 10, offset: (page - 1) * 10"
+        desc: Paginacja — limit i offset
+        detail:
+          what: "limit ogranicza liczbę zwracanych rekordów. offset pomija N pierwszych."
+          how: "offset = (page - 1) * limit  # strona 3 przy limit 10 = offset 20."
+          tips:
+            - "Przy dużych zbiorach używaj cursor pagination zamiast offset — szybsza"
+      - cmd: "include: [{ model: Post, as: 'posts', where: { published: true }, required: false }]"
+        desc: Eager loading z filtrem na relacji
+        detail:
+          what: "include wykonuje JOIN i ładuje powiązane dane razem z głównym modelem."
+          how: "required: true = INNER JOIN, required: false = LEFT JOIN (domyślne)."
+          tips:
+            - "attributes: ['id', 'title']  # ogranicz kolumny relacji"
+            - "separate: true  # osobny SELECT zamiast JOIN (lepsze dla N:M)"
+      - cmd: "attributes: { exclude: ['password', 'salt'] }"
+        desc: Projekcja — wyklucz kolumny z wyniku
+        detail:
+          what: "Ogranicza kolumny w SELECT — nie zwraca wykluczonych pól."
+          how: "Alternatywa do podawania wszystkich innych kolumn — łatwiejsze w utrzymaniu."
+          tips:
+            - "attributes: ['id', 'username']  # wybierz konkretne kolumny"
+            - "[sequelize.fn('COUNT', sequelize.col('id')), 'count']  # agregacja jako atrybut"
+      - cmd: "await User.count({ where: { isActive: true }, col: 'id', distinct: true })"
+        desc: "Policz rekordy — count()"
+        detail:
+          what: "Wykonuje COUNT z opcjonalnym filtrem. Szybciej niż findAll().length."
+          how: "Zwraca number. Bez where liczy wszystkie rekordy tabeli."
+          tips:
+            - "distinct: true  # COUNT DISTINCT — unikalne wartości"
+      - cmd: "await Order.sum('amount', { where: { status: 'paid' } })"
+        desc: "Agregacje — sum() / min() / max() / avg()"
+        detail:
+          what: "sum() liczy sumę kolumny. min()/max() zwracają extrema. Filtrowanie przez where."
+          how: "Pierwszy argument to nazwa kolumny (camelCase JavaScript)."
+          tips:
+            - "await Product.min('price')  # najniższa cena"
+            - "await User.aggregate('age', 'avg', { where: { isActive: true } })"
+      - cmd: "await sequelize.query('SELECT * FROM users WHERE role = :role', { replacements: { role: 'admin' }, type: QueryTypes.SELECT })"
+        desc: Raw SQL query z named parametrami
+        detail:
+          what: "Wykonuje surowy SQL. Zwraca tablicę czystych obiektów (nie instancji modelu)."
+          how: "replacements używa named params (:param). bind używa positional ($1, $2)."
+          tips:
+            - "const { QueryTypes } = require('sequelize')  # import QueryTypes"
+            - "type: QueryTypes.SELECT zwraca tylko rows (nie [rows, meta])"
+      - cmd: "await sequelize.transaction(async (t) => { await User.create({...}, { transaction: t }); await Profile.create({...}, { transaction: t }); })"
+        desc: Transakcja managed (auto commit/rollback)
+        detail:
+          what: "Jeśli callback nie rzuca błędu — commit automatyczny. Jeśli rzuca — rollback."
+          how: "Przekazuj { transaction: t } do każdej operacji w callbacku."
+          tips:
+            - "Managed transaction to zalecany sposób — nie zapomnisz o rollback"
+            - "Sequelize.useCLS(namespace) — automatyczne przekazywanie transakcji"
+      - cmd: "await User.findAll({ paranoid: false })"
+        desc: Pobierz wszystkie rekordy — również soft-deleted (paranoid mode)
+        detail:
+          what: "paranoid: false w opcjach query zwraca też rekordy z ustawionym deletedAt."
+          how: "Model musi mieć paranoid: true. deletedAt IS NULL WHERE jest wtedy pomijany."
+          tips:
+            - "await user.restore()  # przywróć soft-deleted rekord"
+            - "await user.destroy({ force: true })  # trwałe usunięcie w paranoid mode"

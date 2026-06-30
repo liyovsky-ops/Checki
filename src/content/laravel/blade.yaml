@@ -1,0 +1,371 @@
+title: Laravel — Blade & Views
+
+labels:
+  section: Dyrektywa
+  example: Przykład
+
+intro: >
+  Blade to silnik szablonów Laravela — kompiluje szablony do czystego PHP i cachuje je.
+  Nie narzuca ograniczeń — możesz używać dowolnego PHP w szablonach. Oferuje dziedziczenie
+  layoutów przez @extends/@section, komponenty przez <x-component>, dyrektywy jak
+  @if, @foreach, @auth, @can. Szablony Blade mają rozszerzenie .blade.php i leżą
+  w katalogu resources/views/.
+
+items:
+  - name: "Wyświetlanie danych — {{ }} i {!! !!}"
+    desc: >
+      Podwójne nawiasy klamrowe {{ }} wyświetlają dane z escapingiem HTML — chronią przed XSS.
+      Potrójne nawiasy {!! !!} wyświetlają raw HTML bez escapingu — używaj tylko dla zaufanych danych.
+      Możesz wywołać dowolne wyrażenie PHP wewnątrz {{ }}, w tym funkcje pomocnicze.
+    code: |
+      {{-- To jest komentarz Blade — nie pojawi się w HTML --}}
+
+      <h1>{{ $post->title }}</h1>
+      <p>Autor: {{ $post->user->name }}</p>
+      <time>{{ $post->created_at->format('d.m.Y') }}</time>
+      <span>{{ number_format($post->views, 0, ',', ' ') }} wyświetleń</span>
+
+      {{-- Raw HTML — tylko dla zaufanych danych (np. z edytora WYSIWYG) --}}
+      <div class="content">{!! $post->content_html !!}</div>
+
+      {{-- Wartość domyślna gdy null --}}
+      <p>{{ $user->bio ?? 'Brak opisu' }}</p>
+      <p>{{ $post->subtitle ?: 'Brak podtytułu' }}</p>
+
+      {{-- Wywołanie funkcji --}}
+      <p>{{ Str::limit($post->content, 200) }}</p>
+      <a href="{{ route('posts.show', $post) }}">Czytaj więcej</a>
+      <img src="{{ asset('images/logo.png') }}" alt="Logo">
+
+  - name: "Dyrektywy warunkowe — @if, @unless, @isset, @empty"
+    desc: >
+      Blade oferuje czytelne dyrektywy warunkowe jako alternatywę dla PHP if/else.
+      @if/@elseif/@else/@endif — podstawowy warunek. @unless to negacja if.
+      @isset sprawdza czy zmienna istnieje i nie jest null. @empty sprawdza czy pusta.
+    code: |
+      @if ($post->status === 'published')
+          <span class="badge badge-success">Opublikowany</span>
+      @elseif ($post->status === 'draft')
+          <span class="badge badge-warning">Szkic</span>
+      @else
+          <span class="badge badge-secondary">Zarchiwizowany</span>
+      @endif
+
+      {{-- @unless = if not --}}
+      @unless ($user->isSubscribed())
+          <div class="alert">Wykup subskrypcję aby zobaczyć więcej treści.</div>
+      @endunless
+
+      {{-- @isset — zmienna istnieje i nie jest null --}}
+      @isset($category)
+          <nav>Kategoria: {{ $category->name }}</nav>
+      @endisset
+
+      {{-- @empty — pusta kolekcja lub falsy --}}
+      @empty($posts)
+          <p>Brak postów do wyświetlenia.</p>
+      @endempty
+
+      {{-- @switch/@case --}}
+      @switch($post->status)
+          @case('draft')
+              <span>Szkic</span>
+              @break
+          @case('published')
+              <span>Opublikowany</span>
+              @break
+          @default
+              <span>Nieznany</span>
+      @endswitch
+
+  - name: "Pętle — @foreach, @for, @while, @forelse"
+    desc: >
+      Blade ma dyrektywy pętli z dostępem do specjalnej zmiennej $loop zawierającej
+      metadane: $loop->index (od 0), $loop->iteration (od 1), $loop->first, $loop->last,
+      $loop->count, $loop->remaining, $loop->depth, $loop->parent.
+      @forelse obsługuje pusty przypadek bez dodatkowego @if.
+    code: |
+      {{-- @foreach z $loop --}}
+      @foreach ($posts as $post)
+          <article class="{{ $loop->first ? 'featured' : '' }}">
+              <h2>{{ $loop->iteration }}. {{ $post->title }}</h2>
+              <p>{{ $post->excerpt }}</p>
+
+              @if (!$loop->last)
+                  <hr>
+              @endif
+          </article>
+      @endforeach
+
+      {{-- @forelse — obsługuje pustą kolekcję --}}
+      @forelse ($posts as $post)
+          <div>{{ $post->title }}</div>
+      @empty
+          <p>Brak postów.</p>
+      @endforelse
+
+      {{-- @for — klasyczna pętla numeryczna --}}
+      @for ($i = 1; $i <= $totalPages; $i++)
+          <a href="?page={{ $i }}" class="{{ $currentPage === $i ? 'active' : '' }}">
+              {{ $i }}
+          </a>
+      @endfor
+
+      {{-- @while --}}
+      @while ($item = array_shift($queue))
+          <li>{{ $item->name }}</li>
+      @endwhile
+
+      {{-- @continue i @break --}}
+      @foreach ($items as $item)
+          @continue($item->hidden)
+          <div>{{ $item->name }}</div>
+          @break($loop->index === 9)
+      @endforeach
+
+  - name: "Layout — @extends, @yield, @section, @include"
+    desc: >
+      Dziedziczenie layoutów to główny wzorzec organizacji widoków Blade.
+      Layout definiuje @yield('slot') — miejsca do wypełnienia. Widok dziecko
+      robi @extends('layouts.app') i wypełnia @section('slot')...@endsection.
+      @include wstrzykuje inny widok — jako partial lub reużywalny fragment.
+    code: |
+      {{-- resources/views/layouts/app.blade.php --}}
+      <!DOCTYPE html>
+      <html lang="pl">
+      <head>
+          <meta charset="UTF-8">
+          <title>@yield('title', 'MyApp')</title>
+          @stack('styles')
+      </head>
+      <body>
+          @include('partials.navbar')
+
+          <main class="container">
+              @yield('content')
+          </main>
+
+          @include('partials.footer')
+          @stack('scripts')
+      </body>
+      </html>
+
+      {{-- resources/views/posts/show.blade.php --}}
+      @extends('layouts.app')
+
+      @section('title', $post->title . ' — MyApp')
+
+      @section('content')
+          <article>
+              <h1>{{ $post->title }}</h1>
+              @include('posts.partials.meta', ['post' => $post])
+              <div>{!! $post->content_html !!}</div>
+          </article>
+          @include('posts.partials.comments', ['comments' => $post->comments])
+      @endsection
+
+      @push('scripts')
+          <script src="{{ asset('js/comments.js') }}"></script>
+      @endpush
+
+  - name: "Komponenty Blade — <x-component>"
+    desc: >
+      Komponenty Blade (od Laravel 7) to alternatywa dla @include z logiką PHP.
+      Komponent = klasa PHP (app/View/Components/) + szablon Blade (resources/views/components/).
+      Props przekazujesz jak atrybuty HTML — Laravel automatycznie je mapuje.
+      Anonymous components (tylko .blade.php bez klasy) dla prostszych przypadków.
+    code: |
+      {{-- php artisan make:component Alert --}}
+
+      {{-- app/View/Components/Alert.php --}}
+      class Alert extends Component
+      {
+          public function __construct(
+              public string $type = 'info',
+              public string $message = '',
+          ) {}
+
+          public function render(): View
+          {
+              return view('components.alert');
+          }
+
+          public function colorClass(): string
+          {
+              return match($this->type) {
+                  'success' => 'bg-green-100 text-green-800',
+                  'error'   => 'bg-red-100 text-red-800',
+                  default   => 'bg-blue-100 text-blue-800',
+              };
+          }
+      }
+
+      {{-- resources/views/components/alert.blade.php --}}
+      <div class="alert {{ $colorClass() }}" role="alert">
+          <strong>{{ ucfirst($type) }}:</strong> {{ $message }}
+          {{ $slot }}  {{-- slot — dodatkowa treść między tagami --}}
+      </div>
+
+      {{-- Użycie w widoku --}}
+      <x-alert type="success" message="Post został zapisany!" />
+
+      <x-alert type="error">
+          <strong>Błąd:</strong> Nie można usunąć posta z komentarzami.
+      </x-alert>
+
+      {{-- Named slots --}}
+      <x-card>
+          <x-slot:header>Tytuł karty</x-slot:header>
+          Treść karty
+          <x-slot:footer>Stopka karty</x-slot:footer>
+      </x-card>
+
+  - name: "Dyrektywy auth — @auth, @guest, @can"
+    desc: >
+      Blade ma wbudowane dyrektywy do obsługi autentykacji i autoryzacji.
+      @auth/@guest sprawdza czy użytkownik jest zalogowany/niezalogowany.
+      @can/@cannot sprawdza uprawnienia przez Gates i Policies.
+      @role/@hasanyrole dostępne przez Spatie permissions.
+    code: |
+      {{-- Sprawdzenie autentykacji --}}
+      @auth
+          <a href="{{ route('profile') }}">{{ auth()->user()->name }}</a>
+          <form action="{{ route('logout') }}" method="POST">
+              @csrf
+              <button type="submit">Wyloguj</button>
+          </form>
+      @endauth
+
+      @guest
+          <a href="{{ route('login') }}">Zaloguj się</a>
+          <a href="{{ route('register') }}">Zarejestruj się</a>
+      @endguest
+
+      {{-- Specific guard --}}
+      @auth('admin')
+          <a href="/admin">Panel admina</a>
+      @endauth
+
+      {{-- Sprawdzenie uprawnień przez Gates/Policies --}}
+      @can('update', $post)
+          <a href="{{ route('posts.edit', $post) }}">Edytuj</a>
+      @endcan
+
+      @cannot('delete', $post)
+          <p class="text-muted">Nie masz uprawnień do usunięcia tego posta.</p>
+      @endcannot
+
+      @canany(['update', 'delete'], $post)
+          <div class="actions">
+              {{-- przyciski akcji --}}
+          </div>
+      @endcanany
+
+      {{-- CSRF token dla formularzy --}}
+      <form method="POST" action="/posts">
+          @csrf
+          @method('PUT')   {{-- dla PUT/PATCH/DELETE --}}
+          {{-- pola formularza --}}
+      </form>
+
+  - name: "Błędy walidacji — @error"
+    desc: >
+      @error wyświetla błędy walidacji dla konkretnego pola. Po nieudanej walidacji
+      Laravel przekierowuje z powrotem z błędami w sesji flash. old() przywraca
+      wartość pola po błędzie. @if($errors->any()) sprawdza czy są jakiekolwiek błędy.
+    code: |
+      {{-- Formularz z obsługą błędów --}}
+      <form method="POST" action="{{ route('posts.store') }}">
+          @csrf
+
+          <div class="form-group">
+              <label for="title">Tytuł</label>
+              <input
+                  type="text"
+                  id="title"
+                  name="title"
+                  value="{{ old('title') }}"
+                  class="form-control @error('title') is-invalid @enderror"
+              >
+              @error('title')
+                  <div class="invalid-feedback">{{ $message }}</div>
+              @enderror
+          </div>
+
+          <div class="form-group">
+              <label for="content">Treść</label>
+              <textarea name="content" class="@error('content') is-invalid @enderror">
+                  {{ old('content') }}
+              </textarea>
+              @error('content')
+                  <span class="error">{{ $message }}</span>
+              @enderror
+          </div>
+
+          <button type="submit">Zapisz post</button>
+      </form>
+
+      {{-- Podsumowanie wszystkich błędów --}}
+      @if ($errors->any())
+          <div class="alert alert-danger">
+              <ul>
+                  @foreach ($errors->all() as $error)
+                      <li>{{ $error }}</li>
+                  @endforeach
+              </ul>
+          </div>
+      @endif
+
+  - name: "Blade — dyrektywy własne i Livewire"
+    desc: >
+      Możesz rejestrować własne dyrektywy Blade w Service Providerze przez
+      Blade::directive(). Livewire to full-stack framework oparty na Blade — dodaje
+      reaktywność (jak React/Vue) bez pisania JavaScript. Komponenty Livewire
+      synchronizują stan między PHP a przeglądarką przez AJAX automatycznie.
+    code: |
+      // Rejestracja własnej dyrektywy — AppServiceProvider.php
+      use Illuminate\Support\Facades\Blade;
+
+      public function boot(): void
+      {
+          // @money(1500, 'PLN')
+          Blade::directive('money', function ($expression) {
+              return "<?php echo number_format($expression, 2, ',', ' '); ?> zł";
+          });
+
+          // @datetime($post->created_at)
+          Blade::directive('datetime', function ($expression) {
+              return "<?php echo ($expression)->format('d.m.Y H:i'); ?>";
+          });
+      }
+
+      // Użycie własnych dyrektyw
+      // Cena: @money($product->price)
+      // Data: @datetime($post->created_at)
+
+      {{-- Livewire — instalacja --}}
+      // composer require livewire/livewire
+      // php artisan make:livewire SearchPosts
+
+      {{-- Komponent Livewire w Blade --}}
+      @livewire('search-posts')
+      {{-- lub --}}
+      <livewire:search-posts />
+
+      {{-- W layoucie — skrypty i style Livewire --}}
+      @livewireStyles
+      @livewireScripts
+
+      {{-- app/Livewire/SearchPosts.php --}}
+      // class SearchPosts extends Component {
+      //     public string $search = '';
+      //     public function render() {
+      //         return view('livewire.search-posts', [
+      //             'posts' => Post::where('title', 'like', "%{$this->search}%")->get()
+      //         ]);
+      //     }
+      // }
+
+      {{-- resources/views/livewire/search-posts.blade.php --}}
+      // <input wire:model.live="search" placeholder="Szukaj...">
+      // @foreach($posts as $post) ... @endforeach

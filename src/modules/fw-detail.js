@@ -66,6 +66,29 @@ import { FW_VITE_DATA }         from '../data/fw_vite.js';
 import { FW_DRIZZLE_DATA }      from '../data/fw_drizzle.js';
 import { FW_REDUX_DATA }        from '../data/fw_redux.js';
 import { FW_BUN_DATA }          from '../data/fw_bun.js';
+import { FW_SVELTEKIT_DATA }   from '../data/fw_sveltekit.js';
+import { FW_ASTRO_DATA }       from '../data/fw_astro.js';
+import { FW_HONO_DATA }        from '../data/fw_hono.js';
+import { FW_HELM_DATA }        from '../data/fw_helm.js';
+import { FW_PYDANTIC_DATA }    from '../data/fw_pydantic.js';
+import { FW_DENO_DATA }        from '../data/fw_deno.js';
+import { FW_THREEJS_DATA }     from '../data/fw_threejs.js';
+import { FW_TURBOREPO_DATA }   from '../data/fw_turborepo.js';
+import { FW_NUXT_DATA }        from '../data/fw_nuxt.js';
+import { FW_FASTIFY_DATA }     from '../data/fw_fastify.js';
+import { FW_FIREBASE_DATA }    from '../data/fw_firebase.js';
+import { FW_CYPRESS_DATA }     from '../data/fw_cypress.js';
+import { FW_REMIX_DATA }       from '../data/fw_remix.js';
+import { FW_GITHUBACTIONS_DATA } from '../data/fw_githubactions.js';
+import { FW_REACTNATIVE_DATA }   from '../data/fw_reactnative.js';
+import { FW_MONGOOSE_DATA }      from '../data/fw_mongoose.js';
+import { FW_MYSQL_DATA }         from '../data/fw_mysql.js';
+import { FW_SHADCNUI_DATA }      from '../data/fw_shadcnui.js';
+import { FW_LARAVEL_DATA }      from '../data/fw_laravel.js';
+import { FW_SPRINGBOOT_DATA }   from '../data/fw_springboot.js';
+import { FW_SEQUELIZE_DATA }    from '../data/fw_sequelize.js';
+import { FW_SQLITE_DATA }       from '../data/fw_sqlite.js';
+import { FW_ANSIBLE_DATA }      from '../data/fw_ansible.js';
 
 let activeTab = 'podstawy';
 let activeFw  = 'react';
@@ -120,6 +143,29 @@ const FW_DATA_MAP = {
   drizzle: FW_DRIZZLE_DATA,
   redux: FW_REDUX_DATA,
   bun: FW_BUN_DATA,
+  sveltekit:  FW_SVELTEKIT_DATA,
+  astro:      FW_ASTRO_DATA,
+  hono:       FW_HONO_DATA,
+  helm:       FW_HELM_DATA,
+  pydantic:   FW_PYDANTIC_DATA,
+  deno:       FW_DENO_DATA,
+  threejs:    FW_THREEJS_DATA,
+  turborepo:  FW_TURBOREPO_DATA,
+  nuxt:       FW_NUXT_DATA,
+  fastify:    FW_FASTIFY_DATA,
+  firebase:   FW_FIREBASE_DATA,
+  cypress:    FW_CYPRESS_DATA,
+  remix:           FW_REMIX_DATA,
+  githubactions:   FW_GITHUBACTIONS_DATA,
+  reactnative:     FW_REACTNATIVE_DATA,
+  mongoose:        FW_MONGOOSE_DATA,
+  mysql:           FW_MYSQL_DATA,
+  shadcnui:        FW_SHADCNUI_DATA,
+  laravel:         FW_LARAVEL_DATA,
+  springboot:      FW_SPRINGBOOT_DATA,
+  sequelize:       FW_SEQUELIZE_DATA,
+  sqlite:          FW_SQLITE_DATA,
+  ansible:         FW_ANSIBLE_DATA,
 };
 
 export function openFramework(fw) {

@@ -1,0 +1,263 @@
+title: SQLite — Ekosystem & Pakiety
+
+labels:
+  section: Pakiet
+  example: Zastosowanie
+
+intro: >
+  Ekosystem SQLite obejmuje drivery dla każdego języka, rozszerzenia szyfrowania, wektorowe,
+  replikację oraz narzędzia GUI. better-sqlite3 dominuje Node.js, aiosqlite obsługuje Python async.
+  SQLite-vec dodaje wyszukiwanie wektorowe, SQLCipher szyfruje bazę, Litestream replikuje do S3.
+
+items:
+  - name: better-sqlite3 (Node.js)
+    icon: "⚡"
+    color: "#f0db4f"
+    tagline: "Najszybszy synchroniczny driver SQLite dla Node.js"
+    desc: >
+      Synchroniczny, typowo bezpieczny driver bez callback-ów i Promisów.
+      2-3x szybszy niż node-sqlite3 dzięki bezpośredniemu binowaniu C++.
+      De facto standard dla Node.js/TypeScript projektów z SQLite.
+    code: |
+      // npm install better-sqlite3
+      // npm install -D @types/better-sqlite3
+
+      import Database from 'better-sqlite3';
+      const db = new Database('myapp.db');
+      db.pragma('journal_mode = WAL');
+      db.pragma('foreign_keys = ON');
+
+      const users = db.prepare('SELECT * FROM users').all();
+      const insert = db.prepare('INSERT INTO users (name, email) VALUES (?, ?)');
+      const insertMany = db.transaction((rows) => {
+        for (const r of rows) insert.run(r.name, r.email);
+      });
+
+  - name: node-sqlite3 (Node.js)
+    icon: "🔄"
+    color: "#68a063"
+    tagline: "Asynchroniczny callback-based driver SQLite — starszy standard"
+    desc: >
+      Starszy driver z asynchronicznym API opartym na callbackach i EventEmitter.
+      Wspiera Promises przez wrapper. Wolniejszy niż better-sqlite3 ale działa
+      w środowiskach wymagających pełnej asynchroniczności (Electron, starsze projekty).
+    code: |
+      // npm install sqlite3
+      // npm install sqlite  -- Promise wrapper
+
+      import sqlite3 from 'sqlite3';
+      import { open } from 'sqlite';
+
+      const db = await open({
+        filename: './myapp.db',
+        driver: sqlite3.Database,
+      });
+
+      await db.exec('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT)');
+      await db.run('INSERT INTO users (name) VALUES (?)', ['Alice']);
+      const users = await db.all('SELECT * FROM users');
+      const user  = await db.get('SELECT * FROM users WHERE id = ?', [1]);
+
+  - name: sqlite-vec (wektory w SQLite)
+    icon: "🔢"
+    color: "#8b5cf6"
+    tagline: "Wyszukiwanie wektorowe bezpośrednio w SQLite — RAG bez osobnego vector store"
+    desc: >
+      Rozszerzenie SQLite dodające typy wektorowe i wyszukiwanie ANN (approximate nearest neighbor).
+      Idealne do małych-średnich aplikacji RAG gdzie nie chcesz osobnego vector store jak Pinecone.
+      Obsługuje float32, int8 i binary wektory.
+    code: |
+      # pip install sqlite-vec
+      import sqlite3
+      import sqlite_vec
+
+      conn = sqlite3.connect(':memory:')
+      sqlite_vec.load(conn)  # załaduj rozszerzenie
+
+      conn.execute("""
+        CREATE VIRTUAL TABLE vec_items USING vec0(
+          embedding float[4]
+        )
+      """)
+
+      conn.execute("""
+        INSERT INTO vec_items(rowid, embedding)
+        VALUES (1, '[0.1, 0.2, 0.3, 0.4]'),
+               (2, '[0.9, 0.8, 0.7, 0.6]')
+      """)
+
+      # Wyszukaj 5 najbliższych sąsiadów
+      rows = conn.execute("""
+        SELECT rowid, distance
+        FROM vec_items
+        WHERE embedding MATCH '[0.1, 0.2, 0.3, 0.4]'
+        ORDER BY distance LIMIT 5
+      """).fetchall()
+
+  - name: SQLCipher (szyfrowanie)
+    icon: "🔐"
+    color: "#ef4444"
+    tagline: "Przezroczyste szyfrowanie AES-256 dla pliku SQLite"
+    desc: >
+      SQLCipher szyfruje całą bazę danych AES-256 bez zmian w API.
+      Kompatybilny z SQLite API — wymaga tylko podania klucza szyfrowania.
+      Używany w aplikacjach mobilnych (WhatsApp), medycznych, finansowych.
+    code: |
+      # pip install sqlcipher3-binary
+      from pysqlcipher3 import dbapi2 as sqlite
+
+      conn = sqlite.connect('encrypted.db')
+      conn.execute("PRAGMA key='moj-tajny-klucz-256bit'")
+      conn.execute("CREATE TABLE IF NOT EXISTS secrets (id INTEGER PRIMARY KEY, data TEXT)")
+      conn.execute("INSERT INTO secrets (data) VALUES (?)", ("tajne dane",))
+      conn.commit()
+
+      # Zmiana klucza
+      conn.execute("PRAGMA rekey='nowy-klucz'")
+
+      # W Node.js: @journeyapps/sqlcipher
+      // npm install @journeyapps/sqlcipher
+      // import Database from '@journeyapps/sqlcipher';
+      // const db = new Database('encrypted.db');
+      // db.serialize(() => { db.run("PRAGMA key='secret'"); });
+
+  - name: Litestream (replikacja do S3)
+    icon: "☁️"
+    color: "#0ea5e9"
+    tagline: "Ciągła replikacja SQLite do S3/GCS/Azure — backup w czasie rzeczywistym"
+    desc: >
+      Litestream to narzędzie CLI które replikuje SQLite do object storage w tle,
+      strumieniując WAL zmiany w czasie rzeczywistym. Zero kodu aplikacji — działa obok procesu.
+      Umożliwia point-in-time recovery i deployment SQLite na serverless.
+    code: |
+      # Instalacja
+      # brew install benbjohnson/litestream/litestream
+
+      # litestream.yml
+      # dbs:
+      #   - path: /data/myapp.db
+      #     replicas:
+      #       - url: s3://my-bucket/myapp.db
+
+      # Replikuj w tle podczas uruchamiania aplikacji
+      # litestream replicate -config litestream.yml
+
+      # Przywróć z backupu
+      # litestream restore -o /data/myapp.db s3://my-bucket/myapp.db
+
+      # Docker compose example:
+      # services:
+      #   app:
+      #     ...
+      #   litestream:
+      #     image: litestream/litestream
+      #     command: replicate
+      #     volumes:
+      #       - ./data:/data
+      #       - ./litestream.yml:/etc/litestream.yml
+
+  - name: Turso / LibSQL (SQLite w chmurze)
+    icon: "🚀"
+    color: "#00c9a7"
+    tagline: "SQLite jako serwis — HTTP, embedded replicas, edge deployment"
+    desc: >
+      Turso to platforma oparta na LibSQL (fork SQLite) umożliwiająca cloudowy dostęp
+      do SQLite przez HTTP. Embedded replicas synchronizują lokalną kopię z chmurą.
+      Idealny do edge funkcji i multi-tenant SaaS.
+    code: |
+      // npm install @libsql/client
+      import { createClient } from '@libsql/client';
+
+      // Tryb lokalny (jak SQLite)
+      const db = createClient({ url: 'file:local.db' });
+
+      // Tryb Turso cloud
+      const db2 = createClient({
+        url: 'libsql://mydb-myuser.turso.io',
+        authToken: process.env.TURSO_TOKEN,
+      });
+
+      // Embedded replica — lokalny plik + sync z chmurą
+      const db3 = createClient({
+        url: 'libsql://mydb-myuser.turso.io',
+        authToken: process.env.TURSO_TOKEN,
+        syncUrl: 'libsql://mydb-myuser.turso.io',
+        localPath: './local-replica.db',
+      });
+
+      const result = await db2.execute('SELECT * FROM users WHERE id = ?', [1]);
+      console.log(result.rows);
+
+  - name: "bun:sqlite (wbudowane w Bun)"
+    icon: "🐇"
+    color: "#fbf0df"
+    tagline: "Natywny, ekstremalnie szybki SQLite wbudowany w runtime Bun"
+    desc: >
+      Bun zawiera SQLite wbudowany w runtime — zero instalacji, zero node_modules.
+      API podobne do better-sqlite3 ale natywne dla Bun. Jeden z najszybszych driverów SQLite
+      dostępnych dla JavaScript.
+    code: |
+      // Wymaga Bun runtime — bun run script.ts
+      import { Database } from 'bun:sqlite';
+
+      const db = new Database('myapp.db');
+
+      // Named query z parametrami $
+      const query = db.query('SELECT * FROM users WHERE id = $id');
+      const user = query.get({ $id: 1 });
+
+      // Prepared statement
+      const insert = db.prepare('INSERT INTO users (name, email) VALUES ($name, $email)');
+      insert.run({ $name: 'Alice', $email: 'alice@example.com' });
+
+      // Transakcja
+      const insertMany = db.transaction((users) => {
+        for (const u of users) insert.run(u);
+      });
+
+      insertMany([
+        { $name: 'Bob',   $email: 'bob@example.com' },
+        { $name: 'Carol', $email: 'carol@example.com' },
+      ]);
+
+      db.close();
+
+  - name: aiosqlite (Python async)
+    icon: "🔀"
+    color: "#3b82f6"
+    tagline: "Asynchroniczny wrapper dla sqlite3 — asyncio + SQLite"
+    desc: >
+      aiosqlite opakowuje standardowy sqlite3 w asynchroniczne API kompatybilne z asyncio.
+      Idealny dla FastAPI, aiohttp, Django Channels gdzie nie możesz blokować event loop.
+      Wewnętrznie używa wątku dla operacji IO.
+    code: |
+      # pip install aiosqlite
+      import aiosqlite
+      import asyncio
+
+      async def main():
+          async with aiosqlite.connect('myapp.db') as db:
+              # Utwórz tabelę
+              await db.execute("""
+                  CREATE TABLE IF NOT EXISTS users (
+                      id    INTEGER PRIMARY KEY,
+                      name  TEXT NOT NULL,
+                      email TEXT UNIQUE
+                  )
+              """)
+              await db.commit()
+
+              # Wstaw
+              await db.execute(
+                  "INSERT INTO users (name, email) VALUES (?, ?)",
+                  ("Alice", "alice@example.com")
+              )
+              await db.commit()
+
+              # Pobierz — row_factory
+              db.row_factory = aiosqlite.Row
+              async with db.execute("SELECT * FROM users") as cursor:
+                  async for row in cursor:
+                      print(dict(row))
+
+      asyncio.run(main())

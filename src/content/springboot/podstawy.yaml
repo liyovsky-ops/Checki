@@ -1,0 +1,203 @@
+title: Spring Boot — Podstawy
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Spring Boot to framework upraszczający tworzenie aplikacji Java na bazie Spring Framework.
+  Oferuje auto-konfigurację, embedded serwery (Tomcat, Jetty) oraz starter dependencies,
+  dzięki czemu projekt produkcyjny działa od razu bez ręcznej konfiguracji XML.
+
+items:
+  - name: "@SpringBootApplication"
+    desc: >
+      Główna adnotacja startowa — łączy @Configuration, @EnableAutoConfiguration i @ComponentScan.
+      Umieszcza się ją na klasie z metodą main(). Spring Boot automatycznie skanuje pakiet i podpakiety.
+    code: |
+      @SpringBootApplication
+      public class MyApp {
+          public static void main(String[] args) {
+              SpringApplication.run(MyApp.class, args);
+          }
+      }
+
+  - name: Auto-konfiguracja
+    desc: >
+      Spring Boot automatycznie konfiguruje beany na podstawie classpath i właściwości.
+      Jeśli wykryje sterownik H2 na classpath — automatycznie skonfiguruje DataSource.
+      Własna konfiguracja zawsze nadpisuje auto-konfigurację.
+    code: |
+      // Wyłączenie konkretnej auto-konfiguracji
+      @SpringBootApplication(exclude = {DataSourceAutoConfiguration.class})
+      public class MyApp { ... }
+
+      // Zobaczenie aktywnych auto-konfiguracji
+      // application.properties:
+      // debug=true
+
+  - name: "@Component, @Service, @Repository"
+    desc: >
+      Trzy stereotypowe adnotacje rejestrujące klasy jako beany Springa.
+      @Component — ogólny; @Service — logika biznesowa; @Repository — dostęp do danych
+      (dodaje translację wyjątków bazodanowych). Wszystkie wykrywane przez @ComponentScan.
+    code: |
+      @Component
+      public class EmailValidator { ... }
+
+      @Service
+      public class UserService {
+          public User findById(Long id) { ... }
+      }
+
+      @Repository
+      public interface UserRepository extends JpaRepository<User, Long> { }
+
+  - name: "@Autowired — Dependency Injection"
+    desc: >
+      Wstrzykiwanie zależności przez pole, setter lub konstruktor. Zalecany sposób to wstrzykiwanie
+      przez konstruktor (constructor injection) — łatwiejsze testowanie i niemutowalność.
+      Jeśli jest jeden konstruktor, @Autowired jest opcjonalny.
+    code: |
+      @Service
+      public class OrderService {
+          private final UserService userService;
+          private final EmailService emailService;
+
+          // Constructor injection — zalecane
+          @Autowired
+          public OrderService(UserService userService, EmailService emailService) {
+              this.userService = userService;
+              this.emailService = emailService;
+          }
+      }
+
+  - name: "@Bean i @Configuration"
+    desc: >
+      @Configuration oznacza klasę jako źródło definicji beanów. Metody oznaczone @Bean
+      zwracają obiekty zarządzane przez kontener IoC. Używaj gdy potrzebujesz skonfigurować
+      bibliotekę zewnętrzną lub stworzyć bean z logiką inicjalizacyjną.
+    code: |
+      @Configuration
+      public class AppConfig {
+
+          @Bean
+          public PasswordEncoder passwordEncoder() {
+              return new BCryptPasswordEncoder();
+          }
+
+          @Bean
+          public RestTemplate restTemplate() {
+              return new RestTemplate();
+          }
+      }
+
+  - name: "application.properties / application.yml"
+    desc: >
+      Główny plik konfiguracyjny Spring Boot. Obsługuje format .properties i .yml.
+      Hierarchia: application.properties < application-{profile}.properties < zmienne środowiskowe.
+      Plik YAML jest czytelniejszy dla zagnieżdżonych właściwości.
+    code: |
+      # application.properties
+      server.port=8080
+      spring.datasource.url=jdbc:postgresql://localhost:5432/mydb
+      spring.datasource.username=postgres
+      spring.datasource.password=secret
+      spring.jpa.hibernate.ddl-auto=update
+
+      # application.yml (odpowiednik)
+      server:
+        port: 8080
+      spring:
+        datasource:
+          url: jdbc:postgresql://localhost:5432/mydb
+          username: postgres
+          password: secret
+
+  - name: "Spring Profiles (@Profile)"
+    desc: >
+      Profile pozwalają na różne konfiguracje dla różnych środowisk (dev, test, prod).
+      Aktywujesz profil przez zmienną środowiskową, argument JVM lub właściwość.
+      Beany z @Profile aktywują się tylko gdy profil jest aktywny.
+    code: |
+      @Configuration
+      @Profile("dev")
+      public class DevConfig {
+          @Bean
+          public DataSource devDataSource() {
+              return new EmbeddedDatabaseBuilder()
+                  .setType(EmbeddedDatabaseType.H2).build();
+          }
+      }
+
+      // application-dev.properties
+      // spring.jpa.show-sql=true
+      // logging.level.org.hibernate=DEBUG
+
+      // Aktywacja profilu:
+      // SPRING_PROFILES_ACTIVE=dev java -jar app.jar
+      // lub: java -jar app.jar --spring.profiles.active=dev
+
+  - name: "Starter Dependencies"
+    desc: >
+      Startery to gotowe zestawy zależności pokrywające konkretny obszar funkcjonalny.
+      Wystarczy dodać jeden starter zamiast dziesiątek zależności. Spring Boot dobiera
+      kompatybilne wersje bibliotek automatycznie przez Spring Boot BOM.
+    code: |
+      <!-- pom.xml — popularne startery -->
+      <dependency>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-starter-web</artifactId>
+      </dependency>
+      <dependency>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-starter-data-jpa</artifactId>
+      </dependency>
+      <dependency>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-starter-security</artifactId>
+      </dependency>
+      <dependency>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-starter-actuator</artifactId>
+      </dependency>
+
+  - name: "ApplicationContext i IoC Container"
+    desc: >
+      ApplicationContext to główny kontener IoC (Inversion of Control) Springa.
+      Zarządza cyklem życia beanów — tworzenie, wstrzykiwanie zależności, niszczenie.
+      Możesz ręcznie pobrać bean z kontekstu przez getBean() — rzadko potrzebne.
+    code: |
+      @SpringBootApplication
+      public class MyApp {
+          public static void main(String[] args) {
+              ApplicationContext ctx = SpringApplication.run(MyApp.class, args);
+
+              // Ręczne pobranie beana (antypattern — użyj DI)
+              UserService svc = ctx.getBean(UserService.class);
+
+              // Sprawdzenie zarejestrowanych beanów
+              String[] beans = ctx.getBeanDefinitionNames();
+          }
+      }
+
+  - name: "CommandLineRunner i ApplicationRunner"
+    desc: >
+      Interfejsy do wykonania kodu po starcie aplikacji. CommandLineRunner otrzymuje args
+      jako String[], ApplicationRunner — jako ApplicationArguments. Przydatne do
+      inicjalizacji danych, migracji lub weryfikacji konfiguracji przy starcie.
+    code: |
+      @Component
+      public class DataInitializer implements CommandLineRunner {
+
+          @Autowired
+          private UserRepository userRepository;
+
+          @Override
+          public void run(String... args) throws Exception {
+              if (userRepository.count() == 0) {
+                  userRepository.save(new User("admin", "admin@example.com"));
+                  System.out.println("Seed data created");
+              }
+          }
+      }

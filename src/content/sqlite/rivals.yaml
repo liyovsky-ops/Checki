@@ -1,0 +1,97 @@
+title: SQLite vs alternatywy baz danych
+
+items:
+  - name: PostgreSQL
+    icon: "🐘"
+    color: "#336791"
+    tagline: "Zaawansowana relacyjna baza — pełny serwer, concurrent writes, enterprise features"
+    pros:
+      - "Prawdziwa współbieżność — wiele równoczesnych pisarzy bez konfliktów"
+      - "Bogaty ekosystem: PostGIS, pgvector, full-text search, JSON/JSONB"
+      - "ACID na poziomie wiersza, MVCC — doskonała izolacja transakcji"
+      - "Zaawansowane typy: arrays, hstore, UUID, ENUM, ranges"
+      - "Replikacja streaming, logical replication, HA z Patroni"
+      - "Procedury składowane, triggery, rozszerzenia (PL/pgSQL, PL/Python)"
+      - "Skalowalność pionowa i pozioma, partycjonowanie tabel"
+    cons:
+      - "Wymaga osobnego serwera/procesu — overhead operacyjny"
+      - "Konfiguracja: postgresql.conf, pg_hba.conf, użytkownicy, schematy"
+      - "Zużywa RAM nawet przy małym obciążeniu (shared_buffers)"
+      - "Migracje schematu trudniejsze (ALTER TABLE może być drogie)"
+      - "Overkill dla małych projektów, CLI tools, aplikacji embedded"
+    vs: "SQLite gdy: jeden plik, embedded app, mobile, prototyp, read-heavy. PostgreSQL gdy: web app z wieloma pisarzami, dużo danych, potrzebujesz rozszerzeń, HA"
+
+  - name: MySQL / MariaDB
+    icon: "🐬"
+    color: "#4479a1"
+    tagline: "Najpopularniejsza relacyjna baza — szybka, sprawdzona, MySQL as a Service wszędzie"
+    pros:
+      - "Ogromne wsparcie hostingowe — każdy hosting ma MySQL"
+      - "Lepsze write performance niż PostgreSQL przy prostych workloadach"
+      - "MySQL 8.0+ ma window functions, CTE, JSON support"
+      - "Łatwa replikacja master-slave, MySQL Group Replication"
+      - "MariaDB: open-source fork z dodatkowymi featurami i lepszą licencją"
+      - "RDS MySQL, Aurora MySQL — managed w AWS"
+    cons:
+      - "Historycznie gorsze wsparcie standardu SQL (NULL handling, GROUP BY)"
+      - "Brak niektórych PostgreSQL-owych featurów (native arrays, partial indexes)"
+      - "Licencja Oracle MySQL może być problematyczna"
+      - "Wymaga serwera — jak PostgreSQL, nie embedded"
+      - "Mniej rozszerzeń niż PostgreSQL ekosystem"
+    vs: "SQLite gdy: lokalny plik, zero-config. MySQL gdy: LAMP stack, CMS (WordPress), potrzebujesz managed cloud i masz dużo równoczesnych requestów"
+
+  - name: DuckDB
+    icon: "🦆"
+    color: "#f4c842"
+    tagline: "Analityczna baza embedded — OLAP na plikach lokalnych, szybkie agregacje"
+    pros:
+      - "Kolumnowe przechowywanie danych — doskonałe dla GROUP BY, aggregations"
+      - "Embedded jak SQLite — jeden plik, zero serwera"
+      - "Czyta Parquet, CSV, JSON, Arrow natively — idealne dla data science"
+      - "Automatyczna równoległość na wielu rdzeniach CPU"
+      - "Integracja z Pandas, Polars, Arrow — zero-copy data transfer"
+      - "SQL standardowy + ARRAY, STRUCT, MAP, LIST types"
+      - "Extensions: httpfs (S3), spatial, full-text search"
+    cons:
+      - "OLAP nie OLTP — nie jest zoptymalizowany dla wielu małych insertów/updateów"
+      - "Brak concurrent writers jak SQLite"
+      - "Większy overhead przy transakcjach OLTP niż SQLite"
+      - "Stosunkowo młody projekt — mniej dojrzały niż SQLite"
+    vs: "SQLite gdy: OLTP, małe dane, transakcje. DuckDB gdy: analityka, agregacje, przetwarzanie plików CSV/Parquet, data science pipeline"
+
+  - name: LibSQL / Turso
+    icon: "🚀"
+    color: "#00c9a7"
+    tagline: "SQLite z siecią i replikacją — embedded SQLite dostępny jako cloud service"
+    pros:
+      - "Kompatybilny z SQLite — ta sama składnia SQL, te same drivery"
+      - "Turso dodaje sieciowy dostęp HTTP/gRPC do SQLite bez zmiany kodu"
+      - "Embedded replicas — lokalna kopia danych z automatyczną synchronizacją"
+      - "Edge deployment (Fly.io, Cloudflare) — SQLite blisko użytkownika"
+      - "Multi-tenancy — oddzielna baza per tenant (tanie, izolowane)"
+      - "WASM-friendly, działa na Cloudflare Workers"
+    cons:
+      - "Nowy projekt — mniejsza społeczność niż SQLite"
+      - "Turso cloud — vendor lock-in, koszty przy skali"
+      - "Nie zastępuje PostgreSQL przy bardzo dużym obciążeniu write"
+      - "Embedded replicas mają opóźnienie synchronizacji"
+    vs: "SQLite gdy: lokalny plik, offline-first, embedded. LibSQL/Turso gdy: chcesz SQLite w chmurze, edge, multi-tenant SaaS, synchronizacja między urządzeniami"
+
+  - name: LevelDB / RocksDB
+    icon: "🪨"
+    color: "#6b7280"
+    tagline: "Key-value store embedded — ekstremalnie szybkie operacje na kluczach, brak SQL"
+    pros:
+      - "Ekstremalnie szybkie write (LSM tree — zoptymalizowane pod write)"
+      - "Embedded — bez serwera, jak SQLite"
+      - "Obsługuje ogromne ilości danych (petabajty w RocksDB)"
+      - "RocksDB: używany przez Facebook, Discord, CockroachDB, TiKV"
+      - "Kompresja danych (Snappy, LZ4, Zstd) — małe rozmiary"
+      - "Bloom filters — szybkie key lookups nawet przy TB danych"
+    cons:
+      - "Brak SQL — tylko operacje GET/PUT/DELETE/SCAN na kluczach"
+      - "Brak relacji, JOIN, transakcji SQL"
+      - "Skomplikowany API — nie dla prostych aplikacji"
+      - "Brak narzędzi GUI jak SQLite Browser"
+      - "Myślenie key-value zamiast relacyjne — zmiana paradygmatu"
+    vs: "SQLite gdy: potrzebujesz SQL, relacji, prostoty. LevelDB/RocksDB gdy: ekstremalne write throughput, key-value access pattern, budujesz bazę wyższego poziomu na silniku storage"

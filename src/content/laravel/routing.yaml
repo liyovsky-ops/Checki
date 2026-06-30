@@ -1,0 +1,373 @@
+title: Laravel — Routing & Controllers
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Routing w Laravelu definiuje się w plikach routes/ — web.php dla aplikacji z sesjami i CSRF,
+  api.php dla REST API (bezstanowe, prefix /api). Każda trasa mapuje URL i metodę HTTP
+  na akcję — closure lub metodę kontrolera. Kontrolery w app/Http/Controllers/
+  grupują powiązaną logikę. Resource Controllers automatycznie tworzą 7 standardowych tras CRUD.
+
+items:
+  - name: "Podstawowe trasy — GET, POST, PUT, DELETE"
+    desc: >
+      Route::get(), post(), put(), patch(), delete() definiują trasy HTTP. Możesz przekazać
+      closure lub tablicę [KontrolerClass, 'metoda']. Route::any() dopasowuje każdą metodę HTTP.
+      Route::match(['get', 'post'], ...) dopasowuje kilka metod naraz.
+    code: |
+      // routes/web.php
+      use App\Http\Controllers\PostController;
+      use Illuminate\Support\Facades\Route;
+
+      // Closure — dla prostych przypadków
+      Route::get('/', function () {
+          return view('welcome');
+      });
+
+      // Kontroler — zalecane
+      Route::get('/posts', [PostController::class, 'index']);
+      Route::get('/posts/{post}', [PostController::class, 'show']);
+      Route::post('/posts', [PostController::class, 'store']);
+      Route::put('/posts/{post}', [PostController::class, 'update']);
+      Route::patch('/posts/{post}', [PostController::class, 'update']);
+      Route::delete('/posts/{post}', [PostController::class, 'destroy']);
+
+      // Kilka metod HTTP
+      Route::match(['get', 'post'], '/search', [SearchController::class, 'index']);
+
+      // Dowolna metoda HTTP
+      Route::any('/webhook', [WebhookController::class, 'handle']);
+
+      // Zwracanie JSON bezpośrednio
+      Route::get('/api/status', function () {
+          return response()->json(['status' => 'ok', 'version' => '1.0']);
+      });
+
+  - name: "Nazwane trasy i URL generowanie"
+    desc: >
+      Nazwane trasy pozwalają generować URL-e i przekierowania przez nazwę zamiast hardkodowanej ścieżki.
+      Gdy zmienisz URL, wszystkie miejsca korzystające z route() zaktualizują się automatycznie.
+      ->name() przypisuje nazwę. route() generuje URL, redirect()->route() przekierowuje.
+    code: |
+      // Definiowanie nazwanych tras
+      Route::get('/posts', [PostController::class, 'index'])->name('posts.index');
+      Route::get('/posts/{post}', [PostController::class, 'show'])->name('posts.show');
+      Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
+      Route::get('/posts/{post}/edit', [PostController::class, 'edit'])->name('posts.edit');
+      Route::put('/posts/{post}', [PostController::class, 'update'])->name('posts.update');
+      Route::delete('/posts/{post}', [PostController::class, 'destroy'])->name('posts.destroy');
+
+      // Generowanie URL przez nazwę
+      $url = route('posts.index');              // /posts
+      $url = route('posts.show', $post);        // /posts/42 (model binding)
+      $url = route('posts.show', ['post' => 42]);  // /posts/42
+      $url = route('posts.index', ['page' => 2]);  // /posts?page=2
+
+      // W Blade
+      // <a href="{{ route('posts.show', $post) }}">{{ $post->title }}</a>
+      // <form action="{{ route('posts.update', $post) }}" method="POST">
+
+      // Przekierowania przez nazwy
+      return redirect()->route('posts.index');
+      return redirect()->route('posts.show', $post)->with('success', 'Post zapisany!');
+
+      // Sprawdzenie aktualnej trasy
+      if (request()->routeIs('posts.*')) {
+          // jesteśmy na jakiejś trasie posts
+      }
+
+  - name: "Parametry tras — statyczne i dynamiczne"
+    desc: >
+      Parametry dynamiczne definiuje się w nawiasach klamrowych {param}. Opcjonalne parametry
+      mają znak zapytania {param?}. Laravel automatycznie dopasowuje modele Eloquent przez
+      Route Model Binding — {post} automatycznie pobiera Post::find($id) lub 404.
+      Możesz też definiować własne wzorce przez ->where().
+    code: |
+      // Parametry wymagane
+      Route::get('/users/{user}/posts/{post}', [PostController::class, 'show']);
+      // /users/42/posts/15 → $user=42, $post=15
+
+      // Parametry opcjonalne — musisz mieć wartość domyślną w metodzie
+      Route::get('/posts/{category?}', function (?string $category = null) {
+          return Post::when($category, fn($q) => $q->where('category', $category))->get();
+      });
+
+      // Ograniczenia wyrażeniami regularnymi
+      Route::get('/posts/{id}', [PostController::class, 'show'])->where('id', '[0-9]+');
+      Route::get('/users/{name}', fn($name) => $name)->where('name', '[A-Za-z]+');
+      Route::get('/search/{query}', fn($q) => $q)->whereAlphaNumeric('query');
+
+      // Route Model Binding — automatyczne pobieranie modelu
+      Route::get('/posts/{post}', [PostController::class, 'show']);
+      // Laravel automatycznie: Post::findOrFail($post) → wstrzykuje model
+
+      // Kontroler z Route Model Binding
+      public function show(Post $post): View
+      {
+          // $post to już instancja modelu Post::findOrFail($id)
+          return view('posts.show', compact('post'));
+      }
+
+      // Binding po innym polu (np. slug zamiast id)
+      Route::get('/posts/{post:slug}', [PostController::class, 'show']);
+      // Lub w modelu: public function getRouteKeyName() { return 'slug'; }
+
+  - name: "Grupy tras — prefix, middleware, namespace"
+    desc: >
+      Grupy tras pozwalają współdzielić konfigurację między wieloma trasami — prefix URL,
+      middleware, namespace kontrolerów, name prefix. Grupy można zagnieżdżać.
+      Prefiks middleware('auth') wymaga zalogowania dla całej grupy.
+    code: |
+      // Prefix URL
+      Route::prefix('admin')->group(function () {
+          Route::get('/users', [Admin\UserController::class, 'index']);    // /admin/users
+          Route::get('/posts', [Admin\PostController::class, 'index']);    // /admin/posts
+          Route::get('/settings', [Admin\SettingController::class, 'index']); // /admin/settings
+      });
+
+      // Middleware dla grupy
+      Route::middleware('auth')->group(function () {
+          Route::get('/profile', [ProfileController::class, 'show']);
+          Route::put('/profile', [ProfileController::class, 'update']);
+          Route::get('/dashboard', [DashboardController::class, 'index']);
+      });
+
+      // Kilka middleware + prefix + name prefix
+      Route::middleware(['auth', 'verified'])
+          ->prefix('admin')
+          ->name('admin.')
+          ->group(function () {
+              Route::get('/users', [Admin\UserController::class, 'index'])->name('users.index');
+              // URL: /admin/users | Nazwa: admin.users.index
+              Route::resource('posts', Admin\PostController::class)->names('posts');
+              // Wszystkie resource trasy z prefiksem admin.posts.*
+          });
+
+  - name: "Resource Controllers — CRUD w jednej linii"
+    desc: >
+      Route::resource() automatycznie tworzy 7 standardowych tras CRUD (index, create, store,
+      show, edit, update, destroy). Artisan make:controller --resource generuje kontroler
+      z wszystkimi metodami. Idealne dla typowego CRUD — mniej kodu, więcej konwencji.
+    code: |
+      // routes/web.php — jedna linia = 7 tras
+      Route::resource('posts', PostController::class);
+
+      // Wygenerowane trasy:
+      // GET    /posts             → index    (lista)
+      // GET    /posts/create      → create   (formularz tworzenia)
+      // POST   /posts             → store    (zapis)
+      // GET    /posts/{post}      → show     (szczegóły)
+      // GET    /posts/{post}/edit → edit     (formularz edycji)
+      // PUT    /posts/{post}      → update   (aktualizacja)
+      // DELETE /posts/{post}      → destroy  (usunięcie)
+
+      // php artisan make:controller PostController --resource
+      class PostController extends Controller
+      {
+          public function index(): View
+          {
+              return view('posts.index', ['posts' => Post::latest()->paginate(10)]);
+          }
+
+          public function create(): View
+          {
+              return view('posts.create');
+          }
+
+          public function store(StorePostRequest $request): RedirectResponse
+          {
+              $post = Post::create($request->validated() + ['user_id' => auth()->id()]);
+              return redirect()->route('posts.show', $post)->with('success', 'Opublikowano!');
+          }
+
+          public function show(Post $post): View
+          {
+              return view('posts.show', compact('post'));
+          }
+
+          public function edit(Post $post): View
+          {
+              $this->authorize('update', $post);
+              return view('posts.edit', compact('post'));
+          }
+
+          public function update(UpdatePostRequest $request, Post $post): RedirectResponse
+          {
+              $this->authorize('update', $post);
+              $post->update($request->validated());
+              return redirect()->route('posts.show', $post)->with('success', 'Zaktualizowano!');
+          }
+
+          public function destroy(Post $post): RedirectResponse
+          {
+              $this->authorize('delete', $post);
+              $post->delete();
+              return redirect()->route('posts.index')->with('success', 'Usunięto!');
+          }
+      }
+
+      // Tylko wybrane akcje
+      Route::resource('photos', PhotoController::class)->only(['index', 'show']);
+      Route::resource('photos', PhotoController::class)->except(['create', 'edit']);
+
+  - name: "API Routing — api.php i bez CSRF"
+    desc: >
+      routes/api.php to dedykowany plik dla REST API — trasy mają automatyczny prefix /api,
+      nie mają CSRF middleware (bo API używa tokenów), używają throttle rate limiting.
+      apiResource() tworzy 5 tras (bez create/edit — formularze HTML niepotrzebne dla API).
+      Typowo używasz z Laravel Sanctum do autentykacji.
+    code: |
+      // routes/api.php
+      use Illuminate\Support\Facades\Route;
+
+      // Trasy publiczne
+      Route::post('/auth/login', [AuthController::class, 'login']);
+      Route::post('/auth/register', [AuthController::class, 'register']);
+
+      // Trasy chronione przez Sanctum
+      Route::middleware('auth:sanctum')->group(function () {
+          Route::get('/user', fn(Request $request) => $request->user());
+          Route::post('/auth/logout', [AuthController::class, 'logout']);
+
+          // apiResource — 5 tras (bez create i edit)
+          Route::apiResource('posts', PostController::class);
+          // GET    /api/posts         → index
+          // POST   /api/posts         → store
+          // GET    /api/posts/{post}  → show
+          // PUT    /api/posts/{post}  → update
+          // DELETE /api/posts/{post}  → destroy
+
+          Route::apiResources([
+              'posts'    => PostController::class,
+              'comments' => CommentController::class,
+              'tags'     => TagController::class,
+          ]);
+      });
+
+      // API Controller — zwraca JSON
+      class PostController extends Controller
+      {
+          public function index(): JsonResponse
+          {
+              return response()->json(
+                  Post::with('user')
+                      ->published()
+                      ->paginate(20)
+              );
+          }
+
+          public function store(StorePostRequest $request): JsonResponse
+          {
+              $post = Post::create($request->validated() + ['user_id' => auth()->id()]);
+              return response()->json($post, 201);
+          }
+      }
+
+  - name: "Form Request Validation"
+    desc: >
+      Form Request to dedykowana klasa walidacji dla żądań HTTP — wydziela reguły z kontrolera.
+      php artisan make:request StorePostRequest. Metoda authorize() sprawdza uprawnienia,
+      rules() definiuje reguły walidacji. Laravel automatycznie wstrzykuje i waliduje
+      przed wywołaniem metody kontrolera — błędy trafiają z powrotem do formularza.
+    code: |
+      // php artisan make:request StorePostRequest
+      namespace App\Http\Requests;
+
+      use Illuminate\Foundation\Http\FormRequest;
+
+      class StorePostRequest extends FormRequest
+      {
+          public function authorize(): bool
+          {
+              // true = każdy zalogowany może, false = 403
+              return $this->user()->can('create', Post::class);
+          }
+
+          public function rules(): array
+          {
+              return [
+                  'title'        => ['required', 'string', 'min:3', 'max:255'],
+                  'content'      => ['required', 'string', 'min:50'],
+                  'slug'         => ['required', 'string', 'unique:posts,slug', 'regex:/^[a-z0-9-]+$/'],
+                  'status'       => ['required', 'in:draft,published'],
+                  'published_at' => ['nullable', 'date', 'after:now'],
+                  'tags'         => ['array', 'max:5'],
+                  'tags.*'       => ['integer', 'exists:tags,id'],
+                  'thumbnail'    => ['nullable', 'image', 'max:2048'],
+              ];
+          }
+
+          public function messages(): array
+          {
+              return [
+                  'title.required' => 'Tytuł jest wymagany.',
+                  'slug.unique'    => 'Ten slug już istnieje — wybierz inny.',
+                  'thumbnail.max'  => 'Miniatura nie może być większa niż 2MB.',
+              ];
+          }
+      }
+
+      // Użycie w kontrolerze — automatyczna walidacja przed wywołaniem
+      public function store(StorePostRequest $request): RedirectResponse
+      {
+          // Tutaj request jest już zwalidowany!
+          $post = Post::create($request->validated());
+          $post->tags()->sync($request->tags ?? []);
+          return redirect()->route('posts.show', $post);
+      }
+
+  - name: "Kontrolery — podstawy i Single Action"
+    desc: >
+      Kontrolery w app/Http/Controllers/ grupują powiązaną logikę requestu.
+      Dziedziczą po Controller który udostępnia authorize(), validate(), middleware().
+      Single Action Controller ma jedną metodę __invoke() — dla prostych, jednocelowych akcji.
+      Zalecane dla webhooks, callbacków OAuth, jednorazowych procesów.
+    code: |
+      // Standardowy kontroler
+      namespace App\Http\Controllers;
+
+      class PostController extends Controller
+      {
+          // Middleware tylko dla wybranych metod
+          public function __construct()
+          {
+              $this->middleware('auth')->except(['index', 'show']);
+              $this->middleware('throttle:5,1')->only('store');
+          }
+
+          public function index(Request $request): View
+          {
+              $posts = Post::published()
+                  ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
+                  ->latest()
+                  ->paginate(10)
+                  ->withQueryString();  // zachowaj parametry query w paginacji
+
+              return view('posts.index', compact('posts'));
+          }
+      }
+
+      // Single Action Controller
+      // php artisan make:controller PublishPostController --invokable
+      class PublishPostController extends Controller
+      {
+          public function __invoke(Post $post): RedirectResponse
+          {
+              $this->authorize('publish', $post);
+              $post->update(['status' => 'published', 'published_at' => now()]);
+              return redirect()->route('posts.show', $post)->with('success', 'Opublikowano!');
+          }
+      }
+
+      // Rejestracja single action controller
+      Route::post('/posts/{post}/publish', PublishPostController::class)->name('posts.publish');
+
+      // Generowanie response — różne typy
+      return view('posts.show', compact('post'));
+      return response()->json(['success' => true], 200);
+      return redirect()->back()->with('error', 'Coś poszło nie tak.');
+      return redirect()->route('home');
+      return response()->download(storage_path('exports/report.pdf'));
+      return response()->file(storage_path('photos/avatar.jpg'));

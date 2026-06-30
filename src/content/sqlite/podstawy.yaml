@@ -1,0 +1,159 @@
+title: SQLite — SQL & Tabele
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  SQLite przechowuje całą bazę danych w jednym pliku. Obsługuje pięć typów danych: TEXT, INTEGER, REAL, BLOB i NULL.
+  Silnik jest bezserwerowy — czyta i pisze bezpośrednio do pliku na dysku bez żadnego procesu serwera.
+  Idealny do prototypowania, aplikacji mobilnych, desktopowych i wszędzie tam, gdzie zależy nam na zero-konfiguracji.
+
+items:
+  - name: CREATE TABLE z typami
+    desc: >
+      SQLite używa dynamicznego systemu typów (type affinity). Pięć typów: TEXT, INTEGER, REAL, BLOB, NULL.
+      Deklaracja kolumny to wskazówka dla silnika, ale wartość może być dowolnego typu.
+    code: |
+      CREATE TABLE users (
+        id      INTEGER PRIMARY KEY AUTOINCREMENT,
+        name    TEXT    NOT NULL,
+        email   TEXT    UNIQUE NOT NULL,
+        age     INTEGER DEFAULT 0,
+        score   REAL    DEFAULT 0.0,
+        avatar  BLOB,
+        bio     TEXT
+      );
+
+  - name: PRIMARY KEY AUTOINCREMENT
+    desc: >
+      INTEGER PRIMARY KEY tworzy alias dla wewnętrznego rowid. AUTOINCREMENT gwarantuje,
+      że ID nigdy nie zostanie ponownie użyte (nawet po DELETE). Bez AUTOINCREMENT SQLite
+      może reużyć ID usuniętych wierszy.
+    code: |
+      CREATE TABLE posts (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        title      TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+
+      -- Sprawdź ostatnie wstawione ID
+      SELECT last_insert_rowid();
+
+  - name: Constraints — NOT NULL, UNIQUE, DEFAULT, CHECK
+    desc: >
+      SQLite obsługuje wszystkie standardowe ograniczenia kolumn. CHECK umożliwia
+      walidację wartości na poziomie bazy. DEFAULT może przyjmować funkcje jak datetime('now').
+    code: |
+      CREATE TABLE products (
+        id       INTEGER PRIMARY KEY AUTOINCREMENT,
+        sku      TEXT    UNIQUE NOT NULL,
+        name     TEXT    NOT NULL,
+        price    REAL    NOT NULL CHECK(price >= 0),
+        stock    INTEGER DEFAULT 0 CHECK(stock >= 0),
+        category TEXT    DEFAULT 'uncategorized'
+      );
+
+  - name: INSERT INTO
+    desc: >
+      Wstawianie pojedynczego lub wielu wierszy. INSERT OR REPLACE zastępuje wiersz
+      gdy naruszy UNIQUE constraint. INSERT OR IGNORE pomija wiersze z konfliktem.
+    code: |
+      -- Pojedynczy wiersz
+      INSERT INTO users (name, email, age) VALUES ('Alice', 'alice@example.com', 30);
+
+      -- Wiele wierszy
+      INSERT INTO users (name, email) VALUES
+        ('Bob',   'bob@example.com'),
+        ('Carol', 'carol@example.com');
+
+      -- Ignoruj duplikaty
+      INSERT OR IGNORE INTO users (name, email) VALUES ('Alice', 'alice@example.com');
+
+      -- Zastąp istniejący
+      INSERT OR REPLACE INTO users (id, name, email) VALUES (1, 'Alice2', 'alice2@example.com');
+
+  - name: SELECT — podstawowe zapytania
+    desc: >
+      SELECT * zwraca wszystkie kolumny — wygodne w developmencie, unikaj w produkcji.
+      Zawsze lepiej wymieniać konkretne kolumny — mniej danych przez sieć, czytelniejszy kod.
+    code: |
+      -- Wszystkie kolumny
+      SELECT * FROM users;
+
+      -- Konkretne kolumny
+      SELECT id, name, email FROM users;
+
+      -- Z aliasem
+      SELECT name AS user_name, email AS contact FROM users;
+
+      -- Unikalne wartości
+      SELECT DISTINCT category FROM products;
+
+  - name: UPDATE SET WHERE
+    desc: >
+      UPDATE bez WHERE zaktualizuje WSZYSTKIE wiersze — zawsze sprawdź czy masz WHERE!
+      SQLite nie ma RETURNING domyślnie (dostępne od v3.35).
+    code: |
+      -- Aktualizuj jeden wiersz
+      UPDATE users SET age = 31 WHERE id = 1;
+
+      -- Wiele kolumn
+      UPDATE products
+        SET price = price * 1.1,
+            stock = stock - 1
+      WHERE id = 42;
+
+      -- Z RETURNING (SQLite >= 3.35)
+      UPDATE users SET name = 'Alicja' WHERE id = 1 RETURNING id, name;
+
+  - name: DELETE WHERE
+    desc: >
+      DELETE bez WHERE usuwa WSZYSTKIE wiersze (tabela pozostaje, tylko dane znikają).
+      TRUNCATE nie istnieje w SQLite — użyj DELETE FROM table bez WHERE lub DROP+CREATE.
+    code: |
+      -- Usuń jeden wiersz
+      DELETE FROM users WHERE id = 5;
+
+      -- Usuń wiele
+      DELETE FROM users WHERE age < 18;
+
+      -- Usuń wszystkie wiersze (tabela pozostaje)
+      DELETE FROM users;
+
+      -- Liczba usuniętych wierszy
+      SELECT changes();
+
+  - name: DROP TABLE i ALTER TABLE
+    desc: >
+      SQLite ma bardzo ograniczone ALTER TABLE — nie można usunąć ani zmienić kolumny
+      (przed wersją 3.35). Obejście: utwórz nową tabelę, skopiuj dane, usuń starą.
+    code: |
+      -- Usuń tabelę
+      DROP TABLE IF EXISTS users;
+
+      -- Dodaj kolumnę (obsługiwane)
+      ALTER TABLE users ADD COLUMN phone TEXT;
+
+      -- Zmień nazwę tabeli
+      ALTER TABLE users RENAME TO app_users;
+
+      -- Zmień nazwę kolumny (SQLite >= 3.25)
+      ALTER TABLE users RENAME COLUMN bio TO description;
+
+  - name: CREATE VIEW
+    desc: >
+      Widoki (views) to zapisane zapytania — upraszczają złożone JOIN-y i ukrywają
+      szczegóły implementacji. SQLite obsługuje tylko widoki tylko do odczytu (bez UPDATE przez view).
+    code: |
+      -- Utwórz widok
+      CREATE VIEW active_users AS
+        SELECT id, name, email
+        FROM users
+        WHERE status = 'active';
+
+      -- Użyj widoku
+      SELECT * FROM active_users WHERE name LIKE 'A%';
+
+      -- Usuń widok
+      DROP VIEW IF EXISTS active_users;

@@ -1,0 +1,90 @@
+title: Spring Boot vs alternatywy Java
+
+items:
+  - name: Quarkus
+    icon: "⚡"
+    color: "#4695eb"
+    tagline: "Kubernetes-native Java — sub-second startup, GraalVM native image"
+    pros:
+      - Czas startu <100ms i pamięć <50MB w trybie natywnym (GraalVM)
+      - Live reload w trybie dev bez restartu JVM
+      - Reaktywne i imperatywne API w jednym projekcie (RESTEasy Reactive)
+      - Dev UI — panel do zarządzania w przeglądarce na http://localhost:8080/q/dev
+      - Doskonała integracja z Kubernetes — health probes, metrics gotowe od razu
+    cons:
+      - Mniejszy ekosystem niż Spring — nie wszystkie biblioteki mają rozszerzenia
+      - Native image wymaga kompilacji i może powodować problemy z refleksją
+      - Mniejsza społeczność — mniej Stack Overflow, mniej tutoriali
+      - Nauka: inny model programowania niż Spring
+    vs: "Quarkus wygrywa gdy startup time i pamięć RAM są krytyczne (lambdy, mikroserwisy serverless, kontenery). Spring Boot dominuje w klasycznych enterprise aplikacjach i ma nieporównywalnie większy ekosystem."
+
+  - name: Micronaut
+    icon: "🔬"
+    color: "#1f5c99"
+    tagline: "Full-stack JVM framework — kompilacja AOT, zero reflection DI"
+    pros:
+      - Dependency injection przez procesor adnotacji (AOT) — zero reflection w runtime
+      - Bardzo szybki startup i niskie zużycie pamięci
+      - Wbudowane wsparcie dla GraalVM native image
+      - Micronaut Data — zero-runtime JPA, podobne do Spring Data
+      - Doskonała integracja z chmurą (AWS, GCP, Azure)
+    cons:
+      - Mniejszy ekosystem i społeczność niż Spring Boot
+      - Błędy DI wychodzą w czasie kompilacji — trudniejsze debugowanie
+      - Mniej materiałów szkoleniowych i mniej ofert pracy
+      - Niektóre wzorce Spring trudne do przeniesienia (proxying, AOP)
+    vs: "Micronaut jest architektonicznie czystszy (brak reflection DI) i szybszy. Spring Boot wygrywa skalą ekosystemu, dokumentacji i rynku pracy. Wybierz Micronaut dla nowych projektów gdzie wydajność startowa jest priorytetem."
+
+  - name: "Jakarta EE (WildFly / Payara)"
+    icon: "🏛️"
+    color: "#d4a017"
+    tagline: "Standardy enterprise Java — specyfikacje JEE, application servers"
+    pros:
+      - Pełna specyfikacja Enterprise Java — standardy ISO/JCP
+      - Przenośność kodu między serwerami aplikacji (WildFly, Payara, GlassFish, TomEE)
+      - Dojrzałe, sprawdzone technologie (EJB, JMS, CDI, JAX-RS, JTA)
+      - Wbudowany JTA — transakcje rozproszone out-of-the-box
+      - Duże wsparcie dostawców (IBM WebSphere, Oracle)
+    cons:
+      - Ciężkie serwery aplikacji — WildFly startuje 10-30 sekund
+      - Wolniejszy development cycle — brak embedded server domyślnie
+      - Bardziej skomplikowana konfiguracja niż Spring Boot
+      - Mniej aktywna społeczność open-source
+      - XML konfiguracja deployment descriptors
+    vs: "Jakarta EE wygrywa w środowiskach gdzie standard i przenośność są wymaganiem (regulacje, kontrakt z dostawcą). Spring Boot dominuje w większości nowych projektów dzięki łatwości startu i ekosystemowi."
+
+  - name: "Vert.x"
+    icon: "🔄"
+    color: "#782a90"
+    tagline: "Reaktywny toolkit JVM — event-driven, non-blocking, polyglot"
+    pros:
+      - Bardzo wysoka throughput — non-blocking event loop (model jak Node.js)
+      - Polyglot — JavaScript, Groovy, Kotlin, Ruby na JVM
+      - Mikroserwisy i event-driven architektura jako first-class citizen
+      - Vert.x Event Bus — lekka komunikacja między komponentami
+      - Doskonałe benchmark wyniki — jeden z najszybszych JVM frameworks
+    cons:
+      - Stroma krzywa uczenia — reaktywny model trudniejszy od imperatywnego
+      - Brak ORM i wbudowanego DI — musisz złożyć stack samodzielnie
+      - Callback hell (choć Futures/Promises i Kotlin coroutines łagodzą)
+      - Mniejsza społeczność niż Spring
+      - Brak konwencji Spring Boot — więcej konfiguracji ręcznej
+    vs: "Vert.x wygrywa w systemach high-throughput, real-time i event-driven (chat, WebSocket, IoT). Spring Boot wygrywa dla standardowych REST API i CRUD aplikacji gdzie developer experience jest priorytetem."
+
+  - name: Helidon
+    icon: "☀️"
+    color: "#c74634"
+    tagline: "Oracle's cloud-native Java — MicroProfile + Helidon SE"
+    pros:
+      - Dwa smaki — Helidon SE (funkcyjny, minimalny) i Helidon MP (MicroProfile)
+      - MicroProfile: przenośne API dla mikroserwisów (JAX-RS, CDI, OpenAPI, JWT)
+      - Doskonała integracja z Oracle Cloud Infrastructure
+      - GraalVM native image wspierany out-of-the-box
+      - Project Loom — virtual threads dla wysokiej concurrency
+    cons:
+      - Mała społeczność — głównie Oracle i korporacje z kontraktami Oracle
+      - Mało tutoriali poza oficjalną dokumentacją
+      - Słabszy ekosystem vs Spring (mniej starters, mniej integracji)
+      - Mało ofert pracy na rynku
+      - Helidon SE wymaga dobrego zrozumienia reaktywnego programowania
+    vs: "Helidon sensowny dla firm już głęboko w Oracle ekosystemie lub gdy MicroProfile standard jest wymaganiem. Dla większości projektów Spring Boot lub Quarkus są lepszym wyborem ze względu na ekosystem i społeczność."

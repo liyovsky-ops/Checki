@@ -1,0 +1,91 @@
+title: Ansible vs alternatywy IaC/CM
+
+items:
+  - name: Terraform
+    icon: "🏗️"
+    color: "#7b42bc"
+    tagline: "Infrastructure provisioning — cloud resources, state management, declarative HCL"
+    pros:
+      - State management — Terraform wie co istnieje i planuje minimalne zmiany
+      - Dedykowany do provisjoningu infrastruktury (VPC, EC2, RDS, Load Balancers)
+      - terraform plan daje precyzyjny podgląd zmian przed wykonaniem
+      - Ogromny ekosystem providerów — AWS, GCP, Azure, K8s, GitHub i 3000+ innych
+      - Silna typizacja i walidacja konfiguracji HCL przed wykonaniem
+    cons:
+      - Brak zarządzania konfiguracją — nie instaluje pakietów, nie zarządza serwisami
+      - HCL ogranicza ekspresję logiki w porównaniu do YAML z Jinja2
+      - Wymaga zarządzania state file — w teamie potrzeba remote backend (S3 + locking)
+      - Wolniejszy przy konfiguracji wielu serwerów (nie parallelizuje SSH tak jak Ansible)
+    vs: "Terraform do tworzenia infrastruktury (VPC, EC2, RDS), Ansible do konfiguracji serwerów i deploymentu aplikacji. Standardowy stack: Terraform tworzy serwery → Ansible je konfiguruje. Ansible ma też moduły cloud (amazon.aws), ale bez state Terraform."
+
+  - name: Chef
+    icon: "👨‍🍳"
+    color: "#f18b21"
+    tagline: "Configuration management w Ruby — przepisy (recipes), cookbooks, Chef Server"
+    pros:
+      - Bardzo elastyczny i ekspresywny — pełna moc Ruby w recepturach
+      - Świetna idempotentność przez resources i providers
+      - Chef InSpec to potężne narzędzie do compliance-as-code i audytów bezpieczeństwa
+      - Dojrzały ekosystem — SuperMarket z tysiącami cookbooków
+      - Chef Server z pełnym audytem i widocznością stanu floty
+    cons:
+      - Wymaga agenta chef-client na każdym serwerze (nie agentless)
+      - Stromy próg wejścia — wymaga znajomości Ruby i DSL Chefa
+      - Chef Server to dodatkowa infrastruktura do zarządzania i utrzymania
+      - Mniejsza popularność — trudniej znaleźć ludzi ze znajomością Chefa
+      - Verbose kod — więcej linii niż Ansible do tego samego zadania
+    vs: "Ansible gdy chcesz prostszy start, brak agentów i YAML zamiast Ruby. Chef gdy masz duży zespół Ruby developerów, potrzebujesz zaawansowanego compliance (Chef InSpec) i akceptujesz złożoność infrastruktury z Chef Server."
+
+  - name: Puppet
+    icon: "🎭"
+    color: "#ffae1a"
+    tagline: "Deklaratywna CM w Puppet DSL — agent-based, model-driven, enterprise-ready"
+    pros:
+      - Silny model deklaratywny — opisujesz STAN a nie kroki dojścia do stanu
+      - Puppet Forge — duże repozytorium gotowych modułów
+      - PuppetDB — pełna baza danych o stanie infrastruktury i historii zmian
+      - Świetny do dużych środowisk enterprise (10k+ serwerów) z Puppet Enterprise
+      - Automatyczne wykrywanie i korygowanie dryftu konfiguracji (30-minutowy cykl)
+    cons:
+      - Wymaga agenta Puppet na każdym serwerze — zarządzanie agentem to overhead
+      - Puppet DSL jest niestandardowy — wymaga nauki od zera
+      - Puppetserver to złożona infrastruktura (Certificate Authority, PuppetDB, Foreman)
+      - Drogi dla enterprise (Puppet Enterprise) — open-source wersja ma ograniczenia UI
+      - Dłuższy cykl convergence — domyślnie co 30 minut (nie on-demand jak Ansible)
+    vs: "Ansible gdy chcesz ad-hoc wykonanie, prostotę YAML i brak agentów. Puppet gdy zarządzasz setkami/tysiącami serwerów i potrzebujesz automatycznego wymuszania stanu i pełnej widoczności historii konfiguracji."
+
+  - name: SaltStack
+    icon: "🧂"
+    color: "#00aeef"
+    tagline: "Event-driven automation — Salt Master/Minion, szybka komunikacja ZeroMQ"
+    pros:
+      - Bardzo szybki — komunikacja przez ZeroMQ/msgpack, nie SSH
+      - Event-driven — reaktory odpowiadają na zdarzenia z systemu (np. nowy serwer)
+      - Salt Pillar — centralne zarządzanie danymi (jak Vault, ale wbudowane)
+      - Działa agentless (salt-ssh) LUB z agentem (salt-minion) — elastyczność
+      - Świetna skalowalność — zaprojektowany dla tysięcy nodów jednocześnie
+    cons:
+      - Stromy próg wejścia — więcej konceptów do zrozumienia (Master, Minion, Pillar, Grain, State)
+      - Mniejsza społeczność i ekosystem niż Ansible
+      - Konfiguracja Salt Master jest bardziej złożona niż Ansible control node
+      - Debugowanie może być trudne — event bus, reaktory i orchestracja
+      - VMware przejął projekt — niepewna przyszłość open-source
+    vs: "Ansible gdy zaczynasz lub Twoja skala to dziesiątki-setki serwerów. SaltStack gdy potrzebujesz event-driven reaktywnej automatyzacji lub zarządzasz tysiącami serwerów gdzie szybkość ZeroMQ jest kluczowa."
+
+  - name: Pulumi
+    icon: "🔷"
+    color: "#8a3391"
+    tagline: "IaC w prawdziwych językach — Python/TypeScript/Go z pełną logiką programistyczną"
+    pros:
+      - Piszesz w Python, TypeScript, Go, C# — pełna moc języka (klasy, testy, biblioteki)
+      - Łatwe testowanie jednostkowe infrastruktury przez pytest / jest
+      - Pulumi ESC (Environment, Secrets, Configuration) — zaawansowane zarządzanie sekretami
+      - Świetna integracja z AI — Pulumi AI generuje konfigurację z opisu naturalnego
+      - Automation API — programowe zarządzanie infrastrukturą z Twojego kodu aplikacji
+    cons:
+      - Nie zastępuje Ansible w Configuration Management — tylko provisjonuje chmurę
+      - Mniejszy ekosystem i społeczność niż Ansible i Terraform
+      - Złożoność Python/TS może być przeszkodą dla teams ops bez doświadczenia deweloperskiego
+      - State management podobny do Terraform — potrzeba Pulumi Cloud lub self-hosted backend
+      - Mniej tutoriali i materiałów szkoleniowych niż Ansible
+    vs: "Ansible gdy potrzebujesz CM (konfiguracja serwerów, deployment aplikacji) — Pulumi tego nie robi. Pulumi vs Terraform: obydwa do provisjoningu chmury, Pulumi gdy preferujesz Python/TS zamiast HCL. Stack Pulumi + Ansible jest sensowny jak Terraform + Ansible."

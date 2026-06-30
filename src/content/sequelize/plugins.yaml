@@ -1,0 +1,202 @@
+title: Sequelize — Ekosystem i pakiety
+
+items:
+  - name: sequelize-cli
+    npm: sequelize-cli
+    desc: >
+      Oficjalny interfejs linii komend dla Sequelize. Generuje modele, migracje
+      i seedery, uruchamia i cofa migracje, inicjalizuje strukturę projektu.
+      Nieodzowny w każdym projekcie Sequelize — zarządza historią schematu bazy.
+    install: npm install --save-dev sequelize-cli
+    usage: |
+      npx sequelize-cli init
+      npx sequelize-cli model:generate --name User --attributes name:string
+      npx sequelize-cli db:migrate
+      npx sequelize-cli db:migrate:undo
+      npx sequelize-cli db:seed:all
+
+  - name: sequelize-typescript
+    npm: sequelize-typescript
+    desc: >
+      Dekoratory TypeScript dla Sequelize — definiujesz modele przez klasy
+      z dekoratorami (@Table, @Column, @HasMany, @BelongsTo). Eliminuje potrzebę
+      Model.init() — model i jego typy w jednym miejscu. Kompatybilny z Sequelize v6.
+    install: npm install sequelize-typescript reflect-metadata
+    usage: |
+      import { Table, Column, Model, HasMany, DataType } from 'sequelize-typescript';
+
+      @Table({ tableName: 'users', timestamps: true })
+      class User extends Model {
+        @Column({ type: DataType.STRING, allowNull: false })
+        username!: string;
+
+        @Column({ type: DataType.STRING, unique: true })
+        email!: string;
+
+        @HasMany(() => Post, 'authorId')
+        posts!: Post[];
+      }
+
+  - name: sequelize-mock
+    npm: sequelize-mock
+    desc: >
+      Biblioteka do mockowania modeli Sequelize w testach jednostkowych.
+      Pozwala testować logikę biznesową bez prawdziwego połączenia z bazą danych.
+      Symuluje metody findAll, findOne, create, update, destroy i asocjacje.
+    install: npm install --save-dev sequelize-mock
+    usage: |
+      const SequelizeMock = require('sequelize-mock');
+      const dbMock = new SequelizeMock();
+
+      const UserMock = dbMock.define('User', {
+        username: 'jan_kowalski',
+        email: 'jan@test.pl',
+        isActive: true,
+      });
+
+      // W testach — bez prawdziwej bazy
+      const user = await UserMock.findOne({ where: { email: 'jan@test.pl' } });
+      expect(user.username).toBe('jan_kowalski');
+
+  - name: cls-hooked
+    npm: cls-hooked
+    desc: >
+      CLS (Continuation Local Storage) — pozwala automatycznie przekazywać
+      transakcję przez wszystkie wywołania bez ręcznego podawania { transaction: t }.
+      Sequelize v6+ ma wbudowane wsparcie dla CLS przez cls-hooked — ustaw raz,
+      transakcja propaguje się automatycznie przez cały call stack.
+    install: npm install cls-hooked
+    usage: |
+      const cls = require('cls-hooked');
+      const { Sequelize } = require('sequelize');
+
+      // Ustaw CLS namespace przed tworzeniem instancji
+      const namespace = cls.createNamespace('sequelize-tx');
+      Sequelize.useCLS(namespace);
+
+      const sequelize = new Sequelize({ /* ... */ });
+
+      // Teraz transakcja propaguje automatycznie
+      await sequelize.transaction(async (t) => {
+        // Nie musisz przekazywać { transaction: t } wszędzie!
+        await User.create({ username: 'jan' });   // automatycznie w transakcji
+        await Profile.create({ userId: 1 });       // automatycznie w transakcji
+      });
+
+  - name: sequelize-paginate
+    npm: sequelize-paginate
+    desc: >
+      Prosty plugin do paginacji dla Sequelize. Dodaje metodę paginate() do
+      modeli jako mixin. Zwraca dane z metainformacjami o paginacji — currentPage,
+      pageCount, pageSize, count. Alternatywa dla ręcznego findAndCountAll.
+    install: npm install sequelize-paginate
+    usage: |
+      const sequelizePaginate = require('sequelize-paginate');
+
+      // Dodaj do modelu
+      sequelizePaginate.paginate(User);
+
+      // Użycie
+      const { docs, pages, total } = await User.paginate({
+        page: 2,
+        paginate: 10,    // per page
+        where: { isActive: true },
+        order: [['createdAt', 'DESC']],
+      });
+
+      console.log(`Strona 2 z ${pages}, razem ${total} rekordów`);
+      console.log(docs); // tablica instancji User
+
+  - name: sequelize-hierarchy
+    npm: sequelize-hierarchy
+    desc: >
+      Plugin do obsługi hierarchicznych danych (drzewa) w Sequelize.
+      Implementuje adjacency list z opcjonalnym cache ancestry. Przydatny
+      dla kategorii, menu, komentarzy z odpowiedziami, struktury organizacyjnej.
+      Dodaje metody getDescendants(), getAncestors(), isLeaf(), isRoot().
+    install: npm install sequelize-hierarchy
+    usage: |
+      const sequelizeHierarchy = require('sequelize-hierarchy');
+      sequelizeHierarchy(Sequelize);
+
+      const Category = sequelize.define('Category', {
+        name: DataTypes.STRING,
+      });
+
+      Category.isHierarchy();  // aktywuj hierarchię
+
+      // Utwórz drzewo
+      const root = await Category.create({ name: 'Elektronika' });
+      const phones = await Category.create({ name: 'Telefony', parentId: root.id });
+      const iphones = await Category.create({ name: 'iPhone', parentId: phones.id });
+
+      // Pobierz wszystkich potomków
+      const descendants = await root.getDescendants();
+      // Pobierz przodków
+      const ancestors = await iphones.getAncestors();
+
+  - name: umzug
+    npm: umzug
+    desc: >
+      Zaawansowany programowy runner migracji — alternatywa dla sequelize-cli
+      do uruchamiania migracji w kodzie aplikacji. Obsługuje różne storage backends,
+      szczegółowe events (migrating, migrated, reverting), i integrację z TypeScript.
+      Używany gdy chcesz uruchamiać migracje przy starcie serwera bez CLI.
+    install: npm install umzug
+    usage: |
+      const { Umzug, SequelizeStorage } = require('umzug');
+
+      const umzug = new Umzug({
+        migrations: { glob: 'migrations/*.js' },
+        context: sequelize.getQueryInterface(),
+        storage: new SequelizeStorage({ sequelize }),
+        logger: console,
+      });
+
+      // Uruchom wszystkie pending migracje (np. przy starcie app)
+      await umzug.up();
+
+      // Cofnij ostatnią
+      await umzug.down();
+
+      // Sprawdź status
+      const pending = await umzug.pending();
+      const executed = await umzug.executed();
+
+      // Event handling
+      umzug.on('migrating', (ev) => console.log(`Migrating: ${ev.name}`));
+      umzug.on('migrated', (ev) => console.log(`Migrated: ${ev.name}`));
+
+  - name: sequelize-pool
+    npm: sequelize-pool
+    desc: >
+      Wewnętrzna biblioteka używana przez Sequelize do zarządzania pulą połączeń.
+      Zazwyczaj nie używasz jej bezpośrednio — konfigurujesz przez opcję pool
+      w konstruktorze Sequelize. Eksponowana osobno dla zaawansowanych przypadków
+      użycia takich jak custom pool monitoring i zarządzanie cyklem życia połączeń.
+    install: "# Zazwyczaj wbudowana w Sequelize — nie instaluj osobno"
+    usage: |
+      // Konfiguracja pool przez Sequelize (standardowy sposób)
+      const sequelize = new Sequelize({
+        dialect: 'postgres',
+        host: 'localhost',
+        database: 'mydb',
+        username: 'user',
+        password: 'secret',
+        pool: {
+          max: 20,           // maks. jednoczesnych połączeń
+          min: 5,            // min. utrzymywanych połączeń
+          acquire: 30000,    // ms timeout na uzyskanie połączenia
+          idle: 10000,       // ms bezczynności przed zwolnieniem
+          evict: 1000,       // jak często sprawdzać idle connections
+        },
+      });
+
+      // Sprawdź stan pool
+      const pool = sequelize.connectionManager.pool;
+      console.log('Pool size:', pool.size);
+      console.log('Available:', pool.available);
+      console.log('Pending:', pool.pending);
+
+      // Zamknij wszystkie połączenia
+      await sequelize.close();

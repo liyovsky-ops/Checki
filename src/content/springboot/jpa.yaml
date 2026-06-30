@@ -1,0 +1,252 @@
+title: Spring Boot — Spring Data JPA
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Spring Data JPA eliminuje powtarzalny kod dostępu do danych. Wystarczy zdefiniować
+  interfejs dziedziczący po JpaRepository — Spring generuje implementację automatycznie.
+  Pod spodem działa Hibernate jako domyślny dostawca JPA obsługujący mapowanie ORM.
+
+items:
+  - name: "@Entity, @Table, @Id, @GeneratedValue"
+    desc: >
+      @Entity oznacza klasę Java jako encję JPA mapowaną na tabelę bazy danych.
+      @Table pozwala nadać niestandardową nazwę tabeli. @Id definiuje klucz główny,
+      a @GeneratedValue określa strategię generowania (IDENTITY, SEQUENCE, AUTO, TABLE).
+    code: |
+      @Entity
+      @Table(name = "users")
+      public class User {
+
+          @Id
+          @GeneratedValue(strategy = GenerationType.IDENTITY)
+          private Long id;
+
+          @Column(name = "full_name", nullable = false, length = 100)
+          private String name;
+
+          @Column(unique = true, nullable = false)
+          private String email;
+
+          @CreationTimestamp
+          private LocalDateTime createdAt;
+
+          @UpdateTimestamp
+          private LocalDateTime updatedAt;
+
+          // gettery, settery lub Lombok @Data
+      }
+
+  - name: "JpaRepository — operacje CRUD"
+    desc: >
+      JpaRepository<T, ID> dostarcza pełny CRUD bez pisania implementacji.
+      Dziedziczy po CrudRepository i PagingAndSortingRepository. Spring Boot
+      automatycznie tworzy implementację bean'a dla każdego interfejsu.
+    code: |
+      public interface UserRepository extends JpaRepository<User, Long> {
+          // Wbudowane metody — gotowe od razu:
+          // save(entity), findById(id), findAll()
+          // delete(entity), deleteById(id)
+          // count(), existsById(id)
+      }
+
+      // Użycie w serwisie
+      @Service
+      public class UserService {
+          @Autowired
+          private UserRepository userRepository;
+
+          public User findById(Long id) {
+              return userRepository.findById(id)
+                  .orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
+          }
+
+          public User save(User user) {
+              return userRepository.save(user);
+          }
+
+          public void delete(Long id) {
+              userRepository.deleteById(id);
+          }
+      }
+
+  - name: "Derived Query Methods"
+    desc: >
+      Spring Data generuje zapytania SQL na podstawie nazwy metody w interfejsie repozytorium.
+      Parsuje nazwy jak findBy, countBy, deleteBy i dodaje warunki (And, Or, Like, Between,
+      GreaterThan itd.). Szybki sposób na proste zapytania bez SQL.
+    code: |
+      public interface UserRepository extends JpaRepository<User, Long> {
+          // Derived queries — Spring generuje SQL automatycznie
+          Optional<User> findByEmail(String email);
+          List<User> findByNameContainingIgnoreCase(String name);
+          List<User> findByAgeGreaterThanAndActiveTrue(int age);
+          List<User> findByCreatedAtBetween(LocalDateTime from, LocalDateTime to);
+          boolean existsByEmail(String email);
+          long countByRole(String role);
+          List<User> findTop5ByOrderByCreatedAtDesc();
+      }
+
+  - name: "@Query — JPQL i Native SQL"
+    desc: >
+      Dla złożonych zapytań których nazewnictwo metod nie wyraża wystarczająco —
+      użyj @Query z JPQL (Java Persistence Query Language) lub natywnym SQL.
+      JPQL operuje na encjach Java (nie tabelach), SQL natywny na tabelach.
+    code: |
+      public interface UserRepository extends JpaRepository<User, Long> {
+
+          // JPQL — operuje na encjach
+          @Query("SELECT u FROM User u WHERE u.email = :email AND u.active = true")
+          Optional<User> findActiveByEmail(@Param("email") String email);
+
+          // JPQL z JOIN
+          @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = :role")
+          List<User> findByRole(@Param("role") String role);
+
+          // Native SQL
+          @Query(value = "SELECT * FROM users WHERE last_login < NOW() - INTERVAL '30 days'",
+                 nativeQuery = true)
+          List<User> findInactiveUsers();
+
+          // Modyfikujące zapytanie
+          @Modifying
+          @Transactional
+          @Query("UPDATE User u SET u.active = false WHERE u.id = :id")
+          void deactivateUser(@Param("id") Long id);
+      }
+
+  - name: "Relacje — @OneToMany, @ManyToOne, @ManyToMany"
+    desc: >
+      JPA obsługuje wszystkie typy relacji między encjami. Kluczowe pojęcia to owning side
+      (strona z foreign key), mappedBy (strona odwrotna) i FetchType (LAZY/EAGER).
+      Zawsze używaj LAZY jako domyślny — EAGER może powodować N+1 problem.
+    code: |
+      @Entity
+      public class Order {
+          @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+          private Long id;
+
+          @ManyToOne(fetch = FetchType.LAZY)
+          @JoinColumn(name = "user_id")
+          private User user;
+
+          @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+          private List<OrderItem> items = new ArrayList<>();
+      }
+
+      @Entity
+      public class User {
+          @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+          private Long id;
+
+          @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+          private List<Order> orders = new ArrayList<>();
+
+          @ManyToMany
+          @JoinTable(name = "user_roles",
+              joinColumns = @JoinColumn(name = "user_id"),
+              inverseJoinColumns = @JoinColumn(name = "role_id"))
+          private Set<Role> roles = new HashSet<>();
+      }
+
+  - name: "@Transactional"
+    desc: >
+      Oznacza metodę lub klasę jako wykonywaną w transakcji bazodanowej.
+      Commit następuje po pomyślnym wykonaniu, rollback przy wyjątku RuntimeException.
+      Domyślnie Spring Data JPA metody repozytorium są transakcyjne — w serwisach
+      musisz dodać @Transactional jawnie dla operacji złożonych.
+    code: |
+      @Service
+      @Transactional(readOnly = true)  // Domyślnie read-only dla serwisu
+      public class OrderService {
+
+          @Transactional  // Write transaction dla tej metody
+          public Order createOrder(Long userId, List<Long> productIds) {
+              User user = userRepository.findById(userId)
+                  .orElseThrow(() -> new EntityNotFoundException("User not found"));
+              Order order = new Order(user);
+              productIds.forEach(pid -> {
+                  Product p = productRepository.findById(pid)
+                      .orElseThrow(() -> new EntityNotFoundException("Product: " + pid));
+                  order.addItem(new OrderItem(p, 1));
+              });
+              return orderRepository.save(order);
+              // Rollback automatyczny przy wyjątku
+          }
+      }
+
+  - name: "Paginacja — Pageable i Page<T>"
+    desc: >
+      Spring Data JPA ma wbudowane wsparcie dla paginacji i sortowania przez Pageable.
+      PageRequest.of(page, size, Sort) tworzy obiekt zapytania. Metody repozytorium
+      przyjmują Pageable i zwracają Page<T> z metadanymi (totalElements, totalPages).
+    code: |
+      // Repozytorium z paginacją
+      public interface ProductRepository extends JpaRepository<Product, Long> {
+          Page<Product> findByCategory(String category, Pageable pageable);
+      }
+
+      // Kontroler
+      @GetMapping("/products")
+      public Page<Product> getProducts(
+              @RequestParam(defaultValue = "0") int page,
+              @RequestParam(defaultValue = "20") int size,
+              @RequestParam(defaultValue = "name") String sortBy) {
+          Pageable pageable = PageRequest.of(page, size, Sort.by(sortBy).ascending());
+          return productRepository.findAll(pageable);
+      }
+
+      // Odpowiedź zawiera:
+      // { content: [...], totalElements: 150, totalPages: 8,
+      //   number: 0, size: 20, first: true, last: false }
+
+  - name: "Projekcje i DTO Mapping"
+    desc: >
+      Zamiast pobierać całe encje, Spring Data obsługuje projekcje — interfejsy lub klasy
+      pobierające tylko wybrane pola. Zmniejsza transfer danych i upraszcza API.
+      Możesz użyć interface projection, class projection lub @Query z DTO.
+    code: |
+      // Interface projection
+      public interface UserSummary {
+          Long getId();
+          String getName();
+          String getEmail();
+      }
+
+      public interface UserRepository extends JpaRepository<User, Long> {
+          List<UserSummary> findAllProjectedBy();
+          Optional<UserSummary> findProjectedById(Long id);
+      }
+
+      // Class projection (DTO)
+      @Query("SELECT new com.example.dto.UserDTO(u.id, u.name, u.email) FROM User u")
+      List<UserDTO> findAllAsDTO();
+
+  - name: "Spring Data Specifications — dynamiczne filtry"
+    desc: >
+      Specifications (oparte na JPA Criteria API) pozwalają budować dynamiczne zapytania
+      w kodzie Java. Interfejs JpaSpecificationExecutor umożliwia łączenie warunków
+      (and, or, not) w runtime. Alternatywa dla QueryDSL.
+    code: |
+      public interface UserRepository extends JpaRepository<User, Long>,
+                                               JpaSpecificationExecutor<User> { }
+
+      // Specification factory
+      public class UserSpecs {
+          public static Specification<User> hasName(String name) {
+              return (root, query, cb) -> name == null ? null :
+                  cb.like(cb.lower(root.get("name")), "%" + name.toLowerCase() + "%");
+          }
+
+          public static Specification<User> isActive() {
+              return (root, query, cb) -> cb.isTrue(root.get("active"));
+          }
+      }
+
+      // Użycie
+      List<User> users = userRepository.findAll(
+          Specification.where(UserSpecs.hasName(search))
+              .and(UserSpecs.isActive())
+      );

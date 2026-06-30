@@ -1,0 +1,231 @@
+title: Sequelize — Podstawy
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Sequelize to dojrzały, Promise-based ORM dla Node.js obsługujący PostgreSQL, MySQL,
+  MariaDB, SQLite i MSSQL. Pozwala mapować tabele na klasy JavaScript (modele),
+  definiować relacje, wykonywać migracje i pisać queries bez surowego SQL.
+  Działa zarówno w CommonJS jak i ESM. Wspiera pełną integrację z TypeScript przez
+  pakiet sequelize-typescript.
+
+items:
+  - name: Instalacja i konfiguracja
+    desc: >
+      Instalujesz sequelize jako główny pakiet oraz driver odpowiedni dla Twojej bazy
+      danych. Każda baza wymaga innego drivera — pg dla PostgreSQL, mysql2 dla MySQL,
+      sqlite3 dla SQLite, tedious dla MSSQL.
+    code: |
+      // Instalacja Sequelize + driver PostgreSQL
+      npm install sequelize pg pg-hstore
+
+      // Inne drivery:
+      // npm install sequelize mysql2        -- MySQL / MariaDB
+      // npm install sequelize sqlite3       -- SQLite
+      // npm install sequelize tedious       -- MSSQL
+      // npm install sequelize mariadb       -- MariaDB
+
+      // TypeScript support:
+      // npm install sequelize-typescript reflect-metadata
+
+  - name: Tworzenie instancji Sequelize
+    desc: >
+      Instancję Sequelize tworzysz podając connection string lub obiekt opcji.
+      Parametry: dialect (wymagany), host, port, database, username, password.
+      Instancja zarządza pulą połączeń (pool) i wszystkimi operacjami na bazie.
+    code: |
+      const { Sequelize } = require('sequelize');
+
+      // Sposób 1 — connection string
+      const sequelize = new Sequelize('postgres://user:pass@localhost:5432/mydb');
+
+      // Sposób 2 — obiekt konfiguracyjny (zalecany)
+      const sequelize = new Sequelize({
+        dialect: 'postgres',
+        host: 'localhost',
+        port: 5432,
+        database: 'mydb',
+        username: 'user',
+        password: 'secret',
+        pool: {
+          max: 10,       // maks. otwartych połączeń
+          min: 0,
+          acquire: 30000, // ms zanim rzuci błąd przy acquire
+          idle: 10000,   // ms bezczynności zanim zwolni połączenie
+        },
+        dialectOptions: {
+          ssl: { require: true, rejectUnauthorized: false }, // dla Neon/Supabase
+        },
+      });
+
+  - name: authenticate() — test połączenia
+    desc: >
+      Metoda authenticate() sprawdza czy połączenie z bazą działa poprawnie.
+      Zwraca Promise — użyj async/await lub .then()/.catch(). Dobra praktyka to
+      wywołać ją przy starcie aplikacji żeby szybko wykryć błędy konfiguracji.
+    code: |
+      async function testConnection() {
+        try {
+          await sequelize.authenticate();
+          console.log('Connection established successfully.');
+        } catch (error) {
+          console.error('Unable to connect to the database:', error);
+          process.exit(1);
+        }
+      }
+
+      testConnection();
+
+  - name: define() vs Model.init()
+    desc: >
+      Są dwa sposoby definiowania modelu. sequelize.define() to starszy styl —
+      zwięzły, inline. Model.init() to nowszy styl OOP — klasa rozszerzająca Model,
+      lepsza integracja z TypeScript i IDE. Oba tworzą ten sam rezultat.
+    code: |
+      const { Sequelize, DataTypes, Model } = require('sequelize');
+
+      // Styl 1 — sequelize.define() (prostszy, szybszy)
+      const User = sequelize.define('User', {
+        id:       { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        username: { type: DataTypes.STRING(100), allowNull: false, unique: true },
+        email:    { type: DataTypes.STRING, allowNull: false },
+      }, {
+        tableName: 'users',
+        timestamps: true,
+      });
+
+      // Styl 2 — Model.init() (zalecany dla TypeScript i OOP)
+      class User extends Model {}
+
+      User.init({
+        id:       { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        username: { type: DataTypes.STRING(100), allowNull: false, unique: true },
+        email:    { type: DataTypes.STRING, allowNull: false },
+      }, {
+        sequelize,      // instancja Sequelize — wymagana
+        modelName: 'User',
+        tableName: 'users',
+        timestamps: true,
+      });
+
+  - name: sync() — synchronizacja modeli z bazą
+    desc: >
+      Model.sync() tworzy tabelę w bazie jeśli nie istnieje. sync({ force: true })
+      usuwa i tworzy od nowa — UWAGA, niszczy dane. sync({ alter: true }) modyfikuje
+      istniejącą tabelę żeby pasowała do modelu. W produkcji używaj migracji,
+      nie sync().
+    code: |
+      // Sync jednego modelu
+      await User.sync();                    // CREATE TABLE IF NOT EXISTS
+      await User.sync({ force: true });     // DROP + CREATE (niszczy dane!)
+      await User.sync({ alter: true });     // ALTER TABLE — dostosuj do modelu
+
+      // Sync wszystkich modeli
+      await sequelize.sync();
+      await sequelize.sync({ force: true });
+      await sequelize.sync({ alter: true });
+
+      // Dobra praktyka — tylko w development
+      if (process.env.NODE_ENV === 'development') {
+        await sequelize.sync({ alter: true });
+      }
+      // W production — używaj migracji (sequelize-cli)
+
+  - name: DataTypes — podstawowe typy
+    desc: >
+      DataTypes to przestrzeń nazw z typami kolumn. Każdy dialekt (PostgreSQL, MySQL,
+      SQLite) mapuje typy na swoje natywne odpowiedniki. Najczęściej używane to
+      STRING, INTEGER, BOOLEAN, DATE, TEXT, JSON, FLOAT, DECIMAL, ENUM, ARRAY.
+    code: |
+      const { DataTypes } = require('sequelize');
+
+      // Tekstowe
+      DataTypes.STRING           // VARCHAR(255)
+      DataTypes.STRING(100)      // VARCHAR(100)
+      DataTypes.TEXT             // TEXT (unlimited)
+      DataTypes.CHAR(10)         // CHAR(10)
+      DataTypes.CITEXT           // CITEXT (PostgreSQL — case insensitive)
+
+      // Liczbowe
+      DataTypes.INTEGER          // INT
+      DataTypes.BIGINT           // BIGINT
+      DataTypes.FLOAT            // FLOAT
+      DataTypes.DOUBLE           // DOUBLE PRECISION
+      DataTypes.DECIMAL(10, 2)   // DECIMAL(10,2)
+
+      // Boolean i daty
+      DataTypes.BOOLEAN          // BOOLEAN / TINYINT(1)
+      DataTypes.DATE             // DATETIME z timezone
+      DataTypes.DATEONLY         // DATE (bez czasu)
+      DataTypes.TIME             // TIME
+
+      // Specjalne
+      DataTypes.JSON             // JSON (native JSON column)
+      DataTypes.JSONB            // JSONB (PostgreSQL — indeksowany)
+      DataTypes.UUID             // UUID
+      DataTypes.ENUM('active', 'inactive', 'banned') // ENUM
+      DataTypes.ARRAY(DataTypes.STRING) // ARRAY (tylko PostgreSQL)
+      DataTypes.BLOB             // BLOB / BYTEA
+
+  - name: Konfiguracja logowania
+    desc: >
+      Domyślnie Sequelize loguje każde zapytanie SQL do konsoli. Możesz to wyłączyć
+      ustawiając logging: false, lub przekazać własną funkcję np. do Winstona.
+      W produkcji zaleca się wyłączenie lub kierowanie logów do systemu logowania.
+    code: |
+      // Wyłącz logowanie
+      const sequelize = new Sequelize({
+        dialect: 'postgres',
+        database: 'mydb',
+        username: 'user',
+        password: 'secret',
+        logging: false,          // brak logów SQL
+      });
+
+      // Własny logger (Winston, Pino itp.)
+      const logger = require('./logger');
+      const sequelize = new Sequelize({
+        dialect: 'postgres',
+        database: 'mydb',
+        username: 'user',
+        password: 'secret',
+        logging: (sql, timing) => {
+          logger.debug(sql, { timing });
+        },
+        benchmark: true,         // mierz czas wykonania query
+      });
+
+  - name: Transakcje — podstawy
+    desc: >
+      Transakcje gwarantują atomowość operacji. Sequelize obsługuje managed transactions
+      (automatyczny commit/rollback) i unmanaged (ręczny). Managed transactions używają
+      callback — jeśli nie rzucono błędu, sequelize commituje; jeśli rzucono, rollbackuje.
+    code: |
+      // Managed transaction (zalecane)
+      const result = await sequelize.transaction(async (t) => {
+        const user = await User.create({
+          username: 'jan',
+          email: 'jan@firma.pl',
+        }, { transaction: t });
+
+        const profile = await Profile.create({
+          userId: user.id,
+          bio: 'Developer',
+        }, { transaction: t });
+
+        return { user, profile };
+        // commit automatyczny jeśli nie rzucono błędu
+        // rollback automatyczny jeśli rzucono błąd
+      });
+
+      // Unmanaged transaction (ręczna kontrola)
+      const t = await sequelize.transaction();
+      try {
+        await User.create({ username: 'anna' }, { transaction: t });
+        await t.commit();
+      } catch (error) {
+        await t.rollback();
+        throw error;
+      }

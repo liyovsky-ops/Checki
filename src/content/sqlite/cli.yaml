@@ -1,0 +1,496 @@
+title: "SQLite — CLI, Python & Node.js"
+
+groups:
+  - name: "SQLite3 CLI — uruchomienie"
+    icon: "🖥️"
+    commands:
+      - cmd: sqlite3 mydb.db
+        desc: "Otwórz lub utwórz bazę SQLite"
+        detail:
+          what: "Uruchamia interaktywny shell SQLite. Tworzy plik jeśli nie istnieje."
+          how: "Wpisz .help dla listy poleceń. Zakończ .quit lub Ctrl+D."
+          tips:
+            - "sqlite3 :memory:  — baza tymczasowa w RAM"
+            - "sqlite3 mydb.db .tables  — wykonaj komendę i wyjdź"
+
+      - cmd: "sqlite3 :memory:"
+        desc: "Uruchom tymczasową bazę w RAM"
+        detail:
+          what: "Tworzy bazę SQLite w pamięci RAM. Znika po zamknięciu shell'a."
+          how: "Idealne do testów, eksperymentów i jednorazowych queries."
+          tips:
+            - "Działa 10-100x szybciej niż baza plikowa"
+            - "Używaj .dump do eksportu zanim zamkniesz"
+
+      - cmd: sqlite3 --version
+        desc: "Sprawdź wersję SQLite"
+        detail:
+          what: "Wyświetla wersję biblioteki SQLite zainstalowanej w systemie."
+          how: "Przydatne przy debugowaniu kompatybilności z nowym funkcjami (JSON, Window functions)."
+          tips:
+            - "SQLite 3.35+ ma RETURNING clause"
+            - "SQLite 3.25+ ma window functions"
+
+      - cmd: ".open mydb.db"
+        desc: "Otwórz inną bazę bez wychodzenia z shell'a"
+        detail:
+          what: "Przełącza bieżącą bazę danych na podany plik. Działa wewnątrz shell'a sqlite3."
+          how: "Stosuj gdy chcesz zmienić bazę bez ponownego uruchamiania sqlite3."
+          tips:
+            - ".open :memory:  — przełącz na bazę in-memory"
+            - ".open --new newdb.db  — utwórz nową (usuń jeśli istnieje)"
+
+      - cmd: ".quit"
+        desc: "Wyjdź z shell'a SQLite"
+        detail:
+          what: "Zamknij połączenie z bazą i wyjdź z interaktywnego shell'a sqlite3."
+          how: "Alternatywnie: .exit lub Ctrl+D (EOF)."
+          tips:
+            - "Dane są automatycznie zapisywane — nie ma potrzeby ręcznego save"
+            - "Ctrl+C anuluje bieżące polecenie, nie zamyka shell'a"
+
+      - cmd: ".help"
+        desc: "Lista wszystkich poleceń dot-commands"
+        detail:
+          what: "Wyświetla listę wszystkich poleceń specjalnych sqlite3 (dot-commands)."
+          how: "Dot-commands zaczynają się od kropki i są komendami shell'a, nie SQL."
+          tips:
+            - ".help .mode  — pomoc dla konkretnej komendy"
+            - "Dot-commands nie kończą się średnikiem"
+
+      - cmd: ".tables"
+        desc: "Lista wszystkich tabel w bazie"
+        detail:
+          what: "Wyświetla nazwy wszystkich tabel w bieżącej bazie danych."
+          how: "Odpowiednik: SELECT name FROM sqlite_master WHERE type='table';"
+          tips:
+            - ".tables us%  — tabele zaczynające się od 'us'"
+            - ".schema users  — schemat konkretnej tabeli"
+
+      - cmd: ".schema"
+        desc: "Pokaż DDL wszystkich tabel"
+        detail:
+          what: "Wyświetla instrukcje CREATE TABLE, CREATE INDEX dla całej bazy."
+          how: "Każda linia to pełny SQL potrzebny do odtworzenia struktury."
+          tips:
+            - ".schema users  — schemat tylko tabeli users"
+            - ".schema --indent  — formatowanie z wcięciami (SQLite 3.35+)"
+
+  - name: "SQLite3 CLI — import / export"
+    icon: "📂"
+    commands:
+      - cmd: ".dump"
+        desc: "Zrzuć całą bazę jako SQL"
+        detail:
+          what: "Generuje pełny dump bazy: CREATE TABLE + INSERT dla każdego wiersza."
+          how: "Wyjście trafia do stdout — przekieruj do pliku."
+          tips:
+            - "sqlite3 mydb.db .dump > backup.sql"
+            - ".dump users  — dump tylko tabeli users"
+
+      - cmd: ".output plik.sql"
+        desc: "Przekieruj output do pliku"
+        detail:
+          what: "Następne komendy zapisują wyniki do pliku zamiast na ekran."
+          how: "Użyj .output stdout aby wrócić do normalnego trybu."
+          tips:
+            - ".output results.csv  — zapisz wyniki zapytania do CSV"
+            - ".output stderr  — wyślij do stderr"
+
+      - cmd: ".mode csv"
+        desc: "Przełącz format wyjścia na CSV"
+        detail:
+          what: "Ustawia format wyświetlania wyników jako CSV z przecinkami."
+          how: "Combine z .output aby eksportować do pliku CSV."
+          tips:
+            - ".separator '|'  — użyj pipe jako separatora"
+            - ".mode json  — format JSON"
+            - ".mode column  — czytelne kolumny (domyślnie)"
+
+      - cmd: ".import data.csv tabela"
+        desc: "Importuj CSV do tabeli"
+        detail:
+          what: "Wczytuje plik CSV i wstawia wiersze do podanej tabeli."
+          how: "Tabela musi istnieć. Nagłówki CSV ignorowane jeśli .headers on."
+          tips:
+            - ".mode csv  — ustaw tryb CSV przed importem"
+            - ".import --csv --skip 1 data.csv users  — pomiń nagłówek"
+
+      - cmd: ".read skrypt.sql"
+        desc: "Wykonaj plik SQL"
+        detail:
+          what: "Wczytuje i wykonuje plik SQL jak batch script."
+          how: "Przydatne dla migracji, seed data, zaawansowanych operacji DDL."
+          tips:
+            - "sqlite3 mydb.db < skrypt.sql  — to samo z poziomu shell'a"
+            - "Pliki SQL mogą zawierać dot-commands"
+
+      - cmd: ".mode json"
+        desc: "Eksportuj wyniki jako JSON"
+        detail:
+          what: "Wyniki SELECT są formatowane jako tablica JSON obiektów."
+          how: "Każdy wiersz to obiekt JSON z nazwami kolumn jako kluczami."
+          tips:
+            - "Combine z .output wyniki.json do zapisu do pliku"
+            - ".mode jsonlines  — jeden JSON per linia (NDJSON)"
+
+      - cmd: ".separator ,"
+        desc: "Ustaw separator pól"
+        detail:
+          what: "Ustawia znak separatora kolumn w trybie list/column."
+          how: ".separator ',' — przecinek; .separator '|' — pipe; .separator TAB — tabulator."
+          tips:
+            - "Przydatne przy eksporcie do plików tekstowych"
+            - "Domyślny separator to '|'"
+
+  - name: "SQL DDL — definicja struktury"
+    icon: "🏗️"
+    commands:
+      - cmd: "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE);"
+        desc: "Utwórz tabelę z kluczem i constraintami"
+        detail:
+          what: "Definiuje nową tabelę. INTEGER PRIMARY KEY = alias dla rowid. TEXT UNIQUE tworzy automatyczny indeks."
+          how: "SQLite ma 5 typów: TEXT, INTEGER, REAL, BLOB, NULL. Reszta to type affinity."
+          tips:
+            - "AUTOINCREMENT zapobiega reużyciu usuniętych ID (wolniejsze)"
+            - "WITHOUT ROWID dla tabel bez klucza całkowitoliczbowego"
+
+      - cmd: "DROP TABLE IF EXISTS users;"
+        desc: "Usuń tabelę jeśli istnieje"
+        detail:
+          what: "Usuwa tabelę i wszystkie jej dane. IF EXISTS zapobiega błędowi gdy tabela nie istnieje."
+          how: "Operacja nieodwracalna — brak kosza. Użyj transakcji dla bezpieczeństwa."
+          tips:
+            - "DROP TABLE jest szybsze niż DELETE FROM — nie generuje wierszy w logu"
+            - "PRAGMA foreign_keys=ON blokuje DROP jeśli są referencje"
+
+      - cmd: "ALTER TABLE users ADD COLUMN age INTEGER DEFAULT 0;"
+        desc: "Dodaj kolumnę do istniejącej tabeli"
+        detail:
+          what: "SQLite ALTER TABLE obsługuje tylko ADD COLUMN i RENAME. Brak DROP COLUMN przed SQLite 3.35."
+          how: "Nowa kolumna dostaje wartość DEFAULT dla istniejących wierszy."
+          tips:
+            - "ALTER TABLE users RENAME TO old_users;  — zmień nazwę tabeli"
+            - "SQLite 3.35+: ALTER TABLE users DROP COLUMN age;"
+
+      - cmd: "CREATE INDEX idx_users_email ON users(email);"
+        desc: "Utwórz indeks na kolumnie"
+        detail:
+          what: "B-tree index przyspiesza WHERE i ORDER BY po kolumnie email."
+          how: "SQLite automatycznie używa indeksu gdy optymizer uzna to za korzystne."
+          tips:
+            - "CREATE UNIQUE INDEX — indeks unikalny"
+            - "CREATE INDEX idx ON t(a, b)  — indeks złożony"
+            - "EXPLAIN QUERY PLAN SELECT...  — sprawdź czy indeks jest używany"
+
+      - cmd: "CREATE VIEW active_users AS SELECT * FROM users WHERE active = 1;"
+        desc: "Utwórz widok (wirtualną tabelę)"
+        detail:
+          what: "View to zapisane zapytanie SELECT. Przy każdym odczycie view wykonuje zapytanie bazowe."
+          how: "Widoki są read-only w SQLite. Dla zapisu użyj INSTEAD OF trigger."
+          tips:
+            - "DROP VIEW IF EXISTS active_users;  — usuń widok"
+            - "View nie przechowuje danych — zawsze query na bieżąco"
+
+  - name: "SQL DML — manipulacja danymi"
+    icon: "✏️"
+    commands:
+      - cmd: "INSERT INTO users (name, email) VALUES ('Anna', 'anna@example.com');"
+        desc: "Wstaw wiersz do tabeli"
+        detail:
+          what: "Dodaje nowy wiersz. Kolumny z DEFAULT lub AUTOINCREMENT można pominąć."
+          how: "INSERT OR IGNORE ignoruje duplikaty. INSERT OR REPLACE zastępuje duplikaty."
+          tips:
+            - "INSERT INTO users VALUES (NULL, 'Jan', 'jan@e.com')  — NULL dla AUTOINCREMENT"
+            - "SELECT last_insert_rowid()  — ostatnio wstawione ID"
+
+      - cmd: "UPDATE users SET name = 'Jan' WHERE id = 1;"
+        desc: "Zaktualizuj wiersz"
+        detail:
+          what: "Modyfikuje istniejące wiersze. Bez WHERE aktualizuje WSZYSTKIE wiersze."
+          how: "UPDATE zwraca liczbę zmodyfikowanych wierszy przez changes() function."
+          tips:
+            - "UPDATE users SET score = score + 10 WHERE active = 1  — inkrementuj"
+            - "Zawsze używaj WHERE — bez niego modyfikujesz całą tabelę"
+
+      - cmd: "DELETE FROM users WHERE id = 1;"
+        desc: "Usuń wiersz z tabeli"
+        detail:
+          what: "Usuwa wiersze spełniające warunek. Bez WHERE usuwa WSZYSTKIE wiersze."
+          how: "DELETE FROM users  — czyści tabelę (zachowuje strukturę). Wolniejsze niż TRUNCATE."
+          tips:
+            - "SQLite nie ma TRUNCATE — używaj DELETE FROM lub DROP+CREATE"
+            - "PRAGMA count_changes=1  — zwróć liczbę usuniętych wierszy"
+
+      - cmd: "REPLACE INTO users (id, name, email) VALUES (1, 'Jan', 'jan@e.com');"
+        desc: "Wstaw lub zastąp istniejący wiersz"
+        detail:
+          what: "Jeśli wiersz z danym PRIMARY KEY istnieje — usuwa go i wstawia nowy. Jeśli nie — wstawia."
+          how: "Odpowiednik INSERT OR REPLACE. Uwaga — DELETE + INSERT, nie UPDATE — triggery DELETE się wywołają."
+          tips:
+            - "INSERT OR REPLACE jest tożsame z REPLACE INTO"
+            - "Używaj INSERT OR UPDATE (UPSERT) w SQLite 3.24+"
+
+      - cmd: "INSERT OR IGNORE INTO users (name, email) VALUES ('Anna', 'anna@example.com');"
+        desc: "Wstaw jeśli nie istnieje (pomiń duplikat)"
+        detail:
+          what: "Wstawia wiersz. Jeśli narusza UNIQUE/PRIMARY KEY — cicho ignoruje, nie zwraca błędu."
+          how: "Przydatne przy bulk import gdy nie wiesz czy dane już są."
+          tips:
+            - "INSERT OR REPLACE — zamień jeśli istnieje"
+            - "INSERT ... ON CONFLICT DO NOTHING  — składnia UPSERT (SQLite 3.24+)"
+
+  - name: "PRAGMA — konfiguracja i wydajność"
+    icon: "⚙️"
+    commands:
+      - cmd: "PRAGMA journal_mode = WAL;"
+        desc: "Włącz WAL — szybszy concurrent access"
+        detail:
+          what: "Write-Ahead Logging pozwala na równoczesne czytanie podczas pisania. Domyślnie DELETE (zamknięty dostęp)."
+          how: "WAL = oddzielny plik .wal i .shm. Readers nie blokują writera. Writer nie blokuje readers."
+          tips:
+            - "Ustaw raz — zapamiętane w pliku bazy"
+            - "PRAGMA journal_mode;  — sprawdź bieżący tryb"
+            - "WAL jest domyślny w better-sqlite3 i Turso"
+
+      - cmd: "PRAGMA synchronous = NORMAL;"
+        desc: "Balans wydajności i bezpieczeństwa zapisu"
+        detail:
+          what: "FULL (domyślnie) = fsync po każdej transakcji. NORMAL = fsync tylko przy checkpointach. OFF = bez fsync."
+          how: "NORMAL to dobry kompromis — dane bezpieczne przy crash OS, ryzyko tylko przy zaniku prądu."
+          tips:
+            - "PRAGMA synchronous = OFF;  — maksymalna wydajność (ryzyko utraty danych)"
+            - "PRAGMA synchronous = FULL;  — maksymalne bezpieczeństwo"
+
+      - cmd: "PRAGMA cache_size = -64000;"
+        desc: "Ustaw cache 64MB dla szybszych queries"
+        detail:
+          what: "Ujemna wartość = rozmiar w kibibajtach. -64000 = 64MB cache stron bazy w RAM."
+          how: "Domyślnie 2MB. Większy cache = mniej odczytów z dysku dla read-heavy workloads."
+          tips:
+            - "PRAGMA cache_size;  — sprawdź bieżący rozmiar (w stronach)"
+            - "PRAGMA page_size = 4096;  — rozmiar strony (ustaw przed CREATE)"
+
+      - cmd: "PRAGMA foreign_keys = ON;"
+        desc: "Włącz wymuszanie kluczy obcych"
+        detail:
+          what: "SQLite domyślnie NIE wymusza foreign keys. Musisz je włączyć per-connection."
+          how: "Ustaw na starcie każdego połączenia — nie jest zapamiętywane w pliku bazy."
+          tips:
+            - "PRAGMA foreign_keys;  — sprawdź czy ON (1) czy OFF (0)"
+            - "W better-sqlite3: db.pragma('foreign_keys = ON')"
+
+      - cmd: "PRAGMA integrity_check;"
+        desc: "Sprawdź integralność bazy danych"
+        detail:
+          what: "Skanuje całą bazę w poszukiwaniu błędów strukturalnych, uszkodzonych stron i problemów B-tree."
+          how: "Zwraca 'ok' jeśli baza jest zdrowa. Przydatne po nieoczekiwanym zamknięciu."
+          tips:
+            - "PRAGMA quick_check;  — szybsza wersja (nie wszystkie sprawdzenia)"
+            - "Uruchamiaj regularnie na krytycznych bazach produkcyjnych"
+
+      - cmd: "PRAGMA optimize;"
+        desc: "Zaktualizuj statystyki zapytań"
+        detail:
+          what: "Aktualizuje statystyki ANALYZE dla query planera. Pomaga optymalizatorowi wybrać lepsze indeksy."
+          how: "Uruchamiaj po dużych zmianach danych (bulk import, masowe DELETE)."
+          tips:
+            - "ANALYZE;  — pełna analiza wszystkich tabel"
+            - "ANALYZE users;  — analiza konkretnej tabeli"
+
+      - cmd: "PRAGMA page_size = 4096;"
+        desc: "Ustaw rozmiar strony bazy (przed utworzeniem)"
+        detail:
+          what: "Rozmiar strony B-tree. Domyślnie 4096. Musi być ustawiony przed pierwszym CREATE TABLE."
+          how: "Większa strona = lepsza wydajność przy dużych wierszach i sekwencyjnym czytaniu."
+          tips:
+            - "Dla WAL i SSD: 4096 lub 8192 to dobry wybór"
+            - "Zmiana page_size po utworzeniu wymaga VACUUM"
+
+      - cmd: "PRAGMA temp_store = MEMORY;"
+        desc: "Tymczasowe tabele i indeksy w RAM"
+        detail:
+          what: "Przechowuje tymczasowe struktury (sortowanie, GROUP BY) w pamięci zamiast na dysku."
+          how: "Domyślnie FILE (temp na dysku). MEMORY = szybsze operacje sortowania."
+          tips:
+            - "PRAGMA temp_store = 2;  — numeryczne: 0=DEFAULT, 1=FILE, 2=MEMORY"
+            - "Przydatne przy złożonych queries z ORDER BY i GROUP BY"
+
+      - cmd: "PRAGMA busy_timeout = 5000;"
+        desc: "Timeout 5s przy zablokowanej bazie"
+        detail:
+          what: "SQLite czeka podaną liczbę ms zanim zwróci SQLITE_BUSY gdy baza jest zablokowana przez inny proces."
+          how: "Domyślnie 0ms — natychmiastowy błąd przy blokadzie. 5000ms = czeka 5 sekund."
+          tips:
+            - "Konieczne przy wielu procesach piszących do tej samej bazy"
+            - "W better-sqlite3: db.pragma('busy_timeout = 5000')"
+
+  - name: "Python sqlite3 — API"
+    icon: "🐍"
+    commands:
+      - cmd: "conn = sqlite3.connect('mydb.db')"
+        desc: "Utwórz połączenie z bazą"
+        detail:
+          what: "Otwiera (lub tworzy) plik bazy. sqlite3 wbudowany w Python — brak instalacji."
+          how: "connect(':memory:') tworzy bazę tymczasową. connection auto-commit wyłączony domyślnie."
+          tips:
+            - "import sqlite3  — wbudowany w stdlib od Python 2.5"
+            - "sqlite3.connect(':memory:')  — in-memory database"
+
+      - cmd: "cur = conn.cursor()"
+        desc: "Utwórz kursor do wykonywania queries"
+        detail:
+          what: "Cursor to obiekt do wykonywania SQL i pobierania wyników. Jeden connection może mieć wiele kursorów."
+          how: "conn.execute() to skrót — automatycznie tworzy cursor."
+          tips:
+            - "Cursor jest iterator — for row in cur: print(row)"
+            - "cur.rowcount  — liczba zmodyfikowanych wierszy"
+
+      - cmd: "cur.execute('SELECT * FROM users WHERE id = ?', (user_id,))"
+        desc: "Parametryzowane zapytanie (bezpieczne)"
+        detail:
+          what: "? to placeholder dla wartości. Python zastępuje ? wartościami z krotki — chroni przed SQL injection."
+          how: "Zawsze używaj placeholderów zamiast f-stringów lub konkatenacji string'ów."
+          tips:
+            - "Zawsze krotka: (value,) — nawet dla jednej wartości"
+            - "Named params: cur.execute('... WHERE id = :id', {'id': user_id})"
+
+      - cmd: "rows = cur.fetchall()"
+        desc: "Pobierz wszystkie wiersze wyników"
+        detail:
+          what: "Zwraca listę krotek [(col1, col2), ...]. Pusta lista gdy brak wyników."
+          how: "Pobiera wszystko do pamięci — dla dużych wyników użyj fetchmany() lub iteratora."
+          tips:
+            - "cur.fetchone()  — tylko pierwszy wiersz lub None"
+            - "cur.fetchmany(100)  — pobierz 100 wierszy naraz"
+
+      - cmd: "row = cur.fetchone()"
+        desc: "Pobierz jeden wiersz wyników"
+        detail:
+          what: "Zwraca pojedynczą krotkę lub None jeśli brak wyników."
+          how: "Idealny dla SELECT gdzie spodziewasz się dokładnie jednego wyniku."
+          tips:
+            - "Sprawdzaj None: if row is None: ..."
+            - "Wielokrotne fetchone() = iteracja przez wyniki"
+
+      - cmd: "cur.executemany('INSERT INTO t VALUES (?)', data)"
+        desc: "Bulk insert wielu wierszy"
+        detail:
+          what: "Wykonuje SQL wielokrotnie dla każdego elementu sekwencji data. Szybsze niż pętla execute()."
+          how: "data to lista krotek lub generator. Zwraca cursor z rowcount = łączna liczba wierszy."
+          tips:
+            - "Wewnątrz transakcji executemany jest dramatycznie szybsze"
+            - "conn.executemany()  — skrót bez tworzenia cursora"
+
+      - cmd: "conn.row_factory = sqlite3.Row"
+        desc: "Wyniki jako obiekty (dostęp po nazwie kolumny)"
+        detail:
+          what: "sqlite3.Row pozwala na dostęp do wartości przez nazwę kolumny: row['name'] zamiast row[0]."
+          how: "Ustaw przed execute(). Wyniki są nadal iterowalne jak krotki."
+          tips:
+            - "row.keys()  — lista nazw kolumn"
+            - "dict(row)  — konwersja do słownika"
+
+      - cmd: "with sqlite3.connect('mydb.db') as conn:"
+        desc: "Context manager — auto commit/rollback"
+        detail:
+          what: "Wewnątrz bloku with: przy sukcesie — commit, przy wyjątku — rollback."
+          how: "UWAGA: context manager NIE zamyka połączenia — tylko zarządza transakcją."
+          tips:
+            - "conn.close()  — zamknij ręcznie po bloku with jeśli potrzebne"
+            - "Zagnieżdżone bloki with tworzą savepoints"
+
+      - cmd: "conn.execute('PRAGMA journal_mode=WAL')"
+        desc: "Ustaw PRAGMA przez connection"
+        detail:
+          what: "Ustawia tryb WAL bezpośrednio przez connection bez tworzenia cursora."
+          how: "conn.execute() to skrót który tworzy cursor i wykonuje. Zwraca cursor."
+          tips:
+            - "Wywołuj PRAGMA zaraz po connect() przed innymi operacjami"
+            - "conn.execute('PRAGMA foreign_keys=ON')  — zawsze włącz FK"
+
+  - name: "Node.js better-sqlite3 — API"
+    icon: "🟨"
+    commands:
+      - cmd: "const db = new Database('./mydb.sqlite')"
+        desc: "Otwórz bazę SQLite (synchronicznie)"
+        detail:
+          what: "Tworzy połączenie z bazą. Synchroniczne — gotowe do użycia natychmiast. Tworzy plik jeśli nie istnieje."
+          how: "npm install better-sqlite3. API jest w 100% synchroniczne — brak Promise/callback overhead."
+          tips:
+            - "new Database(':memory:')  — baza in-memory"
+            - "new Database('./db.sqlite', { readonly: true })  — tylko do odczytu"
+            - "new Database('./db.sqlite', { verbose: console.log })  — loguj SQL"
+
+      - cmd: "const stmt = db.prepare('SELECT * FROM users WHERE id = ?')"
+        desc: "Skompiluj statement raz, używaj wielokrotnie"
+        detail:
+          what: "prepare() kompiluje SQL do bytecode SQLite. Wielokrotne użycie bez ponownej kompilacji."
+          how: "Zwraca Statement object z metodami run(), get(), all(). Kluczowe dla wydajności."
+          tips:
+            - "Przechowuj skompilowane statements w zmiennych — nie twórz ich w pętli"
+            - "Statement jest automatycznie finalizowany przy zamknięciu db"
+
+      - cmd: "const result = db.prepare('INSERT INTO users VALUES (?, ?)').run('Jan', 'jan@e.com')"
+        desc: "run() — INSERT / UPDATE / DELETE"
+        detail:
+          what: "Wykonuje INSERT/UPDATE/DELETE. Zwraca obiekt { changes: number, lastInsertRowid: bigint }."
+          how: "changes = liczba zmodyfikowanych wierszy. lastInsertRowid = ID ostatnio wstawionego wiersza."
+          tips:
+            - "result.changes === 0  — nic nie zmieniono (WHERE nie znalazł wiersza)"
+            - "BigInt dla lastInsertRowid — konwertuj: Number(result.lastInsertRowid)"
+
+      - cmd: "const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId)"
+        desc: "get() — jeden wiersz SELECT"
+        detail:
+          what: "Zwraca pierwszy pasujący wiersz jako obiekt JavaScript lub undefined jeśli brak wyników."
+          how: "Szybsze niż all() gdy potrzebujesz jednego wiersza — nie ładuje reszty wyników."
+          tips:
+            - "Sprawdzaj undefined: if (!user) { ... }"
+            - "get() bez argumentów — SELECT bez WHERE"
+
+      - cmd: "const users = db.prepare('SELECT * FROM users WHERE active = ?').all(1)"
+        desc: "all() — wiele wierszy SELECT"
+        detail:
+          what: "Zwraca tablicę obiektów JavaScript dla wszystkich pasujących wierszy. Pusta tablica gdy brak."
+          how: "Ładuje wszystkie wyniki do pamięci. Dla dużych zbiorów użyj iterate()."
+          tips:
+            - "stmt.iterate()  — lazy iterator dla dużych wyników"
+            - "Każdy wiersz to POJO (plain object) z kolumnami jako kluczami"
+
+      - cmd: "db.prepare('INSERT INTO t VALUES (@name, @email)').run({ name: 'Jan', email: 'jan@e.com' })"
+        desc: "Named params — obiekty zamiast tablic"
+        detail:
+          what: "Placeholder @name odpowiada kluczu name w przekazanym obiekcie. Czytelniejsze niż pozycyjne ?."
+          how: "Można używać :name lub $name zamiast @name — wszystkie formy równoważne."
+          tips:
+            - "Mix jest niemożliwy — albo @name albo ? w jednym statement"
+            - "Obiekt może mieć dodatkowe klucze — są ignorowane"
+
+      - cmd: "const insertMany = db.transaction((items) => { for (const i of items) insert.run(i); });"
+        desc: "transaction() — atomowy batch"
+        detail:
+          what: "Owija funkcję w transakcję SQLite. BEGIN przed wywołaniem, COMMIT po sukcesie, ROLLBACK przy wyjątku."
+          how: "Kluczowe dla wydajności bulk insert. 1000 insertów w transakcji vs bez = 100x szybciej."
+          tips:
+            - "const res = insertMany(dataArray)  — wywołaj jak zwykłą funkcję"
+            - "Nested transactions = savepoints automatycznie"
+            - "db.transaction() zwraca nową funkcję — nie wykonuje od razu"
+
+      - cmd: "db.pragma('journal_mode = WAL')"
+        desc: "Ustaw PRAGMA przez better-sqlite3"
+        detail:
+          what: "Wygodny skrót do wykonania PRAGMA. Zwraca wynik zapytania jako wartość lub tablicę."
+          how: "db.pragma('journal_mode = WAL') — setter. db.pragma('journal_mode') — getter."
+          tips:
+            - "db.pragma('foreign_keys = ON')  — zawsze włącz FK"
+            - "db.pragma('busy_timeout = 5000')  — timeout przy concurrent access"
+
+      - cmd: "db.close()"
+        desc: "Zamknij połączenie z bazą"
+        detail:
+          what: "Finalizuje wszystkie prepared statements i zamyka plik bazy. Po close() obiekt db jest nieużywalny."
+          how: "W aplikacjach long-running (serwery) rzadko potrzebne — jedno połączenie na cały czas życia procesu."
+          tips:
+            - "process.on('exit', () => db.close())  — zamknij przy wyjściu procesu"
+            - "db.open  — true jeśli połączenie otwarte"

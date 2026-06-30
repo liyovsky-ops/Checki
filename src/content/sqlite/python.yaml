@@ -1,0 +1,290 @@
+title: SQLite — Python API
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Moduł sqlite3 jest wbudowany w Pythonie od wersji 2.5 — zero instalacji, zero zależności.
+  Obsługuje pełne API DB-API 2.0 (PEP 249): połączenia, kursory, transakcje.
+  Row factory umożliwia dostęp do kolumn po nazwie zamiast indeksu. Idealne do skryptów,
+  narzędzi CLI, aplikacji desktopowych i prototypowania.
+
+items:
+  - name: "import sqlite3 i connect()"
+    desc: >
+      Połączenie z bazą to otwarcie lub utworzenie pliku. Specjalna ścieżka :memory:
+      tworzy tymczasową bazę w RAM — super szybka, ginie po zamknięciu połączenia.
+    code: |
+      import sqlite3
+
+      # Połącz z plikiem (tworzy jeśli nie istnieje)
+      conn = sqlite3.connect('myapp.db')
+
+      # Baza w RAM (tymczasowa, super szybka)
+      conn = sqlite3.connect(':memory:')
+
+      # Shared cache między połączeniami
+      conn = sqlite3.connect('file:myapp.db?cache=shared', uri=True)
+
+      # Timeout na oczekiwanie na lock (domyślnie 5s)
+      conn = sqlite3.connect('myapp.db', timeout=30)
+
+      # Zawsze zamknij po użyciu
+      conn.close()
+
+  - name: cursor() i execute()
+    desc: >
+      Kursor wykonuje zapytania SQL. execute() zwraca kursor — możesz od razu
+      fetchować wyniki. executescript() wykonuje wiele poleceń SQL naraz (oddzielonych średnikiem).
+    code: |
+      import sqlite3
+
+      conn = sqlite3.connect('myapp.db')
+      cur = conn.cursor()
+
+      # DDL — utwórz tabelę
+      cur.execute("""
+          CREATE TABLE IF NOT EXISTS users (
+              id    INTEGER PRIMARY KEY AUTOINCREMENT,
+              name  TEXT NOT NULL,
+              email TEXT UNIQUE NOT NULL
+          )
+      """)
+
+      # DML — wstaw wiersz
+      cur.execute("INSERT INTO users (name, email) VALUES ('Alice', 'alice@example.com')")
+      conn.commit()
+
+      # Pobierz ostatnie ID
+      print(cur.lastrowid)
+
+      conn.close()
+
+  - name: fetchone(), fetchall(), fetchmany()
+    desc: >
+      Trzy metody pobierania wyników: fetchone() — jeden wiersz lub None,
+      fetchall() — wszystkie (może być duże!), fetchmany(n) — N wierszy na raz (streaming).
+    code: |
+      import sqlite3
+
+      conn = sqlite3.connect('myapp.db')
+      cur = conn.cursor()
+
+      # fetchone — pierwszy wynik
+      cur.execute("SELECT * FROM users WHERE id = 1")
+      row = cur.fetchone()  # tuple lub None
+      print(row)  # (1, 'Alice', 'alice@example.com')
+
+      # fetchall — wszystkie wyniki
+      cur.execute("SELECT * FROM users")
+      rows = cur.fetchall()  # lista krotek
+      for row in rows:
+          print(row)
+
+      # fetchmany — partiami (wydajne przy dużych zbiorach)
+      cur.execute("SELECT * FROM users ORDER BY id")
+      while batch := cur.fetchmany(100):
+          for row in batch:
+              process(row)
+
+      conn.close()
+
+  - name: Parametryzowane zapytania (? placeholder)
+    desc: >
+      ZAWSZE używaj parametryzowanych zapytań zamiast f-stringów lub formatowania.
+      ? to placeholder dla parametrów — sqlite3 sanitizuje wartości i chroni przed SQL Injection.
+      Możesz też użyć nazwanych parametrów z `:name` lub `%(name)s`.
+    code: |
+      import sqlite3
+
+      conn = sqlite3.connect('myapp.db')
+      cur = conn.cursor()
+
+      # Pozycyjne placeholdery (?)
+      name = "Alice'; DROP TABLE users; --"  # próba SQL injection
+      cur.execute("SELECT * FROM users WHERE name = ?", (name,))
+
+      # Wiele parametrów
+      cur.execute(
+          "INSERT INTO users (name, email) VALUES (?, ?)",
+          ("Bob", "bob@example.com")
+      )
+
+      # Nazwane parametry (:name)
+      cur.execute(
+          "SELECT * FROM users WHERE name = :name AND age > :min_age",
+          {"name": "Alice", "min_age": 18}
+      )
+
+      # Nie rób tak nigdy!
+      # cur.execute(f"SELECT * FROM users WHERE name = '{name}'")  # SQL Injection!
+
+      conn.commit()
+      conn.close()
+
+  - name: executemany() — bulk insert
+    desc: >
+      executemany() wstawia wiele wierszy jednym wywołaniem. W połączeniu z transakcją
+      osiągasz nawet 100x przyspieszenie vs wstawianie pojedynczo z auto-commit.
+    code: |
+      import sqlite3
+
+      conn = sqlite3.connect('myapp.db')
+      cur = conn.cursor()
+
+      users = [
+          ("Alice", "alice@example.com", 30),
+          ("Bob",   "bob@example.com",   25),
+          ("Carol", "carol@example.com", 35),
+      ]
+
+      # Bulk insert w jednej transakcji
+      cur.executemany(
+          "INSERT INTO users (name, email, age) VALUES (?, ?, ?)",
+          users
+      )
+      conn.commit()
+      print(f"Wstawiono {cur.rowcount} wierszy")
+
+      # Z generatorem (nie ładuje wszystkiego do RAM)
+      def user_generator():
+          for i in range(10000):
+              yield (f"User{i}", f"user{i}@example.com", 20 + i % 50)
+
+      cur.executemany("INSERT INTO users (name, email, age) VALUES (?, ?, ?)", user_generator())
+      conn.commit()
+
+      conn.close()
+
+  - name: row_factory = sqlite3.Row
+    desc: >
+      Domyślnie wyniki to krotki. Row factory sqlite3.Row pozwala na dostęp po nazwie kolumny
+      jak słownik (row['name']) oraz przez indeks (row[0]). Można też ustawić dict_factory dla zwykłych słowników.
+    code: |
+      import sqlite3
+
+      conn = sqlite3.connect('myapp.db')
+      conn.row_factory = sqlite3.Row  # ustaw PRZED cursor()
+
+      cur = conn.cursor()
+      cur.execute("SELECT id, name, email FROM users WHERE id = 1")
+      row = cur.fetchone()
+
+      # Dostęp po nazwie kolumny
+      print(row['name'])   # Alice
+      print(row['email'])  # alice@example.com
+
+      # Konwersja do słownika
+      d = dict(row)
+      print(d)  # {'id': 1, 'name': 'Alice', 'email': 'alice@example.com'}
+
+      # Dostęp po indeksie (nadal działa)
+      print(row[1])  # Alice
+
+      # fetchall jako lista dict
+      cur.execute("SELECT * FROM users")
+      users = [dict(r) for r in cur.fetchall()]
+
+      # Alternatywa: dict_factory
+      conn.row_factory = lambda c, row: dict(
+          (col[0], row[idx]) for idx, col in enumerate(c.description)
+      )
+
+      conn.close()
+
+  - name: "with conn: — context manager (auto-commit/rollback)"
+    desc: >
+      Moduł sqlite3 obsługuje context manager dla transakcji. with conn: automatycznie
+      wywołuje commit() przy sukcesie lub rollback() przy wyjątku — nie zamyka połączenia!
+      Aby zamknąć połączenie użyj osobnego with lub conn.close().
+    code: |
+      import sqlite3
+
+      conn = sqlite3.connect('myapp.db')
+
+      # Context manager transakcji (NIE zamyka połączenia)
+      try:
+          with conn:  # auto-commit lub rollback
+              conn.execute("INSERT INTO users (name, email) VALUES (?, ?)", ("Dave", "dave@example.com"))
+              conn.execute("INSERT INTO users (name, email) VALUES (?, ?)", ("Eve",  "eve@example.com"))
+              # Jeśli tu wyjątek -> automatyczny rollback
+      except sqlite3.IntegrityError as e:
+          print(f"Błąd: {e}")  # rollback nastąpił
+
+      # Pełny pattern z zamknięciem połączenia
+      with sqlite3.connect('myapp.db') as conn:
+          conn.row_factory = sqlite3.Row
+          conn.execute("PRAGMA foreign_keys = ON")
+          cur = conn.cursor()
+          with conn:  # transakcja
+              cur.execute("DELETE FROM users WHERE id = 99")
+      # Uwaga: with sqlite3.connect(...) as conn NIE zamknie połączenia automatycznie!
+      conn.close()
+
+  - name: Pragmy przez Python
+    desc: >
+      PRAGMy to polecenia konfiguracyjne SQLite. Ustawiaj je zaraz po otwarciu połączenia,
+      przed pierwszą operacją na danych. Najważniejsze: foreign_keys, journal_mode, synchronous.
+    code: |
+      import sqlite3
+
+      conn = sqlite3.connect('myapp.db')
+
+      # Włącz foreign keys (domyślnie WYŁĄCZONE w SQLite!)
+      conn.execute("PRAGMA foreign_keys = ON")
+
+      # WAL mode — lepsza współbieżność
+      conn.execute("PRAGMA journal_mode = WAL")
+
+      # Szybszy zapis (mniej bezpieczny przy crash)
+      conn.execute("PRAGMA synchronous = NORMAL")
+
+      # Większy cache (domyślnie -2000 = 2MB)
+      conn.execute("PRAGMA cache_size = -64000")  # 64MB
+
+      # Timeout na lock
+      conn.execute("PRAGMA busy_timeout = 5000")  # 5000ms
+
+      # Sprawdź integralność bazy
+      result = conn.execute("PRAGMA integrity_check").fetchone()
+      print(result[0])  # 'ok' jeśli wszystko dobrze
+
+      conn.close()
+
+  - name: text_factory i obsługa typów
+    desc: >
+      text_factory kontroluje jak SQLite dekoduje TEXT z bazy do Pythona. Domyślnie str (UTF-8).
+      detect_types umożliwia automatyczną konwersję typów (np. datetime jako Python datetime).
+    code: |
+      import sqlite3
+      import datetime
+
+      # Detect types — automatyczna konwersja Python <-> SQLite
+      conn = sqlite3.connect(
+          'myapp.db',
+          detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES
+      )
+
+      # Rejestracja niestandardowego adaptera i konwertera
+      sqlite3.register_adapter(datetime.date, lambda d: d.isoformat())
+      sqlite3.register_converter("DATE", lambda b: datetime.date.fromisoformat(b.decode()))
+
+      conn.execute("""
+          CREATE TABLE IF NOT EXISTS events (
+              id   INTEGER PRIMARY KEY,
+              name TEXT,
+              date DATE  -- typ kolumny ważny dla detect_types
+          )
+      """)
+
+      # Python datetime.date zapisuje się automatycznie jako TEXT
+      conn.execute("INSERT INTO events (name, date) VALUES (?, ?)",
+                   ("Urodziny", datetime.date(2024, 1, 15)))
+      conn.commit()
+
+      # Odczyt automatycznie daje datetime.date
+      row = conn.execute("SELECT date FROM events LIMIT 1").fetchone()
+      print(type(row[0]))  # <class 'datetime.date'>
+
+      conn.close()

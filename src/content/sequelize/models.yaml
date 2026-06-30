@@ -1,0 +1,404 @@
+title: Sequelize — Modele & Typy danych
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Model w Sequelize to klasa JavaScript mapowana na tabelę w bazie danych.
+  Definiujesz kolumny, typy, walidatory, wartości domyślne, gettery, settery
+  i pola wirtualne. Sequelize automatycznie obsługuje znaczniki czasu (createdAt,
+  updatedAt) oraz soft delete przez paranoid mode. Dobrze zaprojektowany model
+  to centrum logiki dostępu do danych w Twojej aplikacji.
+
+items:
+  - name: Model.init() — pełna konfiguracja
+    desc: >
+      Model.init() przyjmuje dwa argumenty: definicję kolumn i obiekt opcji.
+      Opcje zawierają instancję Sequelize, nazwę modelu, nazwę tabeli, ustawienia
+      timestamps, paranoid i inne. To zalecany sposób definiowania modeli
+      w nowoczesnych projektach.
+    code: |
+      const { Model, DataTypes } = require('sequelize');
+
+      class User extends Model {
+        // Możesz dodać własne metody instancji i statyczne tutaj
+        getFullName() {
+          return `${this.firstName} ${this.lastName}`;
+        }
+
+        static async findByEmail(email) {
+          return this.findOne({ where: { email } });
+        }
+      }
+
+      User.init(
+        {
+          id: {
+            type: DataTypes.INTEGER,
+            primaryKey: true,
+            autoIncrement: true,
+          },
+          firstName: {
+            type: DataTypes.STRING(50),
+            allowNull: false,
+            field: 'first_name',  // nazwa kolumny w bazie (snake_case)
+          },
+          lastName: {
+            type: DataTypes.STRING(50),
+            allowNull: false,
+            field: 'last_name',
+          },
+          email: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            unique: true,
+          },
+          role: {
+            type: DataTypes.ENUM('admin', 'user', 'guest'),
+            defaultValue: 'user',
+          },
+        },
+        {
+          sequelize,          // instancja połączenia — wymagana
+          modelName: 'User',  // nazwa modelu w Sequelize
+          tableName: 'users', // faktyczna nazwa tabeli w bazie
+          timestamps: true,   // createdAt, updatedAt
+          paranoid: false,    // soft delete (deletedAt)
+          underscored: true,  // camelCase → snake_case automatycznie
+        }
+      );
+
+  - name: DataTypes — kompletna lista typów
+    desc: >
+      Sequelize mapuje swoje DataTypes na typy natywne każdego dialektu.
+      Niektóre typy jak JSONB czy ARRAY są dostępne tylko w PostgreSQL.
+      Zawsze sprawdzaj dokumentację dialektu jeśli używasz egzotycznych typów.
+    code: |
+      const { DataTypes } = require('sequelize');
+
+      // --- TEKSTOWE ---
+      DataTypes.STRING          // VARCHAR(255)
+      DataTypes.STRING(100)     // VARCHAR(100)
+      DataTypes.TEXT            // TEXT
+      DataTypes.TEXT('tiny')    // TINYTEXT (MySQL)
+      DataTypes.TEXT('medium')  // MEDIUMTEXT (MySQL)
+      DataTypes.TEXT('long')    // LONGTEXT (MySQL)
+      DataTypes.CHAR(10)        // CHAR(10)
+      DataTypes.CITEXT          // CITEXT (PostgreSQL)
+
+      // --- LICZBOWE ---
+      DataTypes.INTEGER         // INT
+      DataTypes.INTEGER.UNSIGNED.ZEROFILL  // INT UNSIGNED ZEROFILL
+      DataTypes.TINYINT         // TINYINT
+      DataTypes.SMALLINT        // SMALLINT
+      DataTypes.MEDIUMINT       // MEDIUMINT (MySQL)
+      DataTypes.BIGINT          // BIGINT
+      DataTypes.FLOAT           // FLOAT
+      DataTypes.FLOAT(11, 10)   // FLOAT(precision, scale)
+      DataTypes.REAL            // REAL
+      DataTypes.DOUBLE          // DOUBLE PRECISION
+      DataTypes.DECIMAL(10, 2)  // DECIMAL(10, 2)
+
+      // --- BOOLEAN / DATY ---
+      DataTypes.BOOLEAN         // BOOLEAN / TINYINT(1) (MySQL)
+      DataTypes.DATE            // DATETIME z timezone
+      DataTypes.DATE(3)         // DATETIME(3) — ms precision
+      DataTypes.DATEONLY        // DATE (bez czasu)
+      DataTypes.TIME            // TIME
+      DataTypes.NOW             // wartość domyślna = NOW()
+
+      // --- BINARNE / UUID ---
+      DataTypes.UUID            // UUID string
+      DataTypes.UUIDV1          // UUID v1 (domyślna wartość)
+      DataTypes.UUIDV4          // UUID v4 (domyślna wartość)
+      DataTypes.BLOB            // BLOB / BYTEA
+      DataTypes.BLOB('tiny')    // TINYBLOB (MySQL)
+
+      // --- SPECJALNE (PostgreSQL) ---
+      DataTypes.JSON            // JSON
+      DataTypes.JSONB           // JSONB (indeksowany)
+      DataTypes.ARRAY(DataTypes.STRING) // ARRAY
+      DataTypes.HSTORE          // HSTORE (klucz-wartość)
+      DataTypes.INET            // INET (adres IP)
+      DataTypes.MACADDR         // MAC address
+      DataTypes.RANGE(DataTypes.INTEGER) // INT4RANGE
+
+      // --- ENUM ---
+      DataTypes.ENUM('active', 'inactive', 'banned')
+
+      // --- VIRTUAL ---
+      DataTypes.VIRTUAL         // pole wirtualne — nie zapisuje do DB
+
+  - name: Walidatory — validate
+    desc: >
+      Pole validate w definicji kolumny pozwala dodawać reguły walidacji.
+      Sequelize ma wbudowane walidatory (isEmail, isUrl, len, min, max, isInt,
+      notNull, isDate, isAlpha) oraz obsługuje własne funkcje walidujące.
+      Walidacja wykonuje się przed INSERT i UPDATE.
+    code: |
+      const User = sequelize.define('User', {
+        email: {
+          type: DataTypes.STRING,
+          allowNull: false,
+          validate: {
+            isEmail: true,           // musi być poprawny email
+            notEmpty: true,          // nie może być pustym stringiem
+            notNull: {
+              msg: 'Email jest wymagany',
+            },
+          },
+        },
+        age: {
+          type: DataTypes.INTEGER,
+          validate: {
+            min: 0,
+            max: 120,
+            isInt: true,
+          },
+        },
+        username: {
+          type: DataTypes.STRING,
+          validate: {
+            len: [3, 50],                  // długość 3–50 znaków
+            isAlphanumeric: true,          // tylko litery i cyfry
+            not: /\s/,                     // brak białych znaków
+          },
+        },
+        website: {
+          type: DataTypes.STRING,
+          validate: {
+            isUrl: true,
+          },
+        },
+        password: {
+          type: DataTypes.STRING,
+          validate: {
+            // Własna funkcja walidująca
+            isStrongPassword(value) {
+              if (value.length < 8) {
+                throw new Error('Hasło musi mieć minimum 8 znaków');
+              }
+              if (!/[A-Z]/.test(value)) {
+                throw new Error('Hasło musi zawierać wielką literę');
+              }
+            },
+          },
+        },
+      });
+
+      // Ręczna walidacja bez zapisu
+      try {
+        await user.validate();
+      } catch (err) {
+        console.log(err.errors); // tablica ValidationErrorItem
+      }
+
+  - name: Gettery i settery
+    desc: >
+      Gettery (get()) i settery (set()) pozwalają transformować wartości pól
+      przy odczycie i zapisie. Getter jest wywoływany gdy odczytujesz wartość,
+      setter — gdy ją przypisujesz. Settery mogą modyfikować inne pola (np. hash hasła).
+    code: |
+      const User = sequelize.define('User', {
+        firstName: {
+          type: DataTypes.STRING,
+          get() {
+            // Getter — wywoływany przy user.firstName
+            const rawValue = this.getDataValue('firstName');
+            return rawValue ? rawValue.charAt(0).toUpperCase() + rawValue.slice(1) : null;
+          },
+        },
+        password: {
+          type: DataTypes.STRING,
+          set(value) {
+            // Setter — wywoływany przy user.password = '...'
+            const bcrypt = require('bcrypt');
+            this.setDataValue('password', bcrypt.hashSync(value, 10));
+          },
+        },
+        email: {
+          type: DataTypes.STRING,
+          set(value) {
+            // Zawsze zapisuj lowercase
+            this.setDataValue('email', value.toLowerCase().trim());
+          },
+          get() {
+            return this.getDataValue('email');
+          },
+        },
+      });
+
+      // Użycie
+      const user = User.build({ firstName: 'jan', password: 'secret123' });
+      console.log(user.firstName); // 'Jan' (przez getter)
+      // password jest już zahashowane (przez setter)
+
+  - name: Pola wirtualne (VIRTUAL)
+    desc: >
+      Pole wirtualne (DataTypes.VIRTUAL) istnieje tylko w obiekcie JavaScript —
+      nie jest zapisywane do bazy danych. Przydatne do obliczonych właściwości
+      takich jak fullName, age w latach, czy pola pomocnicze w formularzach
+      (np. passwordConfirmation).
+    code: |
+      const User = sequelize.define('User', {
+        firstName: { type: DataTypes.STRING },
+        lastName:  { type: DataTypes.STRING },
+        birthDate: { type: DataTypes.DATEONLY },
+
+        // Pole wirtualne — nie trafia do DB
+        fullName: {
+          type: DataTypes.VIRTUAL,
+          get() {
+            return `${this.firstName} ${this.lastName}`;
+          },
+          set(value) {
+            // Możesz też parsować przy przypisaniu
+            const [first, ...rest] = value.split(' ');
+            this.setDataValue('firstName', first);
+            this.setDataValue('lastName', rest.join(' '));
+          },
+        },
+
+        age: {
+          type: DataTypes.VIRTUAL,
+          get() {
+            const birth = new Date(this.birthDate);
+            const now = new Date();
+            return now.getFullYear() - birth.getFullYear();
+          },
+        },
+      });
+
+      const user = await User.findByPk(1);
+      console.log(user.fullName); // 'Jan Kowalski' (przez getter)
+      console.log(user.age);      // obliczone na bieżąco
+
+  - name: defaultValue, allowNull, unique, primaryKey
+    desc: >
+      Kluczowe opcje kolumny: defaultValue ustawia wartość domyślną (może być
+      funkcją lub Sequelize.NOW), allowNull kontroluje czy NULL jest dozwolone,
+      unique wymusza unikalność, primaryKey oznacza klucz główny.
+    code: |
+      const { DataTypes, Sequelize } = require('sequelize');
+
+      const Product = sequelize.define('Product', {
+        id: {
+          type: DataTypes.UUID,
+          defaultValue: DataTypes.UUIDV4,  // automatyczny UUID v4
+          primaryKey: true,
+          allowNull: false,
+        },
+        sku: {
+          type: DataTypes.STRING(50),
+          unique: true,                    // UNIQUE constraint
+          allowNull: false,
+        },
+        name: {
+          type: DataTypes.STRING,
+          allowNull: false,                // NOT NULL
+        },
+        price: {
+          type: DataTypes.DECIMAL(10, 2),
+          allowNull: false,
+          defaultValue: 0.00,             // domyślna wartość
+        },
+        isActive: {
+          type: DataTypes.BOOLEAN,
+          defaultValue: true,             // domyślnie aktywny
+          allowNull: false,
+        },
+        createdBy: {
+          type: DataTypes.STRING,
+          defaultValue: 'system',
+        },
+        expiresAt: {
+          type: DataTypes.DATE,
+          defaultValue: Sequelize.NOW,    // NOW() jako domyślna
+          allowNull: true,               // NULL dozwolone
+        },
+        tags: {
+          type: DataTypes.ARRAY(DataTypes.STRING),
+          defaultValue: [],              // pusta tablica (PostgreSQL)
+        },
+      });
+
+  - name: timestamps — createdAt i updatedAt
+    desc: >
+      Sequelize domyślnie dodaje do każdego modelu pola createdAt i updatedAt.
+      Możesz wyłączyć timestamps globalnie lub per model, zmienić ich nazwy,
+      lub włączyć tylko jedno z nich. Pole updatedAt jest automatycznie
+      aktualizowane przy każdym UPDATE.
+    code: |
+      // Wyłącz timestamps globalnie dla modelu
+      const Log = sequelize.define('Log', {
+        message: DataTypes.TEXT,
+      }, {
+        timestamps: false,     // brak createdAt i updatedAt
+      });
+
+      // Tylko createdAt (bez updatedAt)
+      const Audit = sequelize.define('Audit', {
+        action: DataTypes.STRING,
+      }, {
+        timestamps: true,
+        updatedAt: false,       // wyłącz updatedAt
+        createdAt: 'created',   // zmień nazwę na 'created'
+      });
+
+      // Własne nazwy kolumn
+      const Event = sequelize.define('Event', {
+        title: DataTypes.STRING,
+      }, {
+        timestamps: true,
+        createdAt: 'createdDate',   // kolumna 'createdDate' zamiast 'createdAt'
+        updatedAt: 'lastModified',  // kolumna 'lastModified'
+      });
+
+      // Globalne ustawienie dla wszystkich modeli
+      const sequelize = new Sequelize({
+        dialect: 'postgres',
+        define: {
+          timestamps: true,
+          underscored: true, // camelCase → snake_case (created_at, updated_at)
+        },
+      });
+
+  - name: paranoid — soft delete
+    desc: >
+      Paranoid mode włącza soft delete — zamiast usuwać rekord, Sequelize ustawia
+      pole deletedAt na bieżący czas. Normalne findy automatycznie pomijają
+      "usuniete" rekordy (WHERE deleted_at IS NULL). Możesz przywrócić rekord
+      metodą restore() lub zobaczyć usunięte przez paranoid: false w opcjach query.
+    code: |
+      const User = sequelize.define('User', {
+        username: DataTypes.STRING,
+        email: DataTypes.STRING,
+      }, {
+        paranoid: true,          // włącz soft delete
+        timestamps: true,        // wymagane dla paranoid
+        // Sequelize doda kolumnę deletedAt
+      });
+
+      // Usunięcie — soft delete (ustawia deletedAt, nie usuwa wiersza)
+      const user = await User.findByPk(1);
+      await user.destroy();
+      // DELETE nie jest wykonane — ustawia deleted_at = NOW()
+
+      // findAll domyślnie pomija "usunięte" (WHERE deleted_at IS NULL)
+      const activeUsers = await User.findAll();
+
+      // Pobierz wszystkich — włącznie z "usuniętymi"
+      const allUsers = await User.findAll({ paranoid: false });
+
+      // Pobierz tylko "usunięte"
+      const deletedUsers = await User.findAll({
+        where: { deletedAt: { [Op.ne]: null } },
+        paranoid: false,
+      });
+
+      // Przywróć "usunięty" rekord
+      await user.restore();
+
+      // Trwałe usunięcie (nawet w paranoid mode)
+      await user.destroy({ force: true });

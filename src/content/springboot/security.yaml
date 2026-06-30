@@ -1,0 +1,284 @@
+title: "Spring Boot — Security & JWT"
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Spring Security to potężny framework autoryzacji i autentykacji zintegrowany ze Spring Boot.
+  Od wersji 6.x konfiguruje się przez SecurityFilterChain (lambda DSL) zamiast przestarzałego
+  WebSecurityConfigurerAdapter. JWT (JSON Web Token) to standardowe podejście dla REST API.
+
+items:
+  - name: "SecurityFilterChain — podstawowa konfiguracja"
+    desc: >
+      Główna konfiguracja bezpieczeństwa od Spring Security 6.x.
+      Definiujesz reguły dostępu do endpointów, mechanizm autentykacji i obsługę sesji.
+      @EnableWebSecurity aktywuje Spring Security, @EnableMethodSecurity włącza adnotacje na metodach.
+    code: |
+      @Configuration
+      @EnableWebSecurity
+      @EnableMethodSecurity
+      public class SecurityConfig {
+
+          @Bean
+          public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+              return http
+                  .csrf(csrf -> csrf.disable())
+                  .sessionManagement(sm -> sm.sessionCreationPolicy(STATELESS))
+                  .authorizeHttpRequests(auth -> auth
+                      .requestMatchers("/api/auth/**").permitAll()
+                      .requestMatchers("/actuator/health").permitAll()
+                      .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                      .anyRequest().authenticated()
+                  )
+                  .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                  .build();
+          }
+      }
+
+  - name: "@EnableWebSecurity"
+    desc: >
+      Aktywuje Spring Security Web dla aplikacji. Od Spring Boot 3.x jest włączone
+      automatycznie gdy spring-boot-starter-security jest na classpath.
+      Eksplicite dodajesz gdy chcesz połączyć z @EnableMethodSecurity.
+      Bez tej adnotacji aplikacja nie jest chroniona.
+    code: |
+      // Minimalna konfiguracja — odblokowanie wszystkich endpointów (np. na dev)
+      @Configuration
+      @EnableWebSecurity
+      public class DevSecurityConfig {
+
+          @Bean
+          public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+              return http
+                  .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                  .csrf(csrf -> csrf.disable())
+                  .build();
+          }
+      }
+
+  - name: "UserDetailsService — własna autentykacja"
+    desc: >
+      Interfejs do ładowania danych użytkownika podczas autentykacji. Spring Security
+      wywołuje loadUserByUsername() ze Spring Security żeby zweryfikować dane logowania.
+      Implementujesz go i podajesz do AuthenticationManagerBuilder.
+    code: |
+      @Service
+      public class CustomUserDetailsService implements UserDetailsService {
+
+          @Autowired
+          private UserRepository userRepository;
+
+          @Override
+          public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+              User user = userRepository.findByEmail(email)
+                  .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
+
+              return org.springframework.security.core.userdetails.User.builder()
+                  .username(user.getEmail())
+                  .password(user.getPassword())
+                  .roles(user.getRoles().toArray(String[]::new))
+                  .build();
+          }
+      }
+
+  - name: "PasswordEncoder — BCrypt"
+    desc: >
+      Nigdy nie przechowuj haseł w postaci plain text. Spring Security dostarcza
+      BCryptPasswordEncoder który haszuje hasła z solą. Zawsze rejestruj go jako bean,
+      żeby Spring Security automatycznie go używał przy autentykacji.
+    code: |
+      @Configuration
+      public class SecurityConfig {
+
+          @Bean
+          public PasswordEncoder passwordEncoder() {
+              return new BCryptPasswordEncoder(12); // strength: 10-12 dla produkcji
+          }
+
+          @Bean
+          public AuthenticationManager authManager(
+                  UserDetailsService userDetailsService,
+                  PasswordEncoder encoder) {
+              DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+              provider.setUserDetailsService(userDetailsService);
+              provider.setPasswordEncoder(encoder);
+              return new ProviderManager(provider);
+          }
+      }
+
+      // Użycie w serwisie rejestracji
+      @Service
+      public class UserService {
+          @Autowired private PasswordEncoder passwordEncoder;
+
+          public User register(String email, String rawPassword) {
+              User user = new User(email, passwordEncoder.encode(rawPassword));
+              return userRepository.save(user);
+          }
+      }
+
+  - name: "JWT Authentication Filter"
+    desc: >
+      Własny filtr HTTP przechwytujący każde żądanie, wyciągający token JWT z nagłówka
+      Authorization i walidujący go. Przy sukcesie ustawia autentykację w SecurityContextHolder.
+      Filtr rejestrujesz przed UsernamePasswordAuthenticationFilter.
+    code: |
+      @Component
+      public class JwtAuthFilter extends OncePerRequestFilter {
+
+          @Autowired private JwtService jwtService;
+          @Autowired private UserDetailsService userDetailsService;
+
+          @Override
+          protected void doFilterInternal(HttpServletRequest req,
+                                          HttpServletResponse res,
+                                          FilterChain chain) throws ServletException, IOException {
+              String authHeader = req.getHeader("Authorization");
+              if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                  chain.doFilter(req, res);
+                  return;
+              }
+              String token = authHeader.substring(7);
+              String username = jwtService.extractUsername(token);
+
+              if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                  UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                  if (jwtService.isTokenValid(token, userDetails)) {
+                      UsernamePasswordAuthenticationToken authToken =
+                          new UsernamePasswordAuthenticationToken(userDetails, null,
+                              userDetails.getAuthorities());
+                      authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(req));
+                      SecurityContextHolder.getContext().setAuthentication(authToken);
+                  }
+              }
+              chain.doFilter(req, res);
+          }
+      }
+
+  - name: "JwtService — generowanie i walidacja tokenów"
+    desc: >
+      Serwis do tworzenia, parsowania i walidacji tokenów JWT. Używa biblioteki JJWT
+      (io.jsonwebtoken). Token zawiera claims (subject, roles, expiration).
+      Secret key musi być wystarczająco długi (min 256 bitów dla HS256).
+    code: |
+      @Service
+      public class JwtService {
+          @Value("${jwt.secret}")
+          private String secretKey;
+
+          @Value("${jwt.expiration:86400000}")
+          private long expiration;
+
+          public String generateToken(UserDetails userDetails) {
+              return Jwts.builder()
+                  .subject(userDetails.getUsername())
+                  .issuedAt(new Date())
+                  .expiration(new Date(System.currentTimeMillis() + expiration))
+                  .signWith(getSignKey())
+                  .compact();
+          }
+
+          public String extractUsername(String token) {
+              return extractClaim(token, Claims::getSubject);
+          }
+
+          public boolean isTokenValid(String token, UserDetails userDetails) {
+              return extractUsername(token).equals(userDetails.getUsername())
+                  && !isTokenExpired(token);
+          }
+
+          private boolean isTokenExpired(String token) {
+              return extractClaim(token, Claims::getExpiration).before(new Date());
+          }
+
+          private <T> T extractClaim(String token, Function<Claims, T> resolver) {
+              Claims claims = Jwts.parser().verifyWith(getSignKey()).build()
+                  .parseSignedClaims(token).getPayload();
+              return resolver.apply(claims);
+          }
+
+          private SecretKey getSignKey() {
+              return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secretKey));
+          }
+      }
+
+  - name: "@PreAuthorize — autoryzacja na poziomie metody"
+    desc: >
+      Spring Expression Language (SpEL) w adnotacjach pozwala na precyzyjną autoryzację
+      przy wywołaniu metody. @PreAuthorize sprawdza przed wykonaniem, @PostAuthorize po.
+      Wymaga @EnableMethodSecurity w konfiguracji. Działa też @Secured i @RolesAllowed.
+    code: |
+      @RestController
+      @RequestMapping("/api/admin")
+      public class AdminController {
+
+          @GetMapping("/users")
+          @PreAuthorize("hasRole('ADMIN')")
+          public List<User> getAllUsers() { ... }
+
+          @DeleteMapping("/users/{id}")
+          @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.id")
+          public void deleteUser(@PathVariable Long id) { ... }
+
+          @GetMapping("/reports")
+          @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER') and hasAuthority('READ_REPORTS')")
+          public List<Report> getReports() { ... }
+      }
+
+      // Sprawdzenie uprawnień w kodzie
+      @Autowired private SecurityContextHolder securityContextHolder;
+
+      Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+      boolean isAdmin = auth.getAuthorities().stream()
+          .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+  - name: "OAuth2 — Spring Security OAuth2 Client"
+    desc: >
+      Spring Boot automatycznie konfiguruje OAuth2 login po dodaniu spring-boot-starter-oauth2-client.
+      Obsługuje Google, GitHub, Facebook i własne providery.
+      Definicja clienta w application.properties — zero kodu.
+    code: |
+      # application.properties
+      # spring.security.oauth2.client.registration.google.client-id=xxx
+      # spring.security.oauth2.client.registration.google.client-secret=xxx
+
+      @Configuration
+      @EnableWebSecurity
+      public class OAuth2Config {
+
+          @Bean
+          public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+              return http
+                  .authorizeHttpRequests(auth -> auth
+                      .requestMatchers("/", "/login").permitAll()
+                      .anyRequest().authenticated()
+                  )
+                  .oauth2Login(oauth2 -> oauth2
+                      .loginPage("/login")
+                      .defaultSuccessUrl("/dashboard")
+                      .userInfoEndpoint(userInfo -> userInfo
+                          .userService(customOAuth2UserService))
+                  )
+                  .build();
+          }
+      }
+
+  - name: "CSRF — konfiguracja"
+    desc: >
+      CSRF (Cross-Site Request Forgery) ochrona jest domyślnie włączona w Spring Security.
+      Dla REST API bez sesji (stateless + JWT) wyłącz CSRF — tokeny JWT wystarczają.
+      Dla aplikacji MVC z sesjami i formularzami — zostaw CSRF włączone.
+    code: |
+      // REST API — wyłącz CSRF
+      http.csrf(csrf -> csrf.disable())
+
+      // MVC z formularzami — CSRF token w formularzu
+      // Thymeleaf dodaje automatycznie: <input type="hidden" th:name="${_csrf.parameterName}"...>
+
+      // Customowa konfiguracja CSRF
+      http.csrf(csrf -> csrf
+          .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+          .ignoringRequestMatchers("/api/webhook/**")
+      )

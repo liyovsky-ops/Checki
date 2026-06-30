@@ -1,0 +1,232 @@
+title: SQLite — Wydajność & WAL
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  SQLite może osiągnąć setki tysięcy operacji na sekundę przy odpowiedniej konfiguracji.
+  Kluczowe optymalizacje: WAL mode zamiast DELETE journala, grupowanie insertów w transakcje,
+  właściwe indeksy, dostrojenie cache. Domyślna konfiguracja SQLite jest konserwatywna —
+  trzeba ją dostroić do konkretnego przypadku użycia.
+
+items:
+  - name: "PRAGMA journal_mode = WAL"
+    desc: >
+      WAL (Write-Ahead Logging) to najważniejsza optymalizacja SQLite dla aplikacji wielodostępnych.
+      Pozwala na równoczesne odczyty podczas zapisu. Zapis nie blokuje odczytów — ogromna poprawa
+      współbieżności vs domyślny tryb DELETE journal.
+    code: |
+      -- Włącz WAL mode
+      PRAGMA journal_mode = WAL;
+      -- Wynik: 'wal'
+
+      -- Sprawdź aktualny tryb
+      PRAGMA journal_mode;
+
+      -- WAL vs DELETE (domyślny):
+      -- DELETE:  pisanie blokuje czytanie, czytanie blokuje pisanie
+      -- WAL:     pisanie NIE blokuje czytania, wiele równoczesnych odczytów
+
+      -- WAL tworzy 2 dodatkowe pliki: myapp.db-wal i myapp.db-shm
+      -- Automatycznie "checkpointuje" (przenosi do głównego pliku) co 1000 stron
+
+      -- Wymuś checkpoint ręcznie
+      PRAGMA wal_checkpoint(TRUNCATE);
+
+  - name: "PRAGMA synchronous = NORMAL"
+    desc: >
+      synchronous kontroluje kiedy SQLite czeka na zapis fizyczny (fsync).
+      FULL = najbezpieczniej, NORMAL = kompromis (zalecane z WAL), OFF = najszybciej ale ryzykowne.
+      Z WAL mode: NORMAL jest prawie tak samo bezpieczny jak FULL.
+    code: |
+      -- Tryby synchronizacji:
+      PRAGMA synchronous = OFF;      -- najszybszy, ryzyko uszkodzenia przy crash
+      PRAGMA synchronous = NORMAL;   -- zalecany z WAL mode
+      PRAGMA synchronous = FULL;     -- domyślny, najbezpieczniejszy
+      PRAGMA synchronous = EXTRA;    -- jeszcze bezpieczniejszy (rzadko potrzebny)
+
+      -- Optymalna konfiguracja dla większości aplikacji:
+      PRAGMA journal_mode = WAL;
+      PRAGMA synchronous = NORMAL;
+      PRAGMA cache_size = -64000;
+      PRAGMA foreign_keys = ON;
+      PRAGMA busy_timeout = 5000;
+
+  - name: "PRAGMA cache_size — tuning pamięci"
+    desc: >
+      cache_size określa ile stron bazy SQLite trzyma w pamięci.
+      Wartość ujemna to kilobajty (zalecana forma). Domyślnie -2000 (2MB) — za mało dla większych baz.
+      Dostosuj do dostępnej RAM i rozmiaru bazy.
+    code: |
+      -- Domyślnie -2000 = 2MB cache
+      PRAGMA cache_size;
+
+      -- Ustaw w KB (wartość ujemna)
+      PRAGMA cache_size = -32000;   -- 32MB
+      PRAGMA cache_size = -64000;   -- 64MB (dobry start dla większości)
+      PRAGMA cache_size = -512000;  -- 512MB (duże bazy)
+
+      -- Strony (wartość dodatnia, rozmiar strony domyślnie 4096B)
+      PRAGMA cache_size = 16384;    -- 16384 * 4096B = 64MB
+
+      -- Sprawdź rozmiar strony
+      PRAGMA page_size;  -- domyślnie 4096
+
+      -- temp_store: gdzie trzymać tabele tymczasowe
+      PRAGMA temp_store = MEMORY;   -- w RAM (szybciej) zamiast dysku
+
+  - name: CREATE INDEX — indeksy
+    desc: >
+      Indeksy przyspieszają SELECT ale spowalniają INSERT/UPDATE/DELETE.
+      Indeksuj kolumny używane w WHERE, ORDER BY, JOIN ON. Sprawdzaj EXPLAIN QUERY PLAN
+      czy indeks jest używany. Unikaj nadmiarowych indeksów.
+    code: |
+      -- Indeks na jednej kolumnie
+      CREATE INDEX idx_users_email ON users(email);
+
+      -- Indeks unikalny
+      CREATE UNIQUE INDEX idx_users_email ON users(email);
+
+      -- Indeks złożony (kolejność kolumn ma znaczenie!)
+      CREATE INDEX idx_orders_user_date ON orders(user_id, created_at);
+
+      -- Indeks częściowy — tylko podzbiór wierszy
+      CREATE INDEX idx_active_users ON users(email) WHERE status = 'active';
+
+      -- Usuń indeks
+      DROP INDEX IF EXISTS idx_users_email;
+
+      -- Lista indeksów tabeli
+      PRAGMA index_list(users);
+
+      -- Szczegóły indeksu
+      PRAGMA index_info(idx_users_email);
+
+  - name: EXPLAIN QUERY PLAN
+    desc: >
+      EXPLAIN QUERY PLAN pokazuje jak SQLite wykonuje zapytanie — czy używa indeksu (SEARCH)
+      czy skanuje całą tabelę (SCAN). SCAN na dużej tabeli bez indeksu = problem wydajnościowy.
+    code: |
+      -- Sprawdź plan zapytania
+      EXPLAIN QUERY PLAN
+        SELECT * FROM users WHERE email = 'alice@example.com';
+      -- Wynik z indeksem:   SEARCH users USING INDEX idx_users_email
+      -- Wynik bez indeksu:  SCAN users
+
+      EXPLAIN QUERY PLAN
+        SELECT u.name, COUNT(o.id)
+        FROM users u
+        LEFT JOIN orders o ON o.user_id = u.id
+        GROUP BY u.id;
+
+      -- Pełne EXPLAIN — bajtkod wewnętrznej maszyny wirtualnej
+      EXPLAIN SELECT * FROM users WHERE id = 1;
+
+      -- W Python
+      -- for row in conn.execute("EXPLAIN QUERY PLAN SELECT * FROM users WHERE email = ?", ('test@test.com',)):
+      --     print(row)
+
+  - name: VACUUM i ANALYZE
+    desc: >
+      VACUUM przebudowuje bazę danych — odzyskuje miejsce po DELETE, defragmentuje.
+      Blokuje bazę na czas działania! ANALYZE aktualizuje statystyki używane przez optymalizator.
+    code: |
+      -- VACUUM — przebuduj bazę (odzyskaj miejsce, defragmentuj)
+      VACUUM;
+
+      -- VACUUM INTO — kopia do nowego pliku (nie blokuje oryginału przez całe działanie)
+      VACUUM INTO 'backup.db';
+
+      -- ANALYZE — aktualizuj statystyki optymalizatora
+      ANALYZE;
+      ANALYZE users;         -- tylko dla tabeli users
+      ANALYZE idx_users_email; -- tylko dla indeksu
+
+      -- Automatyczne ANALYZE przy optimize
+      PRAGMA optimize;       -- SQLite samo decyduje co zoptymalizować
+
+      -- Sprawdź rozmiar bazy
+      SELECT page_count * page_size AS size_bytes FROM pragma_page_count(), pragma_page_size();
+
+  - name: Bulk insert — transakcja = 1000x szybciej
+    desc: >
+      Domyślnie każdy INSERT to oddzielna transakcja i fsync. 10000 insertów = 10000 fsynców.
+      Opakowanie wszystkiego w jedną transakcję redukuje to do 1 fsync — dramatyczna poprawa prędkości.
+    code: |
+      -- Wolno: auto-commit per wiersz (N fsynców)
+      -- INSERT INTO users VALUES (...);  -- x10000 = bardzo wolno
+
+      -- Szybko: jedna transakcja (1 fsync)
+      BEGIN TRANSACTION;
+        INSERT INTO users (name, email) VALUES ('User1', 'u1@example.com');
+        INSERT INTO users (name, email) VALUES ('User2', 'u2@example.com');
+        -- ... tysiące insertów
+      COMMIT;
+
+      -- Python — benchmark
+      -- import sqlite3, time
+      -- conn = sqlite3.connect(':memory:')
+      -- conn.execute("CREATE TABLE t(v INTEGER)")
+      --
+      -- # Wolno (auto-commit)
+      -- t = time.time()
+      -- for i in range(10000):
+      --     conn.execute("INSERT INTO t VALUES (?)", (i,))
+      --     conn.commit()  # <- problem
+      -- print(f"Wolno: {time.time()-t:.2f}s")
+      --
+      -- # Szybko (jedna transakcja)
+      -- t = time.time()
+      -- with conn:
+      --     conn.executemany("INSERT INTO t VALUES (?)", [(i,) for i in range(10000)])
+      -- print(f"Szybko: {time.time()-t:.2f}s")
+
+  - name: "PRAGMA busy_timeout — obsługa locków"
+    desc: >
+      Gdy baza jest zablokowana przez inny proces, SQLite domyślnie natychmiast zwraca błąd SQLITE_BUSY.
+      busy_timeout ustawia czas czekania (ms) zanim zwróci błąd — kluczowe przy wielodostępie.
+    code: |
+      -- Ustaw timeout (w milisekundach)
+      PRAGMA busy_timeout = 5000;   -- czekaj do 5 sekund
+
+      -- Sprawdź aktualny timeout
+      PRAGMA busy_timeout;
+
+      -- W Python
+      -- conn = sqlite3.connect('myapp.db', timeout=30)  -- 30 sekund
+      -- conn.execute("PRAGMA busy_timeout = 30000")
+
+      -- W better-sqlite3
+      -- db.pragma('busy_timeout = 5000');
+
+      -- Strategia dla aplikacji wielodostępnych:
+      -- 1. Włącz WAL mode (zmniejsza konflikty)
+      -- 2. Ustaw busy_timeout > 0 (nie fail natychmiast)
+      -- 3. Używaj transakcji tylko gdy potrzebne
+      -- 4. Rozważ connection pooling w warstwach aplikacji
+
+  - name: Connection pooling i wielodostęp
+    desc: >
+      SQLite obsługuje wielu równoczesnych czytelników ale tylko jeden pisarz naraz.
+      WAL mode poprawia współbieżność ale nie zastępuje prawdziwego serwera bazy.
+      Dla aplikacji webowych z wieloma requestami rozważ pool połączeń lub dedykowany wątek db.
+    code: |
+      -- SQLite a współbieżność:
+      -- Tryb DELETE journal:  jeden reader LUB jeden writer (exclusive)
+      -- Tryb WAL:             wiele readers I jeden writer równocześnie
+
+      -- W Node.js (better-sqlite3) — synchroniczny, jeden wątek
+      -- Bezpieczny pattern: jeden obiekt Database per proces
+      -- db jest thread-safe dla single-threaded Node
+
+      -- W Python (wielowątkowość) — check_same_thread=False
+      -- conn = sqlite3.connect('myapp.db', check_same_thread=False)
+      -- Ale lepiej: osobne połączenie per wątek
+
+      -- Turso/LibSQL — SQLite z siecią i replikacją
+      -- Rozwiązuje problem współbieżności przez HTTP protokół
+
+      -- Benchmark: SQLite vs PostgreSQL
+      -- SQLite wygrywa przy:     lokalnym dostępie, małych-średnich danych, embedded
+      -- PostgreSQL wygrywa przy: wielu równoczesnych pisarzach, sieciowym dostępie, TB danych

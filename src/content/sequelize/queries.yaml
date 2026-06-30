@@ -1,0 +1,400 @@
+title: Sequelize — Queries & Finders
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Sequelize udostępnia bogaty zestaw metod finder do pobierania danych. findAll
+  i findOne obsługują filtrowanie przez where z operatorami Op (Op.eq, Op.ne,
+  Op.like, Op.in, Op.between, Op.or), sortowanie przez order, paginację przez
+  limit i offset oraz projekcję przez attributes. Możesz też wykonywać raw SQL,
+  agregacje (count, sum, min, max) i findOrCreate dla operacji upsert.
+
+items:
+  - name: findAll — pobierz wiele rekordów
+    desc: >
+      findAll to podstawowa metoda pobierania wielu rekordów. Zwraca Promise
+      z tablicą instancji modelu. Bez argumentów pobiera wszystkie rekordy.
+      Możesz przekazać obiekt opcji z where, order, limit, offset, attributes,
+      include i innymi.
+    code: |
+      const { Op } = require('sequelize');
+
+      // Pobierz wszystkich (bez filtrów)
+      const allUsers = await User.findAll();
+
+      // Z podstawowym filtrem
+      const activeUsers = await User.findAll({
+        where: { isActive: true },
+      });
+
+      // Wielokrotne warunki (domyślnie AND)
+      const filteredUsers = await User.findAll({
+        where: {
+          isActive: true,
+          role: 'user',
+        },
+      });
+
+      // Z sortowaniem i paginacją
+      const page = 2;
+      const pageSize = 10;
+      const users = await User.findAll({
+        order: [['createdAt', 'DESC'], ['username', 'ASC']],
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+      });
+
+      // Projekcja — tylko wybrane atrybuty
+      const emails = await User.findAll({
+        attributes: ['id', 'email', 'username'],
+      });
+
+      // Wyklucz atrybuty
+      const withoutPassword = await User.findAll({
+        attributes: { exclude: ['password', 'salt'] },
+      });
+
+  - name: findOne i findByPk
+    desc: >
+      findOne zwraca pierwszy rekord pasujący do warunków lub null. findByPk
+      pobiera rekord po kluczu głównym (PRIMARY KEY) — najszybszy sposób pobrania
+      konkretnego rekordu. Oba zwracają instancję modelu lub null, nigdy tablicę.
+    code: |
+      // findByPk — po id (PRIMARY KEY)
+      const user = await User.findByPk(42);
+      if (!user) throw new Error('User not found');
+
+      // findByPk z include i atrybutami
+      const userWithProfile = await User.findByPk(42, {
+        include: [{ model: Profile, as: 'profile' }],
+        attributes: ['id', 'username', 'email'],
+      });
+
+      // findOne — pierwszy pasujący rekord
+      const userByEmail = await User.findOne({
+        where: { email: 'jan@firma.pl' },
+      });
+
+      // findOne — zwraca null jeśli nie znaleziono
+      const admin = await User.findOne({
+        where: { username: 'admin', role: 'admin' },
+        order: [['createdAt', 'ASC']],  // jeśli więcej niż jeden — bierz najstarszego
+      });
+
+      if (!admin) {
+        console.log('Brak admina');
+        return;
+      }
+
+      console.log(admin.email);
+
+  - name: findOrCreate — znajdź lub utwórz
+    desc: >
+      findOrCreate szuka rekordu pasującego do where — jeśli nie istnieje, tworzy go
+      z danymi z defaults połączonymi z where. Zwraca tablicę [instance, created]
+      gdzie created to boolean informujący czy rekord został nowo utworzony.
+      Atomowa operacja — bezpieczna przy race conditions.
+    code: |
+      // Podstawowe findOrCreate
+      const [user, created] = await User.findOrCreate({
+        where: { email: 'jan@firma.pl' },
+        defaults: {
+          username: 'jan_kowalski',
+          role: 'user',
+          isActive: true,
+        },
+      });
+
+      if (created) {
+        console.log('Nowy użytkownik utworzony:', user.id);
+      } else {
+        console.log('Znaleziono istniejącego:', user.id);
+      }
+
+      // findOrCreate z transakcją
+      const t = await sequelize.transaction();
+      try {
+        const [tag, created] = await Tag.findOrCreate({
+          where: { name: 'javascript' },
+          defaults: { color: '#f7df1e' },
+          transaction: t,
+        });
+        await t.commit();
+        return tag;
+      } catch (err) {
+        await t.rollback();
+        throw err;
+      }
+
+      // upsert — create or update (alternatywa)
+      const [product, created2] = await Product.upsert({
+        sku: 'PROD-001',
+        name: 'Produkt A',
+        price: 99.99,
+      });
+
+  - name: findAndCountAll — paginacja z liczbą
+    desc: >
+      findAndCountAll zwraca obiekt z count (całkowita liczba pasujących rekordów)
+      i rows (tablica instancji dla aktualnej strony). Idealne do paginacji API
+      gdzie potrzebujesz wiedzieć ile stron w sumie istnieje.
+    code: |
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const offset = (page - 1) * limit;
+
+      const { count, rows } = await User.findAndCountAll({
+        where: { isActive: true },
+        order: [['createdAt', 'DESC']],
+        limit,
+        offset,
+        distinct: true,   // ważne przy include (unika duplikatów w count)
+      });
+
+      const totalPages = Math.ceil(count / limit);
+
+      return {
+        data: rows,
+        pagination: {
+          total: count,
+          currentPage: page,
+          totalPages,
+          limit,
+        },
+      };
+
+      // findAndCountAll z include
+      const result = await Post.findAndCountAll({
+        where: { isPublished: true },
+        include: [{ model: User, as: 'author', attributes: ['username'] }],
+        limit: 5,
+        offset: 0,
+        distinct: true,  // bez tego count może być zawyżony przez JOIN
+      });
+
+  - name: Operatory where — Op
+    desc: >
+      Op to obiekt z operatorami porównania i logicznymi. Najważniejsze: Op.eq (=),
+      Op.ne (!=), Op.gt (>), Op.gte (>=), Op.lt (<), Op.lte (<=), Op.like, Op.iLike,
+      Op.in, Op.notIn, Op.between, Op.or, Op.and, Op.is, Op.not.
+    code: |
+      const { Op } = require('sequelize');
+
+      // Operatory porównania
+      await User.findAll({ where: { age: { [Op.gt]: 18 } } });       // age > 18
+      await User.findAll({ where: { age: { [Op.gte]: 18 } } });      // age >= 18
+      await User.findAll({ where: { age: { [Op.lt]: 65 } } });       // age < 65
+      await User.findAll({ where: { age: { [Op.ne]: 0 } } });        // age != 0
+      await User.findAll({ where: { age: { [Op.between]: [18, 65] } } }); // BETWEEN
+
+      // LIKE / ILIKE
+      await User.findAll({ where: { name: { [Op.like]: 'Jan%' } } });     // LIKE
+      await User.findAll({ where: { name: { [Op.iLike]: '%jan%' } } });   // ILIKE (PostgreSQL)
+      await User.findAll({ where: { name: { [Op.notLike]: '%test%' } } }); // NOT LIKE
+
+      // IN / NOT IN
+      await User.findAll({ where: { role: { [Op.in]: ['admin', 'moderator'] } } });
+      await User.findAll({ where: { role: { [Op.notIn]: ['banned'] } } });
+
+      // IS NULL / IS NOT NULL
+      await User.findAll({ where: { deletedAt: { [Op.is]: null } } });
+      await User.findAll({ where: { deletedAt: { [Op.not]: null } } });
+
+      // OR — logiczny
+      await User.findAll({
+        where: {
+          [Op.or]: [
+            { role: 'admin' },
+            { role: 'moderator' },
+          ],
+        },
+      });
+
+      // AND z OR zagnieżdżonym
+      await User.findAll({
+        where: {
+          isActive: true,
+          [Op.or]: [
+            { age: { [Op.lt]: 25 } },
+            { plan: 'premium' },
+          ],
+        },
+      });
+
+  - name: order, limit, offset — sortowanie i paginacja
+    desc: >
+      order przyjmuje tablicę par [kolumna, kierunek]. Możesz sortować po
+      powiązanych modelach. limit ogranicza liczbę wyników, offset pomija
+      pierwsze N rekordów. Razem tworzą paginację.
+    code: |
+      // Sortowanie podstawowe
+      await User.findAll({
+        order: [['createdAt', 'DESC']],
+      });
+
+      // Sortowanie po wielu kolumnach
+      await User.findAll({
+        order: [
+          ['lastName', 'ASC'],
+          ['firstName', 'ASC'],
+        ],
+      });
+
+      // Sortowanie po powiązanym modelu (eager load required)
+      await Post.findAll({
+        include: [{ model: User, as: 'author' }],
+        order: [
+          [{ model: User, as: 'author' }, 'username', 'ASC'],
+        ],
+      });
+
+      // Sortowanie po funkcji SQL
+      await User.findAll({
+        order: sequelize.literal('RANDOM()'),   // PostgreSQL / SQLite
+        // order: sequelize.literal('RAND()'), // MySQL
+      });
+
+      // Limit i offset — paginacja
+      const limit = 10;
+      const page = 3;
+      await User.findAll({
+        limit,
+        offset: (page - 1) * limit,  // pomiń pierwsze 20
+      });
+
+  - name: attributes — projekcja i aliasy
+    desc: >
+      Opcja attributes kontroluje które kolumny są zwracane. Możesz wykluczyć
+      kolumny, dodać aliasy, obliczone pola (sequelize.fn) i literały SQL.
+      Projekcja zmniejsza ilość transferowanych danych z bazy.
+    code: |
+      // Wybierz konkretne kolumny
+      await User.findAll({
+        attributes: ['id', 'username', 'email'],
+      });
+
+      // Wyklucz kolumny
+      await User.findAll({
+        attributes: { exclude: ['password', 'salt', 'resetToken'] },
+      });
+
+      // Alias dla kolumny
+      await User.findAll({
+        attributes: [
+          'id',
+          ['username', 'name'],       // kolumna 'username' jako 'name'
+          ['email', 'emailAddress'],
+        ],
+      });
+
+      // Agregacje jako atrybuty (sequelize.fn)
+      await User.findAll({
+        attributes: [
+          'id',
+          'username',
+          [sequelize.fn('COUNT', sequelize.col('posts.id')), 'postCount'],
+        ],
+        include: [{ model: Post, as: 'posts', attributes: [] }],
+        group: ['User.id'],
+      });
+
+      // Literał SQL jako atrybut
+      await User.findAll({
+        attributes: [
+          'id',
+          [sequelize.literal("CONCAT(first_name, ' ', last_name)"), 'fullName'],
+        ],
+      });
+
+  - name: Raw queries — surowe zapytania SQL
+    desc: >
+      sequelize.query() wykonuje surowe zapytania SQL. Możesz parametryzować
+      przez replacements (pozycyjne :param) lub bind (pozycyjne $1, $2).
+      Zwraca tablicę [results, metadata]. Opcja type kontroluje format wyników —
+      QueryTypes.SELECT zwraca czyste obiekty.
+    code: |
+      const { QueryTypes } = require('sequelize');
+
+      // Proste raw query
+      const results = await sequelize.query(
+        'SELECT * FROM users WHERE role = :role',
+        {
+          replacements: { role: 'admin' },  // :param — named replacements
+          type: QueryTypes.SELECT,          // zwraca czyste obiekty (nie Modele)
+        }
+      );
+
+      // Pozycyjne replacements
+      const [users] = await sequelize.query(
+        'SELECT * FROM users WHERE age > ? AND isActive = ?',
+        {
+          replacements: [18, true],   // ? dla MySQL/SQLite
+        }
+      );
+
+      // bind parameters (PostgreSQL $1, $2)
+      const activeAdults = await sequelize.query(
+        'SELECT id, username FROM users WHERE age > $1 AND is_active = $2',
+        {
+          bind: [18, true],
+          type: QueryTypes.SELECT,
+        }
+      );
+
+      // Inne typy
+      await sequelize.query('UPDATE users SET isActive = false WHERE lastLogin < :date', {
+        replacements: { date: new Date('2023-01-01') },
+        type: QueryTypes.UPDATE,
+      });
+
+      // Model.sequelize.query — przez instancję modelu
+      await User.sequelize.query('VACUUM ANALYZE users');
+
+  - name: Agregacje — count, sum, min, max
+    desc: >
+      Sequelize ma metody agregujące count(), sum(), min(), max(), avg().
+      Wszystkie przyjmują nazwę kolumny i opcje where do filtrowania.
+      Możesz też używać sequelize.fn() w kombinacji z findAll i group
+      dla bardziej złożonych agregacji.
+    code: |
+      const { Op } = require('sequelize');
+
+      // count — policz rekordy
+      const totalUsers = await User.count();
+      const activeCount = await User.count({ where: { isActive: true } });
+
+      // sum — suma wartości
+      const totalRevenue = await Order.sum('amount');
+      const monthRevenue = await Order.sum('amount', {
+        where: {
+          createdAt: {
+            [Op.gte]: new Date('2024-01-01'),
+            [Op.lte]: new Date('2024-01-31'),
+          },
+        },
+      });
+
+      // min i max
+      const minPrice = await Product.min('price');
+      const maxPrice = await Product.max('price');
+      const newestUser = await User.max('createdAt');
+
+      // avg
+      const avgAge = await User.aggregate('age', 'avg', {
+        where: { isActive: true },
+      });
+
+      // GROUP BY z findAll + sequelize.fn
+      const statsByRole = await User.findAll({
+        attributes: [
+          'role',
+          [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+          [sequelize.fn('AVG', sequelize.col('age')), 'avgAge'],
+        ],
+        group: ['role'],
+        order: [[sequelize.literal('count'), 'DESC']],
+      });
+
+      // Wynik: [{ role: 'user', count: 150, avgAge: 32 }, ...]

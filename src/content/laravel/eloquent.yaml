@@ -1,0 +1,369 @@
+title: Laravel — Eloquent ORM
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Eloquent to Active Record ORM wbudowany w Laravel. Każda tabela w bazie danych ma
+  odpowiadający model PHP — Model wie jak czytać i zapisywać do swojej tabeli.
+  Eloquent oferuje ekspresywne API zapytań, obsługę relacji (hasMany, belongsTo,
+  belongsToMany, hasOne, morphTo), lazy/eager loading, soft deletes, scope-y i wiele więcej.
+  Działa z MySQL, PostgreSQL, SQLite i SQL Server.
+
+items:
+  - name: "Tworzenie modelu i migracji"
+    desc: >
+      Model Eloquent to klasa PHP dziedzicząca po Model. Konwencja nazewnicza — model Post
+      odpowiada tabeli posts (liczba mnoga, snake_case). Migracje definiują strukturę tabeli.
+      Artisan generuje oba naraz przez php artisan make:model Post -m.
+    code: |
+      // php artisan make:model Post -m
+      // Tworzy: app/Models/Post.php + database/migrations/..._create_posts_table.php
+
+      // database/migrations/2024_01_01_000000_create_posts_table.php
+      Schema::create('posts', function (Blueprint $table) {
+          $table->id();                              // bigint auto_increment PRIMARY KEY
+          $table->string('title');
+          $table->text('content');
+          $table->string('slug')->unique();
+          $table->enum('status', ['draft', 'published'])->default('draft');
+          $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+          $table->timestamp('published_at')->nullable();
+          $table->timestamps();                      // created_at + updated_at
+          $table->softDeletes();                     // deleted_at (dla soft delete)
+      });
+
+      // app/Models/Post.php
+      namespace App\Models;
+
+      use Illuminate\Database\Eloquent\Model;
+      use Illuminate\Database\Eloquent\SoftDeletes;
+
+      class Post extends Model
+      {
+          use SoftDeletes;
+
+          protected $fillable = ['title', 'content', 'slug', 'status', 'published_at'];
+
+          protected $casts = [
+              'published_at' => 'datetime',
+              'status'       => PostStatus::class,  // PHP 8.1 Enum
+          ];
+      }
+
+  - name: "Zapytania — find, where, get"
+    desc: >
+      Eloquent Query Builder to płynne (fluent) API do budowania zapytań SQL.
+      Metody chainują się — każda zwraca Builder do dalszego budowania.
+      find() zwraca model lub null, findOrFail() rzuca 404 gdy nie znajdzie.
+      get() zwraca Collection, first() zwraca jeden model, count() zwraca liczbę.
+    code: |
+      // Pobieranie rekordów
+      $posts = Post::all();                          // SELECT * FROM posts
+      $post  = Post::find(1);                        // znajdź po ID lub null
+      $post  = Post::findOrFail(1);                  // znajdź lub rzuć 404
+
+      // Filtrowanie
+      $published = Post::where('status', 'published')->get();
+      $recent    = Post::where('created_at', '>=', now()->subDays(7))->get();
+
+      // Łączenie warunków
+      Post::where('status', 'published')
+          ->where('user_id', auth()->id())
+          ->orderBy('published_at', 'desc')
+          ->limit(10)
+          ->get();
+
+      // Przydatne metody
+      Post::where('status', 'published')->count();
+      Post::where('status', 'published')->exists();
+      Post::whereIn('id', [1, 2, 3])->get();
+      Post::whereBetween('created_at', [$start, $end])->get();
+      Post::whereNull('published_at')->get();
+      Post::latest()->first();                       // ORDER BY created_at DESC LIMIT 1
+      Post::oldest()->get();                         // ORDER BY created_at ASC
+
+      // Chunking dużych zestawów danych
+      Post::chunk(100, function ($posts) {
+          foreach ($posts as $post) {
+              // przetwarzaj po 100 rekordów
+          }
+      });
+
+  - name: "Tworzenie, aktualizacja, usuwanie"
+    desc: >
+      Eloquent oferuje kilka sposobów na zapis danych. create() wymaga $fillable lub $guarded
+      w modelu (mass assignment protection). save() tworzy lub aktualizuje model.
+      update() masowo aktualizuje na podstawie zapytania. delete() usuwa (soft delete jeśli użyty).
+    code: |
+      // Tworzenie
+      $post = Post::create([
+          'title'   => 'Mój pierwszy post',
+          'content' => 'Treść posta...',
+          'slug'    => 'moj-pierwszy-post',
+          'user_id' => auth()->id(),
+      ]);
+
+      // Lub przez model
+      $post = new Post();
+      $post->title   = 'Tytuł';
+      $post->content = 'Treść';
+      $post->save();
+
+      // firstOrCreate — pobierz lub utwórz
+      $post = Post::firstOrCreate(
+          ['slug' => 'unique-slug'],          // szukaj po tych polach
+          ['title' => 'Tytuł', 'content' => 'Treść'],  // te pola jeśli tworzysz
+      );
+
+      // Aktualizacja
+      $post = Post::findOrFail(1);
+      $post->update(['title' => 'Nowy tytuł', 'status' => 'published']);
+
+      // Masowa aktualizacja przez Query Builder
+      Post::where('status', 'draft')
+          ->where('created_at', '<', now()->subDays(30))
+          ->update(['status' => 'archived']);
+
+      // Usuwanie
+      $post->delete();                        // soft delete jeśli SoftDeletes włączone
+
+      // Trwałe usunięcie (nawet przy soft delete)
+      $post->forceDelete();
+
+      // Przywracanie soft-deleted
+      Post::withTrashed()->find(1)->restore();
+
+  - name: "Mass Assignment — fillable i guarded"
+    desc: >
+      Ochrona przed mass assignment vulnerability — przez $fillable definiujesz które pola
+      mogą być masowo ustawiane (whitelist), przez $guarded definiujesz które NIE mogą (blacklist).
+      Używaj fillable — bardziej bezpieczne. Nigdy nie rób $guarded = [] bez przemyślenia.
+      $casts automatycznie konwertuje typy przy odczycie/zapisie.
+    code: |
+      class Post extends Model
+      {
+          // Whitelist — TYLKO te pola przez create()/update()
+          protected $fillable = [
+              'title',
+              'content',
+              'slug',
+              'status',
+              'published_at',
+              'user_id',
+          ];
+
+          // Blacklist — NIE te pola (alternatywa do fillable)
+          // protected $guarded = ['id', 'created_at', 'updated_at'];
+
+          // Automatyczne rzutowanie typów
+          protected $casts = [
+              'published_at' => 'datetime',
+              'is_featured'  => 'boolean',
+              'meta'         => 'array',       // JSON kolumna → tablica PHP
+              'price'        => 'decimal:2',
+          ];
+
+          // Ukryte pola — nie pokazuj w JSON (np. hasła)
+          protected $hidden = ['password', 'remember_token'];
+
+          // Zawsze dołączane pola (computed)
+          protected $appends = ['full_url'];
+
+          // Accessor — pole obliczane
+          public function getFullUrlAttribute(): string
+          {
+              return url('/posts/' . $this->slug);
+          }
+
+          // Mutator — przekształć przed zapisem
+          public function setSlugAttribute(string $value): void
+          {
+              $this->attributes['slug'] = Str::slug($value);
+          }
+      }
+
+  - name: "Relacje — hasMany i belongsTo"
+    desc: >
+      Eloquent obsługuje relacje między tabelami metodami definiowanymi w modelach.
+      hasMany — jeden do wielu (User ma wiele Posts). belongsTo — odwrotność (Post należy do User).
+      Relacje ładowane są lazy domyślnie — dostęp do $post->user odpala SQL.
+      Eager loading (with()) ładuje relacje z góry — unika N+1 problem.
+    code: |
+      // app/Models/User.php
+      class User extends Model
+      {
+          // Jeden User — wiele Posts
+          public function posts(): HasMany
+          {
+              return $this->hasMany(Post::class);
+          }
+
+          // Jeden User — jeden Profile
+          public function profile(): HasOne
+          {
+              return $this->hasOne(Profile::class);
+          }
+      }
+
+      // app/Models/Post.php
+      class Post extends Model
+      {
+          // Post należy do User
+          public function user(): BelongsTo
+          {
+              return $this->belongsTo(User::class);
+          }
+
+          // Post należy do wielu Tags (i Tag do wielu Posts)
+          public function tags(): BelongsToMany
+          {
+              return $this->belongsToMany(Tag::class)
+                          ->withTimestamps()
+                          ->withPivot('added_by');
+          }
+      }
+
+      // Używanie relacji
+      $user = User::find(1);
+      $posts = $user->posts;                  // lazy load — SQL odpala się tutaj
+      $user->posts()->where('status', 'published')->get();  // chainowanie
+
+      $post = Post::find(1);
+      $author = $post->user;                  // lazy load
+      echo $post->user->name;
+
+      // Eager loading — WAŻNE dla unikania N+1
+      $posts = Post::with('user', 'tags')->get();
+      // = 3 zapytania zamiast N+1
+
+  - name: "Soft Deletes"
+    desc: >
+      Soft delete zamiast trwałego usunięcia ustawia timestamp w kolumnie deleted_at.
+      Eloquent automatycznie pomija soft-deleted rekordy w zapytaniach.
+      withTrashed() włącza usunięte, onlyTrashed() pokazuje tylko usunięte.
+      Przydatne do audytu, GDPR (możliwość przywrócenia), recycle bin.
+    code: |
+      // Dodaj do migracji
+      $table->softDeletes();  // kolumna deleted_at nullable timestamp
+
+      // W modelu
+      use Illuminate\Database\Eloquent\SoftDeletes;
+
+      class Post extends Model
+      {
+          use SoftDeletes;
+      }
+
+      // Użycie
+      $post->delete();                             // soft delete — ustawia deleted_at
+      Post::all();                                 // pomija soft-deleted (WHERE deleted_at IS NULL)
+
+      // Pobieranie usuniętych
+      Post::withTrashed()->get();                  // wszystkie łącznie z usuniętymi
+      Post::onlyTrashed()->get();                  // tylko usunięte
+      Post::withTrashed()->find(5);                // konkretny usunięty rekord
+
+      // Przywracanie
+      $post = Post::withTrashed()->find(5);
+      $post->restore();                            // czyści deleted_at
+
+      // Trwałe usunięcie
+      $post->forceDelete();                        // usuwa z bazy permanentnie
+
+      // Automatyczne usuwanie po 30 dniach (w scheduler)
+      Post::onlyTrashed()
+          ->where('deleted_at', '<', now()->subDays(30))
+          ->forceDelete();
+
+  - name: "Query Scopes — lokalne i globalne"
+    desc: >
+      Scopy to wielokrotnego użytku fragmenty zapytań. Lokalne scope to metody modelu z
+      prefixem scope — wywoływane bez prefixu (scopePublished → published()).
+      Globalne scope stosują się do wszystkich zapytań modelu automatycznie.
+      Przydatne do często używanych filtrów — published, active, recent, forUser.
+    code: |
+      class Post extends Model
+      {
+          // Lokalny scope — używaj jako ->published()
+          public function scopePublished(Builder $query): Builder
+          {
+              return $query->where('status', 'published')
+                           ->whereNotNull('published_at');
+          }
+
+          // Scope z parametrem — ->recentDays(7)
+          public function scopeRecentDays(Builder $query, int $days = 7): Builder
+          {
+              return $query->where('created_at', '>=', now()->subDays($days));
+          }
+
+          // Scope dla zalogowanego użytkownika
+          public function scopeForUser(Builder $query, User $user): Builder
+          {
+              return $query->where('user_id', $user->id);
+          }
+      }
+
+      // Używanie scopes — chain jak metody wbudowane
+      Post::published()->latest()->paginate(10);
+      Post::published()->recentDays(30)->count();
+      Post::forUser($user)->published()->get();
+
+      // Globalny scope — stosuje się do WSZYSTKICH zapytań
+      class ActiveScope implements Scope
+      {
+          public function apply(Builder $builder, Model $model): void
+          {
+              $builder->where('active', true);
+          }
+      }
+
+      // W modelu
+      protected static function booted(): void
+      {
+          static::addGlobalScope(new ActiveScope());
+      }
+
+      // Pominięcie globalnego scope
+      Post::withoutGlobalScope(ActiveScope::class)->get();
+
+  - name: "Eager Loading i N+1 Problem"
+    desc: >
+      N+1 to najczęstszy problem wydajnościowy w aplikacjach z ORM. Pętla po 100 postach
+      i odwołanie do $post->user odpala 101 zapytań SQL (1 + 100). Eager loading
+      (with()) ładuje wszystkie powiązane modele w jednym dodatkowym zapytaniu.
+      Laravel Telescope lub Debugbar pomagają wykryć N+1 w development.
+    code: |
+      // Problem N+1 — NIE RÓB TEGO
+      $posts = Post::all();                    // 1 zapytanie
+      foreach ($posts as $post) {
+          echo $post->user->name;              // 1 zapytanie PER post = N+1!
+          echo $post->tags->count();           // kolejne N zapytań!
+      }
+      // Dla 100 postów = 201+ zapytań SQL
+
+      // Rozwiązanie — Eager Loading
+      $posts = Post::with('user', 'tags')->get();
+      // = 3 zapytania łącznie: posts + users + tags
+
+      foreach ($posts as $post) {
+          echo $post->user->name;              // z cache — 0 zapytań
+          echo $post->tags->count();           // z cache — 0 zapytań
+      }
+
+      // Eager loading zagnieżdżony
+      Post::with('user.profile', 'tags.category')->get();
+
+      // Eager loading z filtrami
+      Post::with(['comments' => function ($query) {
+          $query->where('approved', true)->latest()->limit(5);
+      }])->get();
+
+      // Leniwy eager loading (po pobraniu)
+      $posts = Post::all();
+      $posts->load('user', 'tags');
+
+      // Wykrywanie N+1 w testach
+      // Model::preventLazyLoading(!app()->isProduction());

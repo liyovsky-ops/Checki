@@ -1,0 +1,431 @@
+title: Laravel — Middleware & Auth
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Middleware to warstwa przetwarzania między HTTP requestem a kontrolerem — filtruje,
+  modyfikuje lub odrzuca żądania. Laravel dostarcza wbudowane middleware dla auth, CSRF,
+  rate limiting, CORS. Własne middleware tworzysz przez php artisan make:middleware.
+  System autoryzacji opiera się na Gates (proste uprawnienia) i Policies (uprawnienia
+  powiązane z modelem). Laravel Sanctum dostarcza API token auth dla SPA i mobile.
+
+items:
+  - name: "Tworzenie i rejestracja middleware"
+    desc: >
+      Middleware implementuje metodę handle() — przetwarza request, wywołuje $next($request)
+      aby przekazać dalej, lub zwraca response aby przerwać. Middleware rejestruje się
+      globalnie (wszystkie requesty), dla grup (web/api) lub dla konkretnych tras.
+      Kolejność w Kernel.php ma znaczenie — przetwarzane po kolei.
+    code: |
+      // php artisan make:middleware CheckSubscription
+
+      namespace App\Http\Middleware;
+
+      use Closure;
+      use Illuminate\Http\Request;
+      use Symfony\Component\HttpFoundation\Response;
+
+      class CheckSubscription
+      {
+          public function handle(Request $request, Closure $next): Response
+          {
+              // Sprawdź przed przekazaniem dalej
+              if (!$request->user()->isSubscribed()) {
+                  // Dla API
+                  if ($request->expectsJson()) {
+                      return response()->json(['error' => 'Subscription required'], 402);
+                  }
+                  // Dla web
+                  return redirect()->route('subscription.required')
+                      ->with('warning', 'Ta funkcja wymaga subskrypcji.');
+              }
+
+              // Przekaż request dalej
+              $response = $next($request);
+
+              // Możesz też modyfikować RESPONSE (po kontrolerze)
+              $response->headers->set('X-Subscription-Level', $request->user()->plan);
+
+              return $response;
+          }
+      }
+
+      // Rejestracja w app/Http/Kernel.php
+      // Globalnie (wszystkie requesty):
+      protected $middleware = [
+          \App\Http\Middleware\CheckSubscription::class,
+      ];
+
+      // Dla grupy tras (web lub api):
+      protected $middlewareGroups = [
+          'web' => [/* ... */],
+          'api' => [/* ... */],
+      ];
+
+      // Z aliasem — dla konkretnych tras:
+      protected $middlewareAliases = [
+          'subscribed' => \App\Http\Middleware\CheckSubscription::class,
+      ];
+
+      // Użycie z aliasem w trasach
+      Route::get('/premium', fn() => view('premium'))
+          ->middleware(['auth', 'subscribed']);
+
+  - name: "Auth Middleware i wbudowane middleware"
+    desc: >
+      Laravel dostarcza wbudowane middleware: auth (wymaga logowania), verified (wymaga
+      potwierdzonego emaila), throttle (rate limiting), guest (tylko niezalogowani),
+      can (sprawdzenie uprawnień Gate). Można przekazywać parametry przez dwukropek.
+    code: |
+      // Najczęściej używane wbudowane middleware
+
+      // Wymaga zalogowania — przekierowuje na /login
+      Route::middleware('auth')->group(function () {
+          Route::get('/dashboard', [DashboardController::class, 'index']);
+      });
+
+      // Wymaga potwierdzonego emaila
+      Route::middleware(['auth', 'verified'])->group(function () {
+          Route::post('/posts', [PostController::class, 'store']);
+      });
+
+      // Rate limiting — throttle:max_requests,minutes
+      Route::middleware('throttle:60,1')->group(function () {
+          Route::get('/api/data', [ApiController::class, 'data']);
+      });
+
+      // Tylko niezalogowani
+      Route::middleware('guest')->group(function () {
+          Route::get('/login', [AuthController::class, 'showLogin']);
+          Route::get('/register', [AuthController::class, 'showRegister']);
+      });
+
+      // Sprawdzenie uprawnienia Gate
+      Route::middleware('can:manage-users')->group(function () {
+          Route::resource('admin/users', Admin\UserController::class);
+      });
+
+      // Specific guard — multiple guards
+      Route::middleware('auth:sanctum')->get('/api/user', fn($request) => $request->user());
+      Route::middleware('auth:admin')->get('/admin', fn() => view('admin.dashboard'));
+
+      // Parametry middleware w kontrolerze
+      $this->middleware('throttle:10,1')->only('store');
+
+  - name: "Gates — proste uprawnienia"
+    desc: >
+      Gates to closures definiujące uprawnienia — proste, niezwiązane z modelem.
+      Rejestruje się je w AuthServiceProvider przez Gate::define(). Sprawdzasz przez
+      Gate::allows(), Gate::denies(), $request->user()->can(), @can w Blade.
+      Idealne dla globalnych uprawnień (manage-users, view-reports, access-admin).
+    code: |
+      // app/Providers/AuthServiceProvider.php
+      use Illuminate\Support\Facades\Gate;
+
+      class AuthServiceProvider extends ServiceProvider
+      {
+          public function boot(): void
+          {
+              // Gate dla roli admin — przed innymi Gate
+              Gate::before(function (User $user, string $ability) {
+                  if ($user->isAdmin()) {
+                      return true;  // admin może wszystko
+                  }
+              });
+
+              // Proste uprawnienia
+              Gate::define('manage-users', fn(User $user) => $user->role === 'admin');
+              Gate::define('view-reports', fn(User $user) => in_array($user->role, ['admin', 'manager']));
+              Gate::define('publish-posts', fn(User $user) => $user->verified && $user->postsCount() >= 3);
+
+              // Gate z modelem
+              Gate::define('edit-post', fn(User $user, Post $post) => $user->id === $post->user_id);
+          }
+      }
+
+      // Używanie Gate
+      if (Gate::allows('manage-users')) {
+          // użytkownik może
+      }
+
+      if (Gate::denies('manage-users')) {
+          abort(403);
+      }
+
+      // W kontrolerze
+      Gate::authorize('manage-users');              // rzuca 403 jeśli brak uprawnień
+      $this->authorize('edit-post', $post);         // przez trait Authorizable
+
+      // Na instancji użytkownika
+      if (auth()->user()->can('publish-posts')) {
+          // może
+      }
+      if (auth()->user()->cannot('manage-users')) {
+          abort(403);
+      }
+
+  - name: "Policies — uprawnienia powiązane z modelem"
+    desc: >
+      Policies to klasy grupujące logikę autoryzacji dla konkretnego modelu. Każda metoda
+      odpowiada akcji (viewAny, view, create, update, delete, restore, forceDelete).
+      Laravel automatycznie odkrywa Policies gdy nazwa pasuje do modelu (PostPolicy dla Post).
+      Metoda before() w Policy sprawdzana jest przed innymi metodami.
+    code: |
+      // php artisan make:policy PostPolicy --model=Post
+      namespace App\Policies;
+
+      class PostPolicy
+      {
+          // Sprawdzana przed innymi metodami — true = wszystko dozwolone
+          public function before(User $user, string $ability): ?bool
+          {
+              if ($user->isAdmin()) return true;
+              return null;  // null = sprawdź dalej
+          }
+
+          // Kto może zobaczyć listę postów?
+          public function viewAny(User $user): bool
+          {
+              return true;  // wszyscy zalogowani
+          }
+
+          // Kto może zobaczyć konkretny post?
+          public function view(?User $user, Post $post): bool
+          {
+              // ? = opcjonalny user (niezalogowani mogą widzieć published)
+              if ($post->status === 'published') return true;
+              return $user && $user->id === $post->user_id;
+          }
+
+          // Kto może tworzyć?
+          public function create(User $user): bool
+          {
+              return $user->email_verified_at !== null;
+          }
+
+          // Kto może edytować?
+          public function update(User $user, Post $post): bool
+          {
+              return $user->id === $post->user_id;
+          }
+
+          // Kto może usuwać?
+          public function delete(User $user, Post $post): bool
+          {
+              return $user->id === $post->user_id && !$post->comments()->exists();
+          }
+      }
+
+      // Użycie w kontrolerze
+      public function update(UpdatePostRequest $request, Post $post): RedirectResponse
+      {
+          $this->authorize('update', $post);  // 403 jeśli brak uprawnień
+          $post->update($request->validated());
+          return redirect()->route('posts.show', $post);
+      }
+
+      // Użycie w Blade
+      // @can('update', $post)
+      //     <a href="{{ route('posts.edit', $post) }}">Edytuj</a>
+      // @endcan
+
+  - name: "Sanctum — autentykacja API i SPA"
+    desc: >
+      Laravel Sanctum to lekka biblioteka do autentykacji API tokenów i SPA (cookie-based).
+      Dla API mobilnych i zewnętrznych: generujesz personalny token, wysyłasz go w nagłówku
+      Authorization: Bearer. Dla SPA (Vue/React na tym samym lub subdomain): cookie-based
+      sesja — bezpieczniejsze niż tokeny w localStorage.
+    code: |
+      // Instalacja
+      // composer require laravel/sanctum
+      // php artisan install:api   (Laravel 11+)
+      // lub: php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
+      // php artisan migrate
+
+      // config/sanctum.php — stateful domains dla SPA
+      'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', 'localhost,127.0.0.1')),
+
+      // Trasy API z Sanctum
+      Route::middleware('auth:sanctum')->group(function () {
+          Route::get('/user', fn(Request $request) => $request->user());
+          Route::apiResource('posts', PostController::class);
+      });
+
+      // Generowanie tokenów — logowanie
+      class AuthController extends Controller
+      {
+          public function login(Request $request): JsonResponse
+          {
+              $credentials = $request->validate([
+                  'email'    => ['required', 'email'],
+                  'password' => ['required'],
+              ]);
+
+              if (!Auth::attempt($credentials)) {
+                  return response()->json(['message' => 'Nieprawidłowe dane logowania'], 401);
+              }
+
+              $user  = Auth::user();
+              $token = $user->createToken('mobile-app', ['posts:read', 'posts:write'])->plainTextToken;
+
+              return response()->json(['token' => $token, 'user' => $user]);
+          }
+
+          public function logout(Request $request): JsonResponse
+          {
+              $request->user()->currentAccessToken()->delete();
+              return response()->json(['message' => 'Wylogowano']);
+          }
+      }
+
+      // Żądanie API z tokenem — nagłówek
+      // Authorization: Bearer 1|abc123...
+      // Accept: application/json
+
+  - name: "CSRF Protection"
+    desc: >
+      Laravel automatycznie generuje token CSRF dla każdej sesji i weryfikuje go dla POST/PUT/PATCH/DELETE.
+      Formularz Blade wymaga @csrf. API routes (routes/api.php) są wykluczone z CSRF.
+      Możesz wykluczyć konkretne URL-e przez $except w VerifyCsrfToken middleware.
+    code: |
+      // Formularz z CSRF token — @csrf wymagane
+      <form method="POST" action="/posts">
+          @csrf   {{-- generuje <input type="hidden" name="_token" value="..."> --}}
+          <input type="text" name="title">
+          <button type="submit">Zapisz</button>
+      </form>
+
+      // PUT/PATCH/DELETE przez formularz HTML (przeglądarka nie obsługuje)
+      <form method="POST" action="/posts/{{ $post->id }}">
+          @csrf
+          @method('PUT')   {{-- generuje <input type="hidden" name="_method" value="PUT"> --}}
+          <input type="text" name="title" value="{{ $post->title }}">
+          <button>Zaktualizuj</button>
+      </form>
+
+      // Wykluczenie URL z CSRF (np. webhooks)
+      // app/Http/Middleware/VerifyCsrfToken.php
+      protected $except = [
+          'stripe/*',
+          'webhooks/*',
+          'api/public/*',
+      ];
+
+      // AJAX z CSRF — nagłówek X-CSRF-TOKEN
+      // W HTML: <meta name="csrf-token" content="{{ csrf_token() }}">
+      // W JS:
+      // const token = document.querySelector('meta[name="csrf-token"]').content;
+      // fetch('/api/endpoint', {
+      //     method: 'POST',
+      //     headers: { 'X-CSRF-TOKEN': token, 'Content-Type': 'application/json' },
+      //     body: JSON.stringify(data)
+      // });
+
+      // Axios (skonfigurowany przez Laravel Vite)
+      // axios.defaults.headers.common['X-CSRF-TOKEN'] = document.querySelector('meta[name="csrf-token"]').content;
+
+  - name: "Rate Limiting — throttle"
+    desc: >
+      Rate Limiting chroni API przed nadużyciami — ogranicza liczbę requestów per użytkownik/IP
+      w danym czasie. Laravel ma wbudowane throttle middleware i zaawansowane Rate Limiters
+      konfigurowane w RouteServiceProvider. Można różnicować limity dla zalogowanych i gości.
+    code: |
+      // Prosty throttle przez middleware
+      Route::middleware('throttle:60,1')->get('/api/data', fn() => 'ok');
+      // max 60 requestów na 1 minutę
+
+      // Konfiguracja Rate Limiters — app/Providers/RouteServiceProvider.php
+      use Illuminate\Cache\RateLimiting\Limit;
+      use Illuminate\Support\Facades\RateLimiter;
+
+      public function boot(): void
+      {
+          // Limiter dla API
+          RateLimiter::for('api', function (Request $request) {
+              return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+          });
+
+          // Różne limity dla zalogowanych i gości
+          RateLimiter::for('uploads', function (Request $request) {
+              return $request->user()
+                  ? Limit::perDay(100)->by($request->user()->id)
+                  : Limit::perDay(10)->by($request->ip());
+          });
+
+          // Limit per endpoint z kluczem
+          RateLimiter::for('login', function (Request $request) {
+              return [
+                  Limit::perMinute(5)->by($request->input('email')),
+                  Limit::perMinute(10)->by($request->ip()),
+              ];
+          });
+      }
+
+      // Użycie skonfigurowanego limitera
+      Route::middleware('throttle:api')->group(function () {
+          Route::apiResource('posts', PostController::class);
+      });
+
+      Route::middleware('throttle:uploads')->post('/upload', [UploadController::class, 'store']);
+      Route::middleware('throttle:login')->post('/login', [AuthController::class, 'login']);
+
+  - name: "Laravel Passport — OAuth2 Server"
+    desc: >
+      Laravel Passport implementuje pełny serwer OAuth2 — Authorization Code Grant,
+      Client Credentials, Personal Access Tokens, Implicit Grant. Bardziej rozbudowany
+      niż Sanctum — dla aplikacji wymagających OAuth2 (third-party apps, enterprise).
+      Sanctum jest prostszy i wystarczający dla SPA i własnych mobilnych aplikacji.
+    code: |
+      // Instalacja Passport
+      // composer require laravel/passport
+      // php artisan migrate
+      // php artisan passport:install   — generuje klucze szyfrowania
+      // php artisan passport:keys      — jeśli klucze trzeba zregenerować
+
+      // app/Models/User.php — dodaj trait
+      use Laravel\Passport\HasApiTokens;
+
+      class User extends Authenticatable
+      {
+          use HasApiTokens, HasFactory, Notifiable;
+      }
+
+      // config/auth.php — ustaw driver
+      'guards' => [
+          'api' => [
+              'driver'   => 'passport',
+              'provider' => 'users',
+          ],
+      ],
+
+      // app/Providers/AuthServiceProvider.php
+      use Laravel\Passport\Passport;
+
+      public function boot(): void
+      {
+          // Konfiguracja expiry tokenów
+          Passport::tokensExpireIn(now()->addDays(15));
+          Passport::refreshTokensExpireIn(now()->addDays(30));
+          Passport::personalAccessTokensExpireIn(now()->addMonths(6));
+
+          // Zakresy (Scopes)
+          Passport::tokensCan([
+              'read-posts'  => 'Read blog posts',
+              'write-posts' => 'Create and edit posts',
+              'admin'       => 'Full admin access',
+          ]);
+      }
+
+      // Trasy Passport (dodawane automatycznie przez Passport::routes())
+      // POST /oauth/token          — uzyskaj token (Client Credentials / Password)
+      // POST /oauth/token/refresh  — odśwież token
+      // GET  /oauth/authorize      — authorization code flow
+      // POST /oauth/authorize      — zatwierdź authorization
+
+      // Ochrona tras przez Passport
+      Route::middleware('auth:api')->get('/user', fn($request) => $request->user());
+
+      // Zakresy w middleware
+      Route::middleware(['auth:api', 'scope:read-posts'])->get('/posts', fn() => Post::all());

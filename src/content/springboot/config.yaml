@@ -1,0 +1,261 @@
+title: "Spring Boot — Konfiguracja & Actuator"
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Spring Boot oferuje wielowarstwową konfigurację — od prostych @Value po
+  typowane @ConfigurationProperties. Spring Actuator dostarcza endpointy produkcyjne
+  do monitorowania zdrowia i metryk. Micrometer integruje z Prometheus, Grafana i innymi.
+
+items:
+  - name: "@Value — wstrzykiwanie właściwości"
+    desc: >
+      Najprostszy sposób wstrzykiwania pojedynczych wartości z application.properties lub
+      zmiennych środowiskowych. Obsługuje wartości domyślne po dwukropku.
+      Działa z String, int, boolean, Duration, List i innymi typami.
+    code: |
+      @Service
+      public class EmailService {
+
+          @Value("${email.sender:noreply@example.com}")
+          private String sender;
+
+          @Value("${email.smtp.host}")
+          private String smtpHost;
+
+          @Value("${email.smtp.port:587}")
+          private int port;
+
+          @Value("${email.enabled:true}")
+          private boolean enabled;
+
+          @Value("${email.allowed-domains}")
+          private List<String> allowedDomains;
+
+          // W application.properties:
+          // email.sender=contact@myapp.com
+          // email.smtp.host=smtp.sendgrid.net
+          // email.allowed-domains=gmail.com,yahoo.com
+      }
+
+  - name: "@ConfigurationProperties — typowana konfiguracja"
+    desc: >
+      Zalecane podejście dla grup właściwości. Mapuje prefiks z properties na POJO —
+      walidacja, autouzupełnianie w IDE, refaktoring. Dodaj spring-boot-configuration-processor
+      do annotationProcessors dla generowania metadata w IDE.
+    code: |
+      @Configuration
+      @ConfigurationProperties(prefix = "app.jwt")
+      @Validated
+      public class JwtProperties {
+
+          @NotBlank
+          private String secret;
+
+          @Min(3600000)
+          private long expiration = 86400000L;
+
+          private String issuer = "myapp";
+
+          // gettery i settery
+      }
+
+      // application.properties:
+      // app.jwt.secret=my-super-secret-key-256-bits-long
+      // app.jwt.expiration=86400000
+      // app.jwt.issuer=myapp
+
+      // Użycie
+      @Service
+      public class JwtService {
+          @Autowired
+          private JwtProperties jwtProperties;
+          // jwtProperties.getSecret(), jwtProperties.getExpiration()
+      }
+
+  - name: "Spring Actuator — endpointy produkcyjne"
+    desc: >
+      spring-boot-starter-actuator dodaje endpointy zarządzające aplikacją.
+      Domyślnie dostępny jest tylko /actuator/health. Pozostałe trzeba jawnie
+      włączyć w konfiguracji. Zabezpiecz actuator rolami w produkcji.
+    code: |
+      # application.properties — włączenie endpointów
+      management.endpoints.web.exposure.include=health,info,metrics,env,beans,mappings
+      management.endpoint.health.show-details=always
+      management.endpoint.metrics.enabled=true
+      management.server.port=8081
+
+      # Zabezpieczenie actuatora (Spring Security)
+      management.endpoints.web.base-path=/actuator
+
+      # Kluczowe endpointy:
+      # GET /actuator/health     — stan zdrowia aplikacji
+      # GET /actuator/metrics    — lista dostępnych metryk
+      # GET /actuator/metrics/jvm.memory.used  — konkretna metryka
+      # GET /actuator/env        — zmienne środowiskowe i properties
+      # GET /actuator/beans      — wszystkie zarejestrowane beany
+      # GET /actuator/mappings   — wszystkie URL mappingi
+      # GET /actuator/info       — informacje o aplikacji
+      # POST /actuator/shutdown  — zatrzymanie aplikacji (wyłączone domyślnie)
+
+  - name: "@ConditionalOnProperty — warunkowe beany"
+    desc: >
+      Rejestruje bean tylko gdy właściwość ma określoną wartość lub jest obecna.
+      Przydatne do feature flags, opcjonalnych integracji, środowiskowej konfiguracji.
+      Rodzina @Conditional* jest szeroka — @ConditionalOnClass, @ConditionalOnBean itp.
+    code: |
+      @Configuration
+      public class FeatureConfig {
+
+          // Bean aktywny gdy feature.email-notifications=true
+          @Bean
+          @ConditionalOnProperty(name = "feature.email-notifications", havingValue = "true")
+          public EmailNotificationService emailNotificationService() {
+              return new EmailNotificationService();
+          }
+
+          // Bean aktywny gdy klasa Redis jest na classpath
+          @Bean
+          @ConditionalOnClass(name = "org.springframework.data.redis.core.RedisTemplate")
+          public CacheService redisCacheService() {
+              return new RedisCacheService();
+          }
+
+          // Fallback gdy brak Redis
+          @Bean
+          @ConditionalOnMissingBean(CacheService.class)
+          public CacheService inMemoryCacheService() {
+              return new InMemoryCacheService();
+          }
+      }
+
+  - name: "Spring Profiles — środowiska dev/prod"
+    desc: >
+      Profiles to mechanizm przełączania konfiguracji między środowiskami.
+      application-dev.properties nadpisuje application.properties gdy aktywny jest profil dev.
+      @Profile na beanach rejestruje je tylko dla wskazanych profili.
+    code: |
+      # application.properties — domyślne
+      spring.datasource.url=jdbc:h2:mem:testdb
+
+      # application-dev.properties
+      spring.datasource.url=jdbc:postgresql://localhost:5432/devdb
+      spring.jpa.show-sql=true
+      logging.level.org.springframework=DEBUG
+
+      # application-prod.properties
+      spring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/${DB_NAME}
+      spring.datasource.username=${DB_USER}
+      spring.datasource.password=${DB_PASS}
+      logging.level.root=WARN
+
+      # Aktywacja
+      # SPRING_PROFILES_ACTIVE=prod java -jar app.jar
+
+      # Bean tylko dla profilu prod
+      @Bean
+      @Profile("prod")
+      public HealthCheck prodHealthCheck() {
+          return new ExternalApiHealthCheck();
+      }
+
+  - name: "Flyway — migracje bazy danych"
+    desc: >
+      Flyway automatyzuje migracje schematu bazy danych. Pliki SQL w resources/db/migration
+      są wykonywane w kolejności (V1__init.sql, V2__add_users.sql). Spring Boot auto-konfiguruje
+      Flyway gdy jest na classpath i maven spring-boot-starter jest dodany.
+    code: |
+      # pom.xml
+      # <dependency>
+      #   <groupId>org.flywaydb</groupId>
+      #   <artifactId>flyway-core</artifactId>
+      # </dependency>
+
+      # application.properties
+      spring.flyway.enabled=true
+      spring.flyway.baseline-on-migrate=true
+      spring.flyway.locations=classpath:db/migration
+
+      # Struktura plików:
+      # src/main/resources/db/migration/
+      #   V1__create_users_table.sql
+      #   V2__add_email_index.sql
+      #   V3__add_orders_table.sql
+
+      # V1__create_users_table.sql
+      # CREATE TABLE users (
+      #   id BIGSERIAL PRIMARY KEY,
+      #   name VARCHAR(100) NOT NULL,
+      #   email VARCHAR(255) UNIQUE NOT NULL,
+      #   created_at TIMESTAMP DEFAULT NOW()
+      # );
+
+  - name: "Micrometer — metryki produkcyjne"
+    desc: >
+      Micrometer to fasada metryk dla Spring Boot — abstrahuje od konkretnego systemu
+      monitorowania (Prometheus, Datadog, CloudWatch). Spring Actuator używa Micrometer
+      wewnętrznie. Możesz definiować własne metryki — liczniki, histogramy, timery.
+    code: |
+      @RestController
+      public class OrderController {
+
+          private final Counter orderCreatedCounter;
+          private final Timer orderProcessingTimer;
+
+          public OrderController(MeterRegistry registry) {
+              this.orderCreatedCounter = Counter.builder("orders.created")
+                  .description("Liczba utworzonych zamówień")
+                  .tag("type", "api")
+                  .register(registry);
+
+              this.orderProcessingTimer = Timer.builder("orders.processing.time")
+                  .description("Czas przetwarzania zamówienia")
+                  .register(registry);
+          }
+
+          @PostMapping("/orders")
+          public Order createOrder(@RequestBody OrderRequest req) {
+              return orderProcessingTimer.record(() -> {
+                  Order order = orderService.create(req);
+                  orderCreatedCounter.increment();
+                  return order;
+              });
+          }
+      }
+
+      # Prometheus — application.properties
+      # management.endpoints.web.exposure.include=health,metrics,prometheus
+      # management.metrics.export.prometheus.enabled=true
+
+  - name: "Konfiguracja logowania"
+    desc: >
+      Spring Boot używa Logback domyślnie przez SLF4J. Konfiguracja poziomu logowania
+      w application.properties. Dla zaawansowanej konfiguracji — logback-spring.xml
+      w resources/. Logback-spring.xml obsługuje Spring profiles.
+    code: |
+      # application.properties
+      logging.level.root=INFO
+      logging.level.com.example=DEBUG
+      logging.level.org.springframework.security=DEBUG
+      logging.level.org.hibernate.SQL=DEBUG
+      logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
+
+      logging.pattern.console=%d{HH:mm:ss} %-5level %logger{36} - %msg%n
+      logging.file.name=logs/app.log
+      logging.file.max-size=10MB
+      logging.file.max-history=30
+
+      # Użycie w kodzie
+      @Slf4j  // Lombok
+      @Service
+      public class UserService {
+          public User findById(Long id) {
+              log.debug("Finding user by id: {}", id);
+              User user = userRepository.findById(id)
+                  .orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
+              log.info("Found user: {}", user.getEmail());
+              return user;
+          }
+      }

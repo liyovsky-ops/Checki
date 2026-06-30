@@ -1,0 +1,98 @@
+title: Ekosystem Laravel
+
+items:
+  - name: Inertia.js
+    icon: "🔗"
+    desc: >
+      Inertia.js to "modern monolith" — łączy Laravel routing/controllers z Vue/React/Svelte
+      na frontendzie bez budowania REST API. Kontroler zwraca Inertia::render() zamiast view(),
+      Inertia przekazuje props do komponentu JS. Routing po stronie serwera, reaktywny frontend.
+      Instalacja: composer require inertiajs/inertia-laravel + npm install @inertiajs/vue3
+
+  - name: Laravel Livewire
+    icon: "⚡"
+    desc: >
+      Livewire dodaje reaktywność jak React/Vue bez pisania JavaScript — piszesz PHP, Livewire
+      synchronizuje przez AJAX. Idealne dla formularzy, filtrów, paginacji real-time, modali.
+      wire:model binduje input do PHP property, wire:click wywołuje metodę PHP.
+      Instalacja: composer require livewire/livewire + php artisan livewire:publish
+
+  - name: Laravel Sanctum
+    icon: "🔐"
+    desc: >
+      Lekka autentykacja API i SPA — tokeny osobiste i cookie-based sesja dla SPA.
+      Idealne dla mobilnych aplikacji (tokeny Bearer) i SPA na tym samym domenie (cookie).
+      Prostszy i bezpieczniejszy niż Passport dla większości projektów.
+      Instalacja: composer require laravel/sanctum + php artisan install:api
+
+  - name: Laravel Horizon
+    icon: "🔭"
+    desc: >
+      Dashboard i konfigurator dla Redis Queue — monitoring jobs, failed queues, throughput,
+      retry, supervisor konfiguracja przez kod PHP. Piękny UI w przeglądarce.
+      Wymaga Redis jako brokera kolejki. Produkcyjny must-have dla aplikacji z queues.
+      Instalacja: composer require laravel/horizon + php artisan horizon:install
+
+  - name: Laravel Echo
+    icon: "📡"
+    desc: >
+      Echo to klient JavaScript do WebSocket broadcasting — nasłuchuje na kanałach i zdarzeniach.
+      Działa z Pusher, Ably lub Laravel Reverb (własny WebSocket server).
+      Idealne dla real-time notyfikacji, czatów, live updateów dashboardu.
+      Instalacja: npm install laravel-echo pusher-js + composer require pusher/pusher-php-server
+
+  - name: Laravel Scout
+    icon: "🔍"
+    desc: >
+      Full-text search przez prosty trait HasSearch — driver-based (Algolia, Meilisearch,
+      Typesense, Database). Model::search('query')->get() zastępuje skomplikowane SQL LIKE.
+      Indeksowanie automatyczne gdy model się zapisuje lub usuwa.
+      Instalacja: composer require laravel/scout + wybierz driver
+
+  - name: "Spatie — Laravel Permission"
+    icon: "🛡️"
+    desc: >
+      Najchętniej pobierany pakiet PHP na Packagist — role i uprawnienia dla Laravela.
+      Role (admin, editor, user) i Permissions (edit-posts, delete-users) do modeli.
+      Middleware wbudowane, Blade dyrektywy @role/@hasPermission, API sprawdzeń.
+      Instalacja: composer require spatie/laravel-permission + php artisan vendor:publish --provider
+
+  - name: "Spatie — Media Library"
+    icon: "🖼️"
+    desc: >
+      Zarządzanie plikami i obrazami powiązanymi z modelami — upload, konwersje (resize, crop,
+      watermark), responsive images, S3/Google Cloud. Jeden model może mieć wiele kolekcji mediów.
+      addMedia(), getFirstMediaUrl(), conversions definiowane w modelu.
+      Instalacja: composer require spatie/laravel-medialibrary + php artisan vendor:publish
+
+  - name: Laravel Telescope
+    icon: "🔭"
+    desc: >
+      Debug assistant dla Laravela — monitoruje requesty, queries, jobs, mail, notifications,
+      cache, exceptions, gates, logs. Piękny dashboard w przeglądarce.
+      Tylko dla development i staging — na produkcji możliwe ale z ostrożnością (dane prywatne).
+      Instalacja: composer require laravel/telescope --dev + php artisan telescope:install
+
+  - name: Filament
+    icon: "🎨"
+    desc: >
+      Admin panel builder dla Laravela — alternatywa dla Nova (płatny). Resources, Forms,
+      Tables, Widgets — deklaratywny API w PHP. Piękny Tailwind UI out-of-the-box.
+      Multi-tenancy, custom actions, bulk actions, import/export. Rosnąca popularność.
+      Instalacja: composer require filament/filament + php artisan filament:install --panels
+
+  - name: Laravel Jetstream
+    icon: "🚀"
+    desc: >
+      Starter kit — pełna autentykacja z UI (login, register, 2FA, team management, API tokens).
+      Wybierasz Livewire lub Inertia.js jako stack. Tailwind CSS wbudowany.
+      Eliminuje tygodnie boilerplate auth na starcie projektu. Alternatywa dla Breeze (prostszy).
+      Instalacja: composer require laravel/jetstream + php artisan jetstream:install livewire
+
+  - name: "Spatie — Laravel Query Builder"
+    icon: "🔎"
+    desc: >
+      Bezpieczne filtrowanie, sortowanie i wyszukiwanie przez URL query parameters — bez
+      ręcznego parsowania requestu. allowedFilters(), allowedSorts(), allowedIncludes()
+      definiują co klient może robić. Idealne dla REST API.
+      Instalacja: composer require spatie/laravel-query-builder

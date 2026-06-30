@@ -1,0 +1,335 @@
+title: Sequelize — Asocjacje i relacje
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Asocjacje w Sequelize definiują relacje między modelami — 1:1, 1:N, N:M.
+  Każda relacja wymaga wywołania metody asocjacji na obu stronach (np. hasMany
+  i belongsTo razem). Sequelize automatycznie tworzy klucze obce, metody pomocnicze
+  (getUser, setUser, addPost) i pozwala na eager loading przez opcję include.
+  Asocjacje definiuje się po załadowaniu wszystkich modeli, typowo w pliku
+  inicjalizacyjnym lub associations.js.
+
+items:
+  - name: hasOne / belongsTo — relacja 1:1
+    desc: >
+      hasOne mówi że jeden rekord modelu A posiada jeden rekord modelu B.
+      belongsTo mówi że B należy do A. Klucz obcy jest tworzony w tabeli modelu
+      który wywołuje belongsTo. Oba wywołania razem tworzą kompletną relację 1:1
+      z metodami pomocniczymi po obu stronach.
+    code: |
+      // User ma jeden profil (klucz obcy userId w tabeli Profile)
+      User.hasOne(Profile, {
+        foreignKey: 'userId',   // nazwa klucza obcego w Profile
+        as: 'profile',          // alias do eager loading
+        onDelete: 'CASCADE',    // usuń profil gdy użytkownik usunięty
+        onUpdate: 'CASCADE',
+      });
+
+      Profile.belongsTo(User, {
+        foreignKey: 'userId',
+        as: 'user',
+      });
+
+      // Sequelize generuje metody:
+      // user.getProfile()       — pobierz profil
+      // user.setProfile(p)      — ustaw profil
+      // user.createProfile({})  — utwórz i powiąż
+      // profile.getUser()
+      // profile.setUser(u)
+
+      // Użycie
+      const user = await User.findByPk(1, {
+        include: [{ model: Profile, as: 'profile' }],
+      });
+      console.log(user.profile.bio);
+
+  - name: hasMany / belongsTo — relacja 1:N
+    desc: >
+      hasMany mówi że jeden rekord A może mieć wiele rekordów B. belongsTo
+      po stronie B wskazuje właściciela. Klucz obcy jest zawsze w tabeli B
+      (strona "many"). Sequelize tworzy metody addPost, removePost, getPosts,
+      createPost po stronie hasMany.
+    code: |
+      // User ma wiele postów, Post należy do User
+      User.hasMany(Post, {
+        foreignKey: 'authorId',
+        as: 'posts',
+        onDelete: 'CASCADE',
+      });
+
+      Post.belongsTo(User, {
+        foreignKey: 'authorId',
+        as: 'author',
+      });
+
+      // Sequelize generuje metody:
+      // user.getPosts()             — pobierz posty
+      // user.createPost({})         — utwórz post powiązany z userem
+      // user.addPost(post)          — dodaj istniejący post
+      // user.addPosts([p1, p2])     — dodaj wiele
+      // user.removePost(post)       — usuń powiązanie
+      // user.countPosts()           — policz
+
+      // Eager loading
+      const userWithPosts = await User.findByPk(1, {
+        include: [{ model: Post, as: 'posts' }],
+      });
+
+      // Tworzenie powiązanego
+      const user = await User.findByPk(1);
+      await user.createPost({ title: 'Nowy post', content: 'Treść...' });
+
+  - name: belongsToMany — relacja N:M
+    desc: >
+      belongsToMany tworzy relację wiele-do-wielu przez tabelę pośrednią (junction).
+      Musisz zdefiniować przez: opcję wskazującą model lub nazwę tabeli pośredniej.
+      Sequelize automatycznie obsługuje tabelę junction i tworzy metody addTag,
+      setTags, getTags, createTag.
+    code: |
+      // Post ma wiele tagów, Tag ma wiele postów — przez PostTag
+      Post.belongsToMany(Tag, {
+        through: 'PostTag',         // nazwa tabeli junction (tworzona automatycznie)
+        foreignKey: 'postId',
+        otherKey: 'tagId',
+        as: 'tags',
+      });
+
+      Tag.belongsToMany(Post, {
+        through: 'PostTag',
+        foreignKey: 'tagId',
+        otherKey: 'postId',
+        as: 'posts',
+      });
+
+      // Lub z modelem pośrednim (gdy chcesz dodatkowe pola w junction)
+      const PostTag = sequelize.define('PostTag', {
+        addedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+        order: DataTypes.INTEGER,
+      });
+
+      Post.belongsToMany(Tag, { through: PostTag, foreignKey: 'postId', as: 'tags' });
+      Tag.belongsToMany(Post, { through: PostTag, foreignKey: 'tagId', as: 'posts' });
+
+      // Użycie
+      const post = await Post.findByPk(1);
+      const tags = await post.getTags();
+
+      // Dodaj tagi
+      const tag = await Tag.findByPk(5);
+      await post.addTag(tag);
+      await post.setTags([tag1, tag2]); // zastąp wszystkie tagi
+
+  - name: foreignKey i targetKey
+    desc: >
+      foreignKey to nazwa klucza obcego w tabeli dziecka. Domyślnie Sequelize
+      tworzy klucz jako modelNameId (np. userId). targetKey to klucz w tabeli
+      rodzica do którego odwołuje się klucz obcy — domyślnie primaryKey (id).
+      sourceKey to klucz w tabeli źródłowej dla hasMany.
+    code: |
+      // Domyślne zachowanie — Sequelize tworzy foreignKey 'userId'
+      User.hasMany(Post);                          // foreignKey: 'userId'
+      Post.belongsTo(User);                        // foreignKey: 'userId'
+
+      // Własna nazwa foreignKey
+      User.hasMany(Post, { foreignKey: 'authorId' });
+      Post.belongsTo(User, { foreignKey: 'authorId' });
+
+      // targetKey — odwołanie do niestandarowego klucza rodzica
+      User.hasMany(Post, {
+        foreignKey: 'userEmail',    // klucz obcy w Post
+        sourceKey: 'email',         // klucz w User (nie id)
+      });
+
+      Post.belongsTo(User, {
+        foreignKey: 'userEmail',
+        targetKey: 'email',         // to samo z perspektywy Post
+      });
+
+      // Pełne opcje foreignKey (jako obiekt)
+      User.hasMany(Post, {
+        foreignKey: {
+          name: 'authorId',
+          allowNull: false,
+          defaultValue: null,
+        },
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE',
+      });
+
+  - name: Eager loading — include
+    desc: >
+      Eager loading ładuje powiązane dane w jednym query (JOIN) zamiast
+      wykonywać osobne zapytania (N+1 problem). Używasz opcji include
+      w findAll/findOne/findByPk. Możesz filtrować, sortować i ograniczać
+      załadowane dane przez where, order, limit w include.
+    code: |
+      const { Op } = require('sequelize');
+
+      // Podstawowe include
+      const users = await User.findAll({
+        include: [
+          { model: Profile, as: 'profile' },
+          { model: Post, as: 'posts' },
+        ],
+      });
+
+      // Include z warunkiem na powiązane
+      const authors = await User.findAll({
+        include: [{
+          model: Post,
+          as: 'posts',
+          where: { isPublished: true },    // tylko opublikowane posty
+          required: true,                  // INNER JOIN (tylko userzy z postami)
+          // required: false               // LEFT JOIN (wszyscy userzy)
+        }],
+      });
+
+      // Include z ograniczeniem atrybutów
+      const users2 = await User.findAll({
+        include: [{
+          model: Post,
+          as: 'posts',
+          attributes: ['id', 'title', 'createdAt'],  // tylko te pola
+        }],
+        attributes: ['id', 'username'],   // pola głównego modelu
+      });
+
+      // Include z sortowaniem i limitem
+      const user = await User.findByPk(1, {
+        include: [{
+          model: Post,
+          as: 'posts',
+          limit: 5,
+          order: [['createdAt', 'DESC']],
+        }],
+      });
+
+  - name: Zagnieżdżone include (nested)
+    desc: >
+      Include można zagnieżdżać wielopoziomowo — np. User → Posts → Comments → Author.
+      Każdy poziom może mieć własne where, attributes, order. Zbyt głębokie
+      zagnieżdżanie wpływa na wydajność — rozważ osobne queries dla złożonych relacji.
+    code: |
+      // User → Posts → Comments → Author (3 poziomy)
+      const users = await User.findAll({
+        include: [{
+          model: Post,
+          as: 'posts',
+          include: [{
+            model: Comment,
+            as: 'comments',
+            include: [{
+              model: User,
+              as: 'author',
+              attributes: ['id', 'username'],
+            }],
+          }],
+        }],
+      });
+
+      // Dostęp do zagnieżdżonych danych
+      for (const user of users) {
+        for (const post of user.posts) {
+          for (const comment of post.comments) {
+            console.log(`${comment.author.username}: ${comment.text}`);
+          }
+        }
+      }
+
+      // Include z tagami (N:M) zagnieżdżone
+      const posts = await Post.findAll({
+        include: [
+          { model: User, as: 'author', attributes: ['username'] },
+          { model: Tag, as: 'tags', through: { attributes: [] } }, // pomiń pola junction
+        ],
+      });
+
+  - name: Alias as — aliasy asocjacji
+    desc: >
+      Opcja as definiuje alias asocjacji — używany w eager loading (include) i
+      metodach pomocniczych. Alias jest szczególnie ważny gdy masz wiele relacji
+      do tego samego modelu (np. User jako author i User jako reviewer).
+      Bez alias Sequelize używa nazwy modelu.
+    code: |
+      // Wiele relacji do tego samego modelu — wymagają aliasów
+      Article.belongsTo(User, { foreignKey: 'authorId', as: 'author' });
+      Article.belongsTo(User, { foreignKey: 'reviewerId', as: 'reviewer' });
+
+      // Eager loading używa aliasu
+      const article = await Article.findByPk(1, {
+        include: [
+          { model: User, as: 'author' },
+          { model: User, as: 'reviewer' },
+        ],
+      });
+
+      console.log(article.author.username);
+      console.log(article.reviewer.username);
+
+      // Metody pomocnicze używają aliasu (PascalCase)
+      await article.getAuthor();
+      await article.setAuthor(user);
+      await article.getReviewer();
+
+      // Self-referential (np. drzewo kategorii)
+      Category.hasMany(Category, { foreignKey: 'parentId', as: 'children' });
+      Category.belongsTo(Category, { foreignKey: 'parentId', as: 'parent' });
+
+      const category = await Category.findByPk(1, {
+        include: [{ model: Category, as: 'children' }],
+      });
+
+  - name: Scope na asocjacjach
+    desc: >
+      Scope pozwala dodać domyślne warunki do asocjacji. Definiujesz scope
+      w opcji scope przy definiowaniu asocjacji lub przez addScope() na modelu.
+      Scope asocjacyjny dodaje warunki WHERE do każdego zapytania przez tę asocjację —
+      przydatne np. do filtrowania po typie (polymorphism).
+    code: |
+      // Scope na asocjacji — tylko opublikowane posty
+      User.hasMany(Post, {
+        foreignKey: 'authorId',
+        as: 'publishedPosts',
+        scope: {
+          isPublished: true,    // zawsze dodaje WHERE is_published = true
+        },
+      });
+
+      User.hasMany(Post, {
+        foreignKey: 'authorId',
+        as: 'draftPosts',
+        scope: {
+          isPublished: false,
+        },
+      });
+
+      // Użycie — automatycznie filtruje
+      const user = await User.findByPk(1, {
+        include: [
+          { model: Post, as: 'publishedPosts' },  // WHERE is_published = true
+          { model: Post, as: 'draftPosts' },      // WHERE is_published = false
+        ],
+      });
+
+      // Scope modelu (defaultScope i named scopes)
+      const Comment = sequelize.define('Comment', {
+        text: DataTypes.TEXT,
+        isApproved: DataTypes.BOOLEAN,
+      }, {
+        defaultScope: {
+          where: { isApproved: true },   // domyślnie tylko zatwierdzone
+        },
+        scopes: {
+          pending: { where: { isApproved: false } },
+          recent: { order: [['createdAt', 'DESC']], limit: 10 },
+        },
+      });
+
+      // Użycie scope
+      await Comment.findAll();                   // domyślnie isApproved: true
+      await Comment.scope('pending').findAll();  // isApproved: false
+      await Comment.scope('recent').findAll();
+      await Comment.unscoped().findAll();        // bez defaultScope

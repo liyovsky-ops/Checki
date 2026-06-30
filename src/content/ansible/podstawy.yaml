@@ -1,0 +1,392 @@
+title: Ansible — Podstawy
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Ansible to narzędzie do automatyzacji IT działające bez agentów — łączy się z serwerami
+  przez SSH i wykonuje zadania opisane w playbookach YAML. Architektura push-based
+  oznacza że kontroler (Twój komputer lub CI) wysyła zadania bezpośrednio do zdalnych hostów.
+  Idempotentność gwarantuje że wielokrotne uruchomienie playbooka daje ten sam wynik —
+  Ansible sprawdza aktualny stan przed każdą zmianą. Brak agentów oznacza mniejszy
+  overhead operacyjny i bezpieczeństwo — jedyne wymaganie to Python i SSH na serwerze.
+
+items:
+  - name: Architektura agentless
+    desc: >
+      Ansible działa w modelu push przez SSH — nie wymaga instalacji agenta na serwerach.
+      Kontroler (lokalna maszyna lub CI/CD) łączy się przez SSH do managed nodes i wykonuje
+      moduły Pythonowe zdalnie. Wymagania na serwerze to tylko Python 3.x i dostęp SSH.
+    code: |
+      # Architektura Ansible
+      # Control Node (Twój komputer / CI)
+      #   → SSH → Managed Nodes (serwery produkcyjne)
+
+      # Wymagania Control Node:
+      #   - Python 3.8+
+      #   - Ansible (pip install ansible)
+
+      # Wymagania Managed Nodes:
+      #   - Python 3.x (ansible.builtin.raw nie potrzebuje Pythona)
+      #   - Dostęp SSH (klucz lub hasło)
+      #   - sudo (dla zadań z become: true)
+
+      # Sprawdź połączenie
+      ansible all -i "192.168.1.10," -m ping -u ubuntu --private-key=~/.ssh/id_rsa
+
+      # Domyślna ścieżka konfiguracji
+      # /etc/ansible/ansible.cfg      <- globalna
+      # ~/.ansible.cfg                <- użytkownika
+      # ./ansible.cfg                 <- projekt (najwyższy priorytet)
+
+  - name: ansible.cfg — konfiguracja
+    desc: >
+      Plik ansible.cfg konfiguruje domyślne zachowanie Ansible — ścieżki inventory,
+      użytkownika SSH, timeout, poziom równoległości (forks), ścieżki ról.
+      Priorytet szukania pliku: zmienna środowiskowa ANSIBLE_CONFIG > ./ansible.cfg > ~/.ansible.cfg > /etc/ansible/ansible.cfg.
+    code: |
+      # ansible.cfg — podstawowa konfiguracja projektu
+      [defaults]
+      inventory      = ./inventory
+      remote_user    = ubuntu
+      private_key_file = ~/.ssh/id_rsa
+      host_key_checking = False
+      forks          = 10
+      timeout        = 30
+      retry_files_enabled = False
+      roles_path     = ./roles:~/.ansible/roles
+
+      # Callback plugin — ładniejszy output
+      stdout_callback = yaml
+      # lub: ansible, debug, minimal, dense, json
+
+      [privilege_escalation]
+      become         = True
+      become_method  = sudo
+      become_user    = root
+      become_ask_pass = False
+
+      [ssh_connection]
+      ssh_args       = -o ControlMaster=auto -o ControlPersist=60s
+      pipelining     = True
+
+  - name: Ad-hoc commands (ansible -m)
+    desc: >
+      Komendy ad-hoc pozwalają uruchamiać pojedyncze moduły Ansible bez playbooka.
+      Przydatne do szybkiego sprawdzenia stanu serwerów, jednorazowych zadań
+      i testowania modułów przed umieszczeniem w playbooku.
+    code: |
+      # Składnia: ansible <pattern> -m <modul> -a "<argumenty>" [opcje]
+
+      # Ping wszystkich hostów
+      ansible all -m ping
+
+      # Uruchom komendę bash (jednorazowa, nie idempotentna)
+      ansible webservers -m command -a "uptime"
+
+      # Sprawdź wolne miejsce
+      ansible all -m command -a "df -h"
+
+      # Zainstaluj pakiet (idempotentne)
+      ansible webservers -m ansible.builtin.package -a "name=nginx state=present" -b
+
+      # Kopiuj plik
+      ansible all -m copy -a "src=./config.conf dest=/etc/myapp/config.conf" -b
+
+      # Uruchom serwis
+      ansible webservers -m service -a "name=nginx state=restarted" -b
+
+      # Zbierz fakty o hoście
+      ansible web1 -m setup
+
+      # Filtruj fakty
+      ansible web1 -m setup -a "filter=ansible_distribution*"
+
+  - name: Moduł package — instalacja pakietów
+    desc: >
+      ansible.builtin.package to abstrakcja ponad menedżerami pakietów — automatycznie
+      wykrywa apt, yum, dnf, zypper zależnie od dystrybucji. Dla specyficznych funkcji
+      (np. install_recommends w apt) użyj ansible.builtin.apt lub ansible.builtin.yum.
+    code: |
+      # Instalacja pakietu (agnostyczne co do dystrybucji)
+      - name: Install nginx
+        ansible.builtin.package:
+          name: nginx
+          state: present   # present / absent / latest
+
+      # Instalacja wielu pakietów
+      - name: Install web stack
+        ansible.builtin.package:
+          name:
+            - nginx
+            - python3
+            - python3-pip
+            - git
+          state: present
+
+      # Konkretny menedżer — apt z extra opcjami
+      - name: Install nginx (Debian/Ubuntu)
+        ansible.builtin.apt:
+          name: nginx
+          state: present
+          update_cache: true    # apt-get update
+          cache_valid_time: 3600
+
+      # yum — RedHat/CentOS/Fedora
+      - name: Install nginx (RHEL)
+        ansible.builtin.yum:
+          name: nginx
+          state: present
+          enablerepo: epel
+
+  - name: Moduł service — zarządzanie serwisami
+    desc: >
+      ansible.builtin.service zarządza serwisami systemd, init.d, launchd.
+      Pozwala uruchomić, zatrzymać, zrestartować serwis i włączyć autostart.
+      Używaj razem z notify/handlers — restart serwisu tylko gdy konfiguracja się zmieniła.
+    code: |
+      # Uruchom i włącz autostart
+      - name: Start and enable nginx
+        ansible.builtin.service:
+          name: nginx
+          state: started    # started / stopped / restarted / reloaded
+          enabled: true     # autostart przy bootowaniu
+
+      # Restart serwisu
+      - name: Restart nginx
+        ansible.builtin.service:
+          name: nginx
+          state: restarted
+
+      # Reload konfiguracji (bez przerwy)
+      - name: Reload nginx config
+        ansible.builtin.service:
+          name: nginx
+          state: reloaded
+
+      # Użycie jako handler (restart tylko gdy potrzebny)
+      tasks:
+        - name: Copy nginx config
+          ansible.builtin.template:
+            src: nginx.conf.j2
+            dest: /etc/nginx/nginx.conf
+          notify: Restart nginx
+
+      handlers:
+        - name: Restart nginx
+          ansible.builtin.service:
+            name: nginx
+            state: restarted
+
+  - name: Moduły copy, file, template
+    desc: >
+      Trzy podstawowe moduły do zarządzania plikami. copy kopiuje pliki bez zmian,
+      template przetwarza Jinja2, file zarządza atrybutami i tworzy katalogi.
+      Zawsze ustawiaj owner, group, mode dla bezpieczeństwa.
+    code: |
+      # copy — kopiuj plik lokalny na serwer
+      - name: Copy application config
+        ansible.builtin.copy:
+          src: files/app.conf         # lokalna ścieżka
+          dest: /etc/myapp/app.conf   # zdalna ścieżka
+          owner: root
+          group: root
+          mode: '0644'
+          backup: true               # zrób backup przed nadpisaniem
+
+      # copy — treść inline (bez pliku lokalnego)
+      - name: Create motd
+        ansible.builtin.copy:
+          content: "Managed by Ansible\n"
+          dest: /etc/motd
+          owner: root
+          mode: '0644'
+
+      # file — utwórz katalog
+      - name: Create app directory
+        ansible.builtin.file:
+          path: /opt/myapp
+          state: directory           # directory / file / absent / link / touch
+          owner: appuser
+          group: appuser
+          mode: '0755'
+
+      # template — kopiuj z Jinja2 (zmienne)
+      - name: Deploy nginx config
+        ansible.builtin.template:
+          src: templates/nginx.conf.j2
+          dest: /etc/nginx/nginx.conf
+          owner: root
+          mode: '0644'
+          validate: /usr/sbin/nginx -t -c %s  # waliduj przed wdrożeniem
+
+  - name: Idempotentność
+    desc: >
+      Idempotentność to kluczowa zasada Ansible — uruchomienie playbooka wielokrotnie
+      daje ten sam wynik co uruchomienie raz. Ansible sprawdza aktualny stan przed
+      każdą zmianą i pomija zadanie jeśli pożądany stan jest już osiągnięty.
+      Zmienione = żółte (changed), bez zmian = zielone (ok).
+    code: |
+      # Idempotentne — sprawdza czy pakiet już jest
+      - name: Install nginx
+        ansible.builtin.package:
+          name: nginx
+          state: present
+      # Pierwsze uruchomienie: changed (zainstalował)
+      # Kolejne uruchomienia: ok (już zainstalowany)
+
+      # NIE idempotentne — zawsze wykonuje
+      - name: Run script (bad)
+        ansible.builtin.command: /opt/setup.sh
+      # Zawsze: changed — command nie sprawdza stanu
+
+      # Idempotentne z creates/removes
+      - name: Run setup script (idempotent)
+        ansible.builtin.command:
+          cmd: /opt/setup.sh
+          creates: /opt/.setup_done  # pomiń jeśli plik istnieje
+
+      # Idempotentne z changed_when
+      - name: Compile app
+        ansible.builtin.command: make build
+        args:
+          chdir: /opt/myapp
+        register: result
+        changed_when: result.rc != 0  # changed tylko gdy błąd
+
+  - name: Check mode (--check) i diff
+    desc: >
+      Tryb check (dry-run) symuluje wykonanie playbooka bez wprowadzania żadnych zmian.
+      Opcja --diff pokazuje dokładnie co zostałoby zmienione w plikach. Razem tworzą
+      bezpieczny podgląd przed wdrożeniem — jak "terraform plan" dla konfiguracji serwerów.
+    code: |
+      # Dry-run — symulacja bez zmian
+      ansible-playbook site.yml --check
+
+      # Dry-run z pokazaniem diffów w plikach
+      ansible-playbook site.yml --check --diff
+
+      # Tylko diff (zastosuj zmiany ale pokaż diffs)
+      ansible-playbook site.yml --diff
+
+      # W zadaniu: wymuś check mode zawsze (bezpieczne zadania)
+      - name: Check disk space
+        ansible.builtin.command: df -h
+        check_mode: false   # uruchom nawet w --check mode
+
+      # Oznacz zadanie jako bezpieczne dla check mode
+      - name: Install nginx
+        ansible.builtin.package:
+          name: nginx
+          state: present
+        check_mode: true    # zawsze działa jako dry-run
+
+  - name: Verbosity (-v -vv -vvv)
+    desc: >
+      Poziomy verbose pozwalają debugować playbooki — od krótkiego outputu po pełne
+      API calls i parametry modułów. -v to minimum do debugowania, -vvv pokazuje
+      połączenia SSH, -vvvv dodaje transport level debug.
+    code: |
+      # -v   = output zadań (argumenty modułów)
+      ansible-playbook site.yml -v
+
+      # -vv  = output zadań + skrypty
+      ansible-playbook site.yml -vv
+
+      # -vvv = SSH verbosity + pełne połączenia
+      ansible-playbook site.yml -vvv
+
+      # -vvvv = transport level debug (bardzo dużo outputu)
+      ansible-playbook site.yml -vvvv
+
+      # Przydatne kombinacje:
+      # Sprawdź co się dzieje z SSH
+      ansible all -m ping -vvv
+
+      # Debug konkretnego playbooka
+      ansible-playbook deploy.yml --check -vv
+
+      # Pokaż wszystkie zmienne (gather_facts + inventory vars)
+      ansible all -m debug -a "var=hostvars[inventory_hostname]"
+
+  - name: gather_facts — zbieranie faktów
+    desc: >
+      Ansible automatycznie zbiera fakty o hostach przed wykonaniem zadań —
+      system operacyjny, adresy IP, CPU, pamięć, dyski, zmienne środowiskowe.
+      Fakty są dostępne jako zmienne w playbooku. Można je wyłączyć dla przyspieszenia.
+    code: |
+      # gather_facts: true jest domyślne
+      - name: Configure servers
+        hosts: all
+        gather_facts: true      # default
+        tasks:
+          - name: Show OS info
+            ansible.builtin.debug:
+              msg: "{{ ansible_distribution }} {{ ansible_distribution_version }}"
+
+          - name: Show IP address
+            ansible.builtin.debug:
+              msg: "IP: {{ ansible_default_ipv4.address }}"
+
+          - name: Install package (per OS)
+            ansible.builtin.package:
+              name: "{{ 'apache2' if ansible_os_family == 'Debian' else 'httpd' }}"
+              state: present
+
+      # Wyłącz gather_facts (szybsze uruchamianie)
+      - name: Quick tasks
+        hosts: all
+        gather_facts: false
+        tasks:
+          - name: Just run a script
+            ansible.builtin.command: /opt/quick_check.sh
+
+      # Zbierz fakty ręcznie
+      - name: Gather facts manually
+        ansible.builtin.setup:
+          filter: ansible_distribution*
+
+  - name: Moduły user i cron
+    desc: >
+      ansible.builtin.user zarządza użytkownikami systemowymi — tworzenie, usuwanie,
+      klucze SSH, grupy, hasła. ansible.builtin.cron zarządza zadaniami cron —
+      dodawanie, usuwanie, zmiana harmonogramu. Oba są idempotentne.
+    code: |
+      # Utwórz użytkownika
+      - name: Create deploy user
+        ansible.builtin.user:
+          name: deploy
+          state: present            # present / absent
+          groups: sudo,docker       # dodaj do grup
+          append: true              # dodaj do grup (nie zastępuj)
+          shell: /bin/bash
+          home: /home/deploy
+          create_home: true
+          system: false             # nie system user
+
+      # Dodaj klucz SSH do authorized_keys
+      - name: Add SSH key for deploy user
+        ansible.posix.authorized_key:
+          user: deploy
+          state: present
+          key: "{{ lookup('file', 'files/deploy_key.pub') }}"
+
+      # Utwórz zadanie cron
+      - name: Backup database every night
+        ansible.builtin.cron:
+          name: "DB backup"          # unikalna nazwa (do identyfikacji)
+          minute: "0"
+          hour: "2"
+          day: "*"
+          month: "*"
+          weekday: "*"
+          user: deploy
+          job: "/opt/backup/db_backup.sh >> /var/log/backup.log 2>&1"
+          state: present             # present / absent
+
+      # Usuń zadanie cron
+      - name: Remove old backup job
+        ansible.builtin.cron:
+          name: "Old backup"
+          state: absent

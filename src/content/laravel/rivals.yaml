@@ -1,0 +1,115 @@
+title: Laravel vs alternatywy PHP
+
+items:
+  - name: Symfony
+    icon: "♾️"
+    color: "#1a171b"
+    tagline: "Dojrzały PHP framework — komponenty, stabilność, enterprise"
+    pros:
+      - "Komponenty jako niezależne biblioteki — używane przez Laravel, Drupal, Magento, WordPress"
+      - "Najwyższy poziom dojrzałości w ekosystemie PHP — stabilne API przez wiele lat"
+      - "LTS (Long Term Support) — wsparcie przez 3 lata dla wersji enterprise"
+      - "Dependency Injection Container i Event Dispatcher — wzorcowa implementacja"
+      - "Flex (Symfony Flex) — automatyczna konfiguracja pakietów przez recipes"
+      - "Profiler wbudowany — debugowanie, SQL queries, logi w dev toolbarze"
+    cons:
+      - "Stroma krzywa uczenia — więcej konfiguracji, więcej konceptów niż Laravel"
+      - "Verbose boilerplate — więcej kodu niż Laravel dla tego samego efektu"
+      - "Brak wbudowanego ORM — trzeba skonfigurować Doctrine osobno"
+      - "Wolniejszy development MVP niż Laravel — mniej 'magic', więcej jawnej konfiguracji"
+      - "Mniejsza baza tutoriali i kursów niż Laravel"
+    vs: "Symfony dla projektów enterprise wymagających stabilnego API przez lata, systemów CMS/ERP,
+         dużych zespołów z rygorystycznym podejściem do architektuiy. Laravel gdy chcesz szybciej
+         dostarczyć produkt — mniej konfiguracji, więcej gotowych rozwiązań. Laravel używa komponentów
+         Symfony pod spodem (HTTP, Console, Finder, VarDumper) — to nie są rywale a komplementy."
+
+  - name: CodeIgniter
+    icon: "🔥"
+    color: "#dd4814"
+    tagline: "Lekki PHP framework — zero konfiguracji, minimalizm, szybki start"
+    pros:
+      - "Minimalna footprint — bardzo lekki, szybki cold start"
+      - "Prosta dokumentacja — łatwy do nauki dla początkujących"
+      - "Działa na każdym hostingu PHP — nawet shared hosting bez wymagań"
+      - "Brak wymagań Composera — można deployować bez narzędzi build"
+      - "Zero magii — przejrzysty przepływ kodu, łatwe debugowanie"
+    cons:
+      - "Brak wbudowanego ORM klasy Eloquent — Query Builder mniej ekspresywny"
+      - "Brak systemu migrations i seederów na poziomie Laravel"
+      - "Mały ekosystem pakietów w porównaniu do Laravela"
+      - "Brak nowoczesnych featur — brak queue, broadcasting, Artisan"
+      - "Wolny rozwój projektu — wieloletnie okresy bez major updates"
+      - "Brak CLI generatora kodu — więcej pisania ręcznie"
+    vs: "CodeIgniter dla prostych aplikacji webowych na tanim hostingu gdzie liczy się
+         minimalizm i brak zależności. Laravel gdy budujesz nowoczesną aplikację SaaS —
+         queue, events, broadcasting, Sanctum, Horizon. CodeIgniter jest dobry do
+         migracji ze starego kodu PHP do frameworka bez dużego narzutu."
+
+  - name: Slim Framework
+    icon: "⚡"
+    color: "#74a600"
+    tagline: "Mikro-framework PHP — PSR-7, middleware stack, minimum kodu"
+    pros:
+      - "Minimalistyczny — mały rozmiar, szybki w requestach"
+      - "PSR-7 HTTP Messages — standardowy interfejs HTTP, kompatybilny z każdym PSR-15 middleware"
+      - "PSR-15 Middleware — standardowy pipeline requestów"
+      - "Idealne dla mikrousług i prostych REST API"
+      - "Pełna kontrola architektury — nie narzuca wzorców"
+      - "Latwy do osadzenia w istniejącej aplikacji PHP"
+    cons:
+      - "Brak ORM, auth, queue, broadcasting, mail — wszystko musisz wybrać sam"
+      - "Brak CLI generatora — zero Artisan-like narzędzi"
+      - "Brak konwencji — każdy projekt wygląda inaczej"
+      - "Znacznie mniejsza społeczność niż Laravel"
+      - "Brak wbudowanej obsługi formularzy, walidacji, sesji"
+      - "Wymaga dobrej znajomości PHP i wzorców aby nie zbudować bałaganu"
+    vs: "Slim dla mikrousług, API gateway, proxy services, małych REST API gdzie Laravel
+         byłby overkill. Laravel gdy budujesz pełną aplikację — Slim wymaga sklejenia wielu
+         bibliotek na własną rękę. Slim jest dla doświadczonych developerów PHP którzy
+         wiedzą dokładnie czego potrzebują."
+
+  - name: CakePHP
+    icon: "🎂"
+    color: "#d33c44"
+    tagline: "Batteries-included PHP — konwencja nad konfigurację, szybki CRUD"
+    pros:
+      - "Convention over configuration — jak Rails dla PHP, mało konfiguracji"
+      - "Bake (generator kodu) — podobny do Artisan, generuje CRUD z jednej komendy"
+      - "Wbudowany ORM z association loading — podobny do Eloquent"
+      - "Security toolkit wbudowany — CSRF, XSS, SQL injection protection"
+      - "Długa historia — stabilny framework od 2005 roku"
+      - "Dobre wsparcie dla legacy kodu PHP 5 projektów"
+    cons:
+      - "Mniejsza popularność niż Laravel — mniej ofert pracy, mniej zasobów"
+      - "Mniej nowoczesny ekosystem — brak odpowiednika Livewire, Jetstream"
+      - "Wolniejszy rozwój niż Laravel — mniej frequent releases"
+      - "Brak odpowiednika Artisan CLI w bogactwie komend"
+      - "Mniejsza dokumentacja i społeczność w języku polskim i angielskim"
+    vs: "CakePHP gdy pracujesz z projektami zbudowanymi na CakePHP lub musisz integrować
+         się z istniejącym kodem. Laravel dla nowych projektów — większa społeczność,
+         więcej pakietów, bardziej nowoczesny ekosystem (Livewire, Inertia, Jetstream).
+         Oba są batteries-included PHP frameworks ale Laravel ma wyraźnie więcej momentum."
+
+  - name: Lumen
+    icon: "💨"
+    color: "#e74430"
+    tagline: "Mikro-Laravel — to samo DNA, połowa wagi, dwa razy szybszy"
+    pros:
+      - "Zbudowany na tym samym DNA co Laravel — te same klasy i API"
+      - "Znacznie szybszy niż Laravel — mniej bootowanych komponentów"
+      - "Idealne dla mikrousług i API endpoints wymagających wydajności"
+      - "Eloquent opcjonalnie — możesz włączyć te same relacje co w Laravel"
+      - "Sanctum i inne pakiety Laravel działają bez zmian"
+      - "Prosta migracja do pełnego Laravel gdy projekt rośnie"
+    cons:
+      - "Brak sesji, cookies, widoków Blade domyślnie (można włączyć)"
+      - "Oficjalnie w maintenance mode od Laravel 10 — Laravel poleca użycie pełnego Laravel"
+      - "Mniej aktywny development niż pełny framework"
+      - "Brak wielu wbudowanych featur które robi przez fasady"
+      - "Ograniczony middleware stack w domyślnej konfiguracji"
+      - "Coraz mniejsza baza zasobów edukacyjnych"
+    vs: "Lumen historycznie dla mikroserwisów PHP wymagających wysokiej throughput.
+         Dziś Laravel poleca używać pełnego Laravel nawet dla API — różnica wydajnościowa
+         jest mniejsza przy Octane (Swoole/RoadRunner). Lumen nadal ma sens dla prostych
+         API w architekturach z wieloma małymi serwisami gdzie każda millisekunda waży.
+         Nowe projekty lepiej zacząć od Laravela z Octane."

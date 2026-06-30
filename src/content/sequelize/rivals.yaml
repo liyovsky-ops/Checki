@@ -1,0 +1,83 @@
+title: Sequelize vs alternatywy ORM
+
+items:
+  - name: Prisma
+    icon: "◈"
+    color: "#5a67d8"
+    tagline: Schema-first type-safe ORM nowej generacji — Prisma Client, Studio, Accelerate
+    pros:
+      - Najlepsza type safety — auto-generowany Prisma Client z pełną IntelliSense
+      - Schema w osobnym pliku .prisma — czytelna, deklaratywna, łatwa do review
+      - Prisma Studio — GUI do bazy danych gotowe od razu po instalacji
+      - Excellent DX — świetna dokumentacja, aktywny rozwój, ogromna społeczność
+      - Prisma Migrate — dojrzałe migracje z historią, diffem i rollback
+    cons:
+      - Ciężki binary query engine — duży cold start, problemy na edge (Cloudflare Workers)
+      - Brak pełnej kontroli nad SQL — Prisma generuje SQL według własnej logiki
+      - Migracje są deklaratywne — mniej elastyczne niż sequelize-cli przy złożonych przypadkach
+      - Słabszy support dla zaawansowanych funkcji DB (ARRAY PostgreSQL, JSONB operators)
+    vs: "Prisma dla nowych projektów Next.js/NestJS/Remix gdzie DX i type safety są priorytetem. Sequelize dla projektów wymagających pełnej kontroli SQL, zaawansowanych typów PostgreSQL, lub gdy migrujesz starszą bazę kodu."
+
+  - name: TypeORM
+    icon: "🔷"
+    color: "#e83524"
+    tagline: "Decorator-based ORM — Active Record i Data Mapper, głęboka integracja z NestJS"
+    pros:
+      - Dekoratory TypeScript — czytelny, deklaratywny kod blisko domeny
+      - Obsługuje Active Record i Data Mapper — wybierasz styl architektoniczny
+      - Głęboka integracja z NestJS przez TypeOrmModule i wstrzykiwanie zależności
+      - Szeroki wybór baz danych — PostgreSQL, MySQL, SQLite, MongoDB, Oracle, MSSQL
+    cons:
+      - Znane bugi i niestabilność — community narzeka od wielu lat
+      - Słaba type safety — wiele metod zwraca any, brak ścisłej inferenci
+      - Powolny development — PR latami czekają w kolejce
+      - Migracje mniej elastyczne niż sequelize-cli — trudniejsze rollbacki
+    vs: "TypeORM dla istniejących projektów NestJS z dekoratorami. Sequelize dla nowych projektów — ma aktywniejszy development, lepsze wsparcie dla surowego SQL i bardziej przewidywalne zachowanie przy złożonych queries."
+
+  - name: Drizzle ORM
+    icon: "💧"
+    color: "#C5F74F"
+    tagline: "TypeScript-first, SQL-like API — schema w kodzie, lekki, edge-ready"
+    pros:
+      - Pełna type safety z inferecją — żadnych generowanych plików, typy z schematu
+      - SQL-like API — db.select().from(users).where() — bliskie prawdziwemu SQL
+      - Lekki i edge-ready — działa na Cloudflare Workers, Bun, Deno bez konfiguracji
+      - Zero dodatkowych procesów (brak query engine binary jak Prisma)
+    cons:
+      - Stosunkowo młody — mniejsza społeczność, mniej gotowych wzorców
+      - Brak wbudowanego GUI (Drizzle Studio jest, ale mniej dopracowane niż Prisma Studio)
+      - Relational queries API mniej intuicyjne niż Sequelize include
+      - Mniej rozbudowana obsługa hooks/lifecycle niż Sequelize
+    vs: "Drizzle dla projektów TypeScript na edge i serverless gdzie bundle size jest kluczowy. Sequelize dla projektów Node.js z bogatymi relacjami, hookami i potrzebą dojrzałego ekosystemu."
+
+  - name: Knex.js
+    icon: "🔧"
+    color: "#e16426"
+    tagline: "SQL query builder — nie ORM, maksymalna kontrola nad SQL, zero abstrakcji nad modelami"
+    pros:
+      - Pełna kontrola nad SQL — query builder 1:1 z SQL bez ukrytej magii
+      - Doskonałe migracje — knex migrate prosto i niezawodnie
+      - Lekki — brak modeli, asocjacji, walidatorów (to zaleta gdy nie są potrzebne)
+      - Obsługuje wiele dialektów SQL z jednolitym API
+    cons:
+      - Nie jest ORM — brak modeli, relacji, walidacji, hooków
+      - Musisz ręcznie zarządzać wszystkimi wzorcami repozytoriów
+      - Brak type safety na wynikach bez dodatkowych narzędzi
+      - Więcej boilerplate dla typowych operacji CRUD niż Sequelize
+    vs: "Knex.js dla projektów gdzie chcesz surowy SQL z query builderem i bez model abstractions — ETL, data pipelines, surowe raporty. Sequelize gdy budujesz aplikację z domenowymi modelami, relacjami i logiką biznesową."
+
+  - name: MikroORM
+    icon: "🏗️"
+    color: "#3f3f46"
+    tagline: "TypeScript ORM z Unit of Work, Identity Map i Data Mapper pattern"
+    pros:
+      - Unit of Work — śledzi zmiany obiektów i batchwuje UPDATE automatycznie
+      - Identity Map — jeden rekord = jedna instancja w pamięci (brak duplikatów)
+      - Pełna type safety z TypeScript — generowane typy, dekoratory lub defineProperty
+      - Bogaty query builder (QueryBuilder) podobny do Doctrine (PHP)
+    cons:
+      - Krzywa uczenia — Unit of Work i Identity Map wymagają zrozumienia wzorca
+      - Mniejsza społeczność niż Sequelize czy Prisma
+      - Konfiguracja bardziej złożona niż Sequelize
+      - Dokumentacja mniej przystępna dla juniorów
+    vs: "MikroORM dla zaawansowanych projektów TypeScript wymagających Unit of Work i Data Mapper (np. DDD). Sequelize gdy potrzebujesz sprawdzonego, prostszego ORM z Active Record i bogatym ekosystemem."

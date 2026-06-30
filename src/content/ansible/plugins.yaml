@@ -1,0 +1,463 @@
+title: Ansible — Ekosystem Collections & Narzędzia
+
+items:
+  - name: ansible.builtin
+    icon: "🏠"
+    desc: >
+      Wbudowana kolekcja Ansible — dostępna bez instalacji. Zawiera wszystkie
+      podstawowe moduły do zarządzania plikami, pakietami, serwisami, siecią.
+      Zawsze używaj pełnych nazw modułów (ansible.builtin.copy zamiast copy)
+      — zapobiega konfliktom z kolekcjami community.
+    code: |
+      # Najpopularniejsze moduły ansible.builtin
+
+      # Pliki i katalogi
+      # ansible.builtin.copy           - kopiuj pliki
+      # ansible.builtin.template       - szablony Jinja2
+      # ansible.builtin.file           - atrybuty plików i katalogów
+      # ansible.builtin.lineinfile     - edytuj linie w plikach
+      # ansible.builtin.blockinfile    - wstaw blok tekstu
+      # ansible.builtin.fetch          - pobierz pliki z serwera
+      # ansible.builtin.stat           - sprawdź atrybuty pliku
+      # ansible.builtin.find           - szukaj plików
+
+      # Pakiety i serwisy
+      # ansible.builtin.package        - agnostyczny instalator
+      # ansible.builtin.apt            - Ubuntu/Debian
+      # ansible.builtin.yum / dnf      - RedHat/CentOS/Fedora
+      # ansible.builtin.service        - zarządzanie serwisami
+      # ansible.builtin.systemd        - systemd specifics
+
+      # Komendy
+      # ansible.builtin.command        - prosta komenda (bez shell)
+      # ansible.builtin.shell          - komenda shell (z pipe, redirect)
+      # ansible.builtin.raw            - bez Pythona na serwerze
+      # ansible.builtin.script         - uruchom lokalny skrypt zdalnie
+
+      # Sieć i URI
+      # ansible.builtin.uri            - HTTP requests
+      # ansible.builtin.get_url        - pobierz plik z URL
+      # ansible.builtin.wait_for       - czekaj na port/plik/warunek
+      # ansible.builtin.wait_for_connection  - czekaj na SSH
+
+      # Kontrola flow
+      # ansible.builtin.debug          - print/debug
+      # ansible.builtin.fail           - fail z komunikatem
+      # ansible.builtin.assert         - walidacja warunków
+      # ansible.builtin.set_fact       - ustaw zmienną
+      # ansible.builtin.include_tasks  - include dynamically
+      # ansible.builtin.import_tasks   - import statically
+      # ansible.builtin.meta           - control flow (flush_handlers, end_play)
+
+  - name: community.general
+    icon: "🌐"
+    desc: >
+      Największa kolekcja community — setki modułów do wszystkiego co nie zmieściło
+      się w ansible.builtin. Moduły dla baz danych (MySQL, PostgreSQL), systemów
+      monitoringu (Zabbix), PKI, GitHub, Slack, zarządzania użytkownikami i wiele więcej.
+    code: |
+      # Instalacja
+      ansible-galaxy collection install community.general
+
+      # Powiadomienia
+      - name: Notify Slack on deploy
+        community.general.slack:
+          token: "{{ slack_token }}"
+          channel: "#deployments"
+          msg: "Deployed {{ app_name }} {{ app_version }} to {{ inventory_hostname }}"
+          color: good
+
+      # Bazy danych
+      - name: Create MySQL database
+        community.general.mysql_db:
+          name: myapp
+          state: present
+          login_user: root
+          login_password: "{{ mysql_root_password }}"
+
+      # Node.js packages
+      - name: Install npm packages
+        community.general.npm:
+          name: pm2
+          global: true
+          state: present
+
+      # Python packages (pip)
+      - name: Install Python packages
+        community.general.pip:
+          name:
+            - gunicorn
+            - celery
+          virtualenv: /opt/myapp/venv
+
+      # Jira ticket
+      - name: Create Jira issue on failure
+        community.general.jira:
+          uri: "https://jira.example.com"
+          username: "{{ jira_user }}"
+          password: "{{ vault_jira_password }}"
+          project: OPS
+          summary: "Deployment failed on {{ inventory_hostname }}"
+          issuetype: Bug
+
+  - name: ansible.posix
+    icon: "🐧"
+    desc: >
+      Kolekcja dla systemów POSIX (Linux, macOS, BSD). Zawiera moduły do zarządzania
+      systemem plików (ACL, SELinux, mount points), siecią i autoryzacją SSH.
+      Szczególnie przydatna na systemach RHEL/CentOS gdzie SELinux jest domyślnie włączony.
+    code: |
+      # Instalacja
+      ansible-galaxy collection install ansible.posix
+
+      # authorized_key — zarządzaj kluczami SSH
+      - name: Add deploy SSH key
+        ansible.posix.authorized_key:
+          user: deploy
+          state: present
+          key: "{{ lookup('file', 'files/deploy_key.pub') }}"
+          key_options: "no-port-forwarding,no-agent-forwarding"
+
+      # firewalld — zarządzaj firewalld (RHEL/CentOS)
+      - name: Open HTTP port
+        ansible.posix.firewalld:
+          service: http
+          permanent: true
+          state: enabled
+          immediate: true
+
+      - name: Open custom port
+        ansible.posix.firewalld:
+          port: "8080/tcp"
+          permanent: true
+          state: enabled
+
+      # selinux — zarządzaj SELinux
+      - name: Set SELinux to permissive
+        ansible.posix.selinux:
+          policy: targeted
+          state: permissive
+
+      # mount — punkty montowania
+      - name: Mount NFS share
+        ansible.posix.mount:
+          path: /mnt/data
+          src: "nfs-server:/data"
+          fstype: nfs
+          opts: rw,sync
+          state: mounted
+
+      # sysctl — parametry kernela
+      - name: Enable IP forwarding
+        ansible.posix.sysctl:
+          name: net.ipv4.ip_forward
+          value: "1"
+          state: present
+          reload: true
+
+  - name: community.docker
+    icon: "🐳"
+    desc: >
+      Kolekcja do zarządzania Dockerem — kontenery, obrazy, sieci, volumes, Docker Compose.
+      Pozwala wdrażać aplikacje kontenerowe przez Ansible bez Kubernetes.
+      Używaj gdy masz proste deploymenty i nie chcesz overhead K8s.
+    code: |
+      # Instalacja
+      ansible-galaxy collection install community.docker
+
+      # Uruchom kontener
+      - name: Run nginx container
+        community.docker.docker_container:
+          name: nginx
+          image: "nginx:1.24-alpine"
+          state: started
+          restart_policy: always
+          ports:
+            - "80:80"
+            - "443:443"
+          volumes:
+            - "/opt/nginx/conf:/etc/nginx/conf.d"
+            - "/opt/nginx/html:/usr/share/nginx/html"
+          env:
+            NGINX_HOST: "example.com"
+
+      # Pull image
+      - name: Pull latest app image
+        community.docker.docker_image:
+          name: "myregistry.example.com/myapp"
+          tag: "{{ app_version }}"
+          source: pull
+          force_source: true
+
+      # Docker Compose
+      - name: Deploy with docker-compose
+        community.docker.docker_compose_v2:
+          project_src: /opt/myapp
+          state: present
+          recreate: auto
+
+      # Docker network
+      - name: Create internal network
+        community.docker.docker_network:
+          name: myapp_net
+          driver: bridge
+
+  - name: amazon.aws
+    icon: "☁️"
+    desc: >
+      Oficjalna kolekcja Amazon do zarządzania AWS przez Ansible. Pozwala provisjonować
+      EC2, S3, RDS, ELB, VPC i inne serwisy AWS. Alternatywa dla Terraform gdy
+      Twój workflow jest już Ansible-based. Wymaga boto3 i konfiguracji AWS credentials.
+    code: |
+      # Instalacja
+      pip install boto3 botocore
+      ansible-galaxy collection install amazon.aws
+
+      # Uruchom instancję EC2
+      - name: Launch EC2 instance
+        amazon.aws.ec2_instance:
+          name: "web-server-01"
+          key_name: my-keypair
+          instance_type: t3.micro
+          image_id: ami-0905a3c97561e0b69
+          region: eu-west-1
+          vpc_subnet_id: subnet-12345678
+          security_groups:
+            - sg-webservers
+          tags:
+            Environment: production
+            ManagedBy: ansible
+          wait: true
+
+      # Utwórz S3 bucket
+      - name: Create S3 bucket
+        amazon.aws.s3_bucket:
+          name: my-company-assets
+          state: present
+          region: eu-west-1
+          versioning: true
+
+      # Dynamic inventory — aws_ec2 plugin
+      # inventory/aws.yml:
+      # plugin: amazon.aws.aws_ec2
+      # regions: [eu-west-1]
+      # filters:
+      #   "tag:ManagedBy": ansible
+      #   instance-state-name: running
+
+  - name: google.cloud
+    icon: "🟡"
+    desc: >
+      Kolekcja do zarządzania Google Cloud Platform — Compute Engine, GCS, GKE, Cloud SQL,
+      IAM, Cloud DNS. Podobna w użyciu do amazon.aws. Wymaga konfiguracji Service Account
+      lub Application Default Credentials.
+    code: |
+      # Instalacja
+      pip install requests google-auth
+      ansible-galaxy collection install google.cloud
+
+      # Uruchom VM na GCP
+      - name: Create GCE instance
+        google.cloud.gcp_compute_instance:
+          name: web-server-01
+          machine_type: e2-micro
+          zone: europe-west1-b
+          project: my-gcp-project
+          auth_kind: serviceaccount
+          service_account_file: /etc/ansible/gcp-creds.json
+          disks:
+            - auto_delete: true
+              boot: true
+              initialize_params:
+                disk_size_gb: 20
+                source_image: "projects/debian-cloud/global/images/family/debian-12"
+          network_interfaces:
+            - network:
+                selfLink: "global/networks/default"
+          labels:
+            env: production
+            managed_by: ansible
+
+      # Dynamic inventory — gcp_compute plugin
+      # inventory/gcp.yml:
+      # plugin: google.cloud.gcp_compute
+      # projects: [my-gcp-project]
+      # zones: [europe-west1-b]
+      # auth_kind: serviceaccount
+
+  - name: kubernetes.core
+    icon: "☸️"
+    desc: >
+      Kolekcja do zarządzania Kubernetes — deployments, services, configmaps, secrets,
+      namespace, CRDs, Helm charts. Pozwala wdrażać aplikacje na K8s przez Ansible.
+      Przydatne gdy chcesz połączyć CM serwerów i deployment K8s w jednym pipeline.
+    code: |
+      # Instalacja
+      pip install kubernetes
+      ansible-galaxy collection install kubernetes.core
+
+      # Zastosuj manifest
+      - name: Deploy application
+        kubernetes.core.k8s:
+          state: present
+          src: /tmp/app-deployment.yml
+          kubeconfig: ~/.kube/config
+          context: production
+
+      # Deployment inline
+      - name: Create deployment
+        kubernetes.core.k8s:
+          state: present
+          definition:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: myapp
+              namespace: default
+            spec:
+              replicas: 3
+              selector:
+                matchLabels:
+                  app: myapp
+              template:
+                metadata:
+                  labels:
+                    app: myapp
+                spec:
+                  containers:
+                    - name: myapp
+                      image: "myapp:{{ app_version }}"
+                      ports:
+                        - containerPort: 8080
+
+      # Helm chart przez Ansible
+      - name: Install nginx ingress
+        kubernetes.core.helm:
+          name: nginx-ingress
+          chart_ref: ingress-nginx/ingress-nginx
+          release_namespace: ingress-nginx
+          create_namespace: true
+
+  - name: AWX / Ansible Automation Platform
+    icon: "🖥️"
+    desc: >
+      AWX to open-source GUI i API dla Ansible (upstream wersja Red Hat AAP).
+      Ansible Automation Platform (AAP) to enterprise wersja z supportem Red Hat.
+      Oba dostarczają web UI, REST API, RBAC, scheduling, credentials management i audit logs.
+    code: |
+      # AWX — instalacja przez Operator (Kubernetes)
+      # kubectl apply -f https://raw.githubusercontent.com/ansible/awx-operator/...
+
+      # Instalacja awxkit CLI
+      pip install awxkit
+
+      # Konfiguracja
+      # export CONTROLLER_HOST=https://awx.example.com
+      # export CONTROLLER_USERNAME=admin
+      # export CONTROLLER_PASSWORD=secret
+
+      # Listuj job templates
+      awx job_templates list
+
+      # Uruchom job template przez ID
+      awx job_templates launch --id 42 \
+        --extra_vars '{"environment": "prod", "version": "1.2.3"}'
+
+      # Sprawdź status zadania
+      awx jobs get --id 123
+
+      # Funkcje AWX/AAP:
+      # Web UI do uruchamiania playbooki bez terminala
+      # Job Templates z parametrami i limitami
+      # Credentials Manager (SSH, AWS, Vault) bez jawnych haseł w kodzie
+      # RBAC - role-based access (kto moze co uruchamiac)
+      # Scheduling - cron-like planowanie playbooki
+      # Notifications - Slack/Email po zakonczeniu
+      # Audit Trail - pelna historia uruchomien z outputem
+
+  - name: ansible-lint
+    icon: "🔍"
+    desc: >
+      ansible-lint sprawdza playbooki, role i kolekcje pod kątem błędów i best practices.
+      Wykrywa przestarzałe składnie, brakujące 'name' w taskach, używanie command zamiast
+      dedykowanych modułów. Integruje się z pre-commit hooks i CI/CD.
+    code: |
+      # Instalacja
+      pip install ansible-lint
+
+      # Lint playbooka
+      ansible-lint site.yml
+
+      # Lint wszystkiego w katalogu
+      ansible-lint
+
+      # Lint roli
+      ansible-lint roles/nginx/
+
+      # Ignoruj konkretne reguły
+      ansible-lint --skip-list yaml[truthy],no-free-form
+
+      # Konfiguracja .ansible-lint
+      # ---
+      # warn_list:
+      #   - yaml[truthy]
+      # skip_list:
+      #   - no-free-form
+      # exclude_paths:
+      #   - .cache/
+      #   - test/
+
+      # pre-commit hook (.pre-commit-config.yaml)
+      # ---
+      # repos:
+      #   - repo: https://github.com/ansible/ansible-lint
+      #     rev: v24.2.0
+      #     hooks:
+      #       - id: ansible-lint
+      #         files: \.(yaml|yml)$
+
+  - name: Molecule — testowanie ról
+    icon: "🧪"
+    desc: >
+      Molecule to framework do testowania ról Ansible — tworzy tymczasowe środowisko
+      (Docker, Vagrant, EC2), uruchamia rolę, weryfikuje wynik przez Testinfra lub Ansible.
+      Pozwala na TDD dla infrastruktury — pisz testy przed implementacją roli.
+    code: |
+      # Instalacja
+      pip install molecule molecule-docker
+
+      # Inicjalizacja Molecule w roli
+      cd roles/nginx
+      molecule init scenario --driver-name docker
+
+      # Struktura po inicjalizacji
+      # roles/nginx/
+      # molecule/
+      #   default/
+      #     molecule.yml      - konfiguracja (driver, platforms)
+      #     converge.yml      - playbook testowy (uruchamia role)
+      #     verify.yml        - weryfikacja (Ansible asserts)
+
+      # molecule.yml
+      # ---
+      # driver:
+      #   name: docker
+      # platforms:
+      #   - name: ubuntu22
+      #     image: "geerlingguy/docker-ubuntu2204-ansible"
+      #     pre_build_image: true
+
+      # Uruchom pełny test (create, converge, verify, destroy)
+      molecule test
+
+      # Tylko stwórz środowisko i uruchom rolę
+      molecule converge
+
+      # Zaloguj się do kontenera testowego
+      molecule login --host ubuntu22
+
+      # Uruchom weryfikację bez re-deploy
+      molecule verify
+
+      # Zniszcz środowisko testowe
+      molecule destroy

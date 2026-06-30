@@ -1,0 +1,493 @@
+title: "Laravel — Artisan & CLI"
+
+groups:
+  - name: "Instalacja i setup"
+    icon: "🚀"
+    commands:
+      - cmd: composer create-project laravel/laravel myapp
+        desc: Utwórz nowy projekt Laravel przez Composer
+        detail:
+          what: "Instaluje najnowszą wersję Laravel. Tworzy pełną strukturę projektu z autoloadem, .env.example i domyślną konfiguracją."
+          how: "Uruchom w katalogu projektów. myapp to nazwa katalogu docelowego."
+          tips:
+            - "composer create-project laravel/laravel myapp --prefer-dist"
+            - "composer create-project laravel/laravel:^10 myapp — konkretna wersja"
+
+      - cmd: laravel new myapp
+        desc: Utwórz nowy projekt przez Laravel Installer (interaktywny)
+        detail:
+          what: "Interaktywny kreator projektu — pyta o starter kit (Breeze/Jetstream), silnik szablonów, framework testowy, bazę danych."
+          how: "Wymaga wcześniejszego: composer global require laravel/installer"
+          tips:
+            - "laravel new myapp --breeze — od razu z Breeze auth"
+            - "laravel new myapp --jet — od razu z Jetstream"
+
+      - cmd: php artisan key:generate
+        desc: Wygeneruj klucz szyfrowania aplikacji APP_KEY
+        detail:
+          what: "Generuje losowy 32-bajtowy klucz i zapisuje go do .env jako APP_KEY. Używany do szyfrowania sesji, cookies, danych."
+          how: "Uruchom po każdym sklonowaniu projektu jeśli brak .env lub APP_KEY jest pusty."
+          tips:
+            - "Klucz zapisywany automatycznie do .env — nie musisz go kopiować ręcznie"
+            - "Zmiana klucza unieważnia wszystkie istniejące sesje i zaszyfrowane dane"
+
+      - cmd: php artisan serve
+        desc: Uruchom wbudowany serwer deweloperski Laravel na localhost:8000
+        detail:
+          what: "Startuje PHP built-in server na porcie 8000. Auto-reload dla zmian. NIE używaj na produkcji."
+          how: "Uruchom w głównym katalogu projektu. Ctrl+C zatrzymuje serwer."
+          tips:
+            - "php artisan serve --port=8080 — inny port"
+            - "php artisan serve --host=0.0.0.0 — dostępny z innych urządzeń w sieci"
+
+      - cmd: php artisan install:api
+        desc: "Zainstaluj Sanctum dla API (Laravel 11+)"
+        detail:
+          what: "Instaluje Laravel Sanctum, dodaje routes/api.php, tworzy migracje tokenów. Zastępuje ręczną instalację Sanctum w Laravel 11+."
+          how: "Uruchom po stworzeniu projektu gdy budujesz API z autentykacją tokenową."
+          tips:
+            - "Automatycznie uruchamia migracje dla tabel Sanctum"
+            - "Dodaje middleware auth:sanctum do grup tras"
+
+      - cmd: php artisan tinker
+        desc: Otwórz interaktywną konsolę REPL Laravela (PsySH)
+        detail:
+          what: "PsySH shell z pełnym dostępem do kodu aplikacji — modele, fasady, helpery. Idealne do testowania kodu bez pisania testów."
+          how: "Wpisuj PHP code bezpośrednio. exit lub Ctrl+D zamyka konsolę."
+          tips:
+            - "User::find(1) — sprawdź model"
+            - "DB::select('SELECT COUNT(*) FROM users') — query SQL"
+            - "app(PaymentService::class)->charge(100) — testuj serwisy"
+
+  - name: "Generowanie kodu — make:"
+    icon: "🏗️"
+    commands:
+      - cmd: php artisan make:model Post
+        desc: Wygeneruj nowy model Eloquent
+        detail:
+          what: "Tworzy plik app/Models/Post.php z podstawową strukturą klasy Model."
+          how: "Nazwa modelu w PascalCase — Laravel rozwiązuje tabelę automatycznie (Post → posts)."
+          tips:
+            - "php artisan make:model Post -m — z migracją"
+            - "php artisan make:model Post -mfsc — z migracją, factory, seeder, controller"
+            - "php artisan make:model Post -a — all: migration + factory + seeder + policy + controller + requests"
+
+      - cmd: "php artisan make:controller PostController"
+        desc: Wygeneruj nowy kontroler HTTP
+        detail:
+          what: "Tworzy app/Http/Controllers/PostController.php z pustą klasą."
+          how: "Nazwa zawsze z sufiksem Controller. Domyślnie pusty kontroler."
+          tips:
+            - "php artisan make:controller PostController --resource — z metodami index/create/store/show/edit/update/destroy"
+            - "php artisan make:controller PostController --api — resource bez create/edit (dla API)"
+            - "php artisan make:controller PublishPostController --invokable — Single Action Controller"
+            - "php artisan make:controller Admin/PostController — w podkatalogu"
+
+      - cmd: "php artisan make:migration create_posts_table"
+        desc: Wygeneruj nowy plik migracji
+        detail:
+          what: "Tworzy plik database/migrations/YYYY_MM_DD_HHMMSS_create_posts_table.php z Schema::create()."
+          how: "Konwencja nazewnicza: create_TABELA_table lub add_KOLUMNA_to_TABELA_table — Laravel wykrywa intencję."
+          tips:
+            - "php artisan make:migration add_status_to_posts_table — migracja zmieniająca tabelę"
+            - "php artisan make:migration create_post_tag_table — tabela pivot"
+
+      - cmd: "php artisan make:middleware CheckAge"
+        desc: Wygeneruj nowy middleware
+        detail:
+          what: "Tworzy app/Http/Middleware/CheckAge.php z metodą handle(). Middleware trzeba jeszcze zarejestrować w Kernel.php."
+          how: "Zarejestruj w app/Http/Kernel.php — globalnie, w grupie lub jako alias."
+          tips:
+            - "php artisan make:middleware EnsureSubscribed"
+            - "Dodaj do Kernel.php: 'subscribed' => CheckSubscription::class"
+
+      - cmd: "php artisan make:request StorePostRequest"
+        desc: Wygeneruj Form Request do walidacji
+        detail:
+          what: "Tworzy app/Http/Requests/StorePostRequest.php z metodami authorize() i rules(). Centralizuje walidację poza kontrolerem."
+          how: "Użyj w type-hint kontrolera zamiast Request — Laravel waliduje automatycznie."
+          tips:
+            - "php artisan make:request UpdatePostRequest — dla PUT/PATCH"
+            - "Zawsze definiuj rules() i authorize() — authorize() false = 403"
+
+      - cmd: "php artisan make:job SendWelcomeEmail"
+        desc: Wygeneruj klasę Job dla kolejki
+        detail:
+          what: "Tworzy app/Jobs/SendWelcomeEmail.php z metodą handle(). Job może być wysłany do kolejki przez dispatch()."
+          how: "Zaimplementuj handle() z logiką. Dispatch przez SendWelcomeEmail::dispatch($user)."
+          tips:
+            - "php artisan make:job ProcessPodcast --sync — synchroniczny (bez kolejki)"
+            - "Użyj retry_after i $tries w klasie do konfiguracji ponowień"
+
+      - cmd: "php artisan make:event OrderPlaced"
+        desc: Wygeneruj klasę Event
+        detail:
+          what: "Tworzy app/Events/OrderPlaced.php — klasa reprezentująca zdarzenie domenowe. Może zawierać dane zdarzenia przez konstruktor."
+          how: "Emit przez event(new OrderPlaced($order)) lub OrderPlaced::dispatch($order)."
+          tips:
+            - "Zdarzenia mogą implementować ShouldBroadcast do broadcastingu przez WebSocket"
+
+      - cmd: "php artisan make:listener SendOrderConfirmation"
+        desc: Wygeneruj nasłuchiwacz zdarzeń (Event Listener)
+        detail:
+          what: "Tworzy app/Listeners/SendOrderConfirmation.php. Rejestruj nasłuchiwanie w EventServiceProvider."
+          how: "Metoda handle() otrzymuje obiekt zdarzenia. Może implementować ShouldQueue do asynchronicznego przetwarzania."
+          tips:
+            - "php artisan make:listener SendOrderConfirmation --event=OrderPlaced — z bindingiem"
+
+      - cmd: "php artisan make:command SendWeeklyReport"
+        desc: Wygeneruj własną komendę Artisan
+        detail:
+          what: "Tworzy app/Console/Commands/SendWeeklyReport.php. Definiuje $signature (komenda + parametry) i handle()."
+          how: "Uruchom przez php artisan reports:weekly. Harmonogramuj w Kernel.php przez $schedule->command()."
+          tips:
+            - "Używaj $this->info(), $this->error(), $this->warn() do kolorowego outputu"
+            - "Pasek postępu: $bar = $this->output->createProgressBar($count)"
+
+      - cmd: "php artisan make:seeder UserSeeder"
+        desc: Wygeneruj seeder do wypełnienia bazy testowymi danymi
+        detail:
+          what: "Tworzy database/seeders/UserSeeder.php z metodą run(). Seeder wywołuje Fabryki lub wstawia dane bezpośrednio."
+          how: "Uruchom przez php artisan db:seed --class=UserSeeder lub dodaj do DatabaseSeeder."
+          tips:
+            - "User::factory(100)->create() — użyj fabryki w seederze"
+            - "DB::table('roles')->insert([...]) — wstaw dane bezpośrednio"
+
+      - cmd: "php artisan make:factory PostFactory"
+        desc: Wygeneruj fabrykę do generowania danych testowych
+        detail:
+          what: "Tworzy database/factories/PostFactory.php. Używa Faker do generowania realistycznych danych."
+          how: "Użyj Post::factory()->create() w testach i seederach."
+          tips:
+            - "php artisan make:factory PostFactory --model=Post — z bindingiem"
+            - "Post::factory(50)->create() — 50 rekordów"
+            - "Post::factory()->published()->create() — z custom state"
+
+      - cmd: "php artisan make:policy PostPolicy --model=Post"
+        desc: Wygeneruj Policy do autoryzacji akcji na modelu
+        detail:
+          what: "Tworzy app/Policies/PostPolicy.php z metodami viewAny/view/create/update/delete/restore/forceDelete."
+          how: "Laravel automatycznie odkrywa Policy dla modelu gdy nazwa pasuje (PostPolicy dla Post)."
+          tips:
+            - "Zarejestruj w AuthServiceProvider jeśli auto-discovery nie działa"
+            - "Używaj $this->authorize('update', $post) w kontrolerze"
+
+      - cmd: "php artisan make:resource PostResource"
+        desc: Wygeneruj API Resource do transformacji modelu do JSON
+        detail:
+          what: "Tworzy app/Http/Resources/PostResource.php. Kontrolujesz dokładnie jakie pola trafiają do JSON response."
+          how: "return new PostResource($post) lub PostResource::collection($posts) w kontrolerze."
+          tips:
+            - "php artisan make:resource PostCollection — kolekcja z meta (paginacja)"
+            - "Używaj conditional fields: 'token' => $this->when($this->is_owner, $token)"
+
+      - cmd: "php artisan make:notification OrderShipped"
+        desc: Wygeneruj klasę Notification (email, SMS, Slack, database)
+        detail:
+          what: "Tworzy app/Notifications/OrderShipped.php. Notyfikacja może być wysyłana przez wiele kanałów naraz."
+          how: "$user->notify(new OrderShipped($order)) lub Notification::send($users, new OrderShipped($order))."
+          tips:
+            - "via() definiuje kanały: mail, database, broadcast, nexmo, slack"
+            - "toMail() buduje email, toArray() dla database channel"
+
+      - cmd: "php artisan make:mail WelcomeMail"
+        desc: Wygeneruj klasę Mailable do wysyłania emaili
+        detail:
+          what: "Tworzy app/Mail/WelcomeMail.php. Klasa Mailable enkapsuluje email — temat, widok, dane."
+          how: "Mail::to($user)->send(new WelcomeMail($user)) lub Mail::to($user)->queue(new WelcomeMail($user))."
+          tips:
+            - "php artisan make:mail WelcomeMail --markdown=emails.welcome — z Markdown template"
+            - "Testuj emaile przez Mailtrap lub Laravel Mailpit (php artisan serve + mailpit)"
+
+  - name: "Migracje i baza danych"
+    icon: "🗄️"
+    commands:
+      - cmd: php artisan migrate
+        desc: Zastosuj wszystkie oczekujące migracje
+        detail:
+          what: "Wykonuje SQL z plików migracji które nie były jeszcze zastosowane. Bezpieczne — każda migracja ma up() i down()."
+          how: "Laravel śledzi zastosowane migracje w tabeli migrations. Idempotentne — drugie wywołanie nic nie zmienia."
+          tips:
+            - "Zawsze uruchamiaj przed deployem — za migracją stoi schema bazy"
+            - "php artisan migrate --pretend — pokaż SQL bez wykonywania"
+
+      - cmd: php artisan migrate:fresh
+        desc: "Usuń wszystkie tabele i uruchom migracje od nowa"
+        detail:
+          what: "Dropuje WSZYSTKIE tabele, a następnie uruchamia wszystkie migracje. Czysta baza danych."
+          how: "UWAGA: niszczy dane! Tylko dla development. Nigdy na produkcji."
+          tips:
+            - "php artisan migrate:fresh --seed — czyść i zasiej danymi testowymi"
+            - "php artisan migrate:fresh --seeder=UserSeeder — konkretny seeder"
+
+      - cmd: php artisan migrate:rollback
+        desc: Cofnij ostatnią partię migracji
+        detail:
+          what: "Wywołuje down() dla ostatniego batcha migracji. Przywraca schema do poprzedniego stanu."
+          how: "Jedna partia to wszystkie migracje z jednego uruchomienia migrate."
+          tips:
+            - "php artisan migrate:rollback --step=3 — cofnij 3 ostatnie partie"
+            - "php artisan migrate:reset — cofnij WSZYSTKIE migracje"
+
+      - cmd: php artisan migrate:status
+        desc: Pokaż status wszystkich migracji
+        detail:
+          what: "Wyświetla listę migracji z statusem Ran (wykonana) lub Pending (oczekująca)."
+          how: "Przydatne do sprawdzenia stanu bazy przed deployem."
+          tips:
+            - "Kolumna Batch pokazuje w której partii była uruchomiona migracja"
+
+      - cmd: php artisan migrate:reset
+        desc: Cofnij WSZYSTKIE migracje (wszystkie down())
+        detail:
+          what: "Wywołuje down() dla każdej migracji w odwrotnej kolejności. Schema wraca do stanu sprzed jakichkolwiek migracji."
+          how: "UWAGA: niszczy wszystkie tabele aplikacji. Tylko dla development."
+          tips:
+            - "Różnica od migrate:fresh — migrate:reset wywołuje down(), migrate:fresh dropuje tabele bezpośrednio"
+
+      - cmd: php artisan db:seed
+        desc: Wypełnij bazę danych danymi (seeders)
+        detail:
+          what: "Uruchamia DatabaseSeeder (database/seeders/DatabaseSeeder.php). Wypełnia bazy testowymi/inicjalnymi danymi."
+          how: "DatabaseSeeder wywołuje call() do innych seederów. Dane generowane przez Fabryki lub wstawiane bezpośrednio."
+          tips:
+            - "php artisan db:seed --class=UserSeeder — konkretny seeder"
+            - "php artisan migrate:fresh --seed — jednorazowo po fresh migrate"
+
+      - cmd: php artisan db:wipe
+        desc: Usuń wszystkie tabele, widoki i typy z bazy danych
+        detail:
+          what: "Usuwa wszystkie obiekty z bazy danych (tabele, widoki, typy). Bardziej agresywne niż migrate:reset."
+          how: "Używaj gdy chcesz absolutnie czyste środowisko. migrate:fresh zazwyczaj wystarczy."
+          tips:
+            - "php artisan db:wipe --database=testing — konkretne połączenie"
+
+      - cmd: php artisan schema:dump
+        desc: "Zrzuć aktualny schema bazy do pliku SQL"
+        detail:
+          what: "Generuje database/schema/mysql-schema.sql. Przyspiesza testy — zamiast uruchamiać 100 migracji, ładuje jeden plik SQL."
+          how: "Używaj gdy masz dużo migracji i testy działają wolno."
+          tips:
+            - "php artisan schema:dump --prune — usuń stare migracje po dump"
+
+  - name: "Server i Cache"
+    icon: "⚡"
+    commands:
+      - cmd: php artisan optimize
+        desc: Cachuj konfigurację, trasy i widoki (produkcja)
+        detail:
+          what: "Uruchamia config:cache + route:cache + view:cache. Przyspiesza aplikację na produkcji — ładowanie z cache zamiast parsowania plików."
+          how: "Uruchom po każdym deployu przed restartem serwera. Na dev nie używaj — zmiany nie będą widoczne."
+          tips:
+            - "Dodaj do pipeline CI/CD: php artisan optimize"
+            - "Nie używaj na development — zmieniony config nie będzie widoczny!"
+
+      - cmd: php artisan optimize:clear
+        desc: Wyczyść wszystkie cache (config, routes, views, events)
+        detail:
+          what: "Usuwa wszystkie wygenerowane cache pliki — config, trasy, widoki, zdarzenia. Przydatne gdy coś nie działa i cache może być problemem."
+          how: "Uruchom gdy zmieniasz config, dodajesz nowe trasy lub components Blade."
+          tips:
+            - "Odpowiednik: config:clear + route:clear + view:clear + event:clear"
+
+      - cmd: php artisan cache:clear
+        desc: Wyczyść cache aplikacji (Redis/Memcached/plik)
+        detail:
+          what: "Czyści application cache — dane zapisane przez Cache::put(), Cache::remember(). Nie usuwa config/route/view cache."
+          how: "Używaj gdy cachowane dane są nieaktualne lub przy debugowaniu cache."
+          tips:
+            - "php artisan cache:forget user.profile.1 — wyczyść konkretny klucz"
+
+      - cmd: php artisan config:clear
+        desc: Usuń cache konfiguracji
+        detail:
+          what: "Usuwa bootstrap/cache/config.php — zmuszając Laravel do ponownego parsowania plików config/ przy każdym requeście."
+          how: "Uruchom po zmianie plików w config/ lub .env w development."
+          tips:
+            - "Po config:clear zmiany w .env i config/ zaczną działać natychmiast"
+
+      - cmd: php artisan route:clear
+        desc: Usuń cache tras
+        detail:
+          what: "Usuwa bootstrap/cache/routes-v7.php — wymusza ponowne parsowanie plików routes/."
+          how: "Uruchom po dodaniu nowych tras gdy używasz route:cache w development."
+          tips:
+            - "php artisan route:list — wyświetl wszystkie trasy z middleware i kontrolerami"
+
+      - cmd: php artisan view:clear
+        desc: Usuń skompilowane widoki Blade
+        detail:
+          what: "Usuwa pliki z storage/framework/views/ — skompilowane szablony Blade."
+          how: "Uruchom gdy zmieniasz szablony Blade i nie widzisz zmian."
+          tips:
+            - "Blade kompiluje szablony automatycznie gdy są starsze niż źródło"
+
+      - cmd: php artisan route:list
+        desc: Wyświetl listę wszystkich zarejestrowanych tras
+        detail:
+          what: "Pokazuje wszystkie trasy z metodą HTTP, URI, middleware, nazwą i kontrolerem."
+          how: "Przydatne do debugowania — sprawdź czy trasa jest zarejestrowana i z jakim middleware."
+          tips:
+            - "php artisan route:list --path=api — tylko trasy zaczynające się od 'api'"
+            - "php artisan route:list --name=posts — trasy z nazwą zawierającą 'posts'"
+
+      - cmd: php artisan storage:link
+        desc: "Utwórz symbolic link z public/storage do storage/app/public"
+        detail:
+          what: "Tworzy public/storage → storage/app/public. Pliki uploadowane przez Storage::disk('public') są dostępne przez URL."
+          how: "Uruchom raz po instalacji i po każdym świeżym deployu na serwer."
+          tips:
+            - "URL do pliku: Storage::url('photo.jpg') → /storage/photo.jpg"
+            - "Wymagane dla Storage::disk('public')->put() żeby pliki były dostępne przez HTTP"
+
+  - name: "Queue — kolejki asynchroniczne"
+    icon: "📬"
+    commands:
+      - cmd: php artisan queue:work
+        desc: Uruchom worker kolejki (przetwarza jeden job i czeka na kolejny)
+        detail:
+          what: "Startuje worker który pobiera joby z kolejki i wykonuje je. Działa w tle. Restart wymagany po zmianie kodu!"
+          how: "Na produkcji używaj Supervisor aby worker restartował się automatycznie przy crash."
+          tips:
+            - "php artisan queue:work redis -- queue=high,default — priorytety kolejek"
+            - "php artisan queue:work --timeout=60 --sleep=3 --tries=3"
+            - "php artisan queue:work --max-jobs=1000 — restart po N jobach"
+
+      - cmd: php artisan queue:listen
+        desc: "Nasłuchuj na nowe joby (auto-restart po każdym jobie)"
+        detail:
+          what: "Podobny do queue:work ale restartuje proces po każdym jobie — wolniejszy ale widzi zmiany kodu natychmiast."
+          how: "Używaj na development. Na produkcji queue:work jest szybszy."
+          tips:
+            - "queue:listen automatycznie widzi zmiany kodu — idealne dla dev"
+
+      - cmd: php artisan queue:failed
+        desc: Wyświetl listę nieudanych jobów
+        detail:
+          what: "Pokazuje joby które nie udały się po wszystkich próbach — z błędem, czasem, klasą."
+          how: "Wymaga tabeli failed_jobs — utwórz przez php artisan queue:failed-table + migrate."
+          tips:
+            - "php artisan queue:retry <id> — ponów konkretny job"
+            - "php artisan queue:retry all — ponów wszystkie failed jobs"
+
+      - cmd: php artisan queue:retry all
+        desc: Ponów wszystkie nieudane joby
+        detail:
+          what: "Przenosi wszystkie joby z failed_jobs z powrotem do kolejki do ponownego przetworzenia."
+          how: "Uruchom gdy naprawisz błąd który powodował failure — joby zostaną przetworzone ponownie."
+          tips:
+            - "php artisan queue:retry <id> — konkretny job po ID"
+            - "php artisan queue:forget <id> — usuń konkretny failed job"
+
+      - cmd: php artisan queue:flush
+        desc: Usuń wszystkie nieudane joby z kolejki failed_jobs
+        detail:
+          what: "Czyści tabelę failed_jobs — usuwa historię nieudanych jobów."
+          how: "Używaj ostrożnie — operacja nieodwracalna. Lepiej najpierw queue:retry all."
+          tips:
+            - "php artisan queue:clear — usuń wszystkie oczekujące joby z kolejki"
+
+      - cmd: php artisan queue:table
+        desc: "Utwórz migrację dla tabeli kolejki bazodanowej (driver database)"
+        detail:
+          what: "Generuje migrację dla tabeli jobs — używaną gdy QUEUE_CONNECTION=database w .env."
+          how: "Uruchom po generacji: php artisan migrate. Prosta alternatywa dla Redis gdy nie masz Redis."
+          tips:
+            - "php artisan queue:failed-table — tabela dla failed jobs (wymagana dla queue:failed)"
+            - "QUEUE_CONNECTION=database w .env żeby używać bazy danych jako brokera"
+
+  - name: "Testowanie"
+    icon: "🧪"
+    commands:
+      - cmd: php artisan test
+        desc: Uruchom testy jednostkowe i integracyjne (PHPUnit)
+        detail:
+          what: "Uruchamia pełną suite testów. Konfiguracja w phpunit.xml. Testy w tests/Unit/ i tests/Feature/."
+          how: "Testy Feature testują HTTP requesty (kontrolery, routing, middleware). Testy Unit testują izolowane klasy."
+          tips:
+            - "php artisan test --stop-on-failure — zatrzymaj przy pierwszym błędzie"
+            - "php artisan test --filter=PostTest — uruchom konkretną klasę lub metodę"
+
+      - cmd: "php artisan test --filter=PostTest::testCanCreatePost"
+        desc: Uruchom konkretny test po nazwie metody
+        detail:
+          what: "Filtruje testy po nazwie klasy lub metody. Szybkie testowanie konkretnego przypadku bez uruchamiania całej suite."
+          how: "Podaj pełną lub częściową nazwę — --filter akceptuje wzorce regex."
+          tips:
+            - "php artisan test --filter=PostTest — cała klasa"
+            - "php artisan test tests/Feature/PostTest.php — przez ścieżkę pliku"
+
+      - cmd: php artisan test --coverage
+        desc: "Uruchom testy z raportem pokrycia kodu (wymaga Xdebug lub PCOV)"
+        detail:
+          what: "Generuje raport code coverage — które linie kodu są testowane, a które nie."
+          how: "Wymaga Xdebug lub PCOV extension. Wolniejsze niż zwykły test run."
+          tips:
+            - "php artisan test --coverage --min=80 — zakończ błędem jeśli coverage < 80%"
+            - "php artisan test --coverage-html=coverage-report — raport HTML"
+
+      - cmd: php artisan test --parallel
+        desc: Uruchom testy równolegle (szybszy run na wielu rdzeniach)
+        detail:
+          what: "Uruchamia testy równolegle w osobnych procesach — znacznie szybszy dla dużych suite testów."
+          how: "Wymaga paralelnego konfiguracji bazy (każdy proces ma swoją bazę testową)."
+          tips:
+            - "php artisan test --parallel --processes=4 — 4 równoległe procesy"
+            - "Wymaga konfiguracji RefreshDatabase trait i paralelnej bazy"
+
+      - cmd: "php artisan make:test PostTest --unit"
+        desc: Wygeneruj nową klasę testową (Unit)
+        detail:
+          what: "Tworzy tests/Unit/PostTest.php — test jednostkowy bez bootowalnia frameworka."
+          how: "Unit testy są szybkie — nie bootują bazy, sesji, routingu. Dla czystej logiki biznesowej."
+          tips:
+            - "php artisan make:test PostControllerTest — Feature test (bootuje framework)"
+            - "Używaj Pest zamiast PHPUnit dla bardziej ekspresywnej składni"
+
+  - name: "Composer"
+    icon: "📦"
+    commands:
+      - cmd: composer install
+        desc: Zainstaluj zależności z composer.lock (po sklonowaniu projektu)
+        detail:
+          what: "Instaluje dokładnie te wersje z composer.lock — deterministyczna instalacja. Nie aktualizuje zależności."
+          how: "Uruchom po każdym git clone lub git pull gdy zmieniały się zależności."
+          tips:
+            - "composer install --no-dev — pomija dev dependencies (na produkcji)"
+            - "composer install --optimize-autoloader — zoptymalizowany autoload"
+
+      - cmd: composer update
+        desc: Zaktualizuj zależności do najnowszych wersji zgodnych z composer.json
+        detail:
+          what: "Aktualizuje wszystkie pakiety w ramach ograniczeń wersji z composer.json. Aktualizuje composer.lock."
+          how: "Uruchom gdy chcesz zaktualizować pakiety. Commituj nowy composer.lock."
+          tips:
+            - "composer update laravel/framework — zaktualizuj tylko jeden pakiet"
+            - "composer update --dry-run — pokaż co będzie zaktualizowane bez aktualizacji"
+
+      - cmd: composer dump-autoload
+        desc: Zregeneruj plik autoloadera Composera
+        detail:
+          what: "Regeneruje vendor/autoload.php. Wymagane po ręcznym dodaniu klas lub zmianie PSR-4 mapowań w composer.json."
+          how: "Uruchom gdy klasa nie jest znajdowana mimo że plik istnieje."
+          tips:
+            - "composer dump-autoload --optimize — zoptymalizowany autoload (szybszy, bez skanowania)"
+            - "composer dump-autoload -o — skrót dla --optimize"
+
+      - cmd: composer require spatie/laravel-permission
+        desc: Dodaj nowy pakiet do projektu
+        detail:
+          what: "Instaluje pakiet i dodaje go do require w composer.json. Automatycznie aktualizuje composer.lock."
+          how: "Pełna nazwa pakietu: vendor/package. Sprawdź na packagist.org."
+          tips:
+            - "composer require laravel/telescope --dev — pakiet tylko dev"
+            - "composer require laravel/framework:^11.0 — konkretna wersja"
+
+      - cmd: composer remove vendor/package
+        desc: Usuń pakiet z projektu
+        detail:
+          what: "Odinstalowuje pakiet, usuwa z composer.json i aktualizuje composer.lock."
+          how: "Sprawdź czy inne pakiety nie zależą od usuwanego — Composer ostrzeże."
+          tips:
+            - "Usuń też konfigurację pakietu (config/, Service Providers, Facades)"
+            - "php artisan vendor:publish --list — sprawdź co zostało opublikowane przez pakiet"

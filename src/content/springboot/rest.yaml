@@ -1,0 +1,226 @@
+title: "Spring Boot — REST & Controllers"
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Spring MVC w Spring Boot oferuje kompletny zestaw adnotacji do budowania REST API.
+  @RestController łączy @Controller i @ResponseBody — każda metoda zwraca dane JSON/XML
+  bezpośrednio do klienta. Walidacja, obsługa błędów i CORS są wbudowane.
+
+items:
+  - name: "@RestController"
+    desc: >
+      Adnotacja łącząca @Controller i @ResponseBody. Każda metoda automatycznie serializuje
+      zwracany obiekt do JSON (przez Jackson). Zastępuje klasyczny @Controller + @ResponseBody
+      na każdej metodzie. Rejestruje klasę jako bean Springa.
+    code: |
+      @RestController
+      @RequestMapping("/api/users")
+      public class UserController {
+
+          @Autowired
+          private UserService userService;
+
+          @GetMapping
+          public List<User> getAllUsers() {
+              return userService.findAll();
+          }
+      }
+
+  - name: "Mapowanie HTTP — GET, POST, PUT, DELETE"
+    desc: >
+      Każda metoda HTTP ma dedykowaną adnotację skracającą zapis.
+      Możesz też użyć @RequestMapping(method = RequestMethod.GET) ale skrócone formy są standardem.
+      Adnotacje można łączyć na poziomie klasy (bazowy URL) i metody (konkretna ścieżka).
+    code: |
+      @RestController
+      @RequestMapping("/api/products")
+      public class ProductController {
+
+          @GetMapping("/{id}")
+          public Product getOne(@PathVariable Long id) { ... }
+
+          @PostMapping
+          public Product create(@RequestBody Product product) { ... }
+
+          @PutMapping("/{id}")
+          public Product update(@PathVariable Long id, @RequestBody Product product) { ... }
+
+          @DeleteMapping("/{id}")
+          public void delete(@PathVariable Long id) { ... }
+
+          @PatchMapping("/{id}")
+          public Product patch(@PathVariable Long id, @RequestBody Map<String, Object> fields) { ... }
+      }
+
+  - name: "@PathVariable"
+    desc: >
+      Wyciąga wartość ze ścieżki URL i wiąże ją z parametrem metody. Nazwa zmiennej w URL
+      musi pasować do nazwy parametru (lub podaj name w adnotacji). Działa z typami
+      prostymi (Long, String, UUID) i automatycznie konwertuje.
+    code: |
+      @GetMapping("/users/{userId}/orders/{orderId}")
+      public Order getOrder(
+              @PathVariable Long userId,
+              @PathVariable("orderId") Long id) {
+          return orderService.findByUserAndId(userId, id);
+      }
+
+  - name: "@RequestParam"
+    desc: >
+      Wiąże parametry zapytania (query string) z parametrami metody.
+      Możesz ustawić wartość domyślną i oznaczyć jako niewymagany.
+      Dla filtrowania i paginacji to standardowe podejście.
+    code: |
+      // GET /api/users?page=0&size=10&search=john
+      @GetMapping("/users")
+      public Page<User> getUsers(
+              @RequestParam(defaultValue = "0") int page,
+              @RequestParam(defaultValue = "10") int size,
+              @RequestParam(required = false) String search) {
+          return userService.findAll(page, size, search);
+      }
+
+  - name: "@RequestBody"
+    desc: >
+      Deserializuje ciało żądania HTTP (JSON) do obiektu Java. Jackson robi to automatycznie.
+      Połącz z @Valid aby walidować dane wejściowe. Przy błędzie walidacji Spring rzuca
+      MethodArgumentNotValidException, którą możesz przechwycić w @ExceptionHandler.
+    code: |
+      @PostMapping("/users")
+      public ResponseEntity<User> createUser(@Valid @RequestBody CreateUserRequest request) {
+          User user = userService.create(request);
+          URI location = URI.create("/api/users/" + user.getId());
+          return ResponseEntity.created(location).body(user);
+      }
+
+      // DTO z walidacją
+      public class CreateUserRequest {
+          @NotBlank
+          private String name;
+
+          @Email
+          private String email;
+
+          @Size(min = 8)
+          private String password;
+      }
+
+  - name: "ResponseEntity<T>"
+    desc: >
+      Daje pełną kontrolę nad odpowiedzią HTTP — status, nagłówki, ciało.
+      Użyj gdy potrzebujesz zwrócić specyficzny kod statusu (201 Created, 204 No Content)
+      lub ustawić nagłówki odpowiedzi. Budowniczy (builder) upraszcza tworzenie.
+    code: |
+      @GetMapping("/{id}")
+      public ResponseEntity<User> getUser(@PathVariable Long id) {
+          return userService.findById(id)
+              .map(ResponseEntity::ok)
+              .orElse(ResponseEntity.notFound().build());
+      }
+
+      @PostMapping
+      public ResponseEntity<User> create(@RequestBody User user) {
+          User saved = userService.save(user);
+          return ResponseEntity
+              .status(HttpStatus.CREATED)
+              .header("X-Created-Id", saved.getId().toString())
+              .body(saved);
+      }
+
+      @DeleteMapping("/{id}")
+      public ResponseEntity<Void> delete(@PathVariable Long id) {
+          userService.delete(id);
+          return ResponseEntity.noContent().build();
+      }
+
+  - name: "Walidacja — @Valid i Bean Validation"
+    desc: >
+      Spring Boot integruje się z Jakarta Bean Validation (Hibernate Validator).
+      Dodaj spring-boot-starter-validation do pom.xml. Adnotacje @NotNull, @NotBlank,
+      @Email, @Min, @Max, @Size, @Pattern na polach DTO — walidacja działa automatycznie.
+    code: |
+      // DTO z pełną walidacją
+      public class UserDTO {
+          @NotNull
+          @Size(min = 2, max = 50)
+          private String name;
+
+          @Email
+          @NotBlank
+          private String email;
+
+          @Min(18)
+          @Max(120)
+          private Integer age;
+
+          @Pattern(regexp = "^\\+?[0-9]{9,15}$")
+          private String phone;
+      }
+
+      // Kontroler
+      @PostMapping
+      public ResponseEntity<User> create(@Valid @RequestBody UserDTO dto) {
+          // Wywołane tylko gdy walidacja OK
+          return ResponseEntity.ok(userService.create(dto));
+      }
+
+  - name: "@ExceptionHandler i @ControllerAdvice"
+    desc: >
+      Globalna obsługa błędów dla całej aplikacji. @ControllerAdvice przechwytuje wyjątki
+      ze wszystkich kontrolerów. Definiujesz metody @ExceptionHandler dla konkretnych typów
+      wyjątków i zwracasz ustandaryzowany format błędu.
+    code: |
+      @RestControllerAdvice
+      public class GlobalExceptionHandler {
+
+          @ExceptionHandler(EntityNotFoundException.class)
+          public ResponseEntity<ErrorResponse> handleNotFound(EntityNotFoundException ex) {
+              return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                  .body(new ErrorResponse("NOT_FOUND", ex.getMessage()));
+          }
+
+          @ExceptionHandler(MethodArgumentNotValidException.class)
+          public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
+              List<String> errors = ex.getBindingResult().getFieldErrors()
+                  .stream().map(FieldError::getDefaultMessage).toList();
+              return ResponseEntity.badRequest()
+                  .body(new ErrorResponse("VALIDATION_ERROR", errors.toString()));
+          }
+
+          @ExceptionHandler(Exception.class)
+          public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
+              return ResponseEntity.internalServerError()
+                  .body(new ErrorResponse("INTERNAL_ERROR", "Something went wrong"));
+          }
+      }
+
+      record ErrorResponse(String code, String message) {}
+
+  - name: "Konfiguracja CORS"
+    desc: >
+      CORS (Cross-Origin Resource Sharing) musi być skonfigurowany gdy frontend działa
+      na innym porcie/domenie niż backend. Spring oferuje @CrossOrigin na metodzie/klasie
+      lub globalną konfigurację przez WebMvcConfigurer.
+    code: |
+      // Globalnie — zalecane
+      @Configuration
+      public class CorsConfig implements WebMvcConfigurer {
+
+          @Override
+          public void addCorsMappings(CorsRegistry registry) {
+              registry.addMapping("/api/**")
+                  .allowedOrigins("http://localhost:3000", "https://myapp.com")
+                  .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH")
+                  .allowedHeaders("*")
+                  .allowCredentials(true)
+                  .maxAge(3600);
+          }
+      }
+
+      // Lokalnie na kontrolerze
+      @CrossOrigin(origins = "http://localhost:3000")
+      @RestController
+      public class UserController { ... }

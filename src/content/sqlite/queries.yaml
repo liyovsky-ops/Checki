@@ -1,0 +1,213 @@
+title: SQLite — Queries & JOIN
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  SQLite implementuje pełny standard SQL-92 plus wiele rozszerzeń SQL:1999.
+  Obsługuje JOIN-y, podzapytania, CTE (WITH), funkcje okienkowe (window functions) od wersji 3.25,
+  oraz bogaty zestaw wbudowanych funkcji. Optymalizator zapytań jest prosty ale skuteczny.
+
+items:
+  - name: WHERE — filtry i operatory
+    desc: >
+      WHERE filtruje wiersze przed zwróceniem wyniku. SQLite obsługuje AND, OR, NOT,
+      LIKE (% = dowolny ciąg, _ = jeden znak), IN, BETWEEN, IS NULL, IS NOT NULL.
+    code: |
+      -- Podstawowe filtry
+      SELECT * FROM users WHERE age > 18 AND status = 'active';
+
+      -- OR i NOT
+      SELECT * FROM users WHERE status = 'active' OR role = 'admin';
+      SELECT * FROM users WHERE NOT status = 'banned';
+
+      -- LIKE — wzorzec tekstowy (case-insensitive domyślnie)
+      SELECT * FROM users WHERE name LIKE 'A%';       -- zaczyna się od A
+      SELECT * FROM users WHERE email LIKE '%@gmail%'; -- zawiera @gmail
+
+      -- IN — lista wartości
+      SELECT * FROM users WHERE role IN ('admin', 'moderator', 'editor');
+
+      -- BETWEEN — zakres
+      SELECT * FROM products WHERE price BETWEEN 10.0 AND 50.0;
+
+      -- NULL checks
+      SELECT * FROM users WHERE avatar IS NULL;
+      SELECT * FROM users WHERE phone IS NOT NULL;
+
+  - name: ORDER BY, LIMIT, OFFSET
+    desc: >
+      ORDER BY sortuje wyniki. LIMIT ogranicza liczbę wierszy — kluczowe dla paginacji.
+      OFFSET pomija pierwsze N wierszy. Kombinacja LIMIT + OFFSET to klasyczna paginacja.
+    code: |
+      -- Sortowanie rosnące i malejące
+      SELECT * FROM products ORDER BY price ASC;
+      SELECT * FROM products ORDER BY price DESC;
+
+      -- Sortowanie po kilku kolumnach
+      SELECT * FROM users ORDER BY role ASC, name ASC;
+
+      -- Paginacja (strona 2, 10 wyników na stronę)
+      SELECT * FROM users ORDER BY id LIMIT 10 OFFSET 10;
+
+      -- Pierwsze 5 najdroższych
+      SELECT name, price FROM products ORDER BY price DESC LIMIT 5;
+
+  - name: GROUP BY i HAVING
+    desc: >
+      GROUP BY grupuje wiersze o tej samej wartości. HAVING filtruje grupy (jak WHERE dla GROUP BY).
+      Bez GROUP BY funkcje agregujące operują na całej tabeli.
+    code: |
+      -- Ile użytkowników w każdej roli
+      SELECT role, COUNT(*) AS cnt FROM users GROUP BY role;
+
+      -- Tylko grupy z więcej niż 5 użytkownikami
+      SELECT role, COUNT(*) AS cnt
+      FROM users
+      GROUP BY role
+      HAVING cnt > 5;
+
+      -- Średnia cena per kategoria
+      SELECT category, AVG(price) AS avg_price, COUNT(*) AS items
+      FROM products
+      GROUP BY category
+      ORDER BY avg_price DESC;
+
+  - name: Funkcje agregujące — COUNT, SUM, AVG, MIN, MAX
+    desc: >
+      Funkcje agregujące redukują zbiór wierszy do jednej wartości. COUNT(*) liczy
+      wszystkie wiersze, COUNT(col) ignoruje NULL. SUM/AVG/MIN/MAX ignorują NULL.
+    code: |
+      -- Podstawowe agregaty
+      SELECT COUNT(*)           AS total_users  FROM users;
+      SELECT COUNT(avatar)      AS with_avatar  FROM users;  -- pomija NULL
+      SELECT SUM(price * stock) AS total_value  FROM products;
+      SELECT AVG(age)           AS avg_age      FROM users;
+      SELECT MIN(price)         AS cheapest     FROM products;
+      SELECT MAX(price)         AS most_expensive FROM products;
+
+      -- Wiele agregatów naraz
+      SELECT
+        COUNT(*)    AS total,
+        AVG(price)  AS avg_p,
+        SUM(stock)  AS stock_total,
+        MIN(price)  AS min_p,
+        MAX(price)  AS max_p
+      FROM products;
+
+  - name: INNER JOIN
+    desc: >
+      INNER JOIN zwraca tylko wiersze, które mają dopasowanie w obu tabelach.
+      Najczęściej używany JOIN — klucz obcy po jednej stronie, PRIMARY KEY po drugiej.
+    code: |
+      -- Klasyczny INNER JOIN
+      SELECT
+        orders.id        AS order_id,
+        users.name       AS customer,
+        orders.total
+      FROM orders
+      INNER JOIN users ON orders.user_id = users.id;
+
+      -- JOIN wielu tabel
+      SELECT
+        orders.id,
+        users.name,
+        products.name AS product,
+        order_items.qty
+      FROM order_items
+      INNER JOIN orders   ON order_items.order_id   = orders.id
+      INNER JOIN users    ON orders.user_id          = users.id
+      INNER JOIN products ON order_items.product_id  = products.id;
+
+  - name: LEFT JOIN
+    desc: >
+      LEFT JOIN zwraca WSZYSTKIE wiersze z lewej tabeli, a z prawej NULL gdzie brak dopasowania.
+      Przydatny do znajdowania rekordów bez powiązanych danych (np. użytkownicy bez zamówień).
+    code: |
+      -- Wszyscy użytkownicy, nawet ci bez zamówień
+      SELECT
+        users.name,
+        COUNT(orders.id) AS order_count
+      FROM users
+      LEFT JOIN orders ON orders.user_id = users.id
+      GROUP BY users.id, users.name;
+
+      -- Znajdź użytkowników BEZ zamówień
+      SELECT users.name
+      FROM users
+      LEFT JOIN orders ON orders.user_id = users.id
+      WHERE orders.id IS NULL;
+
+  - name: Podzapytania (subqueries)
+    desc: >
+      Podzapytania to SELECT zagnieżdżone wewnątrz innego zapytania — w WHERE, FROM lub SELECT.
+      Korelowane podzapytania odwołują się do zewnętrznego zapytania (wolniejsze — SQLite wykonuje je dla każdego wiersza).
+    code: |
+      -- Podzapytanie w WHERE
+      SELECT name, price FROM products
+      WHERE price > (SELECT AVG(price) FROM products);
+
+      -- IN z podzapytaniem
+      SELECT * FROM users
+      WHERE id IN (SELECT DISTINCT user_id FROM orders WHERE total > 100);
+
+      -- Podzapytanie jako kolumna (scalar subquery)
+      SELECT
+        name,
+        (SELECT COUNT(*) FROM orders WHERE orders.user_id = users.id) AS order_count
+      FROM users;
+
+      -- EXISTS
+      SELECT * FROM users u
+      WHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id);
+
+  - name: CTE — WITH clause
+    desc: >
+      CTE (Common Table Expressions) tworzą tymczasowe nazwane wyniki — jak widoki na czas zapytania.
+      Poprawiają czytelność złożonych zapytań. SQLite obsługuje rekurencyjne CTE (WITH RECURSIVE).
+    code: |
+      -- Prosty CTE
+      WITH active AS (
+        SELECT id, name FROM users WHERE status = 'active'
+      )
+      SELECT * FROM active WHERE name LIKE 'A%';
+
+      -- Kilka CTE
+      WITH
+        expensive AS (
+          SELECT * FROM products WHERE price > 100
+        ),
+        counts AS (
+          SELECT category, COUNT(*) AS cnt FROM expensive GROUP BY category
+        )
+      SELECT * FROM counts ORDER BY cnt DESC;
+
+      -- Rekurencyjne CTE — generuj sekwencję 1..10
+      WITH RECURSIVE nums(n) AS (
+        SELECT 1
+        UNION ALL
+        SELECT n + 1 FROM nums WHERE n < 10
+      )
+      SELECT n FROM nums;
+
+  - name: DISTINCT i funkcje tekstowe
+    desc: >
+      DISTINCT eliminuje duplikaty z wyników. SQLite ma bogaty zestaw funkcji tekstowych:
+      length(), upper(), lower(), substr(), replace(), trim(), printf() (formatowanie).
+    code: |
+      -- DISTINCT
+      SELECT DISTINCT category FROM products ORDER BY category;
+
+      -- Funkcje tekstowe
+      SELECT
+        upper(name)                    AS name_upper,
+        length(email)                  AS email_len,
+        substr(email, 1, 10)           AS email_prefix,
+        replace(email, '@', ' [at] ')  AS safe_email,
+        trim('  hello  ')              AS trimmed,
+        printf('%.2f PLN', price)      AS formatted_price
+      FROM users, products LIMIT 5;
+
+      -- Konkatenacja tekstów
+      SELECT first_name || ' ' || last_name AS full_name FROM users;

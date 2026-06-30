@@ -1,0 +1,472 @@
+title: Spring Boot — Maven, Gradle & CLI
+
+groups:
+  - name: Maven — uruchomienie i budowanie
+    icon: "🔨"
+    commands:
+      - cmd: mvn spring-boot:run
+        desc: Uruchom aplikację Spring Boot przez Maven
+        detail:
+          what: "Kompiluje i uruchamia aplikację. Używa spring-boot-maven-plugin."
+          how: "Uruchom w katalogu z pom.xml. Domyślnie port 8080."
+          tips:
+            - "mvn spring-boot:run -Dspring-boot.run.profiles=dev"
+            - "mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=9090"
+
+      - cmd: mvn package
+        desc: Skompiluj i spakuj do JAR/WAR
+        detail:
+          what: "Tworzy plik JAR (lub WAR) w katalogu target/. Uruchamia testy przed pakowaniem."
+          how: "Plik JAR w target/myapp-1.0.0.jar. Wykonywalny fat JAR z embedded Tomcat."
+          tips:
+            - "mvn package -DskipTests — pomiń testy"
+            - "mvn package -P prod — użyj profilu Maven prod"
+
+      - cmd: mvn test
+        desc: Uruchom wszystkie testy jednostkowe i integracyjne
+        detail:
+          what: "Kompiluje kod testowy i uruchamia przez Surefire Plugin."
+          how: "Raporty w target/surefire-reports/. JUnit 5 domyślnie w Spring Boot 3.x."
+          tips:
+            - "mvn test -Dtest=UserServiceTest — jeden test"
+            - "mvn test -Dtest='User*Test' — wildcard"
+
+      - cmd: mvn clean
+        desc: Usuń katalog target/ z poprzednich buildów
+        detail:
+          what: "Usuwa katalog target/ — wymuszone czyste budowanie od zera."
+          how: "Zawsze używaj mvn clean package razem, żeby uniknąć starych artefaktów."
+          tips:
+            - "mvn clean package -DskipTests — najczęstszy flow budowania"
+
+      - cmd: mvn clean install
+        desc: Zbuduj i zainstaluj w lokalnym repozytorium Maven
+        detail:
+          what: "Buduje JAR i instaluje do ~/.m2/repository. Dostępny jako zależność dla innych projektów."
+          how: "Potrzebne gdy projekty lokalne zależą od siebie wzajemnie."
+          tips:
+            - "mvn install -DskipTests — szybsza instalacja bez testów"
+
+      - cmd: mvn dependency:tree
+        desc: Wyświetl drzewo zależności projektu
+        detail:
+          what: "Pokazuje pełne drzewo zależności — bezpośrednie i tranzytywne."
+          how: "Pomaga wykryć konflikty wersji (dependency conflict) i zbędne zależności."
+          tips:
+            - "mvn dependency:tree | grep spring — filtruj po nazwie"
+            - "mvn dependency:tree -Dverbose — pokaż pominięte konflikty"
+
+      - cmd: mvn versions:display-dependency-updates
+        desc: Pokaż dostępne aktualizacje zależności
+        detail:
+          what: "Wyświetla listę zależności z dostępnymi nowszymi wersjami."
+          how: "Wymaga plugins versions-maven-plugin. Pomaga utrzymać zależności aktualne."
+          tips:
+            - "mvn versions:use-latest-versions — automatycznie zaktualizuj pom.xml"
+
+      - cmd: mvn spring-boot:build-image
+        desc: Zbuduj obraz Docker przez Cloud Native Buildpacks (bez Dockerfile)
+        detail:
+          what: "Tworzy optymalny obraz Docker bez Dockerfile używając Buildpacks (Paketo)."
+          how: "Wymaga Dockera. Nazwa obrazu z artifactId:version z pom.xml."
+          tips:
+            - "mvn spring-boot:build-image -Dspring-boot.build-image.imageName=myapp:latest"
+            - "Automatyczne layering — szybki rebuild przy zmianach kodu"
+
+  - name: Gradle — uruchomienie i budowanie
+    icon: "🐘"
+    commands:
+      - cmd: ./gradlew bootRun
+        desc: Uruchom aplikację Spring Boot przez Gradle
+        detail:
+          what: "Kompiluje i uruchamia przez spring-boot Gradle plugin."
+          how: "Odpowiednik mvn spring-boot:run. Wymaga pliku gradlew w katalogu projektu."
+          tips:
+            - "./gradlew bootRun --args='--spring.profiles.active=dev'"
+            - "./gradlew bootRun --args='--server.port=9090'"
+
+      - cmd: ./gradlew build
+        desc: Zbuduj projekt i uruchom testy
+        detail:
+          what: "Kompiluje, testuje i pakuje do JAR. Odpowiednik mvn package."
+          how: "Artefakt w build/libs/myapp-1.0.0.jar"
+          tips:
+            - "./gradlew build -x test — pomiń testy"
+            - "./gradlew build --parallel — buduj równolegle (multi-moduł)"
+
+      - cmd: ./gradlew test
+        desc: Uruchom testy jednostkowe
+        detail:
+          what: "Uruchamia wszystkie testy. Raporty HTML w build/reports/tests/test/."
+          how: "JUnit 5 domyślnie. Otwórz raport w przeglądarce: build/reports/tests/test/index.html"
+          tips:
+            - "./gradlew test --tests 'com.example.UserServiceTest'"
+            - "./gradlew test --info — szczegółowe logi"
+
+      - cmd: ./gradlew clean
+        desc: Usuń katalog build/ z poprzednich buildów
+        detail:
+          what: "Usuwa katalog build/ — wymuszone czyste budowanie."
+          how: "Używaj z build: ./gradlew clean build"
+          tips:
+            - "./gradlew clean bootRun — czysty start aplikacji"
+
+      - cmd: ./gradlew bootJar
+        desc: Zbuduj wykonywalny fat JAR (bez uruchamiania)
+        detail:
+          what: "Tworzy JAR ze wszystkimi zależnościami (fat JAR) w build/libs/."
+          how: "Różni się od jar — zawiera embedded Tomcat i wszystkie biblioteki."
+          tips:
+            - "java -jar build/libs/myapp-1.0.0.jar — uruchomienie zbudowanego JAR"
+
+      - cmd: ./gradlew dependencies
+        desc: Wyświetl drzewo zależności
+        detail:
+          what: "Pokazuje wszystkie zależności projektu wraz z tranzitywnymi."
+          how: "Przydatne do debugowania konfliktów wersji i zbędnych zależności."
+          tips:
+            - "./gradlew dependencies --configuration runtimeClasspath"
+            - "./gradlew dependencyInsight --dependency spring-security-core"
+
+      - cmd: ./gradlew tasks
+        desc: Wyświetl dostępne zadania Gradle
+        detail:
+          what: "Lista wszystkich task'ów projektu z opisem. Odkryj niestandardowe taki."
+          how: "Pokazuje pogrupowane taski: build, verification, application."
+          tips:
+            - "./gradlew tasks --all — pokaż wszystkie włącznie z wewnętrznymi"
+
+      - cmd: ./gradlew bootBuildImage
+        desc: Zbuduj obraz Docker przez Cloud Native Buildpacks
+        detail:
+          what: "Tworzy obraz Docker bez Dockerfile przez Paketo Buildpacks."
+          how: "Odpowiednik mvn spring-boot:build-image. Wymaga Dockera."
+          tips:
+            - "./gradlew bootBuildImage --imageName=myapp:latest"
+
+  - name: Spring Initializr — tworzenie projektu
+    icon: "🚀"
+    commands:
+      - cmd: curl https://start.spring.io/starter.zip -d dependencies=web,data-jpa,security -d type=maven-project -d language=java -d bootVersion=3.2.0 -d groupId=com.example -d artifactId=myapp -o myapp.zip
+        desc: Pobierz nowy projekt Spring Boot przez curl (start.spring.io API)
+        detail:
+          what: "Generuje projekt ZIP z wybranymi dependencjami przez REST API start.spring.io."
+          how: "Rozpakuj: unzip myapp.zip. Wszystkie parametry są opcjonalne — mają wartości domyślne."
+          tips:
+            - "dependencies=web,data-jpa,security,actuator,lombok,validation"
+            - "type=gradle-project dla Gradle zamiast Maven"
+
+      - cmd: curl https://start.spring.io/starter.tgz -d dependencies=web,actuator,security | tar -xzvf -
+        desc: Pobierz i natychmiast rozpakuj projekt Spring Boot
+        detail:
+          what: "Pobiera tarball i od razu rozpakowuje w bieżącym katalogu."
+          how: "Szybsza alternatywa — bez ręcznego unzip."
+          tips:
+            - "Dodaj -d baseDir=myapp dla nazwy katalogu"
+
+      - cmd: spring init --dependencies=web,data-jpa --build=maven --java-version=21 myapp
+        desc: Utwórz projekt przez Spring Boot CLI
+        detail:
+          what: "Spring Boot CLI (spring) generuje projekt lokalnie. Wymaga zainstalowania spring CLI."
+          how: "Instalacja: brew install spring-boot (macOS) lub SDKMAN: sdk install springboot"
+          tips:
+            - "spring init --list — pokaż dostępne dependencje i opcje"
+            - "spring init -d=web,security --build=gradle myapp-gradle"
+
+      - cmd: spring init --dependencies=web,data-jpa,security,actuator,lombok --java-version=21 --build=maven --group-id=com.example --artifact-id=myapi --name=MyAPI myapi
+        desc: Pełny przykład tworzenia projektu przez Spring CLI
+        detail:
+          what: "Kompletna komenda z wszystkimi parametrami — gotowy do produkcji projekt."
+          how: "Tworzy katalog myapi/ z pom.xml i pełną strukturą projektu."
+          tips:
+            - "--type=maven-project lub gradle-project"
+            - "--packaging=jar lub war"
+
+  - name: Spring Boot CLI — komendy
+    icon: "⚡"
+    commands:
+      - cmd: spring init
+        desc: Interaktywne tworzenie nowego projektu
+        detail:
+          what: "Interaktywny kreator projektu — pyta o zależności, typ, wersję."
+          how: "Instalacja CLI: sdk install springboot lub brew install spring-boot"
+          tips:
+            - "spring init --list — wyświetl wszystkie dostępne opcje"
+
+      - cmd: spring run HelloWorld.groovy
+        desc: Uruchom skrypt Groovy jako aplikację Spring Boot
+        detail:
+          what: "Spring CLI może uruchamiać skrypty Groovy jako mini-aplikacje bez kompilacji."
+          how: "Plik HelloWorld.groovy z @RestController — uruchamia się natychmiast."
+          tips:
+            - "Przydatne do szybkiego prototypowania i testowania"
+
+      - cmd: spring jar myapp.jar *.groovy
+        desc: Spakuj skrypty Groovy do wykonywalnego JAR
+        detail:
+          what: "Pakuje skrypty Groovy do samodzielnego wykonywalnego JAR."
+          how: "Następnie: java -jar myapp.jar"
+          tips:
+            - "Alternatywa dla Spring Boot: spring jar app.jar app.groovy"
+
+      - cmd: spring install org.springframework.boot:spring-boot-cli-extension:1.0.0
+        desc: Zainstaluj rozszerzenie Spring CLI
+        detail:
+          what: "Dodaje rozszerzenia do Spring CLI z Maven Central."
+          how: "spring uninstall --all — usuń wszystkie rozszerzenia"
+          tips:
+            - "spring install <group>:<artifact>:<version>"
+
+      - cmd: spring --version
+        desc: Sprawdź wersję Spring Boot CLI
+        detail:
+          what: "Wyświetla zainstalowaną wersję Spring Boot CLI."
+          how: "spring help — lista dostępnych komend"
+          tips:
+            - "sdk upgrade springboot — aktualizacja przez SDKMAN"
+
+  - name: Docker i packaging
+    icon: "🐳"
+    commands:
+      - cmd: docker build -t myapp:latest .
+        desc: Zbuduj obraz Docker z Dockerfile
+        detail:
+          what: "Buduje obraz Docker na podstawie Dockerfile w bieżącym katalogu."
+          how: "Wymaga pliku Dockerfile z FROM eclipse-temurin:21-jre lub podobnego."
+          tips:
+            - "Wieloetapowy build: FROM maven AS build → FROM eclipse-temurin AS runtime"
+            - "docker build -t myapp:$(git rev-parse --short HEAD) . — tag z commitem"
+
+      - cmd: docker run -p 8080:8080 -e SPRING_PROFILES_ACTIVE=prod myapp:latest
+        desc: Uruchom kontener Spring Boot z profilem prod
+        detail:
+          what: "Startuje kontener z mapowaniem portu i zmienną środowiskową profilu."
+          how: "Zmienne środowiskowe nadpisują application.properties (SPRING_ prefix)."
+          tips:
+            - "docker run -p 8080:8080 -e DB_URL=jdbc:postgresql://host/db myapp:latest"
+            - "docker run -d --name myapp myapp:latest — w tle (detached)"
+
+      - cmd: mvn spring-boot:build-image -Dspring-boot.build-image.imageName=myapp:latest
+        desc: Zbuduj obraz Docker bez Dockerfile przez Maven Buildpacks
+        detail:
+          what: "Paketo Buildpacks analizuje projekt i buduje optymalny obraz bez Dockerfile."
+          how: "Automatyczne: warstwy, JVM, optymalizacje. Wymaga działającego Dockera."
+          tips:
+            - "Najlepsze podejście dla nowych projektów — zero Dockerfile maintenance"
+
+      - cmd: java -jar target/myapp-1.0.0.jar --server.port=9090 --spring.profiles.active=prod
+        desc: Uruchom fat JAR z nadpisaniem właściwości przez argumenty
+        detail:
+          what: "Uruchamia fat JAR. Argumenty linii komend mają najwyższy priorytet w Spring."
+          how: "Kolejność priorytetów: args > env vars > application-{profile}.properties > application.properties"
+          tips:
+            - "java -jar app.jar --spring.config.location=file:/etc/myapp/config.yml"
+            - "java -Xmx512m -jar app.jar — limity pamięci JVM"
+
+      - cmd: java -jar target/myapp-1.0.0.jar
+        desc: Uruchom zbudowany JAR bezpośrednio
+        detail:
+          what: "Uruchomienie wykonywalne fat JAR z embedded Tomcat."
+          how: "Szybkie sprawdzenie czy produkcyjny build działa poprawnie."
+          tips:
+            - "JAVA_OPTS='-Xmx1g -Xms512m' java $JAVA_OPTS -jar app.jar"
+
+  - name: Actuator — endpointy przez curl
+    icon: "📊"
+    commands:
+      - cmd: curl http://localhost:8080/actuator
+        desc: Lista wszystkich dostępnych endpointów Actuator
+        detail:
+          what: "Zwraca JSON z linkami do wszystkich aktywnych endpointów."
+          how: "Wymaga management.endpoints.web.exposure.include=* lub listy endpointów."
+          tips:
+            - "Odpowiedź zawiera _links z href do każdego endpointu"
+
+      - cmd: curl http://localhost:8080/actuator/health
+        desc: Sprawdź stan zdrowia aplikacji (health check)
+        detail:
+          what: "Zwraca status: UP/DOWN/OUT_OF_SERVICE. Sprawdza DB, Redis, disk space itp."
+          how: "Domyślnie zawsze aktywny. Używany przez Kubernetes liveness/readiness probes."
+          tips:
+            - "management.endpoint.health.show-details=always — pełne szczegóły"
+            - "Odpowiedź: {status: 'UP', components: {db: {status: 'UP'}}}"
+
+      - cmd: curl http://localhost:8080/actuator/health/liveness
+        desc: Kubernetes liveness probe endpoint
+        detail:
+          what: "Sprawdza czy aplikacja żyje (nie ma deadlocka). Kubernetes restartuje pod jeśli DOWN."
+          how: "Wymaga: management.endpoint.health.probes.enabled=true"
+          tips:
+            - "curl http://localhost:8080/actuator/health/readiness — readiness probe"
+
+      - cmd: curl http://localhost:8080/actuator/metrics
+        desc: Lista wszystkich dostępnych metryk
+        detail:
+          what: "Zwraca listę nazw metryk: JVM, HTTP, datasource, cache, custom."
+          how: "Odpowiedź: {names: ['jvm.memory.used', 'http.server.requests', ...]}"
+          tips:
+            - "Następnie: curl /actuator/metrics/jvm.memory.used"
+
+      - cmd: curl "http://localhost:8080/actuator/metrics/http.server.requests"
+        desc: Pobierz szczegóły metryki HTTP requests
+        detail:
+          what: "Statystyki żądań HTTP — count, total czas, max czas per endpoint."
+          how: "Odpowiedź zawiera measurements: COUNT, TOTAL_TIME, MAX"
+          tips:
+            - "curl '/actuator/metrics/http.server.requests?tag=uri:/api/users'"
+            - "curl '/actuator/metrics/jvm.memory.used?tag=area:heap'"
+
+      - cmd: curl http://localhost:8080/actuator/env
+        desc: Pobierz wszystkie właściwości środowiska aplikacji
+        detail:
+          what: "Zwraca wszystkie właściwości: system env, JVM props, application.properties."
+          how: "UWAGA: może eksponować sekrety w środowisku. Zabezpiecz w produkcji."
+          tips:
+            - "curl http://localhost:8080/actuator/env/server.port — konkretna właściwość"
+
+      - cmd: curl http://localhost:8080/actuator/beans
+        desc: Lista wszystkich zarejestrowanych Spring Beanów
+        detail:
+          what: "Pokazuje wszystkie beany w kontekście Spring — nazwa, typ, zależności."
+          how: "Przydatne do debugowania DI i sprawdzenia co jest załadowane."
+          tips:
+            - "Filtruj przez jq: curl /actuator/beans | jq '.contexts.application.beans | keys'"
+
+      - cmd: curl http://localhost:8080/actuator/mappings
+        desc: Lista wszystkich URL mappingów (endpointów REST)
+        detail:
+          what: "Wszystkie zarejestrowane URL handlery — metoda HTTP, ścieżka, handler."
+          how: "Pomocne przy debugowaniu 404 lub konfliktach URL."
+          tips:
+            - "Pokazuje też Actuator i Spring Security mappingi"
+
+      - cmd: curl -X POST http://localhost:8080/actuator/loggers/com.example -H 'Content-Type:application/json' -d '{"configuredLevel":"DEBUG"}'
+        desc: Zmień poziom logowania w runtime bez restartu
+        detail:
+          what: "Dynamicznie zmienia log level dla pakietu. Nie wymaga restartu aplikacji."
+          how: "Bardzo przydatne do debugowania produkcji bez downtime."
+          tips:
+            - "curl /actuator/loggers/com.example — sprawdź aktualny poziom"
+            - "Ustaw null żeby zresetować do domyślnego"
+
+      - cmd: curl http://localhost:8080/actuator/threaddump
+        desc: Pobierz thread dump aplikacji
+        detail:
+          what: "Dump wszystkich wątków JVM — stan, stack trace, blokady."
+          how: "Kluczowe do diagnozowania deadlocków i wysokiego CPU."
+          tips:
+            - "curl /actuator/threaddump > threaddump.json && python3 -m json.tool threaddump.json"
+
+      - cmd: curl http://localhost:8080/actuator/heapdump -o heapdump.hprof
+        desc: Pobierz heap dump do analizy pamięci
+        detail:
+          what: "Pobiera snapshot pamięci JVM. Plik HPROF do analizy w Eclipse MAT lub VisualVM."
+          how: "UWAGA: plik może być duży (MB-GB). Ostrożnie w produkcji."
+          tips:
+            - "Otwórz w Eclipse Memory Analyzer (MAT) lub VisualVM"
+
+      - cmd: curl http://localhost:8080/actuator/info
+        desc: Informacje o aplikacji (wersja, opis, custom info)
+        detail:
+          what: "Zwraca informacje zdefiniowane w application.properties pod kluczem info.*"
+          how: "Wymaga: management.info.env.enabled=true i management.endpoint.info.enabled=true"
+          tips:
+            - "info.app.version=@project.version@ — wersja z pom.xml automatycznie"
+
+      - cmd: curl http://localhost:8080/actuator/conditions
+        desc: Sprawdź warunki auto-konfiguracji (które beany zostały załadowane i dlaczego)
+        detail:
+          what: "Pokazuje wyniki @Conditional — co zostało załadowane i co pominięte i dlaczego."
+          how: "Bezcenne do debugowania auto-konfiguracji i zrozumienia dlaczego bean nie istnieje."
+          tips:
+            - "Szukaj positiveMatches i negativeMatches dla konkretnej klasy"
+
+      - cmd: curl http://localhost:8080/actuator/configprops
+        desc: Lista wszystkich właściwości @ConfigurationProperties
+        detail:
+          what: "Pokazuje wszystkie bindowane ConfigurationProperties z wartościami."
+          how: "Weryfikuj że konfiguracja aplikacji jest prawidłowo odczytana."
+          tips:
+            - "Wartości wrażliwe są maskowane automatycznie (password, secret)"
+
+  - name: Testing
+    icon: "🧪"
+    commands:
+      - cmd: mvn test -Dtest=UserServiceTest
+        desc: Uruchom konkretny test klasy przez Maven
+        detail:
+          what: "Uruchamia tylko testy z klasy UserServiceTest."
+          how: "Szybsze niż uruchamianie wszystkich testów podczas TDD."
+          tips:
+            - "mvn test -Dtest=UserServiceTest#findById — konkretna metoda"
+            - "mvn test -Dtest='User*Test' — wildcard po nazwie"
+
+      - cmd: mvn test -Dtest=UserServiceTest -Dspring.profiles.active=test
+        desc: Uruchom test z konkretnym Spring Profilem
+        detail:
+          what: "Aktywuje profil test, który może ładować application-test.properties."
+          how: "Przydatne gdy testy wymagają osobnej bazy danych lub mocków."
+          tips:
+            - "Profil test może używać H2 zamiast PostgreSQL"
+
+      - cmd: ./gradlew test --tests 'com.example.*IntegrationTest'
+        desc: Uruchom testy integracyjne przez Gradle
+        detail:
+          what: "Wildcard pattern dla testów integracyjnych oddzielonych od jednostkowych."
+          how: "Konwencja: *Test.java = jednostkowe, *IntegrationTest.java = integracyjne."
+          tips:
+            - "./gradlew test --tests 'com.example.UserControllerTest.shouldReturn200'"
+
+      - cmd: mvn verify -Pfailsafe
+        desc: Uruchom testy integracyjne przez Failsafe Plugin
+        detail:
+          what: "Failsafe Plugin uruchamia *IT.java testy po fazie package — startuje aplikację."
+          how: "Klasy *IT.java są traktowane jako integration tests przez Failsafe."
+          tips:
+            - "mvn verify -Dfailsafe.useFile=false — output na konsolę"
+
+      - cmd: mvn test -pl module-name
+        desc: Uruchom testy w konkretnym module Maven (multi-moduł)
+        detail:
+          what: "W projekcie wielomodułowym uruchamia testy tylko w podanym module."
+          how: "mvn test -pl api-module — tylko moduł api-module"
+          tips:
+            - "mvn test -pl api-module,service-module — kilka modułów"
+            - "mvn test -pl . — tylko root moduł"
+
+  - name: "Flyway — migracje bazy danych"
+    icon: "🦋"
+    commands:
+      - cmd: mvn flyway:migrate
+        desc: Wykonaj oczekujące migracje bazy danych przez Maven
+        detail:
+          what: "Uruchamia wszystkie nowe migracje SQL (od ostatniej wykonanej wersji)."
+          how: "Wymaga flyway-maven-plugin i konfiguracji połączenia w pom.xml lub application.properties."
+          tips:
+            - "mvn flyway:migrate -Dflyway.url=jdbc:postgresql://localhost/mydb"
+            - "Wykonuje tylko nowe migracje — bezpieczne uruchamianie wielokrotnie"
+
+      - cmd: mvn flyway:info
+        desc: Sprawdź status migracji Flyway
+        detail:
+          what: "Pokazuje listę migracji: Pending (oczekujące), Success (wykonane), Failed (błędy)."
+          how: "Używaj przed migrate żeby zobaczyć co zostanie wykonane."
+          tips:
+            - "Tabela flyway_schema_history przechowuje historię"
+
+      - cmd: mvn flyway:repair
+        desc: Napraw tabelę historii Flyway po błędzie
+        detail:
+          what: "Usuwa wpisy Failed migracji z flyway_schema_history. Po repair możesz retry."
+          how: "Użyj gdy migracja nie udała się a Flyway blokuje kolejne uruchomienia."
+          tips:
+            - "Po repair popraw SQL i uruchom mvn flyway:migrate ponownie"
+
+      - cmd: ./gradlew flywayMigrate
+        desc: Wykonaj migracje Flyway przez Gradle
+        detail:
+          what: "Odpowiednik mvn flyway:migrate dla projektów Gradle."
+          how: "Wymaga pluginu Flyway w build.gradle: plugins { id 'org.flywaydb.flyway' version '9.x.x' }"
+          tips:
+            - "./gradlew flywayInfo — sprawdź status migracji"
+            - "./gradlew flywayClean — usuń wszystkie obiekty schema (UWAGA: niszczy dane!)"
