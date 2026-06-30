@@ -89,6 +89,7 @@ import { FW_SPRINGBOOT_DATA }   from '../data/fw_springboot.js';
 import { FW_SEQUELIZE_DATA }    from '../data/fw_sequelize.js';
 import { FW_SQLITE_DATA }       from '../data/fw_sqlite.js';
 import { FW_ANSIBLE_DATA }      from '../data/fw_ansible.js';
+import { FW_PROMETHEUS_DATA }  from '../data/fw_prometheus.js';
 
 let activeTab = 'podstawy';
 let activeFw  = 'react';
@@ -166,6 +167,7 @@ const FW_DATA_MAP = {
   sequelize:       FW_SEQUELIZE_DATA,
   sqlite:          FW_SQLITE_DATA,
   ansible:         FW_ANSIBLE_DATA,
+  prometheus:      FW_PROMETHEUS_DATA,
 };
 
 export function openFramework(fw) {

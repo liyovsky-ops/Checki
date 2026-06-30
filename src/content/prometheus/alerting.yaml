@@ -1,0 +1,327 @@
+title: Alerting — Reguły i Alertmanager
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Prometheus ocenia reguły alertów co evaluation_interval (domyślnie 15s). Gdy wyrażenie
+  PromQL zwróci wartość, alert przechodzi w stan "pending". Po upływie czasu "for:" — firing.
+  Alertmanager odbiera alerty od Prometheusa i zarządza routingiem (Slack, PagerDuty, email),
+  grupowaniem, silencami i inhibicjami. Wzorzec RED (Rate/Errors/Duration) i Golden Signals
+  to fundament alertów na serwisy aplikacyjne.
+
+items:
+  - name: Reguły alertów — format
+    desc: >
+      Plik reguł to YAML z grupami alertów. Każdy alert ma: expr (PromQL gdy firing),
+      for (czas pending → firing), labels (routing w Alertmanager), annotations (opis dla on-call).
+      "for:" eliminuje false positives z chwilowych skoków. Referencja w prometheus.yml przez rule_files.
+    code: |
+      # /etc/prometheus/rules/alerts.yml
+
+      groups:
+        - name: infrastructure
+          # interval: 1m  # opcjonalnie nadpisz evaluation_interval per group
+          rules:
+
+            # Alert: instancja niedostępna
+            - alert: InstanceDown
+              expr: up == 0
+              for: 2m                  # pending → firing po 2 minutach
+              labels:
+                severity: critical     # używane do routingu w Alertmanager
+                team: infra
+              annotations:
+                summary: "Instancja {{ $labels.instance }} jest niedostępna"
+                description: >
+                  Job {{ $labels.job }} na {{ $labels.instance }}
+                  nie odpowiada od ponad 2 minut.
+                runbook_url: "https://wiki.example.com/runbooks/instance-down"
+
+            # Alert: wysokie CPU
+            - alert: HighCPUUsage
+              expr: >
+                100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+                > 85
+              for: 10m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Wysokie CPU na {{ $labels.instance }}"
+                description: "CPU: {{ $value | printf \"%.1f\" }}% od 10 minut"
+
+            # Alert: wysoki error rate (> 5%)
+            - alert: HighErrorRate
+              expr: >
+                sum by(job) (rate(http_requests_total{status=~"5.."}[5m]))
+                / sum by(job) (rate(http_requests_total[5m]))
+                > 0.05
+              for: 5m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Wysoki error rate w {{ $labels.job }}"
+                description: "Error rate: {{ $value | humanizePercentage }}"
+
+            # Alert: dysk pełny za < 4h (predykcja)
+            - alert: DiskWillFillIn4h
+              expr: >
+                predict_linear(
+                  node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}[1h],
+                  4 * 3600
+                ) < 0
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Dysk {{ $labels.mountpoint }} zapełni się w 4h"
+
+            # Alert: metryka zniknęła z Prometheusa
+            - alert: ServiceDown
+              expr: absent(up{job="critical-api"}) == 1
+              for: 1m
+              labels:
+                severity: critical
+              annotations:
+                summary: "critical-api nie raportuje do Prometheusa"
+
+  - name: Recording rules
+    desc: >
+      Recording rules pre-obliczają kosztowne wyrażenia PromQL i zapisują wynik
+      jako nowe serie danych. Dashboardy odpytują gotowe serie zamiast obliczać w locie —
+      przyśpieszenie 10–100x dla skomplikowanych queries na dużych danych.
+    code: |
+      # /etc/prometheus/rules/recording_rules.yml
+
+      groups:
+        - name: http_recording
+          interval: 1m               # jak często przeliczać (domyślnie: global evaluation_interval)
+          rules:
+            # Konwencja nazw: level:metric:operations
+            - record: job:http_requests_total:rate5m
+              expr: sum by (job, status) (rate(http_requests_total[5m]))
+
+            - record: job:http_request_duration_p99:5m
+              expr: >
+                histogram_quantile(0.99,
+                  sum by (job, le) (
+                    rate(http_request_duration_seconds_bucket[5m])
+                  )
+                )
+
+            - record: instance:node_cpu_utilization:avg5m
+              expr: >
+                100 - (
+                  avg by(instance) (
+                    irate(node_cpu_seconds_total{mode="idle"}[5m])
+                  ) * 100
+                )
+
+            - record: instance:node_memory_utilization:ratio
+              expr: >
+                (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+                / node_memory_MemTotal_bytes
+
+      # W dashboardzie Grafana zamiast drogiego zapytania:
+      #   histogram_quantile(0.99, sum by (job, le) (rate(http_request_duration_seconds_bucket[5m])))
+      # Używamy gotowej metryki:
+      #   job:http_request_duration_p99:5m
+
+  - name: Alertmanager — routing alertów
+    desc: >
+      Alertmanager odbiera alerty od Prometheusa i decyduje: komu wysłać, kiedy i jak.
+      Route to drzewo decyzyjne — każdy alert przechodzi przez nie od góry. group_by
+      grupuje alerty w jeden komunikat. group_wait zbiera alerty przed pierwszą notyfikacją.
+    code: |
+      # /etc/alertmanager/alertmanager.yml
+
+      global:
+        resolve_timeout: 5m
+        smtp_smarthost: 'smtp.gmail.com:587'
+        smtp_from: 'alerts@company.com'
+
+      templates:
+        - '/etc/alertmanager/templates/*.tmpl'
+
+      route:
+        group_by: ['alertname', 'cluster', 'service']
+        group_wait: 30s        # czekaj na zebranie alertów z grupy przed wysłaniem
+        group_interval: 5m     # min czas między kolejnymi notyfikacjami tej grupy
+        repeat_interval: 4h    # powtarzaj jeśli nadal firing
+        receiver: 'slack-default'
+
+        routes:
+          # Critical → PagerDuty + Slack
+          - match:
+              severity: critical
+            receiver: 'pagerduty-critical'
+            continue: true     # continue=true → idzie też do następnych routes
+
+          - match:
+              severity: critical
+            receiver: 'slack-critical'
+
+          # Team database → dedykowany kanał
+          - match_re:
+              team: 'database|dba'
+            receiver: 'slack-dba'
+            group_wait: 1m    # nadpisz global dla tego route
+
+      receivers:
+        - name: 'slack-default'
+          slack_configs:
+            - api_url: 'https://hooks.slack.com/services/TOKEN'
+              channel: '#alerts'
+              send_resolved: true
+              title: '{{ template "slack.default.title" . }}'
+              text: '{{ template "slack.default.text" . }}'
+              color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+
+        - name: 'slack-critical'
+          slack_configs:
+            - api_url: 'https://hooks.slack.com/services/TOKEN'
+              channel: '#alerts-critical'
+              send_resolved: true
+
+        - name: 'pagerduty-critical'
+          pagerduty_configs:
+            - service_key: 'PAGERDUTY_KEY'
+
+        - name: 'slack-dba'
+          slack_configs:
+            - api_url: 'https://hooks.slack.com/services/TOKEN'
+              channel: '#db-alerts'
+
+  - name: Silences i inhibitions
+    desc: >
+      Silence wycisza alerty na czas planowanych prac (maintenance). Inhibition rule
+      automatycznie wycisza alerty niższego priorytetu gdy krytyczny jest aktywny —
+      redukuje szum (np. wycisz alerty aplikacji gdy serwer jest down).
+    code: |
+      # SILENCES — przez amtool CLI
+
+      # Wycisz instancję na 2h podczas maintenance
+      amtool silence add \
+        alertname=".*" \
+        instance="web-01:9100" \
+        --comment="Planned maintenance window" \
+        --author="ops-team" \
+        --duration=2h
+
+      # Wycisz wszystkie warning alerty podczas load testów
+      amtool silence add \
+        'severity=~"warning|info"' \
+        --duration=30m \
+        --comment="Load testing in progress"
+
+      # Lista aktywnych silences
+      amtool silence list
+
+      # Wygaś silence przed czasem
+      amtool silence expire <silence-id>
+
+      # ---
+
+      # INHIBITION RULES — w alertmanager.yml
+
+      inhibit_rules:
+        # Wycisz warning gdy critical dla tej samej instancji/alertname
+        - source_match:
+            severity: critical
+          target_match:
+            severity: warning
+          equal: ['alertname', 'instance']
+
+        # Wycisz alerty aplikacji gdy node jest down
+        - source_match:
+            alertname: NodeDown
+          target_match_re:
+            alertname: '.+'
+          equal: ['instance']
+
+        # Wycisz staging alerty gdy env != staging
+        - source_match:
+            alertname: StagingMaintenance
+          target_match:
+            env: staging
+
+  - name: RED method i Golden Signals
+    desc: >
+      RED method (Rate/Errors/Duration) — standardowe metryki dla każdego serwisu HTTP.
+      USE method (Utilization/Saturation/Errors) — dla zasobów infrastruktury.
+      Google's Four Golden Signals — biznesowy widok zdrowia systemu.
+    code: |
+      # RED METHOD — 3 alerty per serwis HTTP
+      # R — Rate: requestów/sekundę (czy serwis żyje?)
+      sum(rate(http_requests_total[5m])) > 0
+
+      # E — Errors: procent błędów (czy serwis działa poprawnie?)
+      # Alert gdy > 5% błędów przez 5 minut:
+      sum(rate(http_requests_total{status=~"5.."}[5m]))
+        / sum(rate(http_requests_total[5m])) > 0.05
+
+      # D — Duration: p99 latencji (czy serwis jest szybki?)
+      # Alert gdy p99 > 2 sekundy:
+      histogram_quantile(0.99,
+        sum by (le) (rate(http_request_duration_seconds_bucket[5m]))
+      ) > 2.0
+
+      # USE METHOD — dla zasobów
+      # U — CPU Utilization
+      1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))
+      # S — CPU Saturation (load average vs cores)
+      node_load1 / count without(cpu, mode) (node_cpu_seconds_total{mode="idle"})
+      # E — Network errors
+      rate(node_network_receive_errs_total[5m]) > 0
+
+      # SLO / ERROR BUDGET
+      # SLI: procent requestów zakończonych sukcesem (< 500ms, nie 5xx)
+      sum(rate(http_requests_total{status!~"5.."}[5m]))
+        / sum(rate(http_requests_total[5m]))
+
+      # Alert gdy error budget skonsumowany w > 2% (przy SLO = 99.9%)
+      1 - (
+        sum(increase(http_requests_total{status!~"5.."}[30d]))
+          / sum(increase(http_requests_total[30d]))
+      ) > 0.001    # > 0.1% błędów = poza SLO
+
+  - name: Anti-patterns alertów
+    desc: >
+      Najczęstsze błędy przy konfiguracji alertów — alert fatigue, alertowanie na przyczyny
+      zamiast objawów, brak runbook_url, zbyt krótkie okno "for:". Dobre alerty budzą
+      człowieka tylko gdy faktycznie można coś zrobić.
+    code: |
+      # ZŁE: alertowanie na każdy spike (brak "for:")
+      - alert: HighCPU
+        expr: node_cpu_usage > 0.8
+        # BRAK for: → alert na chwilowy spike = false positive
+
+      # DOBRE: alert dopiero po ustabilizowaniu
+      - alert: HighCPU
+        expr: node_cpu_usage > 0.8
+        for: 10m    # CPU > 80% przez co najmniej 10 minut
+
+      # ---
+
+      # ZŁE: alertowanie na przyczynę (infrastruktura)
+      - alert: HighCPU
+        expr: cpu_usage > 0.95
+        # "Co mam zrobić? Nie wiem czy to wpływa na użytkowników"
+
+      # DOBRE: alertowanie na objaw (użytkownik)
+      - alert: HighLatency
+        expr: histogram_quantile(0.99, ...) > 2.0
+        # "p99 latencja > 2s → użytkownicy odczuwają degradację"
+
+      # ---
+
+      # Każdy alert MUSI mieć runbook_url:
+      annotations:
+        runbook_url: "https://wiki.company.com/runbooks/{{ $labels.alertname }}"
+        # On-call bez runbooka = panika o 3 w nocy
+
+      # Severity levels z definicją:
+      # critical → budzi człowieka o 3 w nocy, page przez PagerDuty
+      # warning  → sprawdź rano, Slack #alerts
+      # info     → FYI, tylko w dashboardzie (nie przez Alertmanager)

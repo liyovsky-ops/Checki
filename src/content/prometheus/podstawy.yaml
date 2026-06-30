@@ -1,0 +1,200 @@
+title: Prometheus — Podstawy
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Prometheus to open-source system monitorowania i alertów oparty na modelu pull — serwer
+  aktywnie scrapuje endpointy /metrics z monitorowanych aplikacji w zdefiniowanych interwałach.
+  Dane przechowywane są w lokalnej bazie TSDB (Time Series Database) z własnym językiem
+  zapytań PromQL. Standard CNCF (Cloud Native Computing Foundation) — natywny dla Kubernetes.
+  Ekosystem: Prometheus + Grafana (wizualizacja) + Alertmanager (routing alertów) = kompletny stack.
+
+items:
+  - name: Architektura — pull model
+    desc: >
+      Prometheus nie czeka na dane — sam je pobiera (scrape) przez HTTP GET do endpointów
+      /metrics co ustalony interwał. Pull model upraszcza wykrywanie awarii (brak danych = down)
+      i centralizuje konfigurację scrapowania w jednym miejscu.
+    code: |
+      # Architektura Prometheusa
+      #
+      #  [Aplikacja Python]  ←── GET /metrics ───┐
+      #  [Node Exporter]     ←── GET /metrics ───┤  Prometheus Server
+      #  [Redis Exporter]    ←── GET /metrics ───┘       │
+      #                                                    ├── TSDB (local storage)
+      #  [Pushgateway] ←── push ── [Cron job]             ├── PromQL engine
+      #       └──── GET /metrics ──► Prometheus            ├── Alert evaluation
+      #                                                    │
+      #  [Alertmanager] ◄── alerts ─────────────────────┘
+      #       │
+      #       ├── Slack / PagerDuty / email
+      #
+      #  [Grafana] ──── PromQL queries ────► Prometheus API
+
+      # Domyślne porty:
+      # Prometheus:    9090
+      # Alertmanager:  9093
+      # node_exporter: 9100
+      # Grafana:       3000
+
+  - name: 4 typy metryk
+    desc: >
+      Prometheus definiuje 4 typy metryk. Counter — tylko rośnie (requesty, błędy). Gauge —
+      dowolna wartość (RAM, temperatura, długość kolejki). Histogram — rozkład wartości w bucketach
+      (latencja, rozmiar). Summary — percentyle liczone po stronie klienta.
+    code: |
+      # COUNTER — wartość tylko rośnie, reset przy restarcie
+      # Używaj z rate() lub increase() — surowe wartości bezużyteczne w grafach
+      # Konwencja: sufiks _total
+      http_requests_total{method="GET", status="200"} 1234
+      errors_total{type="timeout"} 42
+
+      # GAUGE — wartość rośnie i maleje, bieżący stan
+      # Używaj bezpośrednio lub z avg_over_time()
+      memory_usage_bytes 536870912
+      active_connections 47
+      queue_depth 12
+      cpu_temperature_celsius 72.5
+
+      # HISTOGRAM — obserwacje w bucketach (cumulative!)
+      # Generuje: _bucket{le="..."}, _sum, _count
+      # le = "less or equal" — buckety kumulatywne
+      http_request_duration_seconds_bucket{le="0.1"} 800
+      http_request_duration_seconds_bucket{le="0.5"} 950
+      http_request_duration_seconds_bucket{le="1.0"} 990
+      http_request_duration_seconds_bucket{le="+Inf"} 1000
+      http_request_duration_seconds_sum 234.7
+      http_request_duration_seconds_count 1000
+
+      # SUMMARY — percentyle po stronie klienta (nie można agregować!)
+      # Używaj gdy masz 1 instancję lub potrzebujesz dokładnych percentyli
+      rpc_duration_seconds{quantile="0.5"} 0.05
+      rpc_duration_seconds{quantile="0.95"} 0.12
+      rpc_duration_seconds{quantile="0.99"} 0.25
+      rpc_duration_seconds_sum 1234.5
+      rpc_duration_seconds_count 10000
+
+  - name: Labels — identyfikacja serii
+    desc: >
+      Labels to pary klucz-wartość dołączone do metryki. Każda unikalna kombinacja
+      wartości labeli = osobna seria w TSDB. Prometheus automatycznie dodaje job i instance
+      przy scrapowaniu. Pułapka: cardinality explosion — nigdy nie używaj user_id, IP, session_id.
+    code: |
+      # Format: metric_name{label="value", ...} wartość [timestamp]
+      http_requests_total{method="GET", status="200", handler="/api/users"} 1234
+
+      # Prometheus dodaje automatycznie:
+      # job="node_exporter"      — z konfiguracji scrape_config
+      # instance="server1:9100"  — z targets
+
+      # DOBRY label (ograniczona liczba wartości)
+      http_requests_total{status="200"}   # statusów HTTP jest ~10
+      http_requests_total{method="GET"}   # metod HTTP jest ~7
+      http_requests_total{region="eu"}    # regionów jest ~5
+
+      # ZŁY label (cardinality explosion!)
+      # http_requests_total{user_id="12345"}     # miliony unikalnych wartości!
+      # http_requests_total{url="/api?token=xyz"} # nieskończona kardynalność
+      # http_requests_total{ip="203.0.113.1"}    # każdy IP = nowa seria
+
+      # Sprawdzenie kardynalności
+      # topk(10, count by (__name__)({__name__!=""}))
+      # prometheus_tsdb_head_series   # ile active series w RAM
+
+  - name: Naming conventions
+    desc: >
+      Konwencje nazewnictwa metryk Prometheusa — snake_case, sufiks jednostki,
+      _total dla counterów. Czytelne nazwy eliminują potrzebę komentarzy w dashboardach.
+    code: |
+      # Format: namespace_subsystem_unit_suffix
+      # namespace = aplikacja lub eksporter
+      # subsystem = komponent (opcjonalny)
+      # unit      = jednostka (bytes, seconds, ratio)
+      # suffix    = _total (counter), _info (gauge info metric)
+
+      # DOBRE nazwy
+      prometheus_http_request_duration_seconds_bucket
+      node_cpu_seconds_total
+      node_memory_MemAvailable_bytes
+      process_resident_memory_bytes
+      go_goroutines                    # bez sufiksu gdy brak jednostki
+      http_requests_total              # _total dla counterów
+
+      # ZASADY
+      # - snake_case (nie camelCase, nie kebab-case)
+      # - Jednostki: _bytes, _seconds, _ratio (nie MB, ms, %)
+      # - Nie dubluj jednostek: nie node_disk_bytes_bytes
+      # - _info dla metryk opisowych (gauge=1, dużo labeli z metadanymi):
+      build_info{version="1.2.3", commit="abc123", branch="main"} 1
+
+  - name: Format exposition (text)
+    desc: >
+      Każdy endpoint /metrics zwraca tekst w formacie Prometheus Text Exposition Format.
+      Aplikacja lub eksporter generuje ten tekst — Prometheus odczytuje go przy każdym
+      scrapowaniu. Format jest prosty i czytelny dla człowieka.
+    code: |
+      # Przykład output /metrics (co widzi Prometheus)
+
+      # HELP http_requests_total Total HTTP requests received
+      # TYPE http_requests_total counter
+      http_requests_total{method="GET",status="200"} 1234 1704067200000
+
+      # HELP process_resident_memory_bytes Resident memory size in bytes
+      # TYPE process_resident_memory_bytes gauge
+      process_resident_memory_bytes 536870912
+
+      # HELP http_request_duration_seconds HTTP request duration histogram
+      # TYPE http_request_duration_seconds histogram
+      http_request_duration_seconds_bucket{le="0.05"} 800
+      http_request_duration_seconds_bucket{le="0.1"} 900
+      http_request_duration_seconds_bucket{le="0.5"} 970
+      http_request_duration_seconds_bucket{le="+Inf"} 1000
+      http_request_duration_seconds_sum 234.7
+      http_request_duration_seconds_count 1000
+
+      # Timestamp (unix miliseconds) — opcjonalny, Prometheus doda swój
+
+  - name: prometheus.yml — konfiguracja scrape
+    desc: >
+      Główny plik konfiguracyjny Prometheusa. Definiuje globalne ustawienia, pliki reguł,
+      połączenie z Alertmanagerem oraz scrapowane targety (scrape_configs). Reload bez
+      restartu przez POST /-/reload (flaga --web.enable-lifecycle).
+    code: |
+      # /etc/prometheus/prometheus.yml
+
+      global:
+        scrape_interval: 15s         # jak często scrapować targety
+        evaluation_interval: 15s     # jak często oceniać reguły alertów
+        scrape_timeout: 10s          # timeout per scrape request
+        external_labels:
+          cluster: 'prod-eu'         # dołączane do alertów i remote_write
+          replica: '0'
+
+      rule_files:
+        - 'rules/*.yml'              # pliki z alertami i recording rules
+
+      alerting:
+        alertmanagers:
+          - static_configs:
+              - targets: ['alertmanager:9093']
+
+      scrape_configs:
+        - job_name: 'prometheus'
+          static_configs:
+            - targets: ['localhost:9090']
+
+        - job_name: 'node_exporter'
+          scrape_interval: 30s       # nadpisuje globalny dla tego joba
+          static_configs:
+            - targets:
+                - 'server1:9100'
+                - 'server2:9100'
+              labels:
+                env: production      # dodatkowe labels do wszystkich serii z tego job
+
+        - job_name: 'my_python_app'
+          metrics_path: /metrics     # domyślnie, można zmienić
+          static_configs:
+            - targets: ['app:8000']

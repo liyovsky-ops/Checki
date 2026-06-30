@@ -1,0 +1,140 @@
+title: Prometheus vs alternatywy monitoring
+
+items:
+  - name: VictoriaMetrics
+    icon: "⚡"
+    color: "#4285f4"
+    tagline: "Drop-in replacement dla Prometheusa — 10x lepsza kompresja, single-node do 100M series"
+    pros:
+      - "Kompresja do 10× lepsza niż Prometheus — mniejszy dysk, niższe koszty storage"
+      - "5× mniejsze zużycie RAM przy tej samej liczbie aktywnych serii"
+      - "Single-node: do 100 milionów active series (vs ~10M dla Prometheus)"
+      - "Wbudowany long-term storage — nie potrzebujesz Thanosa ani S3"
+      - "PromQL kompatybilny + MetricsQL (nadzbiór z rollup(), quantiles(), outliers())"
+      - "Akceptuje remote_write od Prometheusa — migracja przez zmianę jednej linii"
+      - "Klaster dla setek milionów serii: vmstorage + vminsert + vmselect"
+      - "vmagent — lekki zamiennik całego Prometheusa (scraping + remote_write)"
+    cons:
+      - "Mniejszy ekosystem niż Prometheus — mniej integracji, mniej dokumentacji"
+      - "MetricsQL (rozszerzenia) nie przeniosą się na inny system bez przepisania"
+      - "Grafana community mniejsza niż dla Prometheusa"
+      - "Prometheus Operator (Kubernetes CRDs) nie zarządza natywnie VictoriaMetrics"
+      - "Brak natywnego OTLP receiver (dostępne przez vmagent z OpenTelemetry)"
+    vs: "VictoriaMetrics gdy masz high cardinality problem (>100k unikalnych kombinacji labeli),
+         ograniczone zasoby RAM/dysk, lub potrzebujesz prostego long-term storage bez S3.
+         Prometheus gdy potrzebujesz pełnego ekosystemu CNCF, Prometheus Operatora z CRDs,
+         lub Thanosa dla multi-cluster federation. Można uruchamiać obydwa jednocześnie —
+         Prometheus scrapuje i remote_write do VictoriaMetrics dla długoterminowych danych."
+
+  - name: Grafana Mimir
+    icon: "📈"
+    color: "#f46800"
+    tagline: "Enterprise-grade Prometheus — multi-tenancy, >100M series, Kafka ingestion"
+    pros:
+      - "Natywna multi-tenancy — każdy team/klient dostaje izolowaną przestrzeń danych"
+      - "Horizontal scaling każdego komponentu niezależnie (ingester, querier, compactor)"
+      - "Remote write kompatybilny — Prometheus przesyła dane bez zmian w scrape_config"
+      - "Koszt przechowywania jak Thanos — S3/GCS jako backend (tani object storage)"
+      - "Grafana Mimir 3.0: Kafka jako async buffer ingestion — ingestion ≠ query latency"
+      - "Deduplikacja danych z wielu Prometheusów (replica labels)"
+      - "Query Frontend: caching, splitting, sharding dla szybkich odpowiedzi"
+    cons:
+      - "Skomplikowany deployment — 8+ komponentów (ingester, querier, compactor, store-gateway...)"
+      - "Wymaga Kafka (od Mimir 3.0 dla decoupled ingestion) lub Cortex-style ring"
+      - "Znacznie wyższy overhead operacyjny niż Thanos (który tylko obudowuje Prometheus)"
+      - "Sens tylko przy dziesiątkach Prometheusów lub setkach milionów series"
+      - "Learning curve: nowe koncepty (ring, zones, tenants, ruler storage)"
+    vs: "Grafana Mimir dla enterprise: wiele teamów, wiele środowisk, każdy z osobnym
+         Prometheusem — Mimir zbiera je wszystkie z multi-tenant isolation. Thanos gdy
+         masz 2-5 Prometheusów i chcesz globalny query bez skomplikowanej infrastruktury.
+         Prometheus standalone dla małych projektów gdzie jeden klaster wystarczy."
+
+  - name: Datadog
+    icon: "🐶"
+    color: "#632ca6"
+    tagline: "Full observability SaaS — metrics + traces + logs + APM w jednym"
+    pros:
+      - "Zero infrastruktury — SaaS, agent DaemonSet i gotowe"
+      - "Full observability stack: metryki + traces (APM) + logi + synthetic monitoring"
+      - "Korelacja automatyczna: log event → trace → metryka w jednym kliku"
+      - "Setki gotowych integracji z auto-discovery (AWS, K8s, Docker, DB)"
+      - "Anomaly detection i forecasting out-of-the-box (ML-based)"
+      - "Live Process Monitoring — widok procesów z korelacją do metryk"
+      - "Synthetic monitoring — probing ze 100+ lokalizacji globalnie"
+    cons:
+      - "Koszt: $15-23/host/miesiąc + $0.05 per custom metric (ponad 300 free)"
+      - "Vendor lock-in — DogStatsD API, DDSketch — nie przeniesiesz się łatwo"
+      - "Dane opuszczają datacenter — problem przy GDPR i data residency"
+      - "Custom metrics drogie przy wysokiej kardynalności (każdy unique tag = metric)"
+      - "Brak PromQL — własny query language (nie przenosi wiedzy na inne systemy)"
+      - "Im większy stack, tym wyższy bill — trudno przewidzieć koszty przy skalowaniu"
+    vs: "Datadog gdy masz mały team ops, ograniczony czas i budżet pozwala na SaaS.
+         Prometheus gdy: dane muszą zostać w Twojej infrastrukturze (GDPR, fintech, healthcare),
+         masz skilled DevOps/SRE team, i nie chcesz vendor lock-in. Duże firmy często
+         używają Prometheusa (Kubernetes) + Datadoga (APM traces) jednocześnie."
+
+  - name: Grafana Loki + Tempo (observability stack)
+    icon: "🔭"
+    color: "#f05a28"
+    tagline: "Loki = logi, Tempo = traces — razem z Prometheus = pełny OSS observability stack"
+    pros:
+      - "Bezpłatny open-source stack: Prometheus (metryki) + Loki (logi) + Tempo (traces)"
+      - "Grafana jako unified UI — wszystkie trzy dane source w jednym dashboardzie"
+      - "Korelacja: z metryki → do logów → do trace (przez exemplars i TraceID)"
+      - "Loki: indeksuje tylko metadane logów (labels), nie treść — bardzo tanie storage"
+      - "Tempo: 100% sampling without tail-based sampling complexity"
+      - "Wiele cloud-managed opcji: Grafana Cloud free tier, GCP, AWS"
+      - "OpenTelemetry jako standard wejścia — jeden agent (otelcol) do wszystkich"
+    cons:
+      - "Trzy osobne systemy do deployowania i utrzymania zamiast jednego"
+      - "Loki query language (LogQL) — kolejny język do nauki obok PromQL"
+      - "Tempo brak full-text search bez Jaeger/Zipkin jako frontendu"
+      - "Korelacja między systemami: wymaga świadomej instrumentacji i TraceID propagation"
+    vs: "Prometheus + Loki + Tempo jako OSS alternative dla Datadog/New Relic.
+         Wyjście: pełna observability bez vendor lock-in i z kontrolą danych.
+         Cena: tylko koszty infrastruktury (storage S3, compute). Wymaga więcej czasu
+         na setup niż Datadog. Grafana Cloud (SaaS) eliminuje deployment — free tier do 10k metryk."
+
+  - name: InfluxDB + Telegraf
+    icon: "🌊"
+    color: "#22adf6"
+    tagline: "Push-based time series DB — IoT, high-frequency data, Flux query language"
+    pros:
+      - "Push model przez Telegraf agent — łatwiejszy w środowiskach bez pull access"
+      - "Telegraf: 200+ gotowych wtyczek input (AWS, Azure, SNMP, Modbus, Kafka)"
+      - "High-frequency data: obsługa milionów points per second natywnie"
+      - "Flux — potężniejszy od PromQL dla transformacji i joinów między measurement"
+      - "Dobry dla IoT i przemysłu (Modbus, MQTT, OPC-UA)"
+      - "InfluxDB Cloud: managed SaaS z serverless tier"
+    cons:
+      - "Flux — nowy język, bardzo różny od SQL i PromQL, stroma krzywa uczenia"
+      - "Brak natywnego Kubernetes Operator — mniej Kubernetes-native niż Prometheus"
+      - "Licencjonowanie: InfluxDB 3.x → BSL (nie w pełni open-source)"
+      - "Małe community relative do Prometheusa w ekosystemie Kubernetes"
+      - "Droższy przy dużych wolumenach (cloud tier)"
+    vs: "InfluxDB + Telegraf dla IoT, przemysłu, środowisk z push-only dostępem,
+         high-frequency sensor data. Prometheus dla Kubernetes-native monitoring,
+         RED/USE method, alerting z Alertmanagerem. Można używać razem —
+         Telegraf jako kolektor danych, Prometheus jako monitoring serwisów."
+
+  - name: OpenTelemetry (OTEL)
+    icon: "🔭"
+    color: "#425cc7"
+    tagline: "Nie rywal — standard transportu metryk, traces i logów dla całego ekosystemu"
+    pros:
+      - "Vendor-neutral standard — jeden SDK zbiera metrics + traces + logs"
+      - "Automatyczna instrumentacja: frameworki Django, FastAPI, Express, Spring boot"
+      - "OpenTelemetry Collector: routing danych do wielu backendów jednocześnie"
+      - "Exemplars: link między metryką a konkretnym trace_id → do Grafana Tempo"
+      - "Prometheus 3.0 native OTLP receiver — bezpośredni push bez Collectora"
+      - "Jedno API w kodzie — zmiana backendu bez rekompilacji (Prometheus/Jaeger/Datadog)"
+    cons:
+      - "OTEL samo w sobie nie przechowuje danych — potrzebujesz backend (Prometheus, Tempo, Loki)"
+      - "OTEL Collector to kolejny komponent do zarządzania"
+      - "Konwersja OTEL metryk → Prometheus format: niektóre typy nie mapują się 1:1"
+      - "Maturacja: niektóre komponenty (logi) nadal w beta"
+    vs: "OpenTelemetry nie zastępuje Prometheusa — uzupełnia go. Używaj OTEL SDK
+         w aplikacjach (jeden agent zamiast wielu), a Prometheus jako backend storage
+         i query engine. Prometheus 3.0 akceptuje OTLP push bezpośrednio
+         (--web.enable-otlp-receiver). W Kubernetes: OTEL Collector zbiera dane,
+         Prometheus scrapuje Collector lub przyjmuje remote_write z Collectora."

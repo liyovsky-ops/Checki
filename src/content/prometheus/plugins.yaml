@@ -1,0 +1,115 @@
+title: Ekosystem Prometheusa
+
+items:
+  - name: Grafana
+    icon: "📊"
+    desc: >
+      De facto standard wizualizacji dla Prometheusa. Grafana łączy się przez datasource plugin
+      i wysyła zapytania PromQL do Prometheusa. Dashboardy z alertami, variable templates,
+      annotations. Grafana 10+ ma Explore Metrics — automatyczne odkrywanie metryk bez PromQL.
+      Provisioning: datasources i dashboardy jako YAML/JSON (GitOps ready).
+      Dashboardy ID do importu z grafana.com: node_exporter=1860, kubernetes=315, postgres=9628,
+      redis=763, nginx=9614, docker=7362, django=9526, mysql=9578.
+      Instalacja: docker run -p 3000:3000 grafana/grafana:latest
+
+  - name: Thanos
+    icon: "🌌"
+    desc: >
+      HA i long-term storage dla Prometheusa. Sidecar uploaduje bloki TSDB do S3/GCS/Azure.
+      Thanos Query deduplikuje i scala wyniki z wielu Prometheusów (global query layer).
+      Compactor tworzy downsampling: raw → 5m resolution → 1h resolution (tanie queries na rok+).
+      Ruler uruchamia alerting rules globalnie ponad danymi z wielu klastrów.
+      Kiedy: masz 2+ Prometheusów, chcesz HA i retencję >30 dni bez drogiego dysku.
+      helm install thanos bitnami/thanos --set existingPrometheusSecret=prometheus-secret
+
+  - name: Prometheus Operator
+    icon: "⚙️"
+    desc: >
+      Kubernetes controller zarządzający Prometheusem przez CRDs. ServiceMonitor — automatyczny
+      scrape przez Kubernetes Service (bez ręcznej konfiguracji targets). PodMonitor — scrape
+      bezpośrednio z Podów. PrometheusRule — alerting/recording rules jako Kubernetes YAML
+      (GitOps: reguły w repo, Operator je aplikuje). ThanosRuler, Probe (blackbox).
+      Instalacja przez kube-prometheus-stack: helm install kube-prometheus-stack
+      prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
+
+  - name: kube-prometheus-stack
+    icon: "☸️"
+    desc: >
+      Helm chart bundlujący cały monitoring stack Kubernetes w jednej komendzie.
+      Zawiera: Prometheus Operator, Prometheus, Alertmanager, Grafana, node-exporter (DaemonSet),
+      kube-state-metrics, domyślne reguły alertów dla Kubernetes. Wersja 87.3.0+.
+      Po instalacji dostępne port-forward: Prometheus :9090, Grafana :3000, Alertmanager :9093.
+      helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack
+      --set grafana.adminPassword=secret --namespace monitoring --create-namespace
+
+  - name: VictoriaMetrics
+    icon: "⚡"
+    desc: >
+      Drop-in replacement lub uzupełnienie Prometheusa — kompatybilny z remote_write i PromQL.
+      10x lepsza kompresja, 5x mniejsze RAM. Single-node do 100M active series bez zewnętrznego
+      storage. vmagent zastępuje Prometheusa w roli kolektora (lżejszy, multi-target remote_write).
+      vmui — wbudowany UI podobny do Grafany dla PromQL/MetricsQL queries.
+      docker run -p 8428:8428 victoriametrics/victoria-metrics -retentionPeriod=12
+
+  - name: Alertmanager
+    icon: "🚨"
+    desc: >
+      Komponenta odpowiedzialna za routing alertów z Prometheusa. Grupy alertów (group_by),
+      deduplikacja, silences (wyciszanie na czas maintenance), inhibition rules (wycisz
+      alerty niższego poziomu gdy wyższy aktywny). Integracje: Slack, PagerDuty, OpsGenie,
+      email, Telegram, webhook. amtool — CLI do zarządzania silencami i testowania routingu.
+      amtool config routes test alertname=InstanceDown severity=critical
+
+  - name: Pushgateway
+    icon: "📤"
+    desc: >
+      Pośrednik dla krótkotrwałych jobów (cron, batch) które kończą się zanim Prometheus
+      zdąży je zscrapować. Job pushuje metryki do Pushgateway, Prometheus scrapuje Pushgateway.
+      Ważne: metryki nie usuwają się automatycznie po zakończeniu joba — wymagają DELETE.
+      Nie stosuj jako ogólny gateway push (do tego vmagent lub remote_write). Port 9091.
+      curl -X POST http://pushgateway:9091/metrics/job/my_cron --data 'my_job_duration_seconds 3.5'
+
+  - name: node_exporter
+    icon: "🖥️"
+    desc: >
+      Najczęściej instalowany eksporter — metryki systemu operacyjnego Linux.
+      CPU (per core, per mode), RAM (MemTotal, MemAvailable, Cached), filesystem (avail, total),
+      sieć (bytes, packets, errors per interface), dysk I/O (reads, writes, time), load average,
+      temperatura (opcjonalnie przez hwmon). Port 9100.
+      node_exporter --collector.systemd  # dodaj metryki systemd services
+
+  - name: OpenTelemetry Collector
+    icon: "🔭"
+    desc: >
+      Vendor-neutral agent zbierający metryki, traces i logi — routuje do wielu backendów
+      jednocześnie. Prometheus receiver — scrapuje /metrics endpointy. Prometheus exporter —
+      eksponuje zebrane dane jako /metrics dla Prometheusa. OTLP exporter — push do Prometheus 3.0,
+      Tempo, Loki. Zastępuje wiele osobnych agentów (node_exporter, Jaeger agent, Fluentd).
+      otelcol --config otel-collector-config.yaml
+
+  - name: Grafana Loki
+    icon: "📋"
+    desc: >
+      System logów zoptymalizowany pod Grafanę — indeksuje tylko labels, nie treść logów.
+      Tanie storage dzięki brakowi full-text index (S3 compatible). LogQL jako język zapytań.
+      Promtail agent zbiera logi z plików/kontenerów i wysyła do Lokiego.
+      Korelacja Prometheus → Loki przez derived fields (TraceID, requestID w logach).
+      docker run -p 3100:3100 grafana/loki:latest
+
+  - name: Grafana Tempo
+    icon: "🕐"
+    desc: >
+      Backend dla distributed tracing — 100% sampling, bardzo tanie (blob storage compatible).
+      Akceptuje Jaeger, Zipkin, OTLP format. Tempo + Loki + Prometheus = pełny Grafana OSS stack.
+      Exemplars w Prometheusie linkują metryke → Tempo trace dla pinpoint debugging.
+      Grafana Explore → TraceQL queries, Service Graph view, waterfall trace view.
+      docker run -p 3200:3200 grafana/tempo:latest -config.file=/etc/tempo.yaml
+
+  - name: blackbox_exporter
+    icon: "📡"
+    desc: >
+      Monitorowanie zewnętrzne — "black box" perspective (sprawdza jak widzi użytkownik).
+      HTTP/HTTPS: status codes, SSL ważność, redirect chains, response body check.
+      TCP: sprawdzenie connectivity. ICMP: ping z monitorowania sieci.
+      Kluczowe metryki: probe_success (0/1), probe_duration_seconds, probe_ssl_earliest_cert_expiry.
+      Alert: probe_ssl_earliest_cert_expiry - time() < 30 * 24 * 3600 (SSL wygaśnie za < 30 dni)

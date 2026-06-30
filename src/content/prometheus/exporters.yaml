@@ -1,0 +1,322 @@
+title: Eksportery i instrumentacja aplikacji
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Eksportery to adaptery między Prometheusem a źródłami metryk — systemy nie wystawiające
+  natywnego /metrics endpoint. Każdy eksporter nasłuchuje na dedykowanym porcie i tłumaczy
+  dane (OS, baza danych, kolejka) na format Prometheus. Natywna instrumentacja przez
+  biblioteki klienckie (prometheus_client, prom-client) dodaje /metrics bezpośrednio do aplikacji.
+  Prometheus scrapuje eksportery tak samo jak natywne endpointy.
+
+items:
+  - name: node_exporter — metryki systemu OS
+    desc: >
+      Najpopularniejszy eksporter — zbiera metryki systemu operacyjnego Linux/macOS.
+      CPU, RAM, dysk, sieć, filesystem, temperatura, load average. Port 9100.
+      Uruchamiany jako DaemonSet w Kubernetes lub systemd service na VM.
+    code: |
+      # Instalacja (Linux)
+      wget https://github.com/prometheus/node_exporter/releases/download/v1.8.2/node_exporter-1.8.2.linux-amd64.tar.gz
+      tar xzf node_exporter-*.tar.gz
+      sudo mv node_exporter-*/node_exporter /usr/local/bin/
+
+      # Uruchomienie
+      node_exporter --web.listen-address=":9100"
+
+      # Sprawdzenie
+      curl http://localhost:9100/metrics | grep node_cpu
+
+      # Docker
+      docker run -d \
+        --name node_exporter \
+        --pid=host \
+        --net=host \
+        -v /proc:/host/proc:ro \
+        -v /sys:/host/sys:ro \
+        prom/node-exporter:latest \
+        --path.procfs=/host/proc \
+        --path.sysfs=/host/sys
+
+      # Systemd service
+      # /etc/systemd/system/node_exporter.service
+      # [Service]
+      # ExecStart=/usr/local/bin/node_exporter
+      # systemctl enable --now node_exporter
+
+      # Kluczowe metryki node_exporter:
+      node_cpu_seconds_total{mode="idle"}       # CPU idle (1 - to = usage)
+      node_memory_MemAvailable_bytes             # dostępna RAM
+      node_memory_MemTotal_bytes                 # całkowita RAM
+      node_filesystem_avail_bytes                # wolne miejsce
+      node_disk_io_time_seconds_total            # czas I/O dysku
+      node_network_receive_bytes_total           # ruch sieciowy IN
+      node_load1                                 # load average 1 minuta
+
+  - name: blackbox_exporter — HTTP/TCP/ICMP probing
+    desc: >
+      Blackbox exporter testuje dostępność z zewnątrz — "black box" perspective.
+      Sprawdza HTTP status codes, SSL ważność certyfikatów, TCP connectivity, ICMP ping.
+      Kluczowe dla monitorowania uptime serwisów i SLA. Port 9115.
+    code: |
+      # blackbox.yml — konfiguracja modułów probingu
+      modules:
+        http_2xx:
+          prober: http
+          timeout: 5s
+          http:
+            valid_status_codes: [200, 201, 204]
+            method: GET
+            follow_redirects: true
+            tls_config:
+              insecure_skip_verify: false
+
+        http_post:
+          prober: http
+          http:
+            method: POST
+            headers:
+              Content-Type: application/json
+
+        tcp_connect:
+          prober: tcp
+          timeout: 5s
+
+        icmp_ping:
+          prober: icmp
+          timeout: 5s
+
+      # Uruchomienie
+      blackbox_exporter --config.file=blackbox.yml
+
+      # Scrape config w prometheus.yml:
+      - job_name: 'blackbox_http'
+        metrics_path: /probe
+        params:
+          module: [http_2xx]
+        static_configs:
+          - targets:
+              - https://api.example.com/health
+              - https://www.example.com
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: __param_target
+          - source_labels: [__param_target]
+            target_label: instance
+          - target_label: __address__
+            replacement: localhost:9115   # adres blackbox_exportera
+
+      # Kluczowe metryki:
+      probe_success                              # 1 = UP, 0 = DOWN
+      probe_duration_seconds                     # czas odpowiedzi
+      probe_http_status_code                     # HTTP status code
+      probe_ssl_earliest_cert_expiry             # timestamp wygaśnięcia SSL
+      # Alert: SSL wygaśnie < 30 dni:
+      # probe_ssl_earliest_cert_expiry - time() < 30 * 24 * 3600
+
+  - name: Eksportery baz danych
+    desc: >
+      Dedykowane eksportery dla popularnych baz danych. Wymagają użytkownika z uprawnieniami
+      tylko do odczytu. Eksportują metryki connections, queries/sec, cache hit ratio,
+      replikacja, blokady, fragmentacja.
+    code: |
+      # POSTGRESQL — port 9187
+      # Konfiguracja użytkownika
+      psql -c "CREATE USER prometheus WITH PASSWORD 'secret';"
+      psql -c "GRANT pg_monitor TO prometheus;"
+
+      # Uruchomienie
+      DATA_SOURCE_NAME="postgresql://prometheus:secret@localhost:5432/postgres?sslmode=disable" \
+        postgres_exporter --web.listen-address=":9187"
+
+      # Kluczowe metryki postgres_exporter:
+      # pg_up                                    # czy serwer odpowiada
+      # pg_stat_activity_count                   # aktywne połączenia
+      # pg_stat_bgwriter_checkpoints_timed_total # checkpoints
+
+      # ---
+
+      # MYSQL — port 9104
+      # Konfiguracja użytkownika
+      # GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'exporter'@'localhost';
+
+      mysqld_exporter \
+        --config.my-cnf=/etc/.mysqld_exporter.cnf \
+        --web.listen-address=":9104"
+
+      # Kluczowe metryki mysqld_exporter:
+      # mysql_up                                 # czy serwer odpowiada
+      # mysql_global_status_connections          # połączenia
+      # mysql_global_status_queries              # zapytania/s
+
+      # ---
+
+      # REDIS — port 9121
+      redis_exporter \
+        --redis.addr=redis://localhost:6379 \
+        --web.listen-address=":9121"
+
+      # Kluczowe metryki redis_exporter:
+      # redis_up                                 # czy serwer odpowiada
+      # redis_connected_clients                  # aktywni klienci
+      # redis_memory_used_bytes                  # użyta pamięć
+      # redis_keyspace_hits_total                # cache hit
+      # redis_keyspace_misses_total              # cache miss
+
+  - name: cAdvisor — metryki kontenerów Docker
+    desc: >
+      cAdvisor (Container Advisor) eksportuje metryki Docker kontenerów —
+      CPU, RAM, I/O sieciowy, I/O dyskowy per kontener. Port 8080.
+      W Kubernetes wbudowany w kubelet (nie trzeba instalować osobno).
+    code: |
+      # Docker — uruchomienie cAdvisor
+      docker run -d \
+        --name cadvisor \
+        --volume=/:/rootfs:ro \
+        --volume=/var/run:/var/run:ro \
+        --volume=/sys:/sys:ro \
+        --volume=/var/lib/docker/:/var/lib/docker:ro \
+        --volume=/dev/disk/:/dev/disk:ro \
+        --publish=8080:8080 \
+        --privileged=true \
+        --device=/dev/kmsg \
+        gcr.io/cadvisor/cadvisor:latest
+
+      # Sprawdzenie
+      curl http://localhost:8080/metrics | grep container_cpu
+
+      # Kluczowe metryki cAdvisor:
+      container_cpu_usage_seconds_total{name="my-app"}       # CPU kontenera
+      container_memory_usage_bytes{name="my-app"}            # RAM kontenera
+      container_network_receive_bytes_total{name="my-app"}   # sieć IN
+      container_network_transmit_bytes_total{name="my-app"}  # sieć OUT
+      container_fs_usage_bytes{name="my-app"}                # dysk
+
+      # PromQL: CPU usage kontenera (%)
+      sum(rate(container_cpu_usage_seconds_total{name!=""}[5m])) by (name) * 100
+
+  - name: Python — prometheus_client
+    desc: >
+      Natywna instrumentacja aplikacji Python. Biblioteka prometheus_client dostarcza
+      Counter, Gauge, Histogram, Summary. start_http_server() eksponuje /metrics na porcie.
+      Integracja z FastAPI przez make_asgi_app() lub prometheus-fastapi-instrumentator.
+    code: |
+      # pip install prometheus_client
+
+      from prometheus_client import Counter, Gauge, Histogram, start_http_server
+      import time
+
+      # Counter — requestów od startu
+      REQUESTS = Counter(
+          'http_requests_total',
+          'Total HTTP requests',
+          ['method', 'endpoint', 'status']
+      )
+
+      # Gauge — aktywne połączenia
+      ACTIVE = Gauge('active_connections', 'Active connections')
+
+      # Histogram — latencja
+      LATENCY = Histogram(
+          'http_request_duration_seconds',
+          'Request duration',
+          ['endpoint'],
+          buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0]
+      )
+
+      def handle_request(method, endpoint):
+          ACTIVE.inc()
+          with LATENCY.labels(endpoint=endpoint).time():  # auto-mierzy czas
+              time.sleep(0.1)  # logika
+              REQUESTS.labels(method=method, endpoint=endpoint, status='200').inc()
+          ACTIVE.dec()
+
+      if __name__ == '__main__':
+          start_http_server(8000)  # /metrics na :8000
+          while True:
+              handle_request('GET', '/api')
+              time.sleep(1)
+
+      # FastAPI — integracja przez middleware
+      from fastapi import FastAPI, Request
+      from prometheus_client import make_asgi_app
+
+      app = FastAPI()
+
+      @app.middleware("http")
+      async def metrics_middleware(request: Request, call_next):
+          start = time.time()
+          response = await call_next(request)
+          LATENCY.labels(endpoint=request.url.path).observe(time.time() - start)
+          REQUESTS.labels(
+              method=request.method,
+              endpoint=request.url.path,
+              status=str(response.status_code)
+          ).inc()
+          return response
+
+      # Montuj /metrics endpoint
+      app.mount('/metrics', make_asgi_app())
+
+  - name: Node.js — prom-client
+    desc: >
+      Biblioteka prom-client dla Node.js i Express. collectDefaultMetrics() automatycznie
+      eksponuje metryki runtime (event loop lag, heap, GC). Idealna do monitorowania
+      mikrousług Node.js produkcyjnych.
+    code: |
+      # npm install prom-client
+
+      const client = require('prom-client');
+      const express = require('express');
+      const app = express();
+
+      const register = client.register;
+
+      # Domyślne metryki Node.js: event loop, heap, GC, handles
+      client.collectDefaultMetrics({ register, prefix: 'node_' });
+
+      # Custom Counter
+      const httpRequests = new client.Counter({
+        name: 'http_requests_total',
+        help: 'Total HTTP requests',
+        labelNames: ['method', 'route', 'status_code'],
+        registers: [register],
+      });
+
+      # Custom Histogram
+      const httpDuration = new client.Histogram({
+        name: 'http_request_duration_seconds',
+        help: 'HTTP request duration',
+        labelNames: ['method', 'route'],
+        buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0],
+        registers: [register],
+      });
+
+      # Gauge
+      const activeConns = new client.Gauge({
+        name: 'active_connections',
+        help: 'Active connections',
+        registers: [register],
+      });
+
+      # Middleware
+      app.use((req, res, next) => {
+        const end = httpDuration.startTimer({ method: req.method, route: req.path });
+        activeConns.inc();
+        res.on('finish', () => {
+          httpRequests.inc({ method: req.method, route: req.path, status_code: res.statusCode });
+          end();
+          activeConns.dec();
+        });
+        next();
+      });
+
+      # /metrics endpoint dla Prometheusa
+      app.get('/metrics', async (req, res) => {
+        res.set('Content-Type', register.contentType);
+        res.end(await register.metrics());
+      });
+
+      app.listen(3000);

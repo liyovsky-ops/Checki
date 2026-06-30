@@ -1,0 +1,227 @@
+title: PromQL — Prometheus Query Language
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  PromQL to funkcyjny język zapytań Prometheusa do eksploracji danych time-series.
+  Operuje na wektorach — instant vector (jedna wartość per seria) i range vector
+  (zestaw próbek z przedziału czasu). Kluczowe funkcje: rate() dla counterów,
+  histogram_quantile() dla percentyli, predict_linear() dla predykcji, absent() dla alertów
+  na brakujące dane. PromQL używany w dashboardach Grafany, regułach alertów i recording rules.
+
+items:
+  - name: Instant vector vs Range vector
+    desc: >
+      Instant vector zwraca jedną aktualną wartość per seria — wyświetlalny bezpośrednio.
+      Range vector zwraca zbiór próbek z przedziału czasowego — wyłącznie jako argument
+      funkcji (rate, irate, increase, avg_over_time etc.).
+    code: |
+      # INSTANT VECTOR — jedna wartość per seria, wyświetlalny
+      http_requests_total                              # bieżąca wartość
+      http_requests_total{job="api"}                   # filtr po labelu
+      http_requests_total{status=~"5.."}               # regex filter (5xx)
+      http_requests_total{status!="200"}               # negacja
+      http_requests_total{job=~"api|web"}              # OR w regex
+
+      # RANGE VECTOR — próbki z okna czasowego, tylko jako argument funkcji
+      http_requests_total[5m]          # ostatnie 5 minut próbek
+      http_requests_total[1h]          # ostatnia godzina
+      http_requests_total[30s]         # ostatnie 30 sekund
+
+      # Okna: s (sekundy), m (minuty), h (godziny), d (dni), w (tygodnie), y (lata)
+      # WAŻNE: range vector NIE można wyświetlić bezpośrednio!
+      # Trzeba opakować w funkcję:
+      rate(http_requests_total[5m])    # poprawne
+      # http_requests_total[5m]        # błąd — nie można wyświetlić
+
+  - name: rate() vs irate() vs increase()
+    desc: >
+      rate() — średni per-second rate, wygładzone, do dashboardów i alertów.
+      irate() — instant rate z 2 ostatnich próbek, wrażliwy na szpilki, do debugowania.
+      increase() — całkowity wzrost w oknie, nie per-second. Interwał minimum 4× scrape_interval.
+    code: |
+      # rate() — średni per-second rate w oknie (wygładzone)
+      # Interwał: min 4× scrape_interval (scrape 15s → min [1m])
+      rate(http_requests_total[5m])
+      # Wynik: ~8.5 req/s (średnia z ostatnich 5 minut)
+
+      # irate() — INSTANT rate z 2 ostatnich próbek (szpiki widoczne!)
+      irate(http_requests_total[5m])
+      # Okno [5m] tylko mówi "szukaj próbek max 5m wstecz"
+      # Wynik: może być 0 lub 100 req/s (bardzo wrażliwy)
+
+      # increase() — całkowity wzrost w oknie (nie per-second)
+      increase(http_requests_total[1h])    # ile requestów w ciągu 1h
+      increase(http_requests_total[5m])    # ile requestów w 5 minut
+
+      # Relacja: increase(x[5m]) == rate(x[5m]) * 5 * 60
+
+      # KIEDY CO:
+      # rate()     — dashboardy, alerty, linie trendów
+      # irate()    — debugging, wykrywanie chwilowych skoków
+      # increase() — wyświetlenie "ile X zdarzeń w ostatniej godzinie"
+
+  - name: Aggregation operators
+    desc: >
+      Operatory agregacji redukują wiele serii do jednej. Klauzula by() określa które
+      labels zachować (reszta usuwana). Klauzula without() wyklucza wymienione labels.
+      topk/bottomk przydatne do rankingu endpointów, instancji, metod.
+    code: |
+      # sum — suma wszystkich serii
+      sum(rate(http_requests_total[5m]))
+      sum by (method) (rate(http_requests_total[5m]))         # grupuj po method
+      sum by (job, status) (rate(http_requests_total[5m]))    # wiele labelów
+      sum without (instance) (rate(http_requests_total[5m]))  # wyklucz instance
+
+      # avg — średnia
+      avg by (job) (process_resident_memory_bytes)
+
+      # max / min
+      max by (instance) (node_cpu_seconds_total)
+      min(node_filesystem_avail_bytes)
+
+      # count — liczba serii (nie suma wartości!)
+      count(up)                    # ile targetów monitorujemy
+      count(up == 1)               # ile jest UP
+      count by (job) (up)          # ile targetów per job
+
+      # topk / bottomk — top N serii według wartości
+      topk(5, rate(http_requests_total[5m]))       # 5 najbardziej obciążonych
+      bottomk(3, node_filesystem_avail_bytes)      # 3 z najmniej miejsca
+
+      # stddev — odchylenie standardowe
+      stddev(node_cpu_seconds_total)
+
+      # quantile — kwantyl przez zbiór serii (nie histogram!)
+      quantile(0.95, rate(http_request_duration_seconds_sum[5m]))
+
+  - name: Binary operators
+    desc: >
+      Operatory binarne łączą dwa wektory. Domyślnie dopasowanie 1:1 po wszystkich labels.
+      on() ogranicza do wymienionych labels. ignoring() pomija wymienione labels.
+      group_left/group_right dla dopasowania wiele-do-jednego.
+    code: |
+      # ARYTMETYCZNE: + - * / % ^
+      node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes   # użyta pamięć
+
+      # PORÓWNANIA: == != > < >= <=
+      up == 0              # które targety są down (filtr)
+      up == bool 0         # konwersja do 0/1 zamiast filtra (dla alertów)
+
+      # Procent użytej pamięci — na przykład łączenie dwóch metryk
+      (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+        / node_memory_MemTotal_bytes * 100
+
+      # on() — dopasuj tylko po wymienionych labels
+      # ignoring() — pomiń wymienione labels przy dopasowaniu
+      rate(http_requests_total[5m]) * on(job) group_left(version)
+        app_build_info
+
+      # LOGICZNE: and, or, unless
+      # and — zwróć lewą stronę gdzie istnieje dopasowanie po prawej
+      http_requests_total and on(instance) up
+
+      # or — unia serii
+      node_cpu_seconds_total or node_cpu_usage_seconds_total
+
+      # unless — zwróć lewą gdzie NIE ma dopasowania po prawej
+      http_requests_total unless on(job) maintenance_mode
+
+  - name: Kluczowe funkcje
+    desc: >
+      histogram_quantile() do percentyli z histogramów. predict_linear() do predykcji
+      gdy dysk się zapełni. absent() do alertów na brakujące metryki. label_replace()
+      do transformacji labelów. changes() i resets() do diagnostyki.
+    code: |
+      # histogram_quantile(φ, histogram) — percentyl z histogramu
+      # φ = 0.5 (mediana), 0.95 (p95), 0.99 (p99)
+      histogram_quantile(0.99,
+        sum by (job, le) (rate(http_request_duration_seconds_bucket[5m]))
+      )
+      # WAŻNE: zawsze sum by (..., le) — le musi zostać!
+
+      # predict_linear(gauge[interval], seconds) — predykcja liniowa
+      # "Za ile sekund dysk będzie pełny jeśli trend z 4h się utrzyma?"
+      predict_linear(node_filesystem_avail_bytes[4h], 3600 * 24)
+      # Alert gdy dysk pełny w ciągu 24h:
+      predict_linear(node_filesystem_avail_bytes[1h], 3600 * 24) < 0
+
+      # absent(v) — zwraca 1 gdy wektor pusty (metryka zniknęła)
+      absent(up{job="critical-api"})
+      # Alert gdy job przestał raportować:
+      absent(up{job="critical-api"}) == 1
+
+      # label_replace(v, dst, replacement, src, regex) — transformacja labeli
+      label_replace(up, "service", "$1", "job", "(.+)-prod")
+      # job="backend-prod" → service="backend"
+
+      # changes(gauge[interval]) — ile razy wartość się zmieniła
+      changes(config_reload_success_total[1h])
+
+      # resets(counter[interval]) — ile razy counter zresetował się (restarty!)
+      resets(process_cpu_seconds_total[24h])
+
+      # avg_over_time / max_over_time / min_over_time
+      avg_over_time(node_memory_MemAvailable_bytes[1h])   # średnia RAM przez godzinę
+      max_over_time(node_cpu_usage[5m])                   # pik CPU w 5 minutach
+
+      # deriv(gauge[interval]) — pochodna (zmiana na sekundę)
+      deriv(node_filesystem_avail_bytes[30m])   # szybkość zapełniania dysku
+
+  - name: Offset i @ modifier
+    desc: >
+      Offset przesuwa zapytanie w czasie — porównanie z przeszłością bez zmiany zakresu.
+      Modifier @ (od Prometheus 2.25) zapytuje o konkretny Unix timestamp lub start/end zakresu.
+    code: |
+      # offset — cofnij o czas (porównanie z wczorajem)
+      rate(http_requests_total[5m] offset 1d)   # ruch sprzed 24h
+      rate(http_requests_total[5m] offset 1w)   # ruch sprzed tygodnia
+
+      # Porównanie bieżący ruch vs wczoraj (ratio):
+      rate(http_requests_total[5m])
+        / rate(http_requests_total[5m] offset 1d)
+
+      # @ modifier — konkretny timestamp
+      http_requests_total @ 1704067200              # Unix timestamp (2024-01-01 00:00:00)
+      http_requests_total @ start()                 # początek zakresu zapytania
+      http_requests_total @ end()                   # koniec zakresu
+
+  - name: Najczęstsze wzorce PromQL
+    desc: >
+      Gotowe wzorce do copy-paste — RED method (Rate, Errors, Duration), dostępność,
+      dysk, CPU, ranking endpointów. Fundamenty każdego dashboardu Prometheus/Grafana.
+    code: |
+      # RED method — metryki dla serwisów HTTP
+      # Rate: requestów na sekundę
+      sum by (job) (rate(http_requests_total[5m]))
+
+      # Errors: procent błędnych requestów
+      sum by (job) (rate(http_requests_total{status=~"5.."}[5m]))
+        / sum by (job) (rate(http_requests_total[5m]))
+
+      # Duration: p99 latencji
+      histogram_quantile(0.99,
+        sum by (job, le) (rate(http_request_duration_seconds_bucket[5m]))
+      )
+
+      # CPU usage per instancja (%)
+      100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+
+      # RAM usage (%)
+      (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+        / node_memory_MemTotal_bytes * 100
+
+      # Top 10 endpointów po ruchu
+      topk(10, sum by (handler) (rate(http_requests_total[5m])))
+
+      # Dostępność instancji (0 do 1)
+      avg(up{job="api-service"})
+
+      # Czas od ostatniego restartu
+      time() - process_start_time_seconds
+
+      # Dysk: ile miejsca zostało (%)
+      node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
+        / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"} * 100

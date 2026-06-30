@@ -1,0 +1,242 @@
+title: Storage, HA i Skalowalność
+
+labels:
+  section: Wzorzec
+  example: Przykład
+
+intro: >
+  Prometheus przechowuje dane w lokalnej bazie TSDB (Time Series Database) — domyślnie 15 dni
+  retencji. Wbudowany brak HA — standardowe rozwiązania to Thanos (long-term storage przez
+  S3/GCS, globalny query layer) lub VictoriaMetrics (lepsza kompresja, single-node do 100M series).
+  Remote write wysyła dane do zewnętrznych systemów w czasie rzeczywistym. Cardinality
+  (kardynalność) to główne źródło problemów z RAM przy dużych deploymentach.
+
+items:
+  - name: TSDB — struktura wewnętrzna
+    desc: >
+      Prometheus TSDB to baza time-series zaprojektowana przez Fabiana Reinhardta.
+      Dane trafiają do WAL (Write-Ahead Log) i in-memory Head block. Po 2h kompaktowane
+      do niemutowalnych bloków na dysku. Kompresja: XOR delta-encoding dla float64 (algorytm Gorilla).
+    code: |
+      # Struktura na dysku:
+      data/
+      ├── 01BKGV7JC0RY8A6MACW02A2PX8/   # niemutowalny blok (2h okno)
+      │   ├── chunks/
+      │   │   ├── 000001                  # skompresowane serie (XOR encoding)
+      │   │   └── 000002
+      │   ├── index                       # odwrócony indeks: labels → serie → chunki
+      │   ├── meta.json                   # min/max timestamp, statystyki
+      │   └── tombstones                  # "usunięte" serie (lazy delete)
+      ├── wal/                            # Write Ahead Log
+      │   ├── 00000001                    # segment WAL (max 128MB)
+      │   └── checkpoint.000020           # snapshot Head do szybkiego recovery
+      └── chunks_head/                    # in-memory HEAD block (bieżące 2h danych)
+
+      # Przepływ danych:
+      # 1. Incoming sample → WAL segment (sequential write, bardzo szybki)
+      # 2. Równolegle → in-memory Head block
+      # 3. Po 2h → kompaktacja do niemutowalnego bloku
+      # 4. Kompaktacja bloków: 2h → 6h → 24h → max 10% retencji
+
+      # Kompresja Gorilla (Facebook):
+      # - Timestamps: delta-of-delta encoding
+      # - Values: XOR encoding z poprzednią wartością
+      # - Wynik: ~1.37 bajty/próbka (vs 16 bajtów surowo)
+
+  - name: Retention — konfiguracja retencji
+    desc: >
+      Domyślnie 15 dni lub 0 (brak limitu rozmiaru). Oba limity mogą być ustawione
+      jednocześnie — który zostanie osiągnięty pierwszy, uruchamia usuwanie.
+      Prometheus usuwa najstarsze bloki gdy warunek jest spełniony.
+    code: |
+      # Flagi startowe Prometheusa
+      prometheus \
+        --storage.tsdb.retention.time=30d \    # retencja czasowa
+        --storage.tsdb.retention.size=50GB \   # retencja przez rozmiar
+        --storage.tsdb.path=/var/lib/prometheus/data
+
+      # Jednostki czasu: ms, s, m, h, d, w, y
+      # Przykłady: 7d, 2w, 90d, 1y
+
+      # Docker Compose:
+      command:
+        - '--config.file=/etc/prometheus/prometheus.yml'
+        - '--storage.tsdb.path=/prometheus'
+        - '--storage.tsdb.retention.time=30d'
+        - '--storage.tsdb.retention.size=20GB'
+
+      # Szacowanie wymaganego miejsca:
+      # bytes_per_sample ≈ 1.5 bajta (po kompresji)
+      # Wzór: (active_series × samples_per_second × seconds × bytes) + overhead
+      # Przykład: 100k series, scrape 15s, 30 dni:
+      # 100000 × (1/15) × (30 × 24 × 3600) × 1.5 = ~17 GB
+
+  - name: Remote Write — przesyłanie danych
+    desc: >
+      Remote write wysyła próbki do zewnętrznych systemów (Thanos, Grafana Cloud,
+      VictoriaMetrics, Cortex/Mimir) przez HTTP POST w czasie rzeczywistym.
+      Queue config kontroluje przepustowość i buforowanie przy wolnych odbiornikach.
+    code: |
+      # prometheus.yml — konfiguracja remote_write
+      remote_write:
+        # Thanos Receive
+        - url: "https://thanos-receive.example.com/api/v1/receive"
+          bearer_token_file: /etc/prometheus/thanos-token
+          queue_config:
+            capacity: 10000          # rozmiar kolejki w pamięci
+            max_samples_per_send: 10000
+            max_shards: 30           # równoległość (30 goroutines)
+            batch_send_deadline: 5s
+
+        # Grafana Cloud
+        - url: "https://prometheus-prod-us.grafana.net/api/prom/push"
+          basic_auth:
+            username: "12345"
+            password_file: /etc/prometheus/grafana-cloud-key
+
+        # VictoriaMetrics
+        - url: "http://victoriametrics:8428/api/v1/write"
+
+        # Filtrowanie — nie wysyłaj wewnętrznych metryk Go
+        - url: "http://mimir:9009/api/v1/push"
+          write_relabel_configs:
+            - source_labels: [__name__]
+              regex: 'go_.*'
+              action: drop
+
+      # Remote Read — odpytywanie zewnętrznych danych przez PromQL
+      remote_read:
+        - url: "https://thanos-query.example.com/api/v1/read"
+          read_recent: true
+
+  - name: Thanos — HA i long-term storage
+    desc: >
+      Thanos rozwiązuje dwa problemy Prometheusa: brak HA i brak long-term storage.
+      Sidecar przy każdym Prometheusie uploaduje bloki do S3. Thanos Query deduplikuje
+      wyniki z wielu Prometheusów. Compactor tworzy downsampling (raw/5m/1h).
+    code: |
+      # Architektura Thanos:
+      #
+      # [Prometheus A] ─── Thanos Sidecar A ──┐
+      # [Prometheus B] ─── Thanos Sidecar B ──┤──► S3/GCS (bloki TSDB)
+      #                                        │         │
+      #                    Thanos Store Gateway──┘         │
+      #                              │                     │
+      #                    Thanos Querier ◄────────────────┘
+      #                              │ (global PromQL)
+      #                    [Grafana / HTTP API]
+      #
+      #                    Thanos Compactor ── kompaktuje S3 (downsampling)
+      #                    Thanos Ruler     ── globalne reguły alertów
+
+      # Sidecar (przy każdym Prometheusie)
+      thanos sidecar \
+        --prometheus.url=http://localhost:9090 \
+        --tsdb.path=/var/lib/prometheus/data \
+        --objstore.config-file=bucket.yml \
+        --grpc-address=0.0.0.0:10901 \
+        --http-address=0.0.0.0:10902
+
+      # bucket.yml (S3)
+      type: S3
+      config:
+        bucket: "prometheus-long-term"
+        endpoint: "s3.amazonaws.com"
+        region: "eu-west-1"
+
+      # Query (global query layer)
+      thanos query \
+        --http-address=0.0.0.0:10902 \
+        --grpc-address=0.0.0.0:10901 \
+        --store=sidecar-a:10901 \
+        --store=sidecar-b:10901 \
+        --store=store-gateway:10901 \
+        --query.replica-label=replica   # deduplikacja po tym labelu
+
+      # Kompaktacja i downsampling
+      thanos compact \
+        --data-dir=/tmp/thanos-compact \
+        --objstore.config-file=bucket.yml \
+        --retention.resolution-raw=30d \
+        --retention.resolution-5m=90d \
+        --retention.resolution-1h=1y
+
+  - name: VictoriaMetrics — alternatywa
+    desc: >
+      VictoriaMetrics to od podstaw zbudowana TSDB — kompatybilna z PromQL, akceptuje
+      Prometheus remote_write. Lepsza kompresja (do 10x), mniejsze zużycie RAM (5x),
+      single-node do 100M active series. Nie wymaga external object storage.
+    code: |
+      # Single-node (najprostszy deployment)
+      docker run -d \
+        --name victoriametrics \
+        -p 8428:8428 \
+        -v /vm-data:/victoria-metrics-data \
+        victoriametrics/victoria-metrics:latest \
+        -retentionPeriod=12    # 12 miesięcy retencji
+
+      # Konfiguracja Prometheus remote_write → VictoriaMetrics
+      remote_write:
+        - url: "http://victoriametrics:8428/api/v1/write"
+
+      # API kompatybilne z Prometheus:
+      # GET /api/v1/query        — instant query (PromQL)
+      # GET /api/v1/query_range  — range query
+      # GET /api/v1/labels       — lista labelów
+      # GET /metrics             — własne metryki VM
+
+      # MetricsQL — nadzbiór PromQL dodający:
+      # rollup() — flexible downsapling
+      # outliers() — wykrywanie anomalii
+      # quantiles() — wiele percentyli jednocześnie
+
+      # VM Cluster (high scale)
+      # vmstorage — przechowuje dane (sharding)
+      # vminsert  — przyjmuje remote_write, routuje do vmstorage
+      # vmselect  — odpowiada na zapytania PromQL, scalając vmstorages
+      # vmauth    — proxy z autentykacją i routingiem per tenant
+
+  - name: Zarządzanie kardynalnością
+    desc: >
+      Kardynalność (liczba unikalnych kombinacji label values) to główny driver zużycia RAM.
+      Każda unikalna seria to ~1-2 KB RAM w Head block. 1M series = ~1.5 GB RAM.
+      Cardinality explosion — najczęstszy problem produkcyjny w Prometheusie.
+    code: |
+      # Diagnoza kardynalności w Prometheus UI (tsdb-status)
+      # http://localhost:9090/tsdb-status
+
+      # PromQL: sprawdź ile serii per metryka
+      topk(10, count by (__name__)({__name__!=""}))
+
+      # Ile active series ogółem
+      prometheus_tsdb_head_series
+
+      # Metryka z najwyższą kardynalnością
+      topk(5, prometheus_tsdb_symbol_table_size_bytes)
+
+      # ---
+
+      # Limity w prometheus.yml (ochrona przed cardinality bomb)
+      scrape_configs:
+        - job_name: my-app
+          sample_limit: 50000    # max samples per scrape (odrzuć jeśli > 50k)
+          label_limit: 32        # max labels per series
+
+      # Usuwanie niechcianych metryk (metric_relabel_configs)
+      scrape_configs:
+        - job_name: my-app
+          metric_relabel_configs:
+            # Usuń bardzo szczegółowe metryki Go runtime
+            - source_labels: [__name__]
+              regex: 'go_gc_.*'
+              action: drop
+
+            # Usuń label z wysoką kardynalnością
+            - regex: 'user_id|session_id'
+              action: labeldrop
+
+      # Dobra kardynalność:
+      # < 100k active series        → Prometheus samodzielnie bez problemu
+      # 100k - 1M active series     → Prometheus + recording rules + monitoruj RAM
+      # 1M - 10M active series      → rozważ Thanos lub VictoriaMetrics
+      # > 10M active series         → VictoriaMetrics Cluster lub Grafana Mimir

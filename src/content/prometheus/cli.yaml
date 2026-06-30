@@ -1,0 +1,377 @@
+title: Prometheus — CLI i komendy
+
+groups:
+  - name: Instalacja i uruchamianie
+    icon: "🚀"
+    commands:
+      - cmd: docker run -p 9090:9090 prom/prometheus:latest
+        desc: Uruchom Prometheus w Dockerze (domyślna konfiguracja)
+        detail:
+          what: "Uruchamia Prometheus na porcie 9090 z domyślną konfiguracją wewnątrz kontenera."
+          how: "UI dostępne pod http://localhost:9090. Dane nie są persistowane (bez wolumenu)."
+          tips:
+            - "docker run -p 9090:9090 -v $(pwd)/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus"
+            - "docker run -p 9090:9090 -v prometheus_data:/prometheus prom/prometheus  # persist data"
+
+      - cmd: "prometheus --config.file=/etc/prometheus/prometheus.yml"
+        desc: Uruchom Prometheus ze wskazanym plikiem konfiguracyjnym
+        detail:
+          what: "Startuje Prometheus Server z podanym plikiem konfiguracji YAML."
+          how: "Domyślnie nasłuchuje na :9090. Dane zapisuje w ./data jeśli nie podano --storage.tsdb.path."
+          tips:
+            - "Sprawdź dostępność: curl http://localhost:9090/-/healthy"
+            - "Sprawdź readiness: curl http://localhost:9090/-/ready"
+
+      - cmd: "prometheus --config.file=prometheus.yml --storage.tsdb.retention.time=30d"
+        desc: Uruchom Prometheus z 30-dniową retencją danych
+        detail:
+          what: "Ustawia retencję danych TSDB na 30 dni — stare bloki są automatycznie usuwane."
+          how: "Domyślna retencja: 15 dni. Jednostki: ms, s, m, h, d, w, y."
+          tips:
+            - "--storage.tsdb.retention.size=50GB  # limit przez rozmiar na dysku"
+            - "--storage.tsdb.path=/var/lib/prometheus/data  # ścieżka danych"
+
+      - cmd: "prometheus --web.enable-lifecycle --web.listen-address=0.0.0.0:9090"
+        desc: Uruchom Prometheus z obsługą hot-reload i nasłuchem na wszystkich interfejsach
+        detail:
+          what: "Flaga --web.enable-lifecycle odblokowuje POST /-/reload (reload bez restartu)."
+          how: "Po zmianie prometheus.yml: curl -X POST http://localhost:9090/-/reload"
+          tips:
+            - "--web.enable-admin-api  # odblokuj API admina (delete series, clean tombstones)"
+            - "--log.level=debug  # szczegółowe logi przy debugowaniu"
+
+      - cmd: "prometheus --web.enable-lifecycle --storage.tsdb.retention.time=30d --storage.tsdb.retention.size=50GB"
+        desc: Uruchom Prometheus z kompletną konfiguracją storage
+        detail:
+          what: "Oba limity retencji jednocześnie — który zostanie osiągnięty pierwszy, usuwa dane."
+          how: "Polecane na produkcji: oba limity jako zabezpieczenie przed zapełnieniem dysku."
+          tips:
+            - "Szacowanie: 100k series × 15s scrape × 30 dni ≈ 17 GB (z kompresją)"
+
+      - cmd: "systemctl enable --now prometheus"
+        desc: Włącz i uruchom Prometheus jako systemd service
+        detail:
+          what: "Włącza autostart i natychmiast uruchamia service prometheus."
+          how: "Wymaga pliku /etc/systemd/system/prometheus.service. Po zmianie: systemctl daemon-reload."
+          tips:
+            - "systemctl status prometheus  # sprawdź stan"
+            - "journalctl -u prometheus -f  # śledź logi"
+
+  - name: promtool — walidacja i testy
+    icon: "🔧"
+    commands:
+      - cmd: "promtool check config /etc/prometheus/prometheus.yml"
+        desc: Zwaliduj plik konfiguracyjny Prometheusa
+        detail:
+          what: "Sprawdza składnię i poprawność semantyczną prometheus.yml — bez uruchamiania serwera."
+          how: "Uruchom przed każdym deploymentem lub reloadem. Zwraca exit code 0 jeśli OK, 1 jeśli błąd."
+          tips:
+            - "Wbuduj w CI/CD pipeline: promtool check config prometheus.yml || exit 1"
+
+      - cmd: "promtool check rules /etc/prometheus/rules/alerts.yml"
+        desc: Zwaliduj plik reguł alertów
+        detail:
+          what: "Sprawdza składnię reguł alertów i recording rules — weryfikuje wyrażenia PromQL."
+          how: "Każda reguła musi mieć poprawne wyrażenie expr. Waliduje też etykiety i adnotacje."
+          tips:
+            - "promtool check rules /etc/prometheus/rules/*.yml  # wszystkie pliki naraz"
+
+      - cmd: "promtool test rules /etc/prometheus/tests/alert_tests.yml"
+        desc: Uruchom testy jednostkowe reguł alertów
+        detail:
+          what: "Wykonuje testy unit dla reguł alertów z pliku testów YAML. Sprawdza czy alerty strzelają poprawnie."
+          how: "Plik testów definiuje input_series (dane) i expected (kiedy alert powinien być firing)."
+          tips:
+            - "Uruchamiaj w CI przed mergem zmian w rules/"
+            - "promtool test rules tests/*.yml  # wszystkie testy"
+
+      - cmd: "promtool query instant http://localhost:9090 'up'"
+        desc: Wykonaj instant query PromQL z terminala
+        detail:
+          what: "Odpytuje Prometheus API z CLI. Wyświetla aktualne wartości metryki up (wszystkie targety)."
+          how: "Przydatne do szybkiego sprawdzenia stanu bez otwierania UI w przeglądarce."
+          tips:
+            - "promtool query instant http://localhost:9090 'rate(http_requests_total[5m])'"
+            - "promtool query instant --time=2024-01-15T10:00:00Z http://localhost:9090 'up'"
+
+      - cmd: "promtool query range --start=2h --end=now --step=1m http://localhost:9090 'up'"
+        desc: Wykonaj range query PromQL (dane w czasie)
+        detail:
+          what: "Pobiera dane z zakresu czasu — analogicznie do wykresu w Grafanie."
+          how: "start/end jako timestamp ISO8601 lub czas względny (2h = 2 godziny temu)."
+          tips:
+            - "Wynik w JSON — pipe do jq dla czytelnego wyświetlenia"
+
+      - cmd: "promtool tsdb analyze /var/lib/prometheus/data"
+        desc: Analizuj bazę TSDB — kardynalność, efektywność kompresji
+        detail:
+          what: "Wyświetla statystyki TSDB: top serie po kardynalności, rozmiary bloków, efektywność kompresji."
+          how: "Uruchom gdy podejrzewasz problemy z kardynalnością (wysokie RAM, wolne zapytania)."
+          tips:
+            - "Wynik pokazuje top metryki po liczbie serii — znajdź cardinality explosion"
+
+      - cmd: "promtool tsdb list /var/lib/prometheus/data"
+        desc: Wylistuj bloki TSDB na dysku
+        detail:
+          what: "Pokazuje wszystkie niemutowalne bloki TSDB: timestampy, rozmiary, numSeries."
+          how: "Przydatne do diagnostyki retencji i zrozumienia struktury danych."
+          tips:
+            - "Bloki w katalogu data/ — każdy folder = 2h okno danych"
+
+      - cmd: "promtool tsdb dump --name=http_requests_total /var/lib/prometheus/data"
+        desc: Eksportuj surowe dane z TSDB do stdout
+        detail:
+          what: "Wyrzuca próbki z TSDB na stdout w formacie OpenMetrics — można przekierować do pliku."
+          how: "Filtrowanie przez --name ogranicza dump do konkretnej metryki. Opcja --min-time/--max-time."
+          tips:
+            - "Używaj do backup i migracji danych lub offline analysis"
+
+  - name: amtool — zarządzanie Alertmanagerem
+    icon: "🚨"
+    commands:
+      - cmd: amtool check-config /etc/alertmanager/alertmanager.yml
+        desc: Zwaliduj konfigurację Alertmanagera
+        detail:
+          what: "Sprawdza składnię alertmanager.yml — receivers, routes, inhibit_rules, templates."
+          how: "Uruchom przed restartem Alertmanagera lub w CI/CD przy zmianie konfiguracji."
+          tips:
+            - "amtool --alertmanager.url=http://alertmanager:9093 check-config alertmanager.yml"
+
+      - cmd: amtool silence list
+        desc: Wylistuj aktywne silences (wyciszenia alertów)
+        detail:
+          what: "Pokazuje wszystkie aktywne silences: ID, matchers, czas wygaśnięcia, komentarz, autora."
+          how: "Wymaga ustawienia ALERTMANAGER_URL lub flagi --alertmanager.url."
+          tips:
+            - "export ALERTMANAGER_URL=http://localhost:9093"
+            - "amtool silence query instance=web-01  # filtruj po matcherze"
+
+      - cmd: "amtool silence add alertname=InstanceDown instance=web-01:9100 --duration=2h --comment='Maintenance'"
+        desc: Wycisz alert na 2 godziny (maintenance)
+        detail:
+          what: "Tworzy silence — alert InstanceDown dla web-01:9100 nie będzie routowany przez 2h."
+          how: "Matchery to pary label=value. --duration obsługuje: s, m, h. Zwraca ID silence."
+          tips:
+            - "amtool silence add 'severity=~warning|info' --duration=30m --comment='Load test'"
+            - "amtool silence add 'alertname=~.*' --duration=1h --comment='Full maintenance'"
+
+      - cmd: "amtool silence expire <silence-id>"
+        desc: Wygaś silence przed czasem
+        detail:
+          what: "Natychmiastowo kończy silence o podanym ID — alerty zaczynają być routowane."
+          how: "ID z amtool silence list. Można podać wiele ID oddzielonych spacją."
+          tips:
+            - "amtool silence expire id1 id2 id3  # wiele na raz"
+
+      - cmd: amtool alert list
+        desc: Wylistuj aktywne alerty w Alertmanagerze
+        detail:
+          what: "Pokazuje alerty które Alertmanager aktualnie przetwarza — stan, etykiety, czas."
+          how: "Rozróżnia alerty firing (aktywne) od resolved (niedawno wygasłe)."
+          tips:
+            - "amtool alert list --filter='severity=critical'  # tylko critical"
+            - "amtool alert list --active --silenced  # wszystkie stany"
+
+      - cmd: "amtool config routes test alertname=InstanceDown severity=critical"
+        desc: Sprawdź routing alertu w Alertmanagerze
+        detail:
+          what: "Symuluje routing alertu przez drzewo routes — pokazuje który receiver dostanie alert."
+          how: "Podaj labels alertu jako key=value. Wyświetla całą ścieżkę przez routes."
+          tips:
+            - "Przydatne przy debugowaniu: 'dlaczego ten alert nie trafił na PagerDuty?'"
+
+      - cmd: amtool config routes show
+        desc: Wyświetl aktualne routes Alertmanagera jako drzewo
+        detail:
+          what: "Pokazuje strukturę routingu w Alertmanagerze (kto dostaje jakie alerty)."
+          how: "Odczytuje live konfigurację z działającego Alertmanagera."
+          tips:
+            - "amtool config show  # cała konfiguracja"
+
+  - name: HTTP API — curl queries
+    icon: "🌐"
+    commands:
+      - cmd: "curl -s 'http://localhost:9090/api/v1/query?query=up' | jq ."
+        desc: Instant query PromQL przez API
+        detail:
+          what: "Odpytuje Prometheus przez HTTP API — zwraca JSON z wynikami instant query."
+          how: "Parametr query= to wyrażenie PromQL. Opcjonalnie &time= dla konkretnego timestampu."
+          tips:
+            - "curl -s 'http://localhost:9090/api/v1/query?query=rate(http_requests_total[5m])' | jq .data.result"
+
+      - cmd: "curl -s 'http://localhost:9090/api/v1/query_range?query=up&start=1h&end=now&step=60s' | jq ."
+        desc: Range query PromQL przez API
+        detail:
+          what: "Pobiera dane w zakresie czasu — output analogiczny do wykresu Grafany."
+          how: "start/end: Unix timestamp lub czas względny. step: rozdzielczość w sekundach."
+          tips:
+            - "Timestamp: $(date -d '1 hour ago' +%s)"
+
+      - cmd: "curl -s 'http://localhost:9090/api/v1/targets?state=active' | jq '.data.activeTargets[] | {job: .labels.job, instance: .labels.instance, health: .health}'"
+        desc: Sprawdź stan scrapowanych targetów
+        detail:
+          what: "Wyświetla wszystkie targety z ich stanem: up/down, czas ostatniego scrape, błędy."
+          how: "state=active (tylko aktywne), state=dropped (odrzucone przez relabeling)."
+          tips:
+            - "curl -s 'http://localhost:9090/api/v1/targets' | jq '.data.activeTargets[] | select(.health==\"down\")'"
+
+      - cmd: "curl -X POST http://localhost:9090/-/reload"
+        desc: Przeładuj konfigurację Prometheusa bez restartu
+        detail:
+          what: "Hot-reload prometheus.yml i plików reguł — bez zatrzymywania serwera."
+          how: "Wymaga flagi startowej --web.enable-lifecycle. Zwraca HTTP 200 gdy reload OK."
+          tips:
+            - "Sprawdź po reloadzie: curl http://localhost:9090/api/v1/status/config | jq .data.yaml -r"
+
+      - cmd: "curl -s http://localhost:9090/-/healthy"
+        desc: Sprawdź czy Prometheus żyje (health check)
+        detail:
+          what: "Endpoint health check — zwraca HTTP 200 z 'Prometheus is Healthy.' jeśli OK."
+          how: "Używany przez Kubernetes livenessProbe i monitoring Prometheusa samego siebie."
+          tips:
+            - "curl http://localhost:9090/-/ready  # readiness (czy gotowy do ruchu)"
+
+      - cmd: "curl -s 'http://localhost:9090/api/v1/label/__name__/values' | jq '.data[:20]'"
+        desc: Wylistuj dostępne nazwy metryk
+        detail:
+          what: "Zwraca listę wszystkich nazw metryk które Prometheus aktualnie posiada."
+          how: "Przydatne do odkrywania metryk i debugowania braku danych."
+          tips:
+            - "curl -s 'http://localhost:9090/api/v1/label/job/values' | jq .  # wartości konkretnego labela"
+            - "curl -s 'http://localhost:9090/api/v1/labels' | jq .  # lista labelów"
+
+      - cmd: "curl -s 'http://localhost:9090/api/v1/series?match[]=http_requests_total' | jq .data[:5]"
+        desc: Wyszukaj serie danych po wzorcu
+        detail:
+          what: "Zwraca metadane serii (kombinacje labels) pasujących do selektora."
+          how: "match[] = selektor PromQL (tak jak w zapytaniu). Wiele match[] = OR."
+          tips:
+            - "curl -s 'http://localhost:9090/api/v1/series?match[]={job=\"node\"}' | jq .data | length"
+
+      - cmd: "curl -s http://localhost:9090/api/v1/status/runtimeinfo | jq ."
+        desc: Pobierz informacje runtime Prometheusa
+        detail:
+          what: "Pokazuje aktualną konfigurację runtime: retencja, storage path, uptime, active series count."
+          how: "Przydatne do weryfikacji że Prometheus używa właściwych ustawień."
+          tips:
+            - "curl -s http://localhost:9090/api/v1/status/buildinfo | jq .  # wersja Prometheusa"
+
+      - cmd: "curl -X POST 'http://localhost:9090/api/v1/admin/tsdb/delete_series?match[]=old_metric_name'"
+        desc: Usuń serię danych z TSDB (wymaga --web.enable-admin-api)
+        detail:
+          what: "Oznacza serię jako usuniętą (lazy delete przez tombstones). Fizyczne usunięcie przy kompakcji."
+          how: "Wymaga flagi --web.enable-admin-api. Po usunięciu: POST /-/reload lub czekaj na kompakcję."
+          tips:
+            - "POST /api/v1/admin/tsdb/clean_tombstones  # wymuś fizyczne usunięcie"
+
+  - name: Docker Compose — pełny stack
+    icon: "🐳"
+    commands:
+      - cmd: "docker compose up -d"
+        desc: Uruchom pełny monitoring stack (Prometheus + Grafana + Alertmanager)
+        detail:
+          what: "Startuje wszystkie serwisy zdefiniowane w docker-compose.yml w tle."
+          how: "Wymaga docker-compose.yml z serwisami prometheus, grafana, alertmanager, node_exporter."
+          tips:
+            - "docker compose ps  # sprawdź stan wszystkich serwisów"
+            - "docker compose logs -f prometheus  # śledzenie logów Prometheusa"
+
+      - cmd: "docker compose -f docker-compose.yml up -d prometheus grafana"
+        desc: Uruchom tylko wybrane serwisy ze stack'u
+        detail:
+          what: "Startuje tylko prometheus i grafana — pomija alertmanager i eksportery."
+          how: "Przydatne podczas development gdy nie potrzebujesz całego stacku."
+          tips:
+            - "docker compose restart prometheus  # restart bez recreate"
+            - "docker compose pull  # pobierz najnowsze obrazy"
+
+      - cmd: docker compose exec prometheus promtool check config /etc/prometheus/prometheus.yml
+        desc: Zwaliduj konfigurację wewnątrz kontenera Prometheusa
+        detail:
+          what: "Wykonuje promtool check config wewnątrz działającego kontenera Docker."
+          how: "Przydatne gdy nie masz promtool lokalnie — używa binarki z kontenera."
+          tips:
+            - "docker compose exec prometheus sh  # wejdź do powłoki kontenera"
+
+  - name: Kubernetes i Helm
+    icon: "☸️"
+    commands:
+      - cmd: "helm repo add prometheus-community https://prometheus-community.github.io/helm-charts && helm repo update"
+        desc: Dodaj repozytorium Prometheus Helm charts
+        detail:
+          what: "Dodaje oficjalne repozytorium Prometheus Community z chartami (kube-prometheus-stack i inne)."
+          how: "Jednorazowe ustawienie. helm repo update aktualizuje listę dostępnych wersji."
+          tips:
+            - "helm search repo prometheus-community  # lista dostępnych chartów"
+
+      - cmd: "helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace --set grafana.adminPassword=admin"
+        desc: Zainstaluj pełny monitoring stack w Kubernetes
+        detail:
+          what: "Instaluje kube-prometheus-stack: Prometheus + Alertmanager + Grafana + node-exporter + kube-state-metrics."
+          how: "Tworzy namespace monitoring jeśli nie istnieje. Po instalacji: sprawdź pods w monitoring namespace."
+          tips:
+            - "kubectl get pods -n monitoring  # sprawdź stan wszystkich podów"
+            - "kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090 -n monitoring"
+            - "kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80 -n monitoring"
+
+      - cmd: "helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack --namespace monitoring"
+        desc: Zaktualizuj kube-prometheus-stack do najnowszej wersji
+        detail:
+          what: "Aktualizuje zainstalowany chart zachowując istniejące wartości konfiguracji."
+          how: "Sprawdź changelog przed upgrade — zmiany w CRDs mogą wymagać dodatkowych kroków."
+          tips:
+            - "helm get values kube-prometheus-stack -n monitoring > values-backup.yaml  # backup przed upgrade"
+
+      - cmd: "kubectl apply -f servicemonitor.yaml"
+        desc: Utwórz ServiceMonitor — automatyczny scrape przez Prometheus Operator
+        detail:
+          what: "Tworzy CRD ServiceMonitor który Prometheus Operator automatycznie przekształca w scrape config."
+          how: "Plik servicemonitor.yaml z apiVersion: monitoring.coreos.com/v1 kind: ServiceMonitor."
+          tips:
+            - "kubectl get servicemonitor -n monitoring  # lista aktywnych ServiceMonitorów"
+            - "Labels muszą pasować do prometheusSpec.serviceMonitorSelector w kube-prometheus-stack"
+
+      - cmd: "kubectl apply -f prometheusrule.yaml"
+        desc: Utwórz PrometheusRule — alerting rules jako Kubernetes YAML
+        detail:
+          what: "Tworzy CRD PrometheusRule który Operator automatycznie dodaje do Prometheusa."
+          how: "apiVersion: monitoring.coreos.com/v1 kind: PrometheusRule z grupami reguł."
+          tips:
+            - "kubectl get prometheusrule -n monitoring  # lista reguł"
+
+      - cmd: "kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090 -n monitoring"
+        desc: Tunel do UI Prometheusa w Kubernetes
+        detail:
+          what: "Przekierowuje port 9090 z Prometheus serwisu na localhost:9090 w Kubernetes."
+          how: "Po uruchomieniu: http://localhost:9090 otwiera UI Prometheusa. Ctrl+C przerywa."
+          tips:
+            - "kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80 -n monitoring  # Grafana"
+            - "kubectl port-forward svc/kube-prometheus-stack-alertmanager 9093:9093 -n monitoring"
+
+  - name: Pushgateway i eksportery
+    icon: "📤"
+    commands:
+      - cmd: "docker run -d -p 9091:9091 prom/pushgateway"
+        desc: Uruchom Pushgateway dla krótkotrwałych jobów
+        detail:
+          what: "Startuje Pushgateway na porcie 9091 — pośrednik dla job-based metryk (cron, batch)."
+          how: "Aplikacja pushuje metryki do :9091, Prometheus scrapuje :9091/metrics."
+          tips:
+            - "curl -X DELETE http://localhost:9091/metrics/job/my_job  # usuń metryki joba"
+
+      - cmd: "echo 'my_job_duration_seconds 3.5' | curl --data-binary @- http://localhost:9091/metrics/job/my_batch_job"
+        desc: Wypchnij metrykę do Pushgateway z cron joba
+        detail:
+          what: "Wysyła metrykę my_job_duration_seconds=3.5 do Pushgateway oznaczoną jako job=my_batch_job."
+          how: "Prometheus scrapuje Pushgateway i automatycznie dodaje label job=my_batch_job do metryk."
+          tips:
+            - "Typ metryki w Pushgateway: push całego pliku z TYPE i HELP"
+            - "Metryki w Pushgateway nie usuwają się automatycznie — usuń po zakończeniu joba"
+
+      - cmd: "docker run -d --net=host --pid=host -v /:/host:ro prom/node-exporter --path.rootfs=/host"
+        desc: Uruchom node_exporter z dostępem do systemu hosta
+        detail:
+          what: "Uruchamia node_exporter z dostępem do /proc i /sys hosta przez --net=host --pid=host."
+          how: "Tryb --net=host niezbędny do metryk sieciowych hosta. Port 9100 na hoście."
+          tips:
+            - "curl http://localhost:9100/metrics | grep node_cpu  # sprawdź metryki CPU"
