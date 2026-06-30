@@ -186,7 +186,7 @@ items:
 
         - name: 'pagerduty-critical'
           pagerduty_configs:
-            - service_key: 'PAGERDUTY_KEY'
+            - routing_key: 'PAGERDUTY_INTEGRATION_KEY'  # Events API v2
 
         - name: 'slack-dba'
           slack_configs:
@@ -240,7 +240,7 @@ items:
             alertname: '.+'
           equal: ['instance']
 
-        # Wycisz staging alerty gdy env != staging
+        # Wycisz alerty staging gdy aktywny jest alert StagingMaintenance
         - source_match:
             alertname: StagingMaintenance
           target_match:

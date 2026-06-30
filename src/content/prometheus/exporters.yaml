@@ -266,7 +266,7 @@ items:
       eksponuje metryki runtime (event loop lag, heap, GC). Idealna do monitorowania
       mikrousług Node.js produkcyjnych.
     code: |
-      # npm install prom-client
+      // npm install prom-client
 
       const client = require('prom-client');
       const express = require('express');
@@ -274,10 +274,10 @@ items:
 
       const register = client.register;
 
-      # Domyślne metryki Node.js: event loop, heap, GC, handles
+      // Domyślne metryki Node.js: event loop, heap, GC, handles
       client.collectDefaultMetrics({ register, prefix: 'node_' });
 
-      # Custom Counter
+      // Custom Counter
       const httpRequests = new client.Counter({
         name: 'http_requests_total',
         help: 'Total HTTP requests',
@@ -285,7 +285,7 @@ items:
         registers: [register],
       });
 
-      # Custom Histogram
+      // Custom Histogram
       const httpDuration = new client.Histogram({
         name: 'http_request_duration_seconds',
         help: 'HTTP request duration',
@@ -294,14 +294,14 @@ items:
         registers: [register],
       });
 
-      # Gauge
+      // Gauge
       const activeConns = new client.Gauge({
         name: 'active_connections',
         help: 'Active connections',
         registers: [register],
       });
 
-      # Middleware
+      // Middleware — mierzy latencję i liczy requesty
       app.use((req, res, next) => {
         const end = httpDuration.startTimer({ method: req.method, route: req.path });
         activeConns.inc();
@@ -313,7 +313,7 @@ items:
         next();
       });
 
-      # /metrics endpoint dla Prometheusa
+      // /metrics endpoint dla Prometheusa
       app.get('/metrics', async (req, res) => {
         res.set('Content-Type', register.contentType);
         res.end(await register.metrics());

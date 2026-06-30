@@ -157,8 +157,8 @@ items:
       label_replace(up, "service", "$1", "job", "(.+)-prod")
       # job="backend-prod" → service="backend"
 
-      # changes(gauge[interval]) — ile razy wartość się zmieniła
-      changes(config_reload_success_total[1h])
+      # changes(gauge[interval]) — ile razy gauge zmienił wartość (dla toggles)
+      changes(node_disk_io_now[1h])   # ile razy disk I/O zmieniło stan
 
       # resets(counter[interval]) — ile razy counter zresetował się (restarty!)
       resets(process_cpu_seconds_total[24h])
