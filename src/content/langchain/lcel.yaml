@@ -1,0 +1,123 @@
+title: LCEL — LangChain Expression Language
+labels:
+  section: Pattern
+  example: Przykład
+
+intro: >
+  LCEL (LangChain Expression Language) to składnia pipe-owa (|) do komponowania
+  Runnable w łańcuchy. chain = prompt | model | parser. Każdy | tworzy
+  RunnableSequence. Zalety: streaming od razu, batch automatycznie, async nativnie,
+  pełna introspection (chain.get_graph()), langsmith tracing out-of-the-box.
+  Stary interfejs chain.run() jest deprecated — używaj chain.invoke().
+
+items:
+  - name: Podstawowe łańcuchy LCEL
+    desc: >
+      Operator | łączy Runnable sekwencyjnie. Wyjście lewego = wejście prawego.
+      RunnableSequence.invoke() wykonuje kolejno. RunnableParallel = kroki równolegle,
+      wynik to dict z kluczami. from_messages + | model + | parser = typowy pattern.
+    code: |
+      from langchain_core.prompts import ChatPromptTemplate
+      from langchain_core.output_parsers import StrOutputParser
+      from langchain_core.runnables import RunnableParallel
+      from langchain_anthropic import ChatAnthropic
+
+      model = ChatAnthropic(model="claude-opus-4-8")
+      parser = StrOutputParser()
+
+      # Prosty łańcuch
+      chain = (
+          ChatPromptTemplate.from_template("Podsumuj w 1 zdaniu: {tekst}")
+          | model
+          | parser
+      )
+      summary = chain.invoke({"tekst": "Lorem ipsum..."})
+
+      # RunnableParallel — dwa LLM calls równolegle
+      parallel = RunnableParallel(
+          podsumowanie=ChatPromptTemplate.from_template("Podsumuj: {tekst}") | model | parser,
+          tlumaczenie=ChatPromptTemplate.from_template("Przetłumacz na angielski: {tekst}") | model | parser,
+      )
+      result = parallel.invoke({"tekst": "Python jest świetny."})
+      # → {"podsumowanie": "...", "tlumaczenie": "..."}
+
+  - name: Streaming w LCEL
+    desc: >
+      stream() i astream() działają automatycznie dla każdego łańcucha LCEL.
+      Tokeny płyną od razu bez buforowania. astream_events() = szczegółowe
+      eventy (on_chat_model_start, on_chain_end itd.) — przydatne do UI.
+    code: |
+      import asyncio
+
+      # Synchroniczny streaming
+      for chunk in chain.stream({"tekst": "Napisz wiersz o Pythonie"}):
+          print(chunk, end="", flush=True)
+
+      # Asynchroniczny streaming
+      async def stream_async():
+          async for chunk in chain.astream({"tekst": "Co to jest asyncio?"}):
+              print(chunk, end="", flush=True)
+
+      asyncio.run(stream_async())
+
+      # astream_events — eventy z metadanymi
+      async def stream_events():
+          async for event in chain.astream_events(
+              {"tekst": "Czym jest LCEL?"},
+              version="v2"
+          ):
+              if event["event"] == "on_chat_model_stream":
+                  print(event["data"]["chunk"].content, end="")
+
+  - name: Łańcuchy z branching (RunnableBranch)
+    desc: >
+      RunnableBranch = if/elif/else dla łańcuchów. Lista (condition, runnable)
+      + fallback. itemgetter z operator.itemgetter pobiera klucze z dict.
+      Przydatne do routingu zapytań do różnych prompts/modeli.
+    code: |
+      from langchain_core.runnables import RunnableBranch
+      from operator import itemgetter
+
+      # Router na podstawie języka
+      pl_chain = ChatPromptTemplate.from_template("Odpowiedz po polsku: {pytanie}") | model | parser
+      en_chain = ChatPromptTemplate.from_template("Answer in English: {pytanie}") | model | parser
+
+      branch = RunnableBranch(
+          (lambda x: x["lang"] == "pl", pl_chain),
+          (lambda x: x["lang"] == "en", en_chain),
+          en_chain,  # fallback
+      )
+      result = branch.invoke({"pytanie": "What is Python?", "lang": "pl"})
+
+      # itemgetter — wyciągnij pole z inputu
+      chain_with_key = (
+          {"pytanie": itemgetter("query"), "kontekst": itemgetter("docs")}
+          | ChatPromptTemplate.from_template("Kontekst: {kontekst}\nPytanie: {pytanie}")
+          | model
+          | parser
+      )
+
+  - name: Fallbacks i retry
+    desc: >
+      .with_fallbacks([backup_chain]) = jeśli chain wyrzuci wyjątek, spróbuj
+      backup. .with_retry(stop_after_attempt=3) = retry z backoff.
+      Przydatne przy niestabilnych API lub limitach rate.
+    code: |
+      from langchain_openai import ChatOpenAI
+
+      # Fallback — jeśli Anthropic nie odpowie, użyj OpenAI
+      primary = ChatAnthropic(model="claude-opus-4-8")
+      backup = ChatOpenAI(model="gpt-4o")
+
+      chain_with_fallback = primary.with_fallbacks([backup])
+      result = chain_with_fallback.invoke([HumanMessage(content="Hello")])
+
+      # Retry z konfiguracją
+      reliable_model = model.with_retry(
+          stop_after_attempt=3,
+          wait_exponential_jitter=True,  # exponential backoff + jitter
+          retry_if_exception_type=(Exception,),
+      )
+
+      # Timeout
+      chain_with_timeout = chain.with_config({"run_name": "my_chain"})

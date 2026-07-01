@@ -1,0 +1,125 @@
+title: httpx — podstawy
+labels:
+  section: Koncept
+  example: Przykład
+
+intro: >
+  httpx to nowoczesna biblioteka HTTP dla Pythona z API kompatybilnym z requests,
+  ale z natywnym wsparciem dla async/await, HTTP/2, type hints i timeout na każdym
+  poziomie. Główna różnica vs requests: AsyncClient dla async, Client dla sync
+  (oba jako context manager). Bez context managera połączenia nie są zamykane!
+
+items:
+  - name: Podstawowe GET / POST
+    desc: >
+      httpx.get/post = one-shot requests (nowe połączenie za każdym razem).
+      Użyj httpx.Client dla wielu requestów (connection pooling).
+      Response ma .text, .json(), .content (bytes), .status_code, .headers.
+    code: |
+      import httpx
+
+      # Sync — one-shot (nie do produkcji)
+      response = httpx.get("https://api.github.com/zen")
+      print(response.status_code)  # 200
+      print(response.text)         # string
+
+      # GET z parametrami
+      r = httpx.get("https://httpbin.org/get", params={"page": 1, "limit": 10})
+      print(r.url)  # → https://httpbin.org/get?page=1&limit=10
+
+      # POST JSON
+      r = httpx.post(
+          "https://api.example.com/users",
+          json={"name": "Łukasz", "email": "test@test.com"},
+          headers={"Authorization": "Bearer token123"},
+      )
+      data = r.json()      # → dict
+      r.raise_for_status() # rzuca HTTPStatusError jeśli 4xx/5xx
+
+  - name: httpx.Client — sync z connection pooling
+    desc: >
+      Client utrzymuje connection pool, sesję (cookies, headers) i konfigurację
+      między requestami. Zawsze używaj jako context manager (with Client()).
+      base_url = prefix do wszystkich requestów. timeout = dla wszystkich requestów
+      w kliencie (możesz nadpisać per request).
+    code: |
+      import httpx
+
+      with httpx.Client(
+          base_url="https://api.github.com",
+          headers={"Authorization": "Bearer ghp_xxx"},
+          timeout=httpx.Timeout(10.0, connect=5.0),
+          follow_redirects=True,
+      ) as client:
+
+          # base_url + "/user" → https://api.github.com/user
+          me = client.get("/user").json()
+          repos = client.get("/user/repos", params={"per_page": 50}).json()
+          print(f"{me['login']} ma {len(repos)} repozytoriów")
+
+          # POST z JSON
+          r = client.post("/user/repos", json={"name": "nowe-repo", "private": True})
+          r.raise_for_status()
+
+  - name: Timeout
+    desc: >
+      httpx.Timeout(n) = timeout dla wszystkich faz. Możesz kontrolować connect,
+      read, write, pool oddzielnie. httpx.Timeout(None) = brak timeout (niebezpieczne).
+      Timeout przy one-shot requestach i kliencie działają identycznie.
+    code: |
+      import httpx
+
+      # Jeden timeout dla wszystkiego (najczęściej używane)
+      r = httpx.get("https://example.com", timeout=5.0)
+
+      # Granularne timeouty
+      timeout = httpx.Timeout(
+          connect=3.0,    # czas na nawiązanie połączenia
+          read=10.0,      # czas na odebranie danych
+          write=5.0,      # czas na wysłanie danych
+          pool=1.0,       # czas na uzyskanie połączenia z poola
+      )
+      r = httpx.get("https://api.slow.com/data", timeout=timeout)
+
+      # Łapanie błędów timeout
+      try:
+          r = httpx.get("https://example.com", timeout=0.001)
+      except httpx.TimeoutException as e:
+          print(f"Timeout: {e}")
+      except httpx.NetworkError as e:
+          print(f"Błąd sieci: {e}")
+
+  - name: Response — atrybuty i metody
+    desc: >
+      Response.json() = automatyczny parsing JSON. .raise_for_status() = wyjątek
+      dla 4xx/5xx. .is_success, .is_error, .is_redirect = flagi. .elapsed = czas
+      odpowiedzi. .headers = Headers (case-insensitive dict).
+    code: |
+      import httpx
+
+      r = httpx.get("https://httpbin.org/json")
+
+      # Podstawowe atrybuty
+      r.status_code        # 200
+      r.is_success         # True dla 2xx
+      r.is_client_error    # True dla 4xx
+      r.is_server_error    # True dla 5xx
+      r.headers            # Headers({'content-type': 'application/json'})
+      r.headers["content-type"]  # case-insensitive
+
+      # Treść
+      r.text               # string (auto-detect encoding)
+      r.content            # bytes
+      r.json()             # → dict/list (throws json.JSONDecodeError jeśli nie JSON)
+
+      # Metadane
+      r.url                # httpx.URL
+      r.elapsed            # timedelta
+      r.encoding           # wykryte kodowanie
+      r.history            # lista redirect responses
+
+      # Raise for status z dobrym komunikatem błędu
+      try:
+          r.raise_for_status()
+      except httpx.HTTPStatusError as e:
+          print(f"HTTP {e.response.status_code}: {e.request.url}")

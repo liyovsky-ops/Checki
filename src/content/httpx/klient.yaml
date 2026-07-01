@@ -1,0 +1,122 @@
+title: Klient — zaawansowane opcje
+labels:
+  section: Feature
+  example: Przykład
+
+intro: >
+  httpx.Client (sync) i httpx.AsyncClient (async) mają identyczne API.
+  Oba wspierają: base_url, domyślne headers, cookies, auth, proxy, certyfikaty SSL,
+  HTTP/2, connection limits. Możesz budować własne klasy klienta przez dziedziczenie.
+
+items:
+  - name: Cookies i Session
+    desc: >
+      Client automatycznie przechowuje cookies między requestami jak przeglądarka.
+      Możesz ustawić cookies globalnie lub per-request. client.cookies = Cookies
+      (dostępne po requestach).
+    code: |
+      import httpx
+
+      # Client z cookies startowymi
+      with httpx.Client(cookies={"session_id": "abc123"}) as client:
+          # cookie wysyłane automatycznie
+          r = client.get("https://example.com/protected")
+
+          # Dodaj cookie per request
+          r = client.get("https://example.com", cookies={"extra": "val"})
+
+          # Odczytaj cookies po zalogowaniu
+          client.post("https://example.com/login", data={"user": "a", "pass": "b"})
+          print(client.cookies)  # Cookies({'session': 'xyz789'})
+          print(client.cookies["session"])  # xyz789
+
+          # Kolejny request — cookie session wysyłane automatycznie
+          r = client.get("https://example.com/dashboard")
+
+  - name: Auth — wbudowane i własne
+    desc: >
+      Wbudowane: BasicAuth, DigestAuth, BearerAuth. Można ustawić globalnie
+      w Client lub per-request. httpx.Auth = klasa bazowa dla własnej autentykacji
+      (np. HMAC, OAuth2).
+    code: |
+      import httpx
+
+      # Basic Auth
+      r = httpx.get("https://api.example.com", auth=("user", "password"))
+      # lub
+      auth = httpx.BasicAuth(username="user", password="password")
+
+      # Bearer Token (przez headers)
+      with httpx.Client(
+          headers={"Authorization": "Bearer eyJhbGc..."}
+      ) as client:
+          r = client.get("/protected")
+
+      # Własna klasa Auth (np. API key w nagłówku)
+      class APIKeyAuth(httpx.Auth):
+          def __init__(self, api_key: str):
+              self.api_key = api_key
+
+          def auth_flow(self, request):
+              request.headers["X-API-Key"] = self.api_key
+              yield request  # wyślij request, odbierz response
+
+      with httpx.Client(auth=APIKeyAuth("sk-xxx")) as client:
+          r = client.get("https://api.example.com/data")
+
+  - name: Proxy i SSL
+    desc: >
+      Proxy przez proxies dict lub HTTPS_PROXY/HTTP_PROXY env vars.
+      verify=False wyłącza weryfikację SSL (tylko dev!). verify="cert.pem" = własny CA.
+      cert=("client.pem", "key.pem") = client certificate.
+    code: |
+      import httpx
+
+      # Proxy
+      with httpx.Client(
+          proxy="http://proxy.company.com:8080",
+      ) as client:
+          r = client.get("https://httpbin.org/ip")
+
+      # Własny proxy per URL scheme
+      with httpx.Client(
+          mounts={
+              "http://": httpx.HTTPTransport(proxy="http://proxy:8080"),
+              "https://": httpx.HTTPTransport(proxy="http://proxy:8080"),
+          }
+      ) as client:
+          r = client.get("https://example.com")
+
+      # SSL — własny certyfikat
+      with httpx.Client(verify="/path/to/ca-bundle.pem") as client:
+          r = client.get("https://internal.company.com")
+
+      # SSL — wyłącz weryfikację (TYLKO development!)
+      with httpx.Client(verify=False) as client:
+          r = client.get("https://self-signed.example.com")
+
+  - name: HTTP/2
+    desc: >
+      httpx obsługuje HTTP/2 natywnie — znacznie szybszy dla wielu requestów
+      do tego samego hosta (multiplexing, header compression). Wymaga pakietu
+      h2. Włącz przez http2=True.
+    code: |
+      pip install httpx[http2]
+
+      import httpx
+
+      # HTTP/2 z jednym klientem
+      with httpx.Client(http2=True) as client:
+          r = client.get("https://www.cloudflare.com")
+          print(r.http_version)  # "HTTP/2"
+
+      # Async + HTTP/2 (najlepsze połączenie)
+      async with httpx.AsyncClient(http2=True) as client:
+          # Wiele requestów do tego samego hosta — HTTP/2 multiplexing
+          import asyncio
+          responses = await asyncio.gather(
+              client.get("https://api.example.com/users"),
+              client.get("https://api.example.com/posts"),
+              client.get("https://api.example.com/tags"),
+          )
+          # Wszystkie 3 = jeden TCP connection (HTTP/2)

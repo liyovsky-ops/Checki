@@ -1,0 +1,112 @@
+title: Pamięć konwersacji
+labels:
+  section: Typ
+  example: Przykład
+
+intro: >
+  LangChain obsługuje pamięć konwersacji przez ChatHistory — listę wiadomości
+  (HumanMessage, AIMessage) przekazywaną do modelu. Dwa podejścia: in-memory
+  przez InMemoryChatMessageHistory (per sesja) lub persystentna przez Redis/SQLite
+  (między sesjami). RunnableWithMessageHistory owija chain dodając automatyczne
+  zarządzanie historią.
+
+items:
+  - name: InMemoryChatMessageHistory
+    desc: >
+      Najprostszy sposób — lista wiadomości w pamięci RAM. Przez session_id
+      możesz mieć wiele niezależnych konwersacji. RunnableWithMessageHistory
+      automatycznie dodaje historię do każdego invoke().
+    code: |
+      from langchain_core.chat_history import InMemoryChatMessageHistory
+      from langchain_core.runnables.history import RunnableWithMessageHistory
+      from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+
+      # Przechowuje sesje
+      store: dict[str, InMemoryChatMessageHistory] = {}
+
+      def get_session_history(session_id: str) -> InMemoryChatMessageHistory:
+          if session_id not in store:
+              store[session_id] = InMemoryChatMessageHistory()
+          return store[session_id]
+
+      # Prompt z placeholderem na historię
+      prompt = ChatPromptTemplate.from_messages([
+          ("system", "Jesteś pomocnym asystentem."),
+          MessagesPlaceholder(variable_name="history"),
+          ("human", "{input}"),
+      ])
+
+      chain = prompt | model | StrOutputParser()
+
+      chain_with_history = RunnableWithMessageHistory(
+          chain,
+          get_session_history,
+          input_messages_key="input",
+          history_messages_key="history",
+      )
+
+      # Użycie — każde invoke() z tym samym session_id pamięta historię
+      config = {"configurable": {"session_id": "user_abc"}}
+      r1 = chain_with_history.invoke({"input": "Jestem Łukasz."}, config=config)
+      r2 = chain_with_history.invoke({"input": "Jak mam na imię?"}, config=config)
+      # → "Masz na imię Łukasz."
+
+  - name: Trim messages — zarządzanie długością kontekstu
+    desc: >
+      Długie konwersacje przekraczają context window. trim_messages() przycina
+      historię zachowując ostatnie N tokenów lub wiadomości. filter_messages()
+      filtruje po typie (np. tylko HumanMessage). Musi działać przed modelem w chain.
+    code: |
+      from langchain_core.messages import trim_messages, filter_messages, SystemMessage
+
+      # Przytnij do ostatnich 1000 tokenów
+      trimmer = trim_messages(
+          max_tokens=1000,
+          strategy="last",           # zachowaj ostatnie (nie pierwsze)
+          token_counter=model,       # używa tokenizera modelu
+          include_system=True,       # zawsze zachowaj SystemMessage
+          allow_partial=False,       # nie przycinaj w połowie wiadomości
+          start_on="human",          # zacznij od HumanMessage
+      )
+
+      # Dodaj trimmer do chain
+      chain = (
+          RunnablePassthrough.assign(history=itemgetter("history") | trimmer)
+          | prompt
+          | model
+          | parser
+      )
+
+      # filter_messages — tylko wiadomości ludzkiego
+      human_only = filter_messages(messages, include_types=["human"])
+
+  - name: Summarize memory — podsumowanie długich konwersacji
+    desc: >
+      Zamiast ciąć historię, podsumuj ją przez LLM gdy przekroczy limit.
+      Pattern: gdy historia > N wiadomości → wywołaj model do podsumowania
+      → zastąp starą historię jedną SystemMessage z podsumowaniem.
+    code: |
+      from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+
+      async def summarize_and_trim(messages: list, model, threshold: int = 10):
+          """Jeśli historia > threshold, podsumuj ją."""
+          if len(messages) <= threshold:
+              return messages
+
+          # Weź stare wiadomości do podsumowania
+          to_summarize = messages[:-4]  # zostaw ostatnie 4
+          recent = messages[-4:]
+
+          # Podsumuj przez LLM
+          summary_prompt = [
+              HumanMessage(content=f"""Podsumuj poniższą rozmowę w 2-3 zdaniach:
+
+      {chr(10).join(f'{m.type}: {m.content}' for m in to_summarize)}""")
+          ]
+          summary = await model.ainvoke(summary_prompt)
+
+          # Zwróć: SystemMessage z podsumowaniem + ostatnie wiadomości
+          return [
+              SystemMessage(content=f"Podsumowanie poprzedniej rozmowy: {summary.content}"),
+              *recent
+          ]

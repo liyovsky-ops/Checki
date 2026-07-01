@@ -1,0 +1,99 @@
+title: Komendy i snippety
+labels:
+  section: Kategoria
+  example: Komenda
+
+intro: >
+  LangChain nie ma własnego CLI — zarządzasz przez pip i Python. LangSmith CLI
+  (langsmith) do zarządzania datasetami i uruchamiania ewaluacji. Tutaj zebrane
+  kluczowe one-linery i snippety przydatne codziennie.
+
+items:
+  - name: Instalacja
+    desc: Pakiety LangChain
+    code: |
+      # Minimalna instalacja
+      pip install langchain-core
+
+      # Z konkretnym modelem
+      pip install langchain langchain-anthropic
+      pip install langchain langchain-openai
+
+      # RAG stack
+      pip install langchain langchain-openai langchain-community faiss-cpu pypdf
+
+      # Pełny stack agentów
+      pip install langchain langgraph langchain-anthropic langchain-community
+
+      # LangSmith (observability)
+      pip install langsmith
+
+  - name: Debug i inspekcja chain
+    desc: Narzędzia do debugowania
+    code: |
+      # Wyświetl graf chain jako ASCII
+      chain.get_graph().print_ascii()
+
+      # JSON schema inputu/outputu
+      print(chain.input_schema.schema())
+      print(chain.output_schema.schema())
+
+      # Verbose mode — loguje każdy krok
+      from langchain.globals import set_verbose, set_debug
+      set_verbose(True)   # logi kroków
+      set_debug(True)     # szczegółowe logi
+
+      # Trace pojedynczego invoke bez LangSmith
+      from langchain_core.tracers import ConsoleCallbackHandler
+      result = chain.invoke(
+          {"input": "test"},
+          config={"callbacks": [ConsoleCallbackHandler()]}
+      )
+
+  - name: Konfiguracja runtime
+    desc: Config przekazywany do invoke/stream
+    code: |
+      # Nadpisz parametry runtime
+      result = chain.invoke(
+          {"input": "test"},
+          config={
+              "run_name": "my_run",          # nazwa w LangSmith
+              "tags": ["prod", "v2"],         # tagi w LangSmith
+              "metadata": {"user_id": "123"}, # metadata
+              "max_concurrency": 5,           # dla batch()
+              "callbacks": [...],             # callbacki
+          }
+      )
+
+      # Configurable fields — zmień parametry bez rebuild
+      configurable_model = model.configurable_fields(
+          temperature=ConfigurableField(id="temperature"),
+      )
+      result = configurable_model.invoke(
+          [HumanMessage(content="test")],
+          config={"configurable": {"temperature": 0.9}},
+      )
+
+  - name: One-linery
+    desc: Przydatne snippety
+    code: |
+      # Szybki test modelu
+      from langchain_anthropic import ChatAnthropic
+      print(ChatAnthropic(model="claude-opus-4-8").invoke("Powiedz 'OK'").content)
+
+      # Zlicz tokeny przed wysłaniem
+      model.get_num_tokens("Mój tekst do tokenizacji")
+
+      # Batch z progress bar
+      from tqdm import tqdm
+      results = [chain.invoke(inp) for inp in tqdm(inputs)]
+
+      # Async batch (najszybszy)
+      import asyncio
+      results = asyncio.run(chain.abatch(inputs, config={"max_concurrency": 10}))
+
+      # VectorStore one-liner (FAISS + OpenAI)
+      from langchain_community.vectorstores import FAISS
+      from langchain_openai import OpenAIEmbeddings
+      vs = FAISS.from_texts(["tekst1", "tekst2"], OpenAIEmbeddings())
+      docs = vs.similarity_search("pytanie", k=2)

@@ -1,0 +1,117 @@
+title: Komendy i snippety
+labels:
+  section: Kategoria
+  example: Komenda / Snippet
+
+intro: >
+  httpx ma wbudowane CLI do szybkiego testowania API z terminala.
+  pip install httpx[cli] → komenda httpx. Poniżej też kluczowe snippety
+  które używasz na co dzień.
+
+items:
+  - name: httpx CLI
+    desc: Wbudowany klient HTTP w terminalu
+    code: |
+      pip install "httpx[cli]"
+
+      # GET
+      httpx https://httpbin.org/get
+
+      # POST JSON
+      httpx POST https://httpbin.org/post --json '{"key": "value"}'
+
+      # Z nagłówkami
+      httpx https://api.example.com/data -H "Authorization: Bearer token"
+
+      # Format JSON (pretty print)
+      httpx https://httpbin.org/json --format json
+
+      # Verbose (pokaż nagłówki)
+      httpx https://example.com --verbose
+
+      # HTTP/2
+      httpx https://www.cloudflare.com --http2
+
+  - name: Instalacja
+    desc: Pakiety i opcjonalne extras
+    code: |
+      # Minimalna
+      pip install httpx
+
+      # Z HTTP/2
+      pip install "httpx[http2]"
+
+      # Z CLI
+      pip install "httpx[cli]"
+
+      # Wszystko naraz
+      pip install "httpx[http2,cli]"
+
+      # Do testów
+      pip install respx pytest-httpx
+
+  - name: Najczęstsze snippety
+    desc: Gotowe wzorce
+    code: |
+      import httpx
+
+      # Szybki test (bez Client — nie do produkcji)
+      data = httpx.get("https://httpbin.org/json", timeout=5.0).json()
+
+      # Pobranie pliku z progress barem
+      from tqdm import tqdm
+
+      def download(url: str, dest: str):
+          with httpx.stream("GET", url) as r:
+              r.raise_for_status()
+              total = int(r.headers.get("content-length", 0))
+              with open(dest, "wb") as f, tqdm(total=total, unit="B", unit_scale=True) as bar:
+                  for chunk in r.iter_bytes(8192):
+                      f.write(chunk)
+                      bar.update(len(chunk))
+
+      # Batch async — N requestów równolegle
+      async def batch_get(urls: list[str]) -> list[dict]:
+          async with httpx.AsyncClient(timeout=10.0) as client:
+              responses = await asyncio.gather(
+                  *[client.get(url) for url in urls],
+                  return_exceptions=True
+              )
+          return [r.json() if not isinstance(r, Exception) else None for r in responses]
+
+      # Retry dekorator (z tenacity)
+      from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+      @retry(
+          stop=stop_after_attempt(3),
+          wait=wait_exponential(min=1, max=10),
+          retry=retry_if_exception_type((httpx.TimeoutException, httpx.NetworkError)),
+      )
+      def safe_get(url: str) -> dict:
+          return httpx.get(url, timeout=5.0).json()
+
+  - name: Debugowanie
+    desc: Logowanie i inspekcja
+    code: |
+      import httpx
+      import logging
+
+      # Włącz logi httpx (poziom DEBUG = nagłówki, ciało)
+      logging.basicConfig(level=logging.DEBUG)
+
+      # Lub bardziej selektywnie
+      httpx_logger = logging.getLogger("httpx")
+      httpx_logger.setLevel(logging.DEBUG)
+      httpcore_logger = logging.getLogger("httpcore")
+      httpcore_logger.setLevel(logging.DEBUG)
+
+      # Sprawdź wersję HTTP połączenia
+      with httpx.Client(http2=True) as client:
+          r = client.get("https://www.cloudflare.com")
+          print(r.http_version)  # "HTTP/2" lub "HTTP/1.1"
+
+      # Inspect request przed wysłaniem
+      request = client.build_request("GET", "https://example.com")
+      print(request.headers)
+      print(request.url)
+      r = client.send(request)

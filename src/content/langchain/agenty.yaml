@@ -1,0 +1,137 @@
+title: Agenty — Tools i ReAct
+labels:
+  section: Koncept
+  example: Przykład
+
+intro: >
+  Agent w LangChain = LLM który sam decyduje jakich narzędzi użyć i w jakiej kolejności.
+  Cykl: model wybiera tool → tool się wykonuje → wynik wraca do modelu → repeat aż
+  do final answer. Najpopularniejszy wzorzec: ReAct (Reason + Act).
+  create_react_agent() z langgraph to aktualnie zalecany sposób budowania agentów.
+
+items:
+  - name: Tool — definiowanie narzędzi
+    desc: >
+      @tool dekorator = najprościej. Docstring = opis dla modelu (jak używać narzędzia).
+      Type hints = schemat parametrów. StructuredTool.from_function() = więcej kontroli.
+      args_schema = Pydantic model dla walidacji.
+    code: |
+      from langchain_core.tools import tool, StructuredTool
+      from pydantic import BaseModel
+
+      # Prosty tool przez dekorator
+      @tool
+      def search_web(query: str) -> str:
+          """Wyszukuje informacje w internecie. Użyj gdy potrzebujesz aktualnych danych."""
+          # implementacja...
+          return f"Wyniki dla: {query}"
+
+      @tool
+      def calculate(expression: str) -> float:
+          """Oblicza wyrażenie matematyczne. Przykład: '2 + 2 * 3'"""
+          return eval(expression)  # tylko dla przykładu!
+
+      # StructuredTool z Pydantic schema
+      class SearchInput(BaseModel):
+          query: str
+          max_results: int = 5
+          language: str = "pl"
+
+      def search_impl(query: str, max_results: int, language: str) -> str:
+          return f"Znaleziono {max_results} wyników dla '{query}' w języku {language}"
+
+      search_tool = StructuredTool.from_function(
+          func=search_impl,
+          name="web_search",
+          description="Przeszukuje internet. Podaj query i opcjonalnie max_results.",
+          args_schema=SearchInput,
+      )
+
+  - name: create_react_agent (z LangGraph)
+    desc: >
+      Aktualnie zalecany sposób. create_react_agent() tworzy gotowego agenta z
+      pętlą ReAct. tools = lista Runnable/tool. checkpointer = pamięć między
+      wiadomościami. invoke() uruchamia agenta — "messages" = lista HumanMessage.
+    code: |
+      pip install langgraph
+
+      from langchain_anthropic import ChatAnthropic
+      from langgraph.prebuilt import create_react_agent
+      from langchain_core.tools import tool
+
+      @tool
+      def get_weather(city: str) -> str:
+          """Pobiera aktualną pogodę dla podanego miasta."""
+          return f"W {city} jest 22°C i słonecznie."
+
+      @tool
+      def get_time(timezone: str = "Europe/Warsaw") -> str:
+          """Zwraca aktualny czas w podanej strefie czasowej."""
+          from datetime import datetime
+          import pytz
+          tz = pytz.timezone(timezone)
+          return datetime.now(tz).strftime("%H:%M %Z")
+
+      model = ChatAnthropic(model="claude-opus-4-8")
+      tools = [get_weather, get_time]
+
+      agent = create_react_agent(model, tools)
+
+      result = agent.invoke({
+          "messages": [("human", "Jaka jest pogoda w Warszawie i która jest godzina?")]
+      })
+      print(result["messages"][-1].content)
+
+  - name: Agent z pamięcią (checkpointer)
+    desc: >
+      MemorySaver = in-memory checkpointer dla multi-turn konwersacji.
+      config z thread_id = oddzielna konwersacja per użytkownik.
+      Każde invoke() z tym samym thread_id pamięta historię wiadomości.
+    code: |
+      from langgraph.checkpoint.memory import MemorySaver
+      from langgraph.prebuilt import create_react_agent
+
+      memory = MemorySaver()
+      agent = create_react_agent(model, tools, checkpointer=memory)
+
+      config = {"configurable": {"thread_id": "user_123"}}
+
+      # Pierwsza wiadomość
+      result1 = agent.invoke(
+          {"messages": [("human", "Jestem Łukasz, buduję apkę AI.")]},
+          config=config
+      )
+
+      # Druga wiadomość — agent pamięta kontekst
+      result2 = agent.invoke(
+          {"messages": [("human", "Jak mam na imię i co robię?")]},
+          config=config
+      )
+      # → "Masz na imię Łukasz i budujesz apkę AI."
+
+  - name: Wbudowane tools
+    desc: >
+      LangChain Community ma gotowe tools: DuckDuckGoSearch, WikipediaQueryRun,
+      PythonREPLTool, FileManagementToolkit. Instaluj przez langchain-community.
+    code: |
+      pip install langchain-community duckduckgo-search wikipedia
+
+      from langchain_community.tools import DuckDuckGoSearchRun, WikipediaQueryRun
+      from langchain_community.utilities import WikipediaAPIWrapper
+      from langchain_experimental.tools import PythonREPLTool
+
+      # DuckDuckGo search
+      search = DuckDuckGoSearchRun()
+      results = search.run("LangChain 2024 news")
+
+      # Wikipedia
+      wiki = WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper())
+      info = wiki.run("Python programming language")
+
+      # Python REPL — agent może wykonywać kod
+      python_tool = PythonREPLTool()
+      output = python_tool.run("print(2 ** 10)")
+      # → "1024"
+
+      # Użycie w agencie
+      agent = create_react_agent(model, [search, wiki, python_tool])

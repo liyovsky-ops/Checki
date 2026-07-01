@@ -1,0 +1,100 @@
+title: Transport i testowanie
+labels:
+  section: Feature
+  example: Przykład
+
+intro: >
+  Transport = warstwa sieciowa httpx. HTTPTransport (sync) i AsyncHTTPTransport (async)
+  to domyślne. MockTransport / HTTPX respx = testowanie bez sieci. httpx.MockTransport
+  pozwala podmienić sieć na funkcję zwracającą Response. respx = dedykowana biblioteka
+  do mockowania httpx.
+
+items:
+  - name: Connection limits
+    desc: >
+      Limits kontrolują liczbę połączeń w poolu. max_connections = globalne.
+      max_keepalive_connections = keepalive pool. keepalive_expiry = czas życia.
+      Ważne przy wielu równoległych requestach żeby nie wyczerpać FD.
+    code: |
+      import httpx
+
+      limits = httpx.Limits(
+          max_connections=100,           # max połączeń jednocześnie
+          max_keepalive_connections=20,  # max keepalive w poolu
+          keepalive_expiry=5.0,          # czas życia keepalive w sekundach
+      )
+
+      with httpx.Client(limits=limits) as client:
+          # client utrzymuje do 20 keepalive connections
+          r = client.get("https://api.example.com/data")
+
+      # Async z limitami
+      async with httpx.AsyncClient(limits=limits) as client:
+          import asyncio
+          # 100 równoległych requestów — pooling zarządza nimi
+          tasks = [client.get(f"https://api.example.com/item/{i}") for i in range(100)]
+          responses = await asyncio.gather(*tasks)
+
+  - name: MockTransport — testowanie
+    desc: >
+      MockTransport(handler) = podmień sieć na funkcję. handler(request) → Response.
+      Używaj w testach żeby nie robić prawdziwych requestów. httpx.Response(200, json=...)
+      = ręczne tworzenie response.
+    code: |
+      import httpx
+
+      def mock_handler(request: httpx.Request) -> httpx.Response:
+          if request.url.path == "/users/1":
+              return httpx.Response(
+                  200,
+                  json={"id": 1, "name": "Łukasz"},
+              )
+          if request.url.path == "/error":
+              return httpx.Response(500, text="Internal Server Error")
+          return httpx.Response(404, json={"error": "Not found"})
+
+      # Użyj w teście
+      transport = httpx.MockTransport(mock_handler)
+      with httpx.Client(transport=transport) as client:
+          r = client.get("https://api.example.com/users/1")
+          assert r.status_code == 200
+          assert r.json()["name"] == "Łukasz"
+
+          r = client.get("https://api.example.com/error")
+          assert r.status_code == 500
+
+  - name: respx — zaawansowane mockowanie
+    desc: >
+      respx = biblioteka do mockowania httpx z wzorcami URL, metodami,
+      asercjami wywołań. respx.mock() jako dekorator lub context manager.
+      Sprawdza czy requesty zostały wywołane, ile razy, z jakimi parametrami.
+    code: |
+      pip install respx pytest
+
+      import httpx
+      import respx
+      import pytest
+
+      @respx.mock
+      def test_api_call():
+          # Zdefiniuj mock
+          route = respx.get("https://api.example.com/users/1").mock(
+              return_value=httpx.Response(200, json={"id": 1, "name": "Łukasz"})
+          )
+
+          with httpx.Client() as client:
+              r = client.get("https://api.example.com/users/1")
+
+          assert r.json()["name"] == "Łukasz"
+          assert route.called  # sprawdź czy wywołany
+          assert route.call_count == 1
+
+      # Pattern matching
+      @respx.mock
+      async def test_async():
+          respx.get(url__regex=r"https://api\.example\.com/users/\d+").mock(
+              return_value=httpx.Response(200, json={"ok": True})
+          )
+          async with httpx.AsyncClient() as client:
+              r = await client.get("https://api.example.com/users/42")
+          assert r.json() == {"ok": True}

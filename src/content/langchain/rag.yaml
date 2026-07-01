@@ -1,0 +1,130 @@
+title: RAG — Retrieval Augmented Generation
+labels:
+  section: Krok
+  example: Przykład
+
+intro: >
+  RAG = uzupełnianie wiedzy modelu przez wyszukiwanie w zewnętrznych dokumentach.
+  Pipeline: załaduj dokumenty → podziel na chunki → osadź w wektorach (embeddings)
+  → zapisz w VectorStore → przy zapytaniu: wyszukaj podobne chunki → podaj do modelu
+  jako kontekst. LangChain ma gotowe komponenty na każdy krok.
+
+items:
+  - name: Document Loaders
+    desc: >
+      Ładują dokumenty do formatu Document(page_content, metadata).
+      WebBaseLoader = strony www. PyPDFLoader = PDF. TextLoader = pliki txt.
+      DirectoryLoader = cały katalog. CSVLoader = pliki CSV.
+    code: |
+      pip install langchain-community pypdf beautifulsoup4
+
+      from langchain_community.document_loaders import (
+          WebBaseLoader, PyPDFLoader, TextLoader, DirectoryLoader
+      )
+
+      # Strona internetowa
+      loader = WebBaseLoader("https://docs.python.org/3/")
+      docs = loader.load()  # → list[Document]
+
+      # PDF
+      pdf_loader = PyPDFLoader("raport.pdf")
+      pdf_docs = pdf_loader.load()
+      # → każda strona = osobny Document z metadata["page"]
+
+      # Katalog z plikami .txt
+      dir_loader = DirectoryLoader(
+          "./dokumenty/",
+          glob="**/*.txt",
+          loader_cls=TextLoader,
+          loader_kwargs={"encoding": "utf-8"},
+      )
+      all_docs = dir_loader.load()
+      print(f"Załadowano {len(all_docs)} dokumentów")
+
+  - name: Text Splitters
+    desc: >
+      Duże dokumenty trzeba podzielić na chunki — LLM ma ograniczony kontekst
+      i wyszukiwanie działa lepiej na małych fragmentach. RecursiveCharacterTextSplitter
+      = najlepsza domyślna opcja. chunk_size i chunk_overlap w tokenach/znakach.
+    code: |
+      from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+      splitter = RecursiveCharacterTextSplitter(
+          chunk_size=1000,       # max znaki na chunk
+          chunk_overlap=200,     # nakładanie = kontekst na granicach
+          separators=["\n\n", "\n", " ", ""],  # kolejność podziału
+      )
+
+      chunks = splitter.split_documents(docs)
+      print(f"{len(docs)} doc → {len(chunks)} chunks")
+
+      # TokenTextSplitter — dzieli po tokenach (dokładniejszy limit)
+      from langchain_text_splitters import TokenTextSplitter
+      token_splitter = TokenTextSplitter(chunk_size=500, chunk_overlap=50)
+
+  - name: Embeddings i VectorStore
+    desc: >
+      Embeddings = numeryczna reprezentacja tekstu w przestrzeni wektorowej.
+      FAISS = lokalny, szybki (in-memory/disk). Chroma = lokalny z persystencją.
+      Pinecone/Weaviate/Qdrant = chmurowe. similarity_search() = K najbliższych wektorów.
+    code: |
+      pip install langchain-openai faiss-cpu  # lub chromadb
+
+      from langchain_openai import OpenAIEmbeddings
+      from langchain_community.vectorstores import FAISS, Chroma
+
+      embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+
+      # FAISS — lokalnie w pamięci
+      vectorstore = FAISS.from_documents(chunks, embeddings)
+      vectorstore.save_local("faiss_index")  # zapisz na dysk
+
+      # Wczytaj z dysku
+      vectorstore = FAISS.load_local("faiss_index", embeddings,
+                                      allow_dangerous_deserialization=True)
+
+      # Wyszukiwanie
+      results = vectorstore.similarity_search("Co to jest asyncio?", k=4)
+      for doc in results:
+          print(doc.page_content[:200])
+
+      # Chroma — z persystencją
+      vectorstore = Chroma.from_documents(
+          chunks,
+          embeddings,
+          persist_directory="./chroma_db"
+      )
+
+  - name: Kompletny RAG chain
+    desc: >
+      Retriever = interfejs do wyszukiwania. as_retriever() konwertuje VectorStore.
+      create_retrieval_chain() = gotowy RAG chain z kontekstem. Wejście: "input".
+      Wyjście: "answer" + "context" (lista dokumentów źródłowych).
+    code: |
+      from langchain.chains import create_retrieval_chain
+      from langchain.chains.combine_documents import create_stuff_documents_chain
+      from langchain_core.prompts import ChatPromptTemplate
+
+      retriever = vectorstore.as_retriever(
+          search_type="similarity",
+          search_kwargs={"k": 4},
+      )
+
+      # Prompt z kontekstem
+      prompt = ChatPromptTemplate.from_messages([
+          ("system", """Odpowiedz na pytanie na podstawie poniższego kontekstu.
+      Jeśli nie znasz odpowiedzi, powiedz że nie wiesz.
+
+      Kontekst:
+      {context}"""),
+          ("human", "{input}"),
+      ])
+
+      question_answer_chain = create_stuff_documents_chain(model, prompt)
+      rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+
+      result = rag_chain.invoke({"input": "Jak działa asyncio?"})
+      print(result["answer"])
+      print("\nŹródła:")
+      for doc in result["context"]:
+          print(f"  - {doc.metadata.get('source', 'unknown')}")

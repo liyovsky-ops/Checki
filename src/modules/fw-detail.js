@@ -90,6 +90,8 @@ import { FW_SEQUELIZE_DATA }    from '../data/fw_sequelize.js';
 import { FW_SQLITE_DATA }       from '../data/fw_sqlite.js';
 import { FW_ANSIBLE_DATA }      from '../data/fw_ansible.js';
 import { FW_PROMETHEUS_DATA }  from '../data/fw_prometheus.js';
+import { FW_LANGCHAIN_DATA }  from '../data/fw_langchain.js';
+import { FW_HTTPX_DATA }      from '../data/fw_httpx.js';
 
 let activeTab = 'podstawy';
 let activeFw  = 'react';
@@ -168,6 +170,8 @@ const FW_DATA_MAP = {
   sqlite:          FW_SQLITE_DATA,
   ansible:         FW_ANSIBLE_DATA,
   prometheus:      FW_PROMETHEUS_DATA,
+  langchain:       FW_LANGCHAIN_DATA,
+  httpx:           FW_HTTPX_DATA,
 };
 
 export function openFramework(fw) {

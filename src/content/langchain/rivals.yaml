@@ -1,0 +1,130 @@
+title: Rywale i alternatywy
+labels:
+  section: Narzędzie
+  example: Kiedy używać
+
+intro: >
+  LangChain dominuje adopcją (100k+ GitHub stars), ale ma reputację "over-engineered"
+  z powodu wielu abstrakcji. LangGraph (od twórców LangChain) staje się preferowanym
+  wyborem dla agentów. Dla prostych przypadków bezpośrednie wywołanie SDK + własna
+  logika może być lepsze niż cały framework.
+
+items:
+  - name: LangGraph
+    desc: >
+      Graph-based agent orchestration od twórców LangChain. Stan jako graf —
+      węzły = funkcje, krawędzie = przepływ. Lepszy dla skomplikowanych agentów
+      ze stanem, wieloetapowych workflow, human-in-the-loop. create_react_agent()
+      jest już zbudowany na LangGraph.
+    code: |
+      # LangGraph — lepsze dla złożonych agentów ze stanem
+      # Stan (TypedDict) przepływa przez węzły grafu
+      from langgraph.graph import StateGraph, END
+      from typing import TypedDict, Annotated
+      import operator
+
+      class State(TypedDict):
+          messages: Annotated[list, operator.add]
+          step_count: int
+
+      def process(state: State) -> State:
+          # logika przetwarzania
+          return {"step_count": state["step_count"] + 1}
+
+      # LangChain — liniowe chain, prostsze przypadki
+      simple_chain = prompt | model | parser
+      # Użyj LangChain gdy: prosty chain bez rozgałęzień
+      # Użyj LangGraph gdy: agenty, branching, pętle, human-in-loop
+
+  - name: LlamaIndex
+    desc: >
+      Specjalizuje się w RAG i wyszukiwaniu dokumentów. Bardziej skupiony
+      na data ingestion pipeline i advanced retrieval (HyperRAG, query routing).
+      LangChain = generalistyczny, LlamaIndex = RAG specialist.
+    code: |
+      # LlamaIndex — zaawansowane RAG
+      from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+
+      documents = SimpleDirectoryReader("data/").load_data()
+      index = VectorStoreIndex.from_documents(documents)
+      query_engine = index.as_query_engine()
+      response = query_engine.query("Co to jest Python?")
+
+      # vs LangChain RAG
+      # create_retrieval_chain(retriever, question_answer_chain)
+      # Wybór: LlamaIndex gdy RAG jest core funkcją apki
+      #        LangChain gdy RAG to jeden z wielu komponentów
+
+  - name: Haystack
+    desc: >
+      Framework od deepset. Silny w enterprise, pipelines jako YAML config,
+      wbudowane komponenty do NLP (NER, QA, classification). Bardziej
+      opinionated niż LangChain. Dobry dla document processing pipeline.
+    code: |
+      # Haystack — pipeline-based podejście
+      from haystack import Pipeline
+      from haystack.components.retrievers import InMemoryBM25Retriever
+
+      pipeline = Pipeline()
+      pipeline.add_component("retriever", InMemoryBM25Retriever(document_store))
+      pipeline.add_component("llm", OpenAIChatGenerator())
+      pipeline.connect("retriever.documents", "llm.documents")
+
+      # vs LangChain LCEL
+      # chain = retriever | prompt | model | parser
+      # Haystack: lepszy DX dla enterprise NLP
+      # LangChain: lepszy dla custom agent logic
+
+  - name: DSPy
+    desc: >
+      Deklaratywny framework (Stanford) — programujesz ZACHOWANIE modelu
+      zamiast pisać prompty ręcznie. Optymalizator automatycznie dobiera prompty.
+      Całkowicie inne podejście niż LangChain — prompt engineering jako problem
+      optymalizacji.
+    code: |
+      import dspy
+
+      # DSPy — zadeklaruj co chcesz, nie JAK to osiągnąć
+      class RAG(dspy.Module):
+          def __init__(self, num_passages=3):
+              self.retrieve = dspy.Retrieve(k=num_passages)
+              self.generate = dspy.ChainOfThought("context, question -> answer")
+
+          def forward(self, question):
+              context = self.retrieve(question).passages
+              return self.generate(context=context, question=question)
+
+      # Compile = optymalizuj prompty na podstawie przykładów
+      rag = RAG()
+      compiled = dspy.compile(rag, trainset=examples)
+
+      # vs LangChain: musisz pisać prompty ręcznie
+      # DSPy: lepszy gdy chcesz automatycznej optymalizacji promptów
+
+  - name: Bezpośrednie SDK vs framework
+    desc: >
+      Dla prostych przypadków bezpośrednie użycie Anthropic/OpenAI SDK może
+      być lepsze niż LangChain — mniej abstrakcji, łatwiejszy debugging,
+      mniejsza zależność. LangChain dodaje wartość gdy: wiele modeli, RAG,
+      agenty z narzędziami, multi-step chains.
+    code: |
+      # Bezpośrednie SDK — kiedy to wystarczy
+      from anthropic import Anthropic
+      client = Anthropic()
+      response = client.messages.create(
+          model="claude-opus-4-8",
+          messages=[{"role": "user", "content": "Hello"}],
+          max_tokens=1000,
+      )
+
+      # LangChain warto gdy:
+      # ✓ Chcesz łatwo zmienić model (Anthropic → OpenAI)
+      # ✓ RAG z VectorStore
+      # ✓ Agenty z narzędziami
+      # ✓ LangSmith tracing
+      # ✓ Streaming + batch w tym samym interfejsie
+
+      # Bezpośrednie SDK warto gdy:
+      # ✓ Jeden model, prosta logika
+      # ✓ Zależy Ci na minimalnych zależnościach
+      # ✓ Debugging bez dodatkowych warstw abstrakcji

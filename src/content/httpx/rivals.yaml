@@ -1,0 +1,107 @@
+title: Rywale — requests, aiohttp, urllib3
+labels:
+  section: Biblioteka
+  example: Porównanie
+
+intro: >
+  requests = de facto standard, brak async. aiohttp = async-only, inny API.
+  urllib3 = low-level, requests używa go pod spodem. httpx = najlepsze z obu
+  światów: identyczny API jak requests + async + HTTP/2 + type hints.
+
+items:
+  - name: requests
+    desc: >
+      Najpopularniejsza biblioteka HTTP w Pythonie. Brak async — blokuje event loop.
+      requests-mock do mockowania. Session = odpowiednik Client. Migracja na httpx
+      jest prosta — API jest prawie identyczne.
+    code: |
+      # requests — sync only
+      import requests
+
+      session = requests.Session()
+      session.headers.update({"Authorization": "Bearer token"})
+      r = session.get("https://api.example.com/data", timeout=10)
+      r.raise_for_status()
+      data = r.json()
+
+      # vs httpx
+      import httpx
+
+      with httpx.Client(
+          headers={"Authorization": "Bearer token"},
+          timeout=10.0
+      ) as client:
+          r = client.get("https://api.example.com/data")
+          r.raise_for_status()
+          data = r.json()
+
+      # Różnice: httpx ma Client (nie Session), timeout jako float nie tuple
+      # Migracja: zamień requests.Session() → httpx.Client()
+      # requests timeout=(connect, read) → httpx.Timeout(connect=x, read=y)
+
+  - name: aiohttp
+    desc: >
+      async-only, starszy od httpx. Inny API (session.get() zamiast client.get(),
+      await r.json() zamiast r.json()). ClientSession musi być tworzone w async context.
+      Lepsze dla websockets. Popularne w starszym kodzie async Pythona.
+    code: |
+      # aiohttp — async only, inny API
+      import aiohttp
+      import asyncio
+
+      async def aiohttp_example():
+          async with aiohttp.ClientSession() as session:
+              async with session.get("https://api.example.com") as r:
+                  data = await r.json()    # await potrzebne!
+                  text = await r.text()   # await potrzebne!
+
+      # vs httpx async
+      async def httpx_example():
+          async with httpx.AsyncClient() as client:
+              r = await client.get("https://api.example.com")
+              data = r.json()    # BEZ await
+              text = r.text      # BEZ await
+
+      # httpx: .json() i .text bez await (już zdekodowane)
+      # aiohttp: .json() i .text() to coroutines (await wymagane)
+
+  - name: urllib3
+    desc: >
+      Low-level HTTP — requests i httpx używają go pod spodem (lub własne implementacje).
+      Rzadko używany bezpośrednio. Przydatny gdy potrzebujesz pełnej kontroli
+      nad połączeniem lub piszesz własną bibliotekę HTTP.
+    code: |
+      # urllib3 — low level, rzadko bezpośrednio
+      import urllib3
+
+      http = urllib3.PoolManager()
+      r = http.request("GET", "https://httpbin.org/get")
+      print(r.status)
+      print(r.data.decode("utf-8"))
+
+      # Kiedy użyć urllib3:
+      # - piszesz własną bibliotekę HTTP
+      # - potrzebujesz pełnej kontroli nad poolem
+      # - problemy z kompatybilnością requests/httpx
+      # Inaczej: użyj requests lub httpx
+
+  - name: Tabela porównawcza
+    desc: Kiedy użyć której biblioteki
+    code: |
+      # ┌─────────────┬──────────┬──────────┬──────────┬──────────┐
+      # │ Feature     │ requests │ aiohttp  │ httpx    │ urllib3  │
+      # ├─────────────┼──────────┼──────────┼──────────┼──────────┤
+      # │ Sync        │    ✓     │    ✗     │    ✓     │    ✓     │
+      # │ Async       │    ✗     │    ✓     │    ✓     │    ✗     │
+      # │ HTTP/2      │    ✗     │    ✗     │    ✓     │    ✗     │
+      # │ Type hints  │  partial │  partial │    ✓     │  partial │
+      # │ WebSockets  │    ✗     │    ✓     │    ✗     │    ✗     │
+      # │ API          │ simple  │ verbose  │ simple   │ verbose  │
+      # │ Stars       │  51k+   │  15k+   │  14k+    │  3k+     │
+      # └─────────────┴──────────┴──────────┴──────────┴──────────┘
+
+      # Wybierz:
+      # requests  → legacy code, sync-only projekty, prostota
+      # aiohttp   → async + WebSockets, starsze async projekty
+      # httpx     → nowe projekty (sync/async), HTTP/2, FastAPI
+      # urllib3   → piszesz bibliotekę, potrzebujesz low-level

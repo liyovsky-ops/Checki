@@ -1,0 +1,124 @@
+title: Auth, Retry i Event Hooks
+labels:
+  section: Feature
+  example: Przykład
+
+intro: >
+  httpx nie ma wbudowanego retry — użyj tenacity lub własnej logiki.
+  Event hooks (event_hooks) = callbacki on_request i on_response do logowania,
+  modyfikacji requestów, obsługi błędów. Przydatne do centralnego logowania
+  i automatycznego refresh tokenów.
+
+items:
+  - name: Event hooks — logowanie i interceptory
+    desc: >
+      event_hooks = {"request": [fn], "response": [fn]}. Funkcje sync lub async.
+      on_request = przed wysłaniem. on_response = po odebraniu. Możesz modyfikować
+      request (np. dodać header) lub response (np. logować).
+    code: |
+      import httpx
+      import time
+
+      def log_request(request: httpx.Request):
+          print(f"→ {request.method} {request.url}")
+
+      def log_response(response: httpx.Response):
+          print(f"← {response.status_code} ({response.elapsed.total_seconds():.3f}s)")
+
+      with httpx.Client(
+          event_hooks={
+              "request": [log_request],
+              "response": [log_response],
+          }
+      ) as client:
+          r = client.get("https://httpbin.org/get")
+          # → GET https://httpbin.org/get
+          # ← 200 (0.234s)
+
+      # Async hooks
+      async def async_log_response(response: httpx.Response):
+          await response.aread()  # wczytaj body (nie jest wczytane automatycznie w hookach)
+          print(f"Body size: {len(response.content)} bytes")
+
+      async with httpx.AsyncClient(
+          event_hooks={"response": [async_log_response]}
+      ) as client:
+          r = await client.get("https://example.com")
+
+  - name: Retry z tenacity
+    desc: >
+      httpx nie ma retry — tenacity = biblioteka do retry z pełną konfiguracją
+      (exponential backoff, jitter, warunki retry). @retry nad funkcją lub
+      Retrying jako context manager. retry_if_exception_type + wait_exponential.
+    code: |
+      pip install tenacity
+
+      import httpx
+      from tenacity import (
+          retry, stop_after_attempt, wait_exponential,
+          retry_if_exception_type, before_sleep_log
+      )
+      import logging
+
+      logger = logging.getLogger(__name__)
+
+      @retry(
+          stop=stop_after_attempt(3),
+          wait=wait_exponential(multiplier=1, min=1, max=10),
+          retry=retry_if_exception_type((httpx.TimeoutException, httpx.NetworkError)),
+          before_sleep=before_sleep_log(logger, logging.WARNING),
+          reraise=True,
+      )
+      def fetch_with_retry(url: str) -> dict:
+          with httpx.Client(timeout=5.0) as client:
+              r = client.get(url)
+              r.raise_for_status()
+              return r.json()
+
+      # Dla 5xx — retry na HTTPStatusError
+      @retry(
+          stop=stop_after_attempt(3),
+          wait=wait_exponential(min=2, max=30),
+          retry=retry_if_exception_type(httpx.HTTPStatusError),
+      )
+      def fetch_robust(url: str) -> httpx.Response:
+          r = httpx.get(url, timeout=10.0)
+          if r.status_code >= 500:
+              r.raise_for_status()  # trigger retry
+          return r
+
+  - name: Auto-refresh tokenu OAuth
+    desc: >
+      Pattern dla OAuth2 — jeśli response 401, odśwież token i powtórz request.
+      httpx.Auth.auth_flow() to generator — yield request → dostaniesz response →
+      możesz sprawdzić i zdecydować czy retry.
+    code: |
+      import httpx
+
+      class OAuth2RefreshAuth(httpx.Auth):
+          def __init__(self, access_token: str, refresh_token: str, token_url: str):
+              self.access_token = access_token
+              self.refresh_token = refresh_token
+              self.token_url = token_url
+
+          def auth_flow(self, request: httpx.Request):
+              request.headers["Authorization"] = f"Bearer {self.access_token}"
+              response = yield request  # wyślij, dostań response
+
+              if response.status_code == 401:
+                  # Token wygasł — odśwież
+                  self._refresh()
+                  request.headers["Authorization"] = f"Bearer {self.access_token}"
+                  yield request  # wyślij ponownie
+
+          def _refresh(self):
+              r = httpx.post(self.token_url, data={
+                  "grant_type": "refresh_token",
+                  "refresh_token": self.refresh_token,
+              })
+              r.raise_for_status()
+              self.access_token = r.json()["access_token"]
+
+      auth = OAuth2RefreshAuth("old_token", "refresh_xxx", "https://auth.example.com/token")
+      with httpx.Client(auth=auth) as client:
+          r = client.get("https://api.example.com/protected")

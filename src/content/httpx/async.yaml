@@ -1,0 +1,132 @@
+title: Async — AsyncClient
+labels:
+  section: Pattern
+  example: Przykład
+
+intro: >
+  httpx.AsyncClient = async/await wersja klienta z identycznym API jak Client.
+  Wymaga async context managera (async with). Idealne dla FastAPI, asyncio aplikacji,
+  serwisów które robią wiele równoległych requestów. asyncio.gather() + AsyncClient
+  = maksymalna równoległość bez blokowania event loop.
+
+items:
+  - name: Podstawy AsyncClient
+    desc: >
+      async with httpx.AsyncClient() → await client.get/post/etc.
+      Wszystkie metody są coroutines. Zawsze używaj jako async context manager —
+      inaczej połączenia nie są zamykane i dostaniesz RuntimeWarning.
+    code: |
+      import httpx
+      import asyncio
+
+      async def main():
+          async with httpx.AsyncClient(
+              base_url="https://api.github.com",
+              headers={"Authorization": "Bearer ghp_xxx"},
+              timeout=10.0,
+          ) as client:
+
+              # await każdy request
+              r = await client.get("/user")
+              me = r.json()
+
+              r = await client.post(
+                  "/user/repos",
+                  json={"name": "test", "private": False}
+              )
+              r.raise_for_status()
+              print(r.json()["html_url"])
+
+      asyncio.run(main())
+
+  - name: Równoległe requesty (gather)
+    desc: >
+      asyncio.gather() = uruchom wiele coroutines równolegle. Najlepsze dla
+      N requestów do tego samego lub różnych API. Znacznie szybsze niż
+      sekwencyjne awaiting (n requestów * czas_odpowiedzi → max_czas_odpowiedzi).
+    code: |
+      import httpx
+      import asyncio
+
+      async def fetch_user(client: httpx.AsyncClient, user_id: int) -> dict:
+          r = await client.get(f"/users/{user_id}")
+          r.raise_for_status()
+          return r.json()
+
+      async def main():
+          user_ids = [1, 2, 3, 4, 5]
+
+          async with httpx.AsyncClient(base_url="https://api.example.com") as client:
+
+              # Sekwencyjnie — wolno (suma wszystkich czasów)
+              # results = [await fetch_user(client, uid) for uid in user_ids]
+
+              # Równolegle — szybko (max czas z wszystkich)
+              results = await asyncio.gather(
+                  *[fetch_user(client, uid) for uid in user_ids]
+              )
+
+          print(f"Pobrано {len(results)} użytkowników")
+
+      asyncio.run(main())
+
+  - name: Streaming async
+    desc: >
+      aiter_bytes(), aiter_text(), aiter_lines() = iteratory async do streamowania
+      dużych odpowiedzi bez ładowania wszystkiego do pamięci. Przydatne dla
+      SSE (Server-Sent Events), dużych plików, streaming LLM responses.
+    code: |
+      import httpx
+      import asyncio
+
+      async def download_large_file(url: str, dest: str):
+          async with httpx.AsyncClient() as client:
+              async with client.stream("GET", url) as r:
+                  r.raise_for_status()
+                  with open(dest, "wb") as f:
+                      async for chunk in r.aiter_bytes(chunk_size=8192):
+                          f.write(chunk)
+
+      async def stream_sse(url: str):
+          """Odczytaj Server-Sent Events."""
+          async with httpx.AsyncClient() as client:
+              async with client.stream("GET", url) as r:
+                  async for line in r.aiter_lines():
+                      if line.startswith("data:"):
+                          print(line[5:].strip())
+
+      asyncio.run(download_large_file("https://example.com/big.zip", "big.zip"))
+
+  - name: FastAPI + httpx (zewnętrzne API)
+    desc: >
+      W FastAPI używaj lifespan do tworzenia jednego AsyncClient dla całej apki
+      (connection pooling). Nie twórz nowego klienta per request — marnuje połączenia.
+    code: |
+      from contextlib import asynccontextmanager
+      from fastapi import FastAPI, Depends
+      import httpx
+
+      # Jeden klient dla całej apki (lifespan)
+      @asynccontextmanager
+      async def lifespan(app: FastAPI):
+          async with httpx.AsyncClient(
+              base_url="https://api.external.com",
+              timeout=30.0,
+          ) as client:
+              app.state.http_client = client
+              yield  # apka działa
+          # tutaj client jest zamknięty
+
+      app = FastAPI(lifespan=lifespan)
+
+      # Dependency injection
+      async def get_http_client(request) -> httpx.AsyncClient:
+          return request.app.state.http_client
+
+      @app.get("/proxy/{user_id}")
+      async def proxy_user(
+          user_id: int,
+          client: httpx.AsyncClient = Depends(get_http_client)
+      ):
+          r = await client.get(f"/users/{user_id}")
+          return r.json()

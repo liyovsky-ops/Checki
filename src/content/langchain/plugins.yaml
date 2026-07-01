@@ -1,0 +1,112 @@
+title: Ekosystem LangChain
+labels:
+  section: Pakiet
+  example: Opis
+
+intro: >
+  LangChain podzielony jest na pakiety: langchain-core (interfejsy, zero deps),
+  langchain (gotowe implementacje), langchain-community (integracje third-party),
+  langgraph (agenty), langserve (deploy jako REST API), langsmith (tracing/eval).
+  Każda integracja (OpenAI, Anthropic, Pinecone...) to osobny pakiet pip.
+
+items:
+  - name: LangSmith — observability i tracing
+    desc: >
+      LangSmith = platforma do debugowania, monitorowania i ewaluacji LLM apps.
+      Automatyczny tracing przez zmienne środowiskowe. Każde wywołanie chain/agent
+      pojawia się w dashboardzie z czasem, tokenami, inputem, outputem. Bezpłatny
+      tier 5k traces/miesiąc.
+    code: |
+      # Zmienne środowiskowe — tracing włącza się automatycznie
+      export LANGCHAIN_TRACING_V2=true
+      export LANGCHAIN_API_KEY=ls__xxx
+      export LANGCHAIN_PROJECT="moja-apka"
+
+      # Teraz każde chain.invoke() = automatyczny trace w LangSmith
+      result = chain.invoke({"input": "test"})
+
+      # Ewaluacja — sprawdź jakość modelu na zestawie testowym
+      from langsmith import Client
+      from langsmith.evaluation import evaluate
+
+      client = Client()
+      dataset = client.create_dataset("test_rag")
+      client.create_examples(
+          inputs=[{"question": "Co to jest Python?"}],
+          outputs=[{"answer": "Język programowania."}],
+          dataset_id=dataset.id,
+      )
+
+  - name: LangServe — deploy jako REST API
+    desc: >
+      LangServe owija LangChain chain jako FastAPI endpoint. Automatycznie generuje
+      /invoke, /batch, /stream, /playground. Playground = interaktywny UI do testowania.
+    code: |
+      pip install langserve[all]
+
+      # server.py
+      from fastapi import FastAPI
+      from langserve import add_routes
+
+      app = FastAPI(title="Mój LLM API")
+
+      add_routes(
+          app,
+          chain,       # twój LangChain chain
+          path="/chat",
+      )
+
+      # uruchom: uvicorn server:app --reload
+      # → POST /chat/invoke
+      # → POST /chat/stream
+      # → GET  /chat/playground (interaktywne UI)
+
+  - name: Integracje — modele i embeddings
+    desc: >
+      Każdy provider = osobny pakiet. Wszystkie implementują ten sam interfejs
+      BaseChatModel / Embeddings — możesz je zamieniać bez zmiany reszty kodu.
+    code: |
+      # Modele
+      pip install langchain-anthropic     # Claude
+      pip install langchain-openai        # GPT, embeddings
+      pip install langchain-google-genai  # Gemini
+      pip install langchain-mistralai     # Mistral
+      pip install langchain-ollama        # Ollama (lokalne modele)
+
+      # Embeddings
+      from langchain_openai import OpenAIEmbeddings        # OpenAI
+      from langchain_huggingface import HuggingFaceEmbeddings  # lokalne
+      from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+      # VectorStores
+      pip install langchain-chroma      # Chroma
+      pip install langchain-pinecone    # Pinecone
+      pip install faiss-cpu             # FAISS
+
+  - name: Przydatne integracje community
+    desc: >
+      langchain-community ma setki integracji. Najczęściej używane: web search,
+      PDF loading, SQL database, Wikipedia, Playwright/Selenium.
+    code: |
+      pip install langchain-community
+
+      # Document loaders
+      from langchain_community.document_loaders import (
+          PyPDFLoader,          # PDF
+          WebBaseLoader,        # strony www
+          GitLoader,            # repo git
+          YoutubeLoader,        # transkrypcja YouTube
+          UnstructuredLoader,   # docx, pptx, xlsx...
+      )
+
+      # Tools
+      from langchain_community.tools import (
+          DuckDuckGoSearchRun,   # web search (bez API key)
+          ArxivQueryRun,         # artykuły naukowe
+          WikipediaQueryRun,     # Wikipedia
+          ShellTool,             # terminal (ostrożnie!)
+      )
+
+      # SQL chain
+      from langchain_community.utilities import SQLDatabase
+      db = SQLDatabase.from_uri("sqlite:///data.db")

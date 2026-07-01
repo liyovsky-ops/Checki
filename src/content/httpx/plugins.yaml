@@ -1,0 +1,120 @@
+title: Ekosystem httpx
+labels:
+  section: Pakiet
+  example: Opis
+
+intro: >
+  httpx jest zbudowany na encode/ ekosystemie: httpcore (transport layer),
+  h11 (HTTP/1.1 parser), h2 (HTTP/2). Dodatkowe: respx (mockowanie), pytest-httpx
+  (fixtures), httpx-sse (SSE klient), anyio (async backend).
+
+items:
+  - name: respx — mockowanie w testach
+    desc: >
+      Dedykowana biblioteka do mockowania httpx. Pattern matching URL, sprawdzanie
+      wywołań, integration z pytest. Zastępuje requests-mock dla httpx.
+    code: |
+      pip install respx
+
+      import respx, httpx, pytest
+
+      # Jako dekorator
+      @respx.mock
+      def test_get():
+          respx.get("https://api.example.com/").mock(
+              return_value=httpx.Response(200, json={"status": "ok"})
+          )
+          r = httpx.get("https://api.example.com/")
+          assert r.json() == {"status": "ok"}
+
+      # Jako context manager
+      with respx.mock() as mock:
+          mock.post("https://api.example.com/login").mock(
+              return_value=httpx.Response(200, json={"token": "abc"})
+          )
+          r = httpx.post("https://api.example.com/login", json={"user": "a"})
+          assert r.json()["token"] == "abc"
+
+  - name: pytest-httpx — fixtures
+    desc: >
+      pytest-httpx = fixture httpx_mock dla testów. Prostsze niż respx dla
+      podstawowych przypadków. httpx_mock.add_response() zamiast respx.get().mock().
+    code: |
+      pip install pytest-httpx
+
+      # test_app.py
+      import httpx
+      from pytest_httpx import HTTPXMock
+
+      def test_my_code(httpx_mock: HTTPXMock):
+          httpx_mock.add_response(
+              url="https://api.example.com/data",
+              method="GET",
+              json={"result": 42},
+              status_code=200,
+          )
+
+          with httpx.Client() as client:
+              r = client.get("https://api.example.com/data")
+          assert r.json()["result"] == 42
+
+          # Sprawdź że request był wysłany
+          requests = httpx_mock.get_requests()
+          assert len(requests) == 1
+
+  - name: httpx-sse — Server-Sent Events
+    desc: >
+      httpx-sse = klient SSE dla httpx. connect_sse() i aconnect_sse() zwracają
+      EventSource z iteratorem. Przydatne do konsumowania SSE z API (np. streaming
+      LLM responses przez własne API).
+    code: |
+      pip install httpx-sse
+
+      from httpx_sse import connect_sse, aconnect_sse
+      import httpx
+
+      # Sync SSE
+      with httpx.Client() as client:
+          with connect_sse(client, "GET", "https://api.example.com/stream") as event_source:
+              for sse in event_source.iter_sse():
+                  print(f"event: {sse.event}, data: {sse.data}")
+                  if sse.event == "done":
+                      break
+
+      # Async SSE
+      async def stream_sse():
+          async with httpx.AsyncClient() as client:
+              async with aconnect_sse(
+                  client, "GET", "https://api.example.com/stream"
+              ) as event_source:
+                  async for sse in event_source.aiter_sse():
+                      print(sse.data)
+
+  - name: Integracje z frameworkami
+    desc: >
+      httpx integruje się z FastAPI (HTTPX TestClient), Starlette, pytest-anyio.
+      httpx.AsyncClient jako TestClient dla ASGI apps.
+    code: |
+      # FastAPI testing z httpx (bez uruchamiania serwera)
+      from fastapi.testclient import TestClient
+      # TestClient jest aliasem na httpx.Client dla ASGI
+
+      from fastapi import FastAPI
+      from httpx import AsyncClient, ASGITransport
+      import pytest
+
+      app = FastAPI()
+
+      @app.get("/")
+      async def root():
+          return {"hello": "world"}
+
+      # Async test z httpx
+      @pytest.mark.anyio
+      async def test_root():
+          async with AsyncClient(
+              transport=ASGITransport(app=app),
+              base_url="http://test"
+          ) as client:
+              r = await client.get("/")
+          assert r.json() == {"hello": "world"}

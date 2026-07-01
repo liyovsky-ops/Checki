@@ -1,0 +1,126 @@
+title: LangChain — podstawy
+labels:
+  section: Koncept
+  example: Przykład
+
+intro: >
+  LangChain to framework do budowania aplikacji opartych na LLM. Główna idea:
+  komponowanie wywołań modeli, narzędzi i danych w deterministyczne łańcuchy (chains)
+  lub dynamiczne agenty. Używa LCEL (LangChain Expression Language) jako składni
+  pipe-owej do łączenia komponentów. Trzy warstwy: langchain-core (interfejsy),
+  langchain (gotowe implementacje), langchain-community (integracje z zewnętrznymi API).
+
+items:
+  - name: Instalacja i podstawowe wywołanie
+    desc: >
+      langchain-openai/anthropic = adaptery do konkretnych modeli.
+      ChatModel przyjmuje listę Message i zwraca AIMessage.
+      invoke() = synchroniczne, ainvoke() = async. Streaming przez stream().
+    code: |
+      pip install langchain langchain-anthropic langchain-openai
+
+      from langchain_anthropic import ChatAnthropic
+      from langchain_core.messages import HumanMessage, SystemMessage
+
+      model = ChatAnthropic(model="claude-opus-4-8")
+
+      response = model.invoke([
+          SystemMessage(content="Odpowiadaj po polsku, krótko."),
+          HumanMessage(content="Co to jest LangChain?"),
+      ])
+      print(response.content)
+
+      # Streaming
+      for chunk in model.stream([HumanMessage(content="Opowiedz mi coś.")]):
+          print(chunk.content, end="", flush=True)
+
+  - name: PromptTemplate
+    desc: >
+      PromptTemplate = szablon z placeholderami. ChatPromptTemplate = wersja
+      dla chatów (SystemMessage + HumanMessage). format_messages() wypełnia
+      zmienne. Zmienne walidowane przy tworzeniu szablonu.
+    code: |
+      from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+
+      # Prosty prompt
+      prompt = PromptTemplate.from_template("Przetłumacz na angielski: {tekst}")
+      filled = prompt.format(tekst="Cześć świecie")
+      # → "Przetłumacz na angielski: Cześć świecie"
+
+      # Chat prompt
+      chat_prompt = ChatPromptTemplate.from_messages([
+          ("system", "Jesteś ekspertem od {dziedzina}."),
+          ("human", "{pytanie}"),
+      ])
+      messages = chat_prompt.format_messages(
+          dziedzina="bezpieczeństwa aplikacji",
+          pytanie="Co to jest SQL injection?"
+      )
+
+      # Invoke całego łańcucha
+      chain = chat_prompt | model
+      result = chain.invoke({"dziedzina": "Python", "pytanie": "Co to jest GIL?"})
+
+  - name: OutputParser
+    desc: >
+      Output parsers konwertują odpowiedź modelu na ustrukturyzowane dane.
+      StrOutputParser = surowy string. JsonOutputParser = dict/JSON.
+      PydanticOutputParser = walidacja przez Pydantic. parse() wywoływane
+      automatycznie gdy parser jest w łańcuchu (|).
+    code: |
+      from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
+      from langchain_core.prompts import ChatPromptTemplate
+      from pydantic import BaseModel
+
+      # StrOutputParser — zwraca string zamiast AIMessage
+      chain = ChatPromptTemplate.from_template("{pytanie}") | model | StrOutputParser()
+      tekst = chain.invoke({"pytanie": "Czym jest Python?"})
+      # → str, nie AIMessage
+
+      # Structured output przez Pydantic (nowszy sposób)
+      class Recenzja(BaseModel):
+          ocena: int       # 1-5
+          komentarz: str
+          czy_polecasz: bool
+
+      structured_model = model.with_structured_output(Recenzja)
+      recenzja = structured_model.invoke("Oceń framework Django.")
+      print(recenzja.ocena, recenzja.komentarz)
+      # → Recenzja(ocena=4, komentarz="...", czy_polecasz=True)
+
+  - name: Runnable — interfejs bazowy
+    desc: >
+      Każdy komponent LangChain implementuje interfejs Runnable: invoke, stream,
+      batch, ainvoke, astream, abatch. batch() = wiele inputów równolegle.
+      RunnablePassthrough = przekazuje input bez zmian (przydatne w RAG).
+      RunnableLambda = owija zwykłą funkcję w Runnable.
+    code: |
+      from langchain_core.runnables import RunnablePassthrough, RunnableLambda
+
+      # batch() — wiele zapytań naraz (z max_concurrency)
+      results = model.batch(
+          [
+              [HumanMessage(content="Stolica Francji?")],
+              [HumanMessage(content="Stolica Niemiec?")],
+          ],
+          config={"max_concurrency": 3}
+      )
+
+      # RunnableLambda — funkcja jako krok w łańcuchu
+      def do_uppercase(text: str) -> str:
+          return text.upper()
+
+      chain = (
+          ChatPromptTemplate.from_template("{topic}")
+          | model
+          | StrOutputParser()
+          | RunnableLambda(do_uppercase)
+      )
+      result = chain.invoke({"topic": "python"})
+
+      # RunnablePassthrough — przekaż oryginał obok transformacji
+      chain = RunnablePassthrough.assign(
+          upper=lambda x: x["text"].upper()
+      )
+      chain.invoke({"text": "hello"})
+      # → {"text": "hello", "upper": "HELLO"}
