@@ -1,0 +1,117 @@
+items:
+  - name: poetry config — konfiguracja globalna
+    desc: >
+      poetry config zarządza ustawieniami globalnymi Poetry (zapisywanymi w ~/.config/pypoetry/config.toml).
+      Ustawienia dotyczą wszystkich projektów. Najważniejsze: virtualenvs.in-project (venv w projekcie)
+      i cache-dir (gdzie Poetry trzyma pobrane pakiety).
+    code: |
+      # Listuj wszystkie ustawienia
+      poetry config --list
+
+      # Output:
+      # cache-dir = "/home/user/.cache/pypoetry"
+      # virtualenvs.create = true
+      # virtualenvs.in-project = false
+      # virtualenvs.path = "{cache-dir}/virtualenvs"
+
+      # Pokaż konkretne ustawienie
+      poetry config virtualenvs.in-project
+
+      # Ustaw konfigurację globalnie
+      poetry config virtualenvs.in-project true
+
+      # Ustaw tylko dla bieżącego projektu (--local zapisuje w poetry.toml)
+      poetry config virtualenvs.in-project true --local
+
+      # Reset do wartości domyślnej
+      poetry config --unset virtualenvs.in-project
+
+  - name: virtualenvs.in-project — venv w katalogu projektu
+    desc: >
+      Domyślnie Poetry trzyma venv w katalogu cache (~/.cache/pypoetry/virtualenvs). Ustawienie
+      virtualenvs.in-project true zmienia lokalizację na .venv/ obok pyproject.toml — widoczne
+      w katalogu, łatwe do usunięcia, kompatybilne z VS Code autodetect.
+    code: |
+      # Włącz venv w katalogu projektu
+      poetry config virtualenvs.in-project true
+
+      # Zainstaluj — .venv/ pojawi się w katalogu projektu
+      poetry install
+      # .venv/
+      #   bin/python
+      #   bin/pytest
+      #   lib/python3.11/site-packages/...
+
+      # .gitignore — dodaj .venv do ignorowanych
+      # .venv/
+
+      # VS Code automatycznie wykryje .venv/:
+      # Python: Select Interpreter → .venv/bin/python
+
+      # Weryfikacja:
+      poetry env info --path
+      # → /home/user/myproject/.venv
+
+      # Uwaga: jeśli zmieniasz ustawienie dla istniejącego projektu,
+      # usuń stare środowisko: poetry env remove --all
+
+  - name: Prywatne repozytoria i mirrors
+    desc: >
+      Poetry obsługuje prywatne repozytoria PyPI (np. firmowe Nexus, Artifactory, Gemfury).
+      Repozytoria dodajesz przez poetry config repositories, a credentiale przez
+      poetry config http-basic lub zmienne środowiskowe.
+    code: |
+      # Dodaj prywatne repozytorium
+      poetry config repositories.myrepo https://pypi.mycompany.com/simple/
+
+      # Skonfiguruj credentials (username + password)
+      poetry config http-basic.myrepo myusername mypassword
+
+      # Credentials przez zmienne środowiskowe (zalecane dla CI/CD):
+      # POETRY_HTTP_BASIC_MYREPO_USERNAME=user
+      # POETRY_HTTP_BASIC_MYREPO_PASSWORD=token
+
+      # Token API (nowocześniejsze podejście)
+      poetry config pypi-token.myrepo token_VALUE
+
+      # Dodaj pakiet z prywatnego repozytorium:
+      poetry add --source myrepo mypackage
+
+      # pyproject.toml — źródło dla konkretnego pakietu:
+      # [[tool.poetry.source]]
+      # name = "myrepo"
+      # url = "https://pypi.mycompany.com/simple/"
+      # priority = "supplemental"  # "primary" | "supplemental" | "explicit"
+
+  - name: Cache i diagnostyka
+    desc: >
+      Poetry cachuje pobrane pakiety żeby nie pobierać ich wielokrotnie. Czasem cache jest
+      uszkodzony i trzeba go wyczyścić. poetry config cache-dir pokazuje ścieżkę, poetry cache list
+      pokazuje zawartość, poetry cache clear czyści.
+    code: |
+      # Pokaż katalog cache
+      poetry config cache-dir
+      # → /home/user/.cache/pypoetry
+
+      # Listuj zawartość cache (repozytoria)
+      poetry cache list
+      # pypi
+      # myrepo
+
+      # Wyczyść cache konkretnego repozytorium
+      poetry cache clear pypi --all
+
+      # Wyczyść wszystkie cache
+      poetry cache clear --all pypi
+
+      # Diagnostyka — sprawdź konfigurację projektu
+      poetry check
+      # Checks that pyproject.toml is valid (dependencies, config)
+
+      # Debug — verbose output
+      poetry install -vvv
+
+      # Informacje o pakiecie
+      poetry show requests
+      poetry show --tree         # drzewo zależności
+      poetry show --outdated     # pakiety z dostępnymi aktualizacjami

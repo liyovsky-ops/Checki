@@ -1,0 +1,76 @@
+title: Scrapy vs inne narzędzia do scrapingu
+
+items:
+  - name: BeautifulSoup + requests
+    icon: "🍲"
+    color: "#3CB371"
+    tagline: Prosty, synchroniczny duet — łatwy start, brak infrastructure
+    pros:
+      - Bardzo łatwy start — 2 importy i scrapejesz
+      - Czytelny, synchroniczny kod — łatwiejszy debugging
+      - requests = pełna kontrola nad HTTP (sesje, cookies, auth)
+      - BeautifulSoup = intuicyjne API dla HTML parsowania
+    cons:
+      - Synchroniczny — jeden request na raz, wolny przy wielu URL
+      - Brak wbudowanego pipeline, retry, throttlingu — musisz pisać sam
+      - Słaby przy dużej skali (tysiące URL)
+    vs: BeautifulSoup+requests = prototypy i proste jednorazowe scrapery. Scrapy = projekty produkcyjne, wiele URL, potrzebujesz pipeline, eksportu, middlewares. Próg wejścia Scrapy jest wyższy, ale zwraca się przy skali.
+
+  - name: Playwright (Python)
+    icon: "🎭"
+    color: "#2EAD33"
+    tagline: Browser automation — pełna obsługa JavaScript, SPA, infinite scroll
+    pros:
+      - Obsługuje JavaScript — scrapejesz strony renderowane przez React, Vue, Angular
+      - Async, szybki — oparty na Chromium/Firefox/WebKit
+      - Async screenshots, PDF, network interception
+      - Obsługa infinite scroll, lazy loading, dynamicznych elementów
+    cons:
+      - Wolniejszy niż Scrapy — pełna przeglądarka zamiast HTTP requestów
+      - Większy zużycie RAM i CPU
+      - Brak wbudowanego pipeline jak w Scrapy
+    vs: "Scrapy (lub scrapy-playwright) dla HTML statycznego — 10x szybszy. Playwright gdy strona wymaga JavaScript. scrapy-playwright = integracja obu: Scrapy zarządza pipeline, Playwright renderuje JS."
+
+  - name: Selenium
+    icon: "🤖"
+    color: "#43B02A"
+    tagline: Browser automation przez WebDriver — starszy standard, szerokie wsparcie
+    pros:
+      - Najszersze wsparcie przeglądarek (Chrome, Firefox, Safari, Edge)
+      - Dojrzały — ogromna społeczność i zasoby
+      - Dobry dla testów E2E i scrapingu jednocześnie
+      - Selenium Grid — skalowanie na wiele przeglądarek równolegle
+    cons:
+      - Synchroniczny API (Selenium 3) — powolny przy scrapingu
+      - Starszy interfejs niż Playwright — bardziej boilerplate
+      - WebDriver wymaga drivera dopasowanego do wersji przeglądarki
+    vs: Scrapy = szybkie, wydajne scrapowanie statycznego HTML. Selenium = testy E2E + scraping stron JS gdy już masz Selenium w projekcie. Do czystego scrapingu JS Playwright jest nowocześniejszy.
+
+  - name: httpx + parsel
+    icon: "🔌"
+    color: "#009688"
+    tagline: Async HTTP + Scrapy selektory — lekki, nowoczesny duet bez frameworka
+    pros:
+      - httpx = async HTTP client z API podobnym do requests
+      - parsel = biblioteka selektorów z Scrapy (CSS + XPath) samodzielnie
+      - Lżejszy niż pełny Scrapy gdy nie potrzebujesz całego frameworka
+      - Prosty kod, łatwy w debugowaniu
+    cons:
+      - Brak wbudowanego pipeline, throttlingu, retry, eksportu
+      - Musisz samodzielnie zarządzać kolejką URL i równoległością
+      - Scrapy ma więcej wbudowanych funkcji gotowych do użycia
+    vs: httpx+parsel = gdy chcesz asynchroniczność Scrapy bez jego overhead i learning curve. Dobry dla niezbyt złożonych scraperów. Scrapy = gdy potrzebujesz pełnego ekosystemu.
+
+  - name: mechanize
+    icon: "⚙️"
+    color: "#607d8b"
+    tagline: Stara szkoła — symulacja przeglądarki tekstowej, obsługa formularzy
+    pros:
+      - Obsługuje formularze, cookies, history jak prawdziwa przeglądarka tekstowa
+      - Prosty w obsłudze stron wymagających logowania przez HTML forms
+      - Lekki — bez GUI przeglądarki
+    cons:
+      - Tylko Python 2 (mechanize) / mechanize port dla Python 3 nie jest aktywnie rozwijany
+      - Synchroniczny, wolny
+      - Nie obsługuje JavaScript
+    vs: mechanize = historyczny, prawie nieużywany. Do obsługi formularzy logowania bez JS użyj requests.Session() + BeautifulSoup. Do JS — Playwright/Selenium. mechanize nie ma zastosowania w nowych projektach.

@@ -1,0 +1,143 @@
+items:
+  - name: FEEDS — eksport do pliku
+    desc: >
+      FEEDS to słownik w settings.py definiujący gdzie i w jakim formacie Scrapy zapisuje
+      zescrapowane dane. Obsługuje lokalne pliki i cloud storage (S3, GCS, FTP).
+      Format, encoding i inne opcje konfiguruje się per feed.
+    code: |
+      # settings.py — konfiguracja FEEDS
+
+      FEEDS = {
+          # JSON — czytelny, ale wymaga wczytania całego pliku
+          "output/products.json": {
+              "format": "json",
+              "encoding": "utf8",
+              "indent": 2,           # czytelne formatowanie
+          },
+
+          # JSON Lines — jeden JSON per linia, idealny do streamingu
+          "output/products.jl": {
+              "format": "jsonlines",
+          },
+
+          # CSV — Excel/pandas friendly
+          "output/products.csv": {
+              "format": "csv",
+              "fields": ["name", "price", "url"],  # kolejność kolumn
+          },
+
+          # XML
+          "output/products.xml": {
+              "format": "xml",
+          },
+      }
+
+      # Dynamiczna ścieżka z nazwą spidera i datą:
+      FEEDS = {
+          "output/%(name)s_%(time)s.json": {
+              "format": "json",
+          },
+      }
+
+  - name: Eksport w CLI — flaga -o
+    desc: >
+      Najprostsza metoda eksportu — flaga -o (output) przy scrapy crawl. Scrapy wykrywa
+      format z rozszerzenia pliku. Nadpisuje FEEDS z settings.py. Idealne do szybkiego
+      prototypowania bez edytowania settings.
+    code: |
+      # Eksport do różnych formatów przez CLI
+
+      # JSON
+      scrapy crawl books -o output.json
+
+      # JSON Lines (jeden obiekt per linia — szybsze niż JSON dla dużych danych)
+      scrapy crawl books -o output.jl
+      scrapy crawl books -o output.jsonlines
+
+      # CSV
+      scrapy crawl books -o output.csv
+
+      # XML
+      scrapy crawl books -o output.xml
+
+      # Nadpisuj (domyślnie dopisuje)
+      scrapy crawl books -O output.json  # wielka litera O = overwrite
+
+      # Parsowanie konkretnego URL (bez crawlowania)
+      scrapy parse --spider=books https://books.toscrape.com
+
+  - name: Cloud storage — S3, GCS
+    desc: >
+      Scrapy obsługuje eksport bezpośrednio do cloud storage przez URI w FEEDS.
+      S3 wymaga biblioteki botocore, GCS wymaga google-cloud-storage. Credentials
+      przekazujesz przez zmienne środowiskowe lub konfigurację AWS/GCP.
+    code: |
+      # settings.py — eksport do AWS S3
+      FEEDS = {
+          "s3://my-bucket/scrapy/%(name)s/%(time)s.json": {
+              "format": "json",
+          },
+      }
+
+      # Credentials AWS (przez env vars lub AWS CLI config):
+      # AWS_ACCESS_KEY_ID = "..."
+      # AWS_SECRET_ACCESS_KEY = "..."
+
+      # Lub bezpośrednio w settings.py:
+      AWS_ACCESS_KEY_ID = "YOUR_KEY"
+      AWS_SECRET_ACCESS_KEY = "YOUR_SECRET"
+
+      # Google Cloud Storage:
+      FEEDS = {
+          "gs://my-bucket/scrapy/%(name)s.json": {
+              "format": "json",
+          },
+      }
+
+      # FTP:
+      FEEDS = {
+          "ftp://user:password@ftp.example.com/scrapy/output.csv": {
+              "format": "csv",
+          },
+      }
+
+      # Wymagane pakiety:
+      # pip install botocore           # S3
+      # pip install google-cloud-storage  # GCS
+
+  - name: Feed exporters — niestandardowe formaty
+    desc: >
+      Scrapy pozwala definiować własne Feed Exporters dla niestandardowych formatów eksportu
+      (np. Parquet, Excel, baza danych). Klasa dziedziczy po BaseItemExporter i implementuje
+      start_exporting(), export_item(), finish_exporting().
+    code: |
+      # Własny eksporter — np. do Excel (openpyxl)
+      import openpyxl
+      from scrapy.exporters import BaseItemExporter
+      from itemadapter import ItemAdapter
+
+      class ExcelExporter(BaseItemExporter):
+          def __init__(self, file, **kwargs):
+              super().__init__(**kwargs)
+              self.file = file
+              self.wb = openpyxl.Workbook()
+              self.ws = self.wb.active
+              self._headers_written = False
+
+          def export_item(self, item):
+              adapter = ItemAdapter(item)
+              if not self._headers_written:
+                  self.ws.append(list(adapter.field_names()))
+                  self._headers_written = True
+              self.ws.append(list(adapter.values()))
+
+          def finish_exporting(self):
+              self.wb.save(self.file)
+
+      # Rejestracja w settings.py:
+      FEED_EXPORTERS = {
+          "xlsx": "myproject.exporters.ExcelExporter",
+      }
+      FEEDS = {
+          "output/products.xlsx": {"format": "xlsx"},
+      }

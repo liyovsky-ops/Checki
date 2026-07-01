@@ -1,0 +1,136 @@
+items:
+  - name: poetry build — budowanie pakietu
+    desc: >
+      poetry build tworzy dwie formy dystrybucji pakietu: sdist (source distribution — tarball
+      z kodem) i wheel (prebudowany format binarny — szybka instalacja). Obie formy trafiają
+      do katalogu dist/. Wheel jest preferowaną formą instalacji przez pip.
+    code: |
+      # Zbuduj pakiet (sdist + wheel)
+      poetry build
+
+      # dist/
+      #   mypackage-0.1.0.tar.gz      ← sdist
+      #   mypackage-0.1.0-py3-none-any.whl  ← wheel
+
+      # Tylko wheel
+      poetry build --format wheel
+
+      # Tylko sdist
+      poetry build --format sdist
+
+      # Sprawdź zawartość wheel (zip):
+      unzip -l dist/mypackage-0.1.0-py3-none-any.whl
+
+      # Zainstaluj lokalny pakiet (testowo):
+      pip install dist/mypackage-0.1.0-py3-none-any.whl
+
+      # W pyproject.toml — co trafia do pakietu:
+      # [tool.poetry]
+      # packages = [{include = "mypackage"}]
+      # exclude = ["tests", "*.pyc"]
+
+  - name: poetry publish — publikowanie na PyPI
+    desc: >
+      poetry publish wysyła zbudowane pakiety na PyPI. Wymaga konta PyPI i tokenu API.
+      Zawsze testuj najpierw na Test PyPI (testpypi) — omyłkowe publikowanie na produkcyjnym
+      PyPI jest trudne do cofnięcia (72h cooling period).
+    code: |
+      # 1. Skonfiguruj token PyPI (bezpieczniejsze niż hasło)
+      poetry config pypi-token.pypi pypi-TOKEN_TWOJEGO_KONTA
+
+      # 2. Zbuduj pakiet
+      poetry build
+
+      # 3a. Opublikuj na Test PyPI (najpierw testuj tu!)
+      poetry publish --repository testpypi
+
+      # 3b. Opublikuj na produkcyjne PyPI
+      poetry publish
+
+      # Zbuduj i opublikuj w jednej komendzie:
+      poetry publish --build
+
+      # Sprawdź pakiet przed publikacją:
+      # pip install twine
+      # twine check dist/*
+
+      # Test PyPI — konfiguracja repozytorium:
+      poetry config repositories.testpypi https://test.pypi.org/legacy/
+      poetry config pypi-token.testpypi pypi-TEST_TOKEN
+
+  - name: __version__ i metadane pakietu
+    desc: >
+      Poetry zarządza wersją pakietu przez pyproject.toml. Dostęp do wersji z kodu
+      przez importlib.metadata — nie duplikuj wersji w wielu miejscach. poetry version
+      pozwala automatycznie inkrementować wersję (semver).
+    code: |
+      # Dostęp do wersji z kodu — importlib.metadata (Python 3.8+)
+      import importlib.metadata
+
+      __version__ = importlib.metadata.version("mypackage")
+      # → "0.1.0"
+
+      # W __init__.py pakietu:
+      try:
+          from importlib.metadata import version, PackageNotFoundError
+          __version__ = version("mypackage")
+      except PackageNotFoundError:
+          __version__ = "0.0.0-dev"
+
+      # pyproject.toml — metadane pakietu
+      # [tool.poetry]
+      # name = "mypackage"
+      # version = "0.1.0"
+      # description = "Opis pakietu"
+      # authors = ["Jan Kowalski <jan@example.com>"]
+      # license = "MIT"
+      # readme = "README.md"
+      # homepage = "https://github.com/user/mypackage"
+      # repository = "https://github.com/user/mypackage"
+      # keywords = ["python", "tool"]
+      # classifiers = ["Programming Language :: Python :: 3"]
+
+      # Inkrementacja wersji przez CLI:
+      # poetry version patch   # 0.1.0 → 0.1.1
+      # poetry version minor   # 0.1.0 → 0.2.0
+      # poetry version major   # 0.1.0 → 1.0.0
+      # poetry version 2.0.0  # ustaw konkretną wersję
+
+  - name: Scripts i entry points
+    desc: >
+      Poetry pozwala definiować CLI entry points — komendy dostępne po instalacji pakietu.
+      scripts w pyproject.toml mapuje nazwę komendy na funkcję Pythona. To standardowy
+      mechanizm tworzenia narzędzi CLI w Pythonie.
+    code: |
+      # pyproject.toml — definicja CLI commands
+
+      [tool.poetry.scripts]
+      myapp = "mypackage.cli:main"
+      myapp-admin = "mypackage.admin:run"
+
+      # Funkcja docelowa musi być wywoływalna:
+      # mypackage/cli.py
+      def main():
+          import argparse
+          parser = argparse.ArgumentParser()
+          parser.add_argument("--verbose", action="store_true")
+          args = parser.parse_args()
+          print(f"Running myapp (verbose={args.verbose})")
+
+      # Po poetry install lub pip install mypackage:
+      # myapp --verbose    ← dostępne globalnie w venv
+
+      # Uruchamianie podczas developmentu:
+      poetry run myapp --verbose
+
+      # Nowoczesne CLI — typer/click z poetry scripts:
+      # mypackage/cli.py
+      import typer
+      app = typer.Typer()
+
+      @app.command()
+      def main(name: str, verbose: bool = False):
+          typer.echo(f"Hello {name}")
+
+      if __name__ == "__main__":
+          app()

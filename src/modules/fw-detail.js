@@ -92,6 +92,9 @@ import { FW_ANSIBLE_DATA }      from '../data/fw_ansible.js';
 import { FW_PROMETHEUS_DATA }  from '../data/fw_prometheus.js';
 import { FW_LANGCHAIN_DATA }  from '../data/fw_langchain.js';
 import { FW_HTTPX_DATA }      from '../data/fw_httpx.js';
+import { FW_ALEMBIC_DATA }   from '../data/fw_alembic.js';
+import { FW_SCRAPY_DATA }    from '../data/fw_scrapy.js';
+import { FW_POETRY_DATA }    from '../data/fw_poetry.js';
 
 let activeTab = 'podstawy';
 let activeFw  = 'react';
@@ -172,6 +175,9 @@ const FW_DATA_MAP = {
   prometheus:      FW_PROMETHEUS_DATA,
   langchain:       FW_LANGCHAIN_DATA,
   httpx:           FW_HTTPX_DATA,
+  alembic:         FW_ALEMBIC_DATA,
+  scrapy:          FW_SCRAPY_DATA,
+  poetry:          FW_POETRY_DATA,
 };
 
 export function openFramework(fw) {

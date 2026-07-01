@@ -1,0 +1,141 @@
+title: Komendy Poetry
+groups:
+  - name: Inicjalizacja projektu
+    icon: "🚀"
+    commands:
+      - cmd: poetry new my-project
+        desc: Utwórz nowy projekt z pełną strukturą katalogów
+        detail:
+          what: Generuje pyproject.toml, README.md, katalog my_project/ z __init__.py i tests/ z __init__.py.
+          how: Uruchom poza katalogiem projektu — tworzy nowy katalog. Dla istniejącego kodu użyj poetry init.
+          tips:
+            - "poetry new my-project --src — struktura src/my_project/ (zalecana dla pakietów)"
+            - "poetry new my-project --name mypackage — inna nazwa pakietu niż katalog"
+      - cmd: poetry init
+        desc: Inicjalizuj Poetry w istniejącym projekcie (interaktywny wizard)
+        detail:
+          what: Interaktywnie tworzy pyproject.toml przez pytania o nazwę, wersję, opis, autora, licencję i zależności.
+          how: Uruchom w istniejącym katalogu projektu. Możesz pominąć pytania przez Enter — edytujesz pyproject.toml ręcznie po.
+          tips:
+            - "poetry init --no-interaction — pomiń wizard, utwórz minimalny pyproject.toml"
+            - "poetry check — waliduj pyproject.toml po ręcznych zmianach"
+
+  - name: Zarządzanie zależnościami
+    icon: "📦"
+    commands:
+      - cmd: poetry add requests
+        desc: Dodaj zależność runtime do projektu
+        detail:
+          what: Dodaje pakiet do [tool.poetry.dependencies] w pyproject.toml, aktualizuje poetry.lock i instaluje w środowisku.
+          how: Poetry automatycznie wybiera kompatybilną wersję z constraint ^ (caret). Możesz podać konkretną wersję.
+          tips:
+            - "poetry add 'requests>=2.31,<3.0' — własny constraint wersji"
+            - "poetry add 'requests[security]' — z extras"
+      - cmd: poetry add --group dev pytest ruff mypy
+        desc: Dodaj zależności developerskie do grupy dev
+        detail:
+          what: Dodaje wiele pakietów do grupy dev w pyproject.toml. Nie trafiają do produkcji przy poetry install --without dev.
+          how: "Możesz dodać do dowolnej grupy: --group test, --group docs. Grupy tworzone automatycznie."
+          tips:
+            - "poetry add --group test pytest-cov httpx — osobna grupa dla testów"
+            - "Stara składnia (Poetry <1.2): poetry add --dev pytest (deprecated)"
+      - cmd: poetry remove requests
+        desc: Usuń zależność z projektu
+        detail:
+          what: Usuwa pakiet z pyproject.toml, aktualizuje poetry.lock i odinstalowuje ze środowiska.
+          how: Automatycznie obsługuje tranzytywne zależności — jeśli usuwany pakiet był jedynym użytkownikiem zależności, ona też jest usuwana.
+          tips:
+            - "poetry remove --group dev pytest — usuń z konkretnej grupy"
+            - "Po usunięciu sprawdź: poetry show --tree"
+      - cmd: poetry update
+        desc: Zaktualizuj wszystkie zależności do najnowszych kompatybilnych wersji
+        detail:
+          what: Aktualizuje poetry.lock do najnowszych wersji spełniających constraints z pyproject.toml. Nie zmienia pyproject.toml.
+          how: Bezpieczne — respektuje Twoje constraints (^, ~). Aby zaktualizować poza constraints, zmień wersję w pyproject.toml.
+          tips:
+            - "poetry update requests — zaktualizuj tylko jeden pakiet"
+            - "poetry show --outdated — najpierw sprawdź co jest nieaktualne"
+
+  - name: Instalacja i środowisko
+    icon: "🏠"
+    commands:
+      - cmd: poetry install
+        desc: Zainstaluj wszystkie zależności z poetry.lock
+        detail:
+          what: Instaluje dokładnie te wersje co w poetry.lock. Jeśli lock file nie istnieje, najpierw go tworzy. Instaluje też sam projekt w trybie editable.
+          how: Uruchom po git clone lub po każdym poetry add/remove. Na CI/CD gwarantuje identyczne środowisko jak lokalne.
+          tips:
+            - "poetry install --without dev — pomij grupę dev (dla deploymentu)"
+            - "poetry install --only main — tylko zależności runtime"
+      - cmd: poetry run python script.py
+        desc: Uruchom komendę w środowisku wirtualnym projektu
+        detail:
+          what: Wykonuje podaną komendę w kontekście virtualenv projektu bez konieczności aktywowania go przez poetry shell.
+          how: Preferowane w skryptach, Makefile i CI/CD — deterministyczne, nie wymaga aktywacji.
+          tips:
+            - "poetry run pytest — uruchom testy"
+            - "poetry run python -m mypackage — uruchom moduł"
+      - cmd: poetry shell
+        desc: Aktywuj wirtualne środowisko w nowej powłoce
+        detail:
+          what: Otwiera nową powłokę (bash/zsh) z aktywowanym venv projektu. Możesz używać python, pytest, ruff bezpośrednio.
+          how: exit lub deactivate wychodzi ze środowiska. Każdy nowy terminal wymaga poetry shell lub poetry run.
+          tips:
+            - "Alternatywa: source $(poetry env info --path)/bin/activate — klasyczna aktywacja"
+            - "VS Code automatycznie wykrywa venv gdy virtualenvs.in-project = true"
+
+  - name: Budowanie i publikowanie
+    icon: "📤"
+    commands:
+      - cmd: poetry build
+        desc: Zbuduj pakiet (sdist + wheel) do katalogu dist/
+        detail:
+          what: Tworzy dwie formy dystrybucji — tarball (sdist) i wheel. Obie formy są potrzebne do publikacji na PyPI.
+          how: Uruchom po każdej nowej wersji. dist/ zawiera pliki gotowe do wysłania przez poetry publish lub twine.
+          tips:
+            - "poetry build --format wheel — tylko wheel (szybsze, nie potrzebne sdist)"
+            - "Sprawdź zawartość przed publikacją: unzip -l dist/*.whl"
+      - cmd: poetry publish --build
+        desc: Zbuduj i opublikuj na PyPI w jednej komendzie
+        detail:
+          what: Łączy poetry build i poetry publish — buduje pakiet i wysyła na PyPI (lub inne repozytorium) w jednym kroku.
+          how: "Wymaga skonfigurowanego tokenu PyPI: poetry config pypi-token.pypi TOKEN lub POETRY_PYPI_TOKEN_PYPI env var."
+          tips:
+            - "poetry publish --build --repository testpypi — najpierw testuj na Test PyPI!"
+            - "twine check dist/* — waliduj pakiet przed publikacją"
+
+  - name: Informacje i diagnostyka
+    icon: "🔍"
+    commands:
+      - cmd: poetry show --tree
+        desc: Pokaż drzewo zależności projektu
+        detail:
+          what: Wyświetla wszystkie zainstalowane pakiety jako drzewo z ich tranzytwnymi zależnościami — widać kto od czego zależy.
+          how: Przydatne do diagnozy dlaczego dany pakiet jest zainstalowany i jakie są konflikty wersji.
+          tips:
+            - "poetry show --outdated — tylko pakiety z dostępnymi aktualizacjami"
+            - "poetry show requests — szczegóły konkretnego pakietu"
+      - cmd: poetry check
+        desc: Waliduj pyproject.toml pod kątem błędów
+        detail:
+          what: Sprawdza poprawność pyproject.toml — czy pola są prawidłowe, czy zależności nie mają konfliktów.
+          how: Uruchom po ręcznych zmianach w pyproject.toml. W CI/CD jako krok weryfikacyjny.
+          tips:
+            - "poetry check --lock — sprawdź też czy poetry.lock jest aktualny z pyproject.toml"
+            - "Exit code 0 = ok, exit code 1 = błędy"
+      - cmd: poetry lock
+        desc: Zaktualizuj poetry.lock bez instalowania pakietów
+        detail:
+          what: Regeneruje poetry.lock z aktualnych constraints w pyproject.toml bez instalacji. Nie modyfikuje środowiska.
+          how: Użyj gdy ręcznie zmodyfikowałeś pyproject.toml i chcesz zaktualizować lock file bez zmiany środowiska.
+          tips:
+            - "poetry lock --no-update — regeneruj lock file bez aktualizacji wersji"
+            - "Zawsze commituj poetry.lock do git!"
+      - cmd: poetry version
+        desc: Pokaż lub ustaw wersję projektu
+        detail:
+          what: Bez argumentu pokazuje aktualną wersję. Z argumentem (patch/minor/major/x.y.z) aktualizuje wersję w pyproject.toml.
+          how: Używaj przed poetry build + poetry publish. Patch = bugfix, minor = nowa funkcja, major = breaking change.
+          tips:
+            - "poetry version patch — 0.1.0 → 0.1.1"
+            - "poetry version 2.0.0 — ustaw konkretną wersję"

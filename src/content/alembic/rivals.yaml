@@ -1,0 +1,77 @@
+title: Alembic vs inne narzędzia do migracji
+
+items:
+  - name: Django Migrations
+    icon: "🟢"
+    color: "#092e20"
+    tagline: Wbudowane migracje Django — automatyczne z modeli, zero konfiguracji
+    pros:
+      - Wbudowane w Django — zero dodatkowej instalacji i konfiguracji
+      - Automatyczne wykrywanie zmian z modeli (python manage.py makemigrations)
+      - Integracja z Django ORM, admin, fixtures — pełny ekosystem
+      - Obsługa squashmigrations — kompresja wielu migracji w jedną
+    cons:
+      - Działa tylko z Django ORM — niekompatybilne z SQLAlchemy
+      - Mniej kontroli nad generowanym SQL niż Alembic
+      - Trudniejsze zarządzanie migracjami między aplikacjami (dependencies)
+    vs: Alembic = wybór przy SQLAlchemy (FastAPI, Flask). Django Migrations = wybór przy Django ORM. Nie można mieszać — każdy ORM ma swoje narzędzie.
+
+  - name: Flyway
+    icon: "☕"
+    color: "#CC0000"
+    tagline: Migracje bazodanowe przez pliki SQL — język-agnostyczne, Java ecosystem
+    pros:
+      - Język-agnostyczne — pliki SQL, działa z każdym językiem programowania
+      - Wersjonowanie przez nazwy plików (V1__init.sql, V2__add_users.sql)
+      - Silna integracja z Spring Boot, Maven, Gradle
+      - Obsługa Java-based migrations dla złożonej logiki
+    cons:
+      - Wymaga JVM — duży overhead dla projektów Python
+      - Brak autogenerate — piszesz SQL ręcznie
+      - Komercyjna wersja (Flyway Teams) dla zaawansowanych funkcji
+    vs: Alembic = naturalny wybór dla Python/SQLAlchemy z autogenerate. Flyway = gdy piszesz czyste SQL, masz project polyglot lub jesteś w ecosystemie Java.
+
+  - name: Liquibase
+    icon: "💧"
+    color: "#2962ff"
+    tagline: Enterprise migracje w XML/YAML/JSON/SQL — bardzo rozbudowane, wieloplatformowe
+    pros:
+      - Migracje w XML, YAML, JSON lub SQL — duża elastyczność formatu
+      - Bardzo dojrzałe — enterprise features (rollback, diff, snapshot)
+      - Język-agnostyczne — integracje z Maven, Gradle, Spring, Jenkins
+      - Obsługa wielu baz danych bez zmiany plików migracji
+    cons:
+      - Verbose konfiguracja XML — dużo boilerplate
+      - Wymaga JVM lub specjalnego CLI
+      - Stroma krzywa uczenia dla XML/YAML changesets
+    vs: Alembic jest prostszy w użyciu dla Python developerów. Liquibase = enterprise, gdy potrzebujesz platformowej niezależności i zaawansowanego audytu. Oba obsługują rollback.
+
+  - name: sqitch
+    icon: "🔧"
+    color: "#336699"
+    tagline: SQL-native migracje — czyste SQL bez ORM, dependency tracking
+    pros:
+      - Czyste SQL — piszesz bezpośrednio, nie przez abstrakcję ORM
+      - Dependency tracking między migracjami (requires/conflicts)
+      - Sprawdza stan przez deploy/revert/verify scripts
+      - Nie wymaga języka programowania — shell + SQL
+    cons:
+      - Wymaga instalacji Perl (niezwykłe dla Python projektów)
+      - Brak autogenerate — wszystko piszesz ręcznie
+      - Mniejsza popularność, mniejsza społeczność niż Alembic/Flyway
+    vs: Alembic = lepszy dla SQLAlchemy projektów z autogenerate. sqitch = gdy cenisz czyste SQL i nie chcesz zależności od ORM. Dobry dla DBA-driven workflows.
+
+  - name: prisma migrate
+    icon: "⬡"
+    color: "#2D3748"
+    tagline: TypeScript-first migracje — schema.prisma jako jedyne źródło prawdy
+    pros:
+      - Schema deklaratywna w Prisma Schema Language — czytelna, type-safe
+      - Autogenerate z porównania schema.prisma ze staną bazy
+      - Silna integracja z TypeScript — generuje typy automatycznie
+      - prisma db push dla szybkiego prototypowania (bez pliku migracji)
+    cons:
+      - Tylko TypeScript/JavaScript — niekompatybilne z Python
+      - Własny DSL (Prisma Schema Language) — nie SQL, nie ORM Python
+      - Mniejsza elastyczność niż Alembic dla złożonych migracji
+    vs: Prisma migrate = odpowiednik Alembic dla ekosystemu TypeScript. Jeśli piszesz w Python — Alembic. Jeśli w TypeScript z Prisma — prisma migrate. Porównywalne koncepcje, inne światy.

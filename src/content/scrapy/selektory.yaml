@@ -1,0 +1,113 @@
+items:
+  - name: CSS selektory — podstawy
+    desc: >
+      CSS selektory to najczytelniejszy sposób wydobywania danych z HTML. Scrapy rozszerza
+      standard CSS o pseudoelementy ::text (treść tekstowa) i ::attr(name) (atrybut).
+      .get() zwraca pierwszy wynik lub None, .getall() zwraca listę.
+    code: |
+      # response.css() — selektor CSS
+
+      # Tekst elementu
+      title = response.css("h1::text").get()
+      # → "Tytuł strony"
+
+      # Atrybut elementu
+      href = response.css("a.product-link::attr(href)").get()
+      # → "/products/123"
+
+      # Wszystkie elementy (lista)
+      paragraphs = response.css("p::text").getall()
+      # → ["Pierwszy akapit", "Drugi akapit", ...]
+
+      # Zagnieżdżony selektor — najpierw section, potem h2 wewnątrz
+      for section in response.css("div.category"):
+          name = section.css("h2::text").get()
+          items = section.css("li::text").getall()
+
+      # Kombinowanie selektorów
+      price = response.css("span.price::text").get()
+      alt_price = response.css("div.sale > span::text, span.regular::text").get()
+
+  - name: XPath selektory — zaawansowane
+    desc: >
+      XPath jest potężniejszy od CSS — pozwala nawigować po drzewie DOM w obu kierunkach,
+      używać predykatów i funkcji. Przydatny gdy CSS nie wystarczy, np. przy wyborze
+      elementu na podstawie treści jego dziecka.
+    code: |
+      # response.xpath() — selektor XPath
+
+      # Tekst elementu
+      title = response.xpath("//h1/text()").get()
+
+      # Atrybut
+      href = response.xpath("//a[@class='product-link']/@href").get()
+
+      # Tekst po predykacie (contains)
+      price = response.xpath("//span[contains(@class, 'price')]/text()").get()
+
+      # Wybierz element na podstawie treści
+      link = response.xpath("//a[text()='Next Page']/@href").get()
+
+      # Nawigacja względna (../parent, following-sibling)
+      label = response.xpath("//label[text()='Price']/../span/text()").get()
+
+      # Łączenie XPath z CSS — możesz mieszać w jednym selektorze
+      for row in response.css("table tr"):
+          cells = row.xpath(".//td/text()").getall()  # . = relative to row
+
+  - name: .get() vs .getall() vs .re()
+    desc: >
+      Scrapy Selector ma trzy metody ekstrakcji. get() = jeden wynik (lub None). getall() =
+      lista wszystkich wyników. re() = lista wyników po filtrowaniu przez regex.
+      re_first() to odpowiednik .get() dla wyrażeń regularnych.
+    code: |
+      # .get() — pierwszy wynik lub None (nie rzuca wyjątku)
+      title = response.css("h1::text").get()
+      title_default = response.css("h1::text").get(default="Brak tytułu")
+
+      # .getall() — lista wszystkich wyników (zawsze lista, nigdy None)
+      all_links = response.css("a::attr(href)").getall()
+      # → ["/about", "/products", "/contact"]
+
+      # .re() — lista wyników po regex (zwraca str, nie Selector)
+      prices = response.css(".price::text").re(r"\d+\.\d+")
+      # → ["29.99", "14.50", "99.00"]
+
+      # .re_first() — pierwszy wynik regex lub None
+      price = response.css(".price::text").re_first(r"\d+\.\d+")
+      # → "29.99"
+
+      # Łańcuchowanie — najpierw CSS, potem tekst przez regex
+      year = response.css(".published::text").re_first(r"\d{4}")
+
+  - name: ItemLoader — strukturyzowanie danych
+    desc: >
+      ItemLoader to wyższy poziom abstrakcji nad selektorami — pozwala definiować procesory
+      (TakeFirst, Join, MapCompose) które oczyszczają i formatują dane zaraz przy ekstrakcji.
+      Oddziela logikę ekstrakcji od parsowania strony.
+    code: |
+      from scrapy.loader import ItemLoader
+      from itemloaders.processors import TakeFirst, MapCompose, Join
+      from w3lib.html import remove_tags
+
+      # Definicja Item z procesorami
+      class ProductItem(scrapy.Item):
+          name = scrapy.Field(
+              output_processor=TakeFirst()    # weź tylko pierwszy wynik
+          )
+          description = scrapy.Field(
+              input_processor=MapCompose(remove_tags, str.strip),  # oczyść HTML
+              output_processor=Join(" ")      # połącz listę w string
+          )
+          price = scrapy.Field(
+              input_processor=MapCompose(lambda x: float(x.replace("$", ""))),
+              output_processor=TakeFirst()
+          )
+
+      # Użycie w spider.parse()
+      def parse(self, response):
+          loader = ItemLoader(item=ProductItem(), response=response)
+          loader.add_css("name", "h1::text")
+          loader.add_css("description", ".desc p::text")
+          loader.add_css("price", ".price::text")
+          yield loader.load_item()  # Zwraca przetworzone pole

@@ -1,0 +1,105 @@
+title: Komendy Scrapy
+groups:
+  - name: Inicjalizacja projektu
+    icon: "🚀"
+    commands:
+      - cmd: scrapy startproject myproject
+        desc: Utwórz nowy projekt Scrapy
+        detail:
+          what: Generuje kompletną strukturę projektu — settings.py, items.py, pipelines.py, middlewares.py i katalog spiders/.
+          how: Uruchom raz na początku projektu. cd myproject, następnie scrapy genspider lub ręcznie twórz spidery.
+          tips:
+            - "scrapy startproject myproject mydir — projekt w innym katalogu"
+            - "scrapy.cfg definiuje ustawienia deploymentu (Scrapyd)"
+      - cmd: scrapy genspider books books.toscrape.com
+        desc: Wygeneruj nowego spidera z szablonu
+        detail:
+          what: Tworzy plik spidera w katalogu spiders/ z wypełnionymi name, allowed_domains i start_urls.
+          how: Pierwszy argument = nazwa spidera (unikalna), drugi = domena startowa.
+          tips:
+            - "scrapy genspider -t crawl myspider example.com — szablon CrawlSpider"
+            - "scrapy genspider -t sitemap myspider example.com — szablon SitemapSpider"
+
+  - name: Uruchamianie spidera
+    icon: "▶️"
+    commands:
+      - cmd: scrapy crawl books
+        desc: Uruchom spidera o podanej nazwie
+        detail:
+          what: Uruchamia spidera books z projektu. Scrapy szuka spidera przez name = "books" w katalogu spiders/.
+          how: Musi być uruchamiany z katalogu projektu (gdzie jest scrapy.cfg).
+          tips:
+            - "scrapy crawl books -o output.json — eksportuj wyniki do JSON"
+            - "scrapy crawl books -s LOG_LEVEL=WARNING — mniej outputu w konsoli"
+      - cmd: scrapy crawl books -o output.csv -s CLOSESPIDER_ITEMCOUNT=100
+        desc: Crawl z eksportem i limitem itemów
+        detail:
+          what: Uruchamia spidera, eksportuje do CSV i zatrzymuje się po zebraniu 100 itemów.
+          how: -s nadpisuje dowolne ustawienie z settings.py. CLOSESPIDER_ITEMCOUNT, CLOSESPIDER_PAGECOUNT, CLOSESPIDER_TIMEOUT.
+          tips:
+            - "scrapy crawl books -O output.json — wielka O = overwrite (nadpisz istniejący)"
+            - "scrapy crawl books 2>/dev/null — ukryj logi, zostaw tylko output"
+      - cmd: scrapy list
+        desc: Listuj wszystkie spidery w projekcie
+        detail:
+          what: Wyświetla nazwy wszystkich spidera zarejestrowanych w projekcie.
+          how: Przydatne gdy masz wiele spidera w projekcie i nie pamiętasz ich nazw.
+          tips:
+            - "Każdy spider musi mieć unikalne name = '...' — scrapy list wykryje duplikaty"
+            - "Uruchamiaj z katalogu projektu"
+
+  - name: Debugowanie i inspekcja
+    icon: "🐛"
+    commands:
+      - cmd: scrapy shell "https://books.toscrape.com"
+        desc: Interaktywna powłoka — testuj selektory na żywo
+        detail:
+          what: Pobiera URL i uruchamia interaktywną sesję Python z dostępem do response, request i selektorów Scrapy.
+          how: W shellu używasz response.css(), response.xpath(), fetch() do pobierania nowych URL, view(response) do otwarcia w przeglądarce.
+          tips:
+            - "response.css('h1::text').getall() — testuj selektory od razu"
+            - "fetch('https://other-url.com') — pobierz inny URL bez wychodzenia z shellu"
+      - cmd: scrapy fetch "https://example.com"
+        desc: Pobierz URL i wyświetl odpowiedź w terminalu
+        detail:
+          what: Pobiera URL przez Scrapy downloader (z wszystkimi middlewares) i wypisuje response body do stdout.
+          how: Przydatne do sprawdzenia co faktycznie widzi Scrapy (z User-Agent, headers z settings.py).
+          tips:
+            - "scrapy fetch --headers https://example.com — pokaż też nagłówki odpowiedzi"
+            - "scrapy fetch --nolog https://example.com — bez logów Scrapy"
+      - cmd: scrapy parse --spider=books "https://books.toscrape.com"
+        desc: Parsuj konkretny URL przez spidera
+        detail:
+          what: Pobiera URL i uruchamia przez parse() spidera — wyświetla wygenerowane Items i Requesty bez uruchamiania pełnego crawla.
+          how: Przydatne do debugowania parsowania bez crawlowania całej strony.
+          tips:
+            - "scrapy parse --spider=books --callback=parse_detail URL — użyj konkretnego callbacku"
+            - "scrapy parse --spider=books --depth=2 URL — podąż za linkami do depth 2"
+
+  - name: Informacje i diagnostyka
+    icon: "📊"
+    commands:
+      - cmd: scrapy check
+        desc: Sprawdź czy spider ma błędy kontraktów (contracts)
+        detail:
+          what: Uruchamia doctest-like contracts zdefiniowane w docstrings spidera — sprawdza czy spider produkuje oczekiwane typy outputu.
+          how: Contracts definiujesz przez @url, @returns items 1, @scrapes name price w docstringu parse().
+          tips:
+            - "Przydatne w CI/CD — sprawdź czy spider dalej działa po zmianach"
+            - "scrapy check books — sprawdź konkretnego spidera"
+      - cmd: scrapy bench
+        desc: Benchmark — zmierz wydajność downloader+pipeline
+        detail:
+          what: Uruchamia testowego spidera który nie pobiera faktycznych URL — mierzy czysty throughput frameworka.
+          how: Pokazuje items/min i requests/min. Przydatne do baseline wydajności i testowania middleware overhead.
+          tips:
+            - "Wyniki w okolicach 1000 requests/s to dobra wartość dla pustego pipeline"
+            - "Porównaj z/bez własnych middlewares żeby zmierzyć ich overhead"
+      - cmd: scrapy view "https://books.toscrape.com"
+        desc: Otwórz URL w przeglądarce przez Scrapy downloader
+        detail:
+          what: Pobiera URL przez Scrapy i otwiera pobrany HTML w domyślnej przeglądarce — widzisz dokładnie to co Scrapy.
+          how: Pomaga zrozumieć dlaczego selektor nie działa — strona może wygladać inaczej bez JavaScript.
+          tips:
+            - "Jeśli strona wygląda inaczej niż w zwykłej przeglądarce = wymaga JavaScript → scrapy-playwright"
+            - "Użyj po scrapy fetch żeby zapisać HTML do pliku"

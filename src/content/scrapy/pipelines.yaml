@@ -1,0 +1,145 @@
+items:
+  - name: Podstawowy pipeline — process_item
+    desc: >
+      Każdy pipeline to klasa z metodą process_item(item, spider). Metoda musi zwrócić item
+      (przepuszcza dalej) lub rzucić DropItem (usuwa z przetwarzania). Rejestruj pipeline
+      w settings.py z priorytetem od 1 (pierwszy) do 1000 (ostatni).
+    code: |
+      # myproject/pipelines.py
+
+      from itemadapter import ItemAdapter
+
+      class ValidationPipeline:
+          """Walidacja — sprawdź czy wymagane pola są wypełnione"""
+
+          def process_item(self, item, spider):
+              adapter = ItemAdapter(item)
+
+              if not adapter.get("name"):
+                  raise DropItem(f"Brak nazwy: {item}")
+
+              if not adapter.get("price"):
+                  raise DropItem(f"Brak ceny: {item}")
+
+              return item  # Przekaż do następnego pipeline
+
+      # settings.py — rejestracja z priorytetami
+      ITEM_PIPELINES = {
+          "myproject.pipelines.ValidationPipeline": 100,   # pierwszy
+          "myproject.pipelines.DuplicatesPipeline": 200,
+          "myproject.pipelines.MongoPipeline": 300,
+          "myproject.pipelines.ExportPipeline": 900,        # ostatni
+      }
+
+  - name: Pipeline deduplication — DropItem
+    desc: >
+      Deduplication pipeline usuwa duplikaty przez śledzenie już widzianych wartości w secie.
+      DropItem to specjalny wyjątek który mówi Scrapy: pomiń ten item, nie przekazuj dalej.
+      Set w pamięci działa dla małych projektów; dla dużych użyj Redis lub bazy danych.
+    code: |
+      from scrapy.exceptions import DropItem
+      from itemadapter import ItemAdapter
+
+      class DuplicatesPipeline:
+          """Odfiltruj duplikaty po URL"""
+
+          def __init__(self):
+              self.seen_urls = set()
+
+          def process_item(self, item, spider):
+              adapter = ItemAdapter(item)
+              url = adapter.get("url")
+
+              if url in self.seen_urls:
+                  raise DropItem(f"Duplikat URL: {url}")
+
+              self.seen_urls.add(url)
+              return item
+
+      # Dla dużej skali — Redis (działa między procesami/instancjami):
+      # import redis
+      # class RedisDedupPipeline:
+      #     def open_spider(self, spider):
+      #         self.r = redis.Redis()
+      #     def process_item(self, item, spider):
+      #         url = ItemAdapter(item).get("url")
+      #         if self.r.sismember("seen_urls", url):
+      #             raise DropItem(f"Duplikat: {url}")
+      #         self.r.sadd("seen_urls", url)
+      #         return item
+
+  - name: Pipeline MongoDB — zapis do bazy
+    desc: >
+      open_spider() i close_spider() to metody cyklu życia pipeline — wywołane raz
+      przy starcie i zatrzymaniu spidera. Użyj ich do otwarcia/zamknięcia połączenia
+      z bazą danych. Unikaj łączenia w process_item — to by się działo dla każdego item.
+    code: |
+      import pymongo
+      from itemadapter import ItemAdapter
+
+      class MongoPipeline:
+          """Zapisuj items do MongoDB"""
+
+          def __init__(self, mongo_uri, mongo_db):
+              self.mongo_uri = mongo_uri
+              self.mongo_db = mongo_db
+
+          @classmethod
+          def from_crawler(cls, crawler):
+              # Pobierz konfigurację z settings.py
+              return cls(
+                  mongo_uri=crawler.settings.get("MONGO_URI"),
+                  mongo_db=crawler.settings.get("MONGO_DATABASE", "scrapy_db"),
+              )
+
+          def open_spider(self, spider):
+              self.client = pymongo.MongoClient(self.mongo_uri)
+              self.db = self.client[self.mongo_db]
+
+          def close_spider(self, spider):
+              self.client.close()
+
+          def process_item(self, item, spider):
+              col = self.db[spider.name]  # kolekcja = nazwa spidera
+              col.insert_one(ItemAdapter(item).asdict())
+              return item
+
+  - name: Pipeline SQLite — zapis do relacyjnej bazy
+    desc: >
+      Wzorzec dla pipeline zapisującego do SQLite lub innej relacyjnej bazy. open_spider()
+      tworzy połączenie i tabelę (CREATE TABLE IF NOT EXISTS). Używaj parametryzowanych
+      zapytań (?, :name) — nigdy f-stringów w SQL.
+    code: |
+      import sqlite3
+      from itemadapter import ItemAdapter
+
+      class SQLitePipeline:
+          """Zapisuj items do SQLite"""
+
+          def open_spider(self, spider):
+              self.conn = sqlite3.connect("scraped_data.db")
+              self.cursor = self.conn.cursor()
+              self.cursor.execute("""
+                  CREATE TABLE IF NOT EXISTS products (
+                      id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      name TEXT NOT NULL,
+                      price REAL,
+                      url TEXT UNIQUE
+                  )
+              """)
+              self.conn.commit()
+
+          def close_spider(self, spider):
+              self.conn.commit()
+              self.conn.close()
+
+          def process_item(self, item, spider):
+              adapter = ItemAdapter(item)
+              try:
+                  self.cursor.execute(
+                      "INSERT OR IGNORE INTO products (name, price, url) VALUES (?, ?, ?)",
+                      (adapter.get("name"), adapter.get("price"), adapter.get("url"))
+                  )
+              except sqlite3.Error as e:
+                  spider.logger.error(f"SQLite error: {e}")
+              return item

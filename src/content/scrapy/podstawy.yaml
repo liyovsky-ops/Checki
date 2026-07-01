@@ -1,0 +1,69 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Scrapy?
+  firstComponent: Pierwszy spider
+  firstComponentLang: Python
+
+intro:
+  title: Czym jest Scrapy?
+  desc: >
+    Scrapy to asynchroniczny framework do web scrapingu napisany w Python. Oferuje pełny
+    pipeline od wysyłania requestów HTTP, przez parsowanie HTML, aż do eksportu danych —
+    bez konieczności ręcznego łączenia bibliotek. Używa Twisted (async I/O) pod spodem,
+    co pozwala scrapować setki stron równolegle w jednym procesie.
+
+concepts:
+  - title: Architektura pipeline
+    desc: >
+      Scrapy działa jak taśma produkcyjna: Engine zarządza przepływem, Scheduler kolejkuje
+      requesty, Downloader pobiera strony, Spider parsuje dane, Pipeline przetwarza wyniki.
+      Każdy komponent jest wymienialny i konfigurowalny.
+    icon: "⚙️"
+  - title: Spider
+    desc: >
+      Spider to klasa definiująca co i jak scrapeować — start_urls (punkty startowe),
+      parse() (jak parsować odpowiedź) i logikę generowania kolejnych requestów.
+      Jeden projekt może mieć wiele pająków dla różnych stron.
+    icon: "🕷️"
+  - title: Item
+    desc: >
+      Item to ustrukturyzowany kontener na zescrapowane dane — odpowiednik dataclass.
+      Definiujesz pola przez scrapy.Field(). Alternatywnie możesz yieldować zwykłe dicty
+      — nowocześniejsza praktyka w Scrapy 2.x+.
+    icon: "📦"
+  - title: Pipeline
+    desc: >
+      Po yieldowaniu Item przez spider, trafia do Item Pipeline — łańcucha klas które
+      go przetwarzają: walidacja, deduplication, zapis do bazy, eksport do pliku.
+      Priorytety (liczby 1-1000) określają kolejność przetwarzania.
+    icon: "🔧"
+
+whenToUse:
+  - Masowe pobieranie danych z wielu stron (tysiące URL, wiele domen)
+  - Crawling — automatyczne odkrywanie linków i podążanie za nimi
+  - Scraping stron które nie wymagają JavaScript (statyczny HTML)
+  - Projekty wymagające pełnego pipeline: request → parse → validate → export
+  - Scraping z zarządzaniem cookie, session, login, paginacją
+  - "NIE DO: stron renderowanych przez JavaScript — użyj scrapy-playwright lub Playwright"
+
+firstComponent: |
+  # 1. Instalacja i nowy projekt
+  pip install scrapy
+  scrapy startproject myproject
+  cd myproject
+
+  # Struktura:
+  # myproject/
+  #   scrapy.cfg
+  #   myproject/
+  #     settings.py    — konfiguracja projektu
+  #     items.py       — definicje Items
+  #     pipelines.py   — Item Pipelines
+  #     middlewares.py — Downloader/Spider Middlewares
+  #     spiders/       — Twoje spidery
+
+  # 2. Generuj spider
+  scrapy genspider books books.toscrape.com
+
+  # 3. Uruchom spider
+  scrapy crawl books

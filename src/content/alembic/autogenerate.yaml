@@ -1,0 +1,110 @@
+items:
+  - name: target_metadata — konfiguracja autogenerate
+    desc: >
+      Autogenerate działa przez porównanie target_metadata (modele SQLAlchemy) ze stanem
+      faktycznej bazy danych. Wymaga poprawnej konfiguracji w env.py — Alembic musi mieć
+      dostęp do wszystkich modeli przed uruchomieniem autogenerate.
+    code: |
+      # migrations/env.py — konfiguracja autogenerate
+
+      # Importuj Base z Twoich modeli (wszystkie muszą być załadowane!)
+      from myapp.models import Base
+      # Lub jeśli modele są w różnych plikach:
+      from myapp.models import user, product, order  # noqa: F401 — ważne: importuj moduły
+      from myapp.database import Base
+
+      # Kluczowa linia — bez tego autogenerate nie wykryje zmian
+      target_metadata = Base.metadata
+
+      # Jeśli modele używają różnych Base (np. przy modularnym projekcie):
+      from sqlalchemy import MetaData
+      combined = MetaData()
+      for table in [*Base1.metadata.tables.values(), *Base2.metadata.tables.values()]:
+          table.tometadata(combined)
+      target_metadata = combined
+
+  - name: Co autogenerate wykrywa
+    desc: >
+      Autogenerate porównuje metadane SQLAlchemy z rzeczywistym schematem bazy i wykrywa
+      konkretne typy zmian. Zawsze sprawdź wygenerowany plik — Alembic może nie wykryć
+      wszystkiego i może generować nieoptymalne operacje.
+    code: |
+      # ✅ Co autogenerate WYKRYWA (i generuje automatycznie):
+
+      # 1. Nowe tabele
+      class NewTable(Base):
+          __tablename__ = "new_table"
+          id = Column(Integer, primary_key=True)
+      # → op.create_table('new_table', ...)
+
+      # 2. Usunięte tabele
+      # Tabela usunięta z modeli → op.drop_table(...)
+
+      # 3. Nowe / usunięte kolumny
+      email = Column(String(255))        # → op.add_column(...)
+      # Usunięta kolumna               # → op.drop_column(...)
+
+      # 4. Nowe / usunięte indeksy
+      __table_args__ = (Index('ix_email', 'email'),)
+      # → op.create_index(...)
+
+      # 5. Klucze obce (ForeignKey)
+      user_id = Column(Integer, ForeignKey('users.id'))
+      # → op.create_foreign_key(...)
+
+  - name: Czego autogenerate NIE wykrywa
+    desc: >
+      Autogenerate ma ograniczenia — pewnych zmian nie wykryje automatycznie. Dla tych
+      przypadków musisz napisać migrację ręcznie lub skonfigurować dodatkowe opcje.
+      Zawsze sprawdzaj wygenerowane migracje ręcznie.
+    code: |
+      # ❌ Co autogenerate NIE WYKRYWA (wymaga ręcznej migracji):
+
+      # 1. Stored procedures, triggers, views
+      # Muszą być w op.execute() w ręcznie napisanej migracji
+
+      # 2. Zmiany wartości DEFAULT kolumn (w wielu bazach)
+      email = Column(String, default="")  # zmiana default nie jest wykrywana
+
+      # 3. CHECK constraints (zależne od dialektu)
+      age = Column(Integer, CheckConstraint('age > 0'))  # może nie być wykryte
+
+      # 4. Zmiany typów kolumn (bez compare_type=True)
+      # String(100) → String(200)  →  NIE wykryte domyślnie!
+
+      # 5. Zmiany serwera (server_default, server_onupdate)
+      created = Column(DateTime, server_default=func.now())  # zmiana nie wykryta
+
+      # 6. Dane (migracje danych — INSERT/UPDATE/DELETE)
+      # Alembic zarządza schematem, nie danymi
+
+  - name: compare_type — wykrywanie zmian typów
+    desc: >
+      Domyślnie Alembic ignoruje zmiany typów kolumn (np. String(100) → String(500)).
+      compare_type=True włącza ich wykrywanie. Może generować fałszywe pozytywne
+      dla typów które dialekt SQL mapuje inaczej niż SQLAlchemy.
+    code: |
+      # migrations/env.py — włącz compare_type
+
+      def run_migrations_online() -> None:
+          connectable = engine_from_config(
+              config.get_section(config.config_ini_section),
+              prefix="sqlalchemy.",
+              poolclass=pool.NullPool,
+          )
+
+          with connectable.connect() as connection:
+              context.configure(
+                  connection=connection,
+                  target_metadata=target_metadata,
+                  compare_type=True,        # ← wykrywa zmiany typów kolumn
+                  compare_server_default=True,  # ← wykrywa zmiany server_default
+                  include_schemas=True,     # ← multi-schema support
+              )
+
+              with context.begin_transaction():
+                  context.run_migrations()
+
+      # Teraz: String(100) → String(500) zostanie wykryte:
+      # op.alter_column('users', 'name', type_=sa.String(500),
+      #                 existing_type=sa.String(100))

@@ -1,0 +1,104 @@
+items:
+  - name: alembic upgrade — aplikowanie migracji
+    desc: >
+      upgrade aplikuje migracje do wskazanej wersji. head oznacza najnowszą. Możesz podać
+      konkretne revision ID lub użyć względnych offsetów (+N oznacza N kroków do przodu).
+      Zawsze uruchamiaj w środowisku testowym przed produkcją.
+    code: |
+      # Aplikuj wszystkie migracje do najnowszej wersji
+      alembic upgrade head
+
+      # Aplikuj N kroków do przodu
+      alembic upgrade +2
+
+      # Aplikuj do konkretnej wersji (revision ID)
+      alembic upgrade a1b2c3d4e5f6
+
+      # Aplikuj do wersji relative do HEAD
+      alembic upgrade head-1
+
+      # Tylko pokaż SQL, nie wykonuj (dry run)
+      alembic upgrade head --sql
+
+  - name: alembic downgrade — cofanie migracji
+    desc: >
+      downgrade cofa migracje. -1 cofa jedną wersję, base cofa do stanu przed pierwszą migracją.
+      Używaj ostrożnie na produkcji — zawsze rób backup bazy przed downgrade.
+    code: |
+      # Cofnij jedną migrację
+      alembic downgrade -1
+
+      # Cofnij N kroków wstecz
+      alembic downgrade -3
+
+      # Cofnij do konkretnej wersji
+      alembic downgrade 9f8e7d6c5b4a
+
+      # Cofnij do stanu początkowego (przed wszystkimi migracjami)
+      alembic downgrade base
+
+      # Tylko SQL (dry run)
+      alembic downgrade -1 --sql > undo.sql
+
+  - name: alembic current i history — inspekcja stanu
+    desc: >
+      current pokazuje aktualną wersję bazy danych. history listuje wszystkie migracje
+      w kolejności. Te komendy są kluczowe do diagnostyki — co jest zaaplikowane, czego nie.
+    code: |
+      # Pokaż aktualną wersję bazy
+      alembic current
+      # Output: a1b2c3d4e5f6 (head)
+
+      # Pokaż historię migracji (od najnowszej)
+      alembic history
+
+      # Pokaż historię z verbose info
+      alembic history --verbose
+
+      # Pokaż historię od konkretnej wersji do head
+      alembic history -r 9f8e7d6c:head
+
+      # Pokaż ostatnie N migracji
+      alembic history -r -3:current
+
+  - name: alembic stamp — oznaczanie wersji bez migracji
+    desc: >
+      stamp ustawia wersję w tabeli alembic_version bez faktycznego uruchamiania migracji.
+      Przydatne gdy ręcznie zmodyfikowałeś bazę lub przenosisz istniejącą bazę pod kontrolę Alembic.
+    code: |
+      # Oznacz bazę jako aktualną (head) bez uruchamiania migracji
+      alembic stamp head
+
+      # Oznacz konkretną wersję
+      alembic stamp a1b2c3d4e5f6
+
+      # Oznacz jako bazową (przed migracjami) — reset
+      alembic stamp base
+
+      # Przykład: istniejąca baza, pierwsza migracja stworzona z --autogenerate
+      # Schema już istnieje, więc stamp head zamiast upgrade head
+      alembic stamp head
+
+  - name: alembic show i heads — informacje o migracjach
+    desc: >
+      show wyświetla szczegóły konkretnej migracji. heads listuje wszystkie aktywne końce
+      łańcucha migracji — w zdrowym projekcie powinien być tylko jeden head.
+    code: |
+      # Szczegóły konkretnej migracji
+      alembic show a1b2c3d4e5f6
+
+      # Pokaż wszystkie aktywne heads
+      alembic heads
+
+      # Pokaż heads z verbose info
+      alembic heads --verbose
+
+      # Pokaż branches — wszystkie gałęzie historii
+      alembic branches
+
+      # Sprawdź plik migracji
+      alembic show a1b2c3d4e5f6
+      # Output: Rev: a1b2c3d4e5f6 (head)
+      #         Parent: 9f8e7d6c5b4a
+      #         Path: migrations/versions/a1b2c3d4_add_users_table.py
+      #         add users table

@@ -1,0 +1,128 @@
+items:
+  - name: Online vs offline mode — env.py
+    desc: >
+      Alembic ma dwa tryby działania. Online mode łączy się z bazą i wykonuje migracje
+      bezpośrednio. Offline mode generuje SQL do pliku — przydatny gdy nie masz dostępu
+      do bazy (np. produkcja zarządzana przez DBA).
+    code: |
+      # migrations/env.py — dwa tryby działania
+
+      def run_migrations_offline() -> None:
+          """Offline: generuje SQL zamiast wykonywać"""
+          url = config.get_main_option("sqlalchemy.url")
+          context.configure(
+              url=url,
+              target_metadata=target_metadata,
+              literal_binds=True,
+              dialect_opts={"paramstyle": "named"},
+          )
+          with context.begin_transaction():
+              context.run_migrations()
+
+      def run_migrations_online() -> None:
+          """Online: łączy się z bazą i wykonuje"""
+          connectable = engine_from_config(
+              config.get_section(config.config_ini_section),
+              prefix="sqlalchemy.",
+              poolclass=pool.NullPool,
+          )
+          with connectable.connect() as connection:
+              context.configure(
+                  connection=connection,
+                  target_metadata=target_metadata,
+              )
+              with context.begin_transaction():
+                  context.run_migrations()
+
+      # Wybór trybu — Alembic wywołuje odpowiednią funkcję:
+      if context.is_offline_mode():
+          run_migrations_offline()
+      else:
+          run_migrations_online()
+
+  - name: Dynamiczny URL z zmiennych środowiskowych
+    desc: >
+      Hardkodowanie URL bazy w alembic.ini jest antypatterm — każde środowisko ma inną bazę.
+      Pobieraj URL ze zmiennych środowiskowych w env.py lub przez pydantic-settings.
+    code: |
+      # migrations/env.py — URL ze zmiennej środowiskowej
+
+      import os
+      from alembic import context
+      from sqlalchemy import engine_from_config, pool
+
+      from myapp.models import Base
+
+      config = context.config
+      target_metadata = Base.metadata
+
+      # Nadpisz URL z .env / environment
+      DATABASE_URL = os.environ.get("DATABASE_URL")
+      if DATABASE_URL:
+          config.set_main_option("sqlalchemy.url", DATABASE_URL)
+
+      # Alternatywnie z pydantic-settings:
+      from myapp.config import settings
+      config.set_main_option("sqlalchemy.url", settings.database_url)
+
+      # alembic.ini może mieć placeholder:
+      # sqlalchemy.url = placeholder  ← nadpisane w env.py
+
+  - name: Multiple databases — wiele baz
+    desc: >
+      Alembic obsługuje migracje dla wielu baz danych jednocześnie — każda baza ma własny
+      katalog migracji i sekcję konfiguracyjną. Przydatne w architekturach mikroserwisowych
+      lub aplikacjach z osobnymi bazami dla różnych domen.
+    code: |
+      # alembic.ini — multi-database config
+      # [alembic]
+      # databases = main, analytics
+
+      # [main]
+      # sqlalchemy.url = postgresql://user:pass@localhost/main_db
+
+      # [analytics]
+      # sqlalchemy.url = postgresql://user:pass@localhost/analytics_db
+
+      # migrations/env.py — multi-db setup
+      from alembic.config import Config
+
+      def run_migrations_for_db(db_name: str, url: str):
+          alembic_cfg = Config("alembic.ini")
+          alembic_cfg.set_main_option("sqlalchemy.url", url)
+          alembic_cfg.set_main_option("script_location", f"migrations/{db_name}")
+
+          from alembic import command
+          command.upgrade(alembic_cfg, "head")
+
+      # Uruchomienie obu baz:
+      run_migrations_for_db("main", os.environ["MAIN_DB_URL"])
+      run_migrations_for_db("analytics", os.environ["ANALYTICS_DB_URL"])
+
+  - name: Sekcje dev/prod w alembic.ini
+    desc: >
+      alembic.ini obsługuje sekcje dla różnych środowisk — możesz przełączać między
+      dev i prod przez zmienną środowiskową lub argument CLI. Alternatywnie wczytuj
+      konfigurację środowiska bezpośrednio w env.py.
+    code: |
+      # alembic.ini — sekcje per środowisko
+      # [dev]
+      # sqlalchemy.url = postgresql://dev_user:dev_pass@localhost/dev_db
+
+      # [prod]
+      # sqlalchemy.url = postgresql://prod_user:prod_pass@prod-host/prod_db
+
+      # Uruchomienie z konkretną sekcją:
+      # alembic --name dev upgrade head
+      # alembic --name prod upgrade head
+
+      # Alternatywnie w env.py — autowybór środowiska:
+      import os
+
+      env_name = os.environ.get("APP_ENV", "dev")  # dev / staging / prod
+      db_urls = {
+          "dev":  "postgresql://localhost/myapp_dev",
+          "staging": os.environ.get("STAGING_DB_URL", ""),
+          "prod": os.environ.get("DATABASE_URL", ""),
+      }
+      config.set_main_option("sqlalchemy.url", db_urls[env_name])

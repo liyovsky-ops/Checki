@@ -1,0 +1,118 @@
+items:
+  - name: poetry-dynamic-versioning — wersjonowanie z git tagów
+    desc: >
+      poetry-dynamic-versioning automatycznie ustawia wersję pakietu z git tagów semver.
+      Eliminuje ręczne aktualizowanie wersji w pyproject.toml — tworzysz tag git v1.2.3
+      i wersja pakietu automatycznie odzwierciedla ten tag. Idealne dla CI/CD.
+    code: |
+      # Instalacja pluginu
+      poetry self add "poetry-dynamic-versioning[plugin]"
+
+      # pyproject.toml — konfiguracja
+      [tool.poetry]
+      name = "mypackage"
+      version = "0.0.0"  # placeholder — nadpisywany przez plugin
+
+      [tool.poetry-dynamic-versioning]
+      enable = true
+      vcs = "git"
+      style = "pep440"    # "semver" | "pvp" | "pep440"
+
+      [build-system]
+      requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0"]
+      build-backend = "poetry-dynamic-versioning.backend"
+
+      # Workflow — twórz tag i buduj:
+      git tag v1.2.3
+      poetry build
+      # → mypackage-1.2.3-py3-none-any.whl
+
+      # Sprawdź aktualną dynamiczną wersję:
+      poetry version
+
+  - name: poetry-export — generuj requirements.txt
+    desc: >
+      poetry export konwertuje poetry.lock do requirements.txt. Przydatne gdy projekt
+      musi być kompatybilny z narzędziami które nie obsługują Poetry (np. stary Docker image
+      używający pip install -r requirements.txt) lub dla integracji z Heroku.
+    code: |
+      # poetry export jest teraz wbudowany jako plugin (poetry 1.5+)
+      # W starszych wersjach: pip install poetry-plugin-export
+
+      # Eksport do requirements.txt
+      poetry export -f requirements.txt -o requirements.txt
+
+      # Tylko runtime (bez dev)
+      poetry export -f requirements.txt --without dev -o requirements.txt
+
+      # Z hashem dla security (weryfikacja pakietów przez pip)
+      poetry export -f requirements.txt --with-credentials -o requirements.txt
+
+      # Konkretna grupa
+      poetry export -f requirements.txt --only test -o requirements-test.txt
+
+      # Dockerfile pattern — Poetry → requirements.txt → pip:
+      # FROM python:3.11-slim
+      # COPY requirements.txt .
+      # RUN pip install --no-cache-dir -r requirements.txt
+      # (bez instalowania Poetry w Docker image)
+
+  - name: poetry-multiproject-plugin — monorepo
+    desc: >
+      poetry-multiproject-plugin dodaje wsparcie dla monorepo — zarządzanie wieloma
+      powiązanymi pakietami Python w jednym repozytorium. Pozwala na lokalne zależności
+      między pakietami bez publikowania ich na PyPI.
+    code: |
+      # Instalacja
+      poetry self add poetry-multiproject-plugin
+
+      # Struktura monorepo:
+      # monorepo/
+      #   pyproject.toml       ← root (workspace)
+      #   packages/
+      #     core/
+      #       pyproject.toml
+      #     api/
+      #       pyproject.toml   ← zależy od core
+      #     worker/
+      #       pyproject.toml   ← zależy od core
+
+      # packages/api/pyproject.toml — lokalna zależność:
+      [tool.poetry.dependencies]
+      core = {path = "../core", develop = true}
+
+      # Instalacja workspace z root:
+      poetry multiproject install
+
+      # Alternatywnie — bez pluginu, wbudowane path dependencies:
+      # poetry add --editable ../core
+      # [tool.poetry.dependencies]
+      # core = {path = "../core", develop = true}
+
+  - name: keyring i credentials management
+    desc: >
+      Poetry integruje się z systemowym keyringiem (keychain na macOS, libsecret na Linux,
+      Windows Credential Store) do bezpiecznego przechowywania haseł do prywatnych PyPI.
+      Alternatywą są zmienne środowiskowe — preferowane w CI/CD.
+    code: |
+      # keyring — bezpieczne przechowywanie credentials
+      pip install keyring
+
+      # Poetry automatycznie użyje keyring gdy jest zainstalowany
+      poetry config http-basic.myrepo username
+      # Pyta o hasło → zapisuje w systemowym keychain
+
+      # Weryfikacja że keyring działa:
+      python -c "import keyring; print(keyring.get_keyring())"
+      # → <keyring.backends.SecretService.Keyring ...>
+
+      # Zmienne środowiskowe — preferowane w CI/CD (GitHub Actions, GitLab CI):
+      # POETRY_HTTP_BASIC_MYREPO_USERNAME=myuser
+      # POETRY_HTTP_BASIC_MYREPO_PASSWORD=${{ secrets.PYPI_TOKEN }}
+      # POETRY_PYPI_TOKEN_PYPI=${{ secrets.PYPI_TOKEN }}
+
+      # W GitHub Actions:
+      # - name: Publish to PyPI
+      #   env:
+      #     POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
+      #   run: poetry publish --build

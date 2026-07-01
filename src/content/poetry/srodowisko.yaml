@@ -1,0 +1,107 @@
+items:
+  - name: Zarządzanie środowiskami — env use, env info
+    desc: >
+      Poetry automatycznie tworzy wirtualne środowisko przy pierwszym poetry install.
+      Możesz wybrać konkretną wersję Pythona przez poetry env use. Każda wersja Pythona
+      dostaje osobne środowisko — wygodne przy testowaniu kompatybilności.
+    code: |
+      # Pokaż info o aktywnym środowisku
+      poetry env info
+
+      # Pokaż ścieżkę do venv
+      poetry env info --path
+      # → /home/user/.cache/pypoetry/virtualenvs/myproject-ABC123-py3.11
+
+      # Utwórz środowisko z konkretną wersją Pythona
+      poetry env use python3.11
+      poetry env use python3.12
+      poetry env use /usr/bin/python3.10   # pełna ścieżka
+
+      # Listuj wszystkie środowiska projektu
+      poetry env list
+      # myproject-ABC123-py3.11 (Activated)
+      # myproject-DEF456-py3.12
+
+      # Aktywacja przez poetry run (bez wchodzenia w shell)
+      poetry run python --version
+
+  - name: poetry run i poetry shell
+    desc: >
+      poetry run wykonuje komendę w środowisku projektu bez aktywowania go — jednolinijkowe
+      uruchomienie. poetry shell otwiera nową powłokę z aktywowanym venv. Preferuj poetry run
+      w skryptach i CI/CD — jest bardziej przewidywalny.
+    code: |
+      # Uruchom skrypt w środowisku projektu
+      poetry run python main.py
+      poetry run python -m pytest
+      poetry run ruff check .
+      poetry run mypy src/
+
+      # Uruchom niestandardowe skrypty zdefiniowane w pyproject.toml
+      # [tool.poetry.scripts]
+      # start = "myapp.main:run"
+      poetry run start
+
+      # Otwórz powłokę z aktywowanym venv (deactivate by exit)
+      poetry shell
+      # W shellu możesz używać python, pytest, ruff bezpośrednio
+
+      # Sprawdź który Python jest aktywny w shellu
+      which python
+      # → /home/user/.cache/pypoetry/virtualenvs/myproject-.../bin/python
+
+  - name: Integracja z pyenv i asdf
+    desc: >
+      Poetry szanuje wersję Pythona ustawioną przez pyenv lub asdf. Jeśli pyproject.toml
+      wymaga Python 3.12, a pyenv ma tę wersję zainstalowaną, Poetry automatycznie ją
+      użyje. Unikasz konieczności globalnego przełączania wersji Pythona.
+    code: |
+      # pyenv — zarządzanie wersjami Pythona
+      pyenv install 3.12.0
+      pyenv local 3.12.0    # .python-version w katalogu projektu
+
+      # Poetry użyje pyenv's Python automatycznie:
+      poetry install        # → używa Python 3.12.0 z pyenv
+
+      # Wymusz konkretną wersję:
+      poetry env use $(pyenv which python3.12)
+
+      # asdf — alternatywa dla pyenv
+      asdf install python 3.12.0
+      asdf local python 3.12.0  # .tool-versions w katalogu projektu
+
+      # Poetry + asdf:
+      poetry env use $(asdf which python)
+
+      # Weryfikacja:
+      poetry env info
+      # Python: 3.12.0
+      # Path: /home/user/.pyenv/versions/3.12.0/bin/python
+
+  - name: Usuwanie środowisk i czyszczenie
+    desc: >
+      poetry env remove usuwa środowisko wirtualne projektu — przydatne gdy chcesz
+      zacząć od czystego stanu lub zmieniasz wersję Pythona. Cache Poetry można wyczyścić
+      gdy środowisko jest uszkodzone lub zajmuje dużo miejsca.
+    code: |
+      # Usuń konkretne środowisko
+      poetry env remove python3.11
+      poetry env remove myproject-ABC123-py3.11
+
+      # Usuń wszystkie środowiska projektu
+      poetry env remove --all
+
+      # Po usunięciu — zainstaluj na nowo
+      poetry install
+
+      # Sprawdź gdzie Poetry trzyma venv
+      poetry config virtualenvs.path
+      # → /home/user/.cache/pypoetry/virtualenvs
+
+      # Zmień lokalizację venv na katalog projektu (.venv)
+      poetry config virtualenvs.in-project true
+      poetry install
+      # Teraz .venv/ jest w katalogu projektu — widoczne w ls
+
+      # Cache Poetry — jeśli coś jest uszkodzone:
+      poetry cache clear --all pypi

@@ -1,0 +1,73 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Poetry?
+  firstComponent: Pierwszy projekt
+  firstComponentLang: bash
+
+intro:
+  title: Czym jest Poetry?
+  desc: >
+    Poetry to narzędzie do zarządzania zależnościami i pakietami Python. Zastępuje pip, venv,
+    setup.py i twine jednym spójnym narzędziem. Wszystkie informacje o projekcie — zależności,
+    metadane, konfiguracja narzędzi — trafiają do jednego pliku pyproject.toml.
+    poetry.lock gwarantuje deterministyczne instalacje na każdej maszynie.
+
+concepts:
+  - title: pyproject.toml
+    desc: >
+      Jedyne źródło prawdy o projekcie — nazwa, wersja, opis, zależności, grupy dev/test/docs,
+      konfiguracja narzędzi (pytest, mypy, ruff). Zastępuje setup.py, setup.cfg, requirements.txt,
+      Makefile w jednym pliku. Standard PEP 517/518.
+    icon: "📄"
+  - title: poetry.lock
+    desc: >
+      Plik z zamrożonymi wersjami wszystkich zależności (łącznie z tranzytywymi). Gwarantuje
+      że pip install requirements.txt może dać różne wyniki, a poetry install z lock file
+      zawsze daje identyczne środowisko. Commituj poetry.lock do repozytorium.
+    icon: "🔒"
+  - title: Grupy zależności
+    desc: >
+      Poetry dzieli zależności na grupy: main (runtime), dev (development), test, docs.
+      poetry install --without dev pomija grupę dev w deploymencie. Czytelna separacja
+      tego co idzie na produkcję od narzędzi developerskich.
+    icon: "📂"
+  - title: Wirtualne środowisko
+    desc: >
+      Poetry automatycznie tworzy i zarządza venv dla każdego projektu. Zero ręcznego
+      python -m venv i source activate. poetry run python lub poetry shell aktywuje
+      środowisko. Domyślnie venv poza projektem, ale możesz zmienić na .venv.
+    icon: "🏠"
+
+whenToUse:
+  - Nowe projekty Python — od razu czysta struktura z pyproject.toml
+  - Publikowanie pakietów na PyPI — poetry build + poetry publish w jednym narzędziu
+  - Praca zespołowa — poetry.lock zapewnia identyczne środowisko dla wszystkich
+  - Projekty z wieloma grupami zależności (dev/test/docs)
+  - Potrzebujesz zarządzania wersjami zależności z semver constraints
+  - "Rozważ uv: jeśli szybkość instalacji jest priorytetem (uv jest 10-100x szybszy)"
+
+firstComponent: |
+  # 1. Instalacja Poetry
+  curl -sSL https://install.python-poetry.org | python3 -
+  # lub: pip install poetry (niezalecane — może kolidować ze środowiskiem)
+
+  # 2a. Nowy projekt od zera
+  poetry new my-project
+  cd my-project
+  # Tworzy: pyproject.toml, README.md, my_project/__init__.py, tests/
+
+  # 2b. Inicjalizacja w istniejącym projekcie
+  cd existing-project
+  poetry init
+  # Interaktywny wizard — pyta o nazwę, wersję, zależności
+
+  # 3. Instalacja zależności (z poetry.lock)
+  poetry install
+
+  # 4. Dodaj zależność
+  poetry add requests
+  poetry add --group dev pytest ruff mypy
+
+  # 5. Uruchom kod
+  poetry run python main.py
+  poetry run pytest

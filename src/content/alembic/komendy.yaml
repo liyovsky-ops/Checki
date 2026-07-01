@@ -1,0 +1,125 @@
+title: Komendy Alembic
+groups:
+  - name: Inicjalizacja projektu
+    icon: "🚀"
+    commands:
+      - cmd: alembic init migrations
+        desc: Inicjalizuj Alembic — utwórz strukturę katalogów
+        detail:
+          what: Tworzy katalog migrations/ z env.py, script.py.mako i versions/. Generuje alembic.ini w katalogu głównym.
+          how: Uruchom raz przy starcie projektu. Następnie skonfiguruj alembic.ini (sqlalchemy.url) i env.py (target_metadata).
+          tips:
+            - "Katalog możesz nazwać dowolnie: alembic init db/migrations"
+            - "Dodaj migrations/versions/ do .gitignore NIE — commituj pliki migracji!"
+      - cmd: alembic init --template generic migrations
+        desc: Inicjalizuj z konkretnym szablonem (generic/multidb/pylons)
+        detail:
+          what: Szablony różnią się konfiguracją env.py. multidb = wiele baz danych, pylons = projekt Pylons.
+          how: Dla większości projektów używaj generic (domyślny). multidb gdy zarządzasz kilkoma bazami z jednego projektu.
+          tips:
+            - "generic = standardowy, najpopularniejszy szablon"
+            - "Możesz też skopiować env.py z innego projektu i dostosować"
+
+  - name: Tworzenie migracji
+    icon: "📝"
+    commands:
+      - cmd: alembic revision --autogenerate -m "add users table"
+        desc: Wygeneruj migrację automatycznie z modeli SQLAlchemy
+        detail:
+          what: Porównuje target_metadata (modele) z aktualnym schematem bazy i generuje plik migracji z odpowiednimi operacjami DDL.
+          how: Wymaga uruchomionej bazy danych i poprawnie skonfigurowanego env.py z target_metadata = Base.metadata.
+          tips:
+            - "ZAWSZE przejrzyj wygenerowany plik przed alembic upgrade!"
+            - "Uruchom alembic check by sprawdzić czy są niezaaplikowane zmiany modeli"
+      - cmd: alembic revision -m "custom migration"
+        desc: Utwórz pustą migrację — piszesz upgrade/downgrade ręcznie
+        detail:
+          what: Generuje pusty plik migracji z upgrade() i downgrade() bez żadnych operacji. Używasz gdy autogenerate nie wystarczy.
+          how: Użyj dla migracji danych (UPDATE/INSERT), stored procedures, trigggerów — rzeczy których autogenerate nie generuje.
+          tips:
+            - "Dobra praktyka: osobna migracja dla schematu, osobna dla danych"
+            - "op.execute() pozwala uruchomić surowy SQL w migracji"
+
+  - name: Aplikowanie i cofanie
+    icon: "▶️"
+    commands:
+      - cmd: alembic upgrade head
+        desc: Aplikuj wszystkie migracje do najnowszej wersji
+        detail:
+          what: Wykonuje upgrade() dla każdej niezaaplikowanej migracji od aktualnej wersji do head (najnowszej).
+          how: Uruchamiaj po każdym git pull lub przed deploymentem. Alembic zapisuje aktualną wersję w tabeli alembic_version.
+          tips:
+            - "alembic upgrade head --sql > migration.sql — generuje SQL bez wykonywania (dry run)"
+            - "alembic upgrade +1 — aplikuj tylko następną migrację"
+      - cmd: alembic downgrade -1
+        desc: Cofnij ostatnią migrację
+        detail:
+          what: Wykonuje downgrade() dla ostatniej zaaplikowanej migracji — cofa jedną zmianę schematu.
+          how: Używaj przy problemach po deploymencie. Upewnij się że downgrade() jest poprawnie zaimplementowany.
+          tips:
+            - "alembic downgrade base — cofnij WSZYSTKIE migracje (pusta baza)"
+            - "alembic downgrade -3 — cofnij 3 ostatnie migracje"
+      - cmd: alembic upgrade head --sql
+        desc: Dry run — pokaż SQL bez wykonywania
+        detail:
+          what: Generuje SQL który zostałby wykonany przez upgrade head, bez faktycznego łączenia się z bazą i wykonywania operacji.
+          how: "Przekieruj do pliku: alembic upgrade head --sql > migration.sql. Przydatne do code review migracji lub dla DBA."
+          tips:
+            - "Działa też dla downgrade: alembic downgrade -1 --sql"
+            - "Wymaga skonfigurowanego sqlalchemy.url nawet w offline mode"
+
+  - name: Inspekcja stanu
+    icon: "🔍"
+    commands:
+      - cmd: alembic current
+        desc: Pokaż aktualną wersję bazy danych
+        detail:
+          what: Wyświetla revision ID aktualnie zaaplikowanego w bazie danych. Czyta z tabeli alembic_version.
+          how: Uruchom gdy nie wiesz w jakim stanie jest baza. Jeśli baza jest na head, pokazuje (head) przy revision ID.
+          tips:
+            - "alembic current --verbose — więcej informacji o aktualnej rewizji"
+            - "Brak outputu = baza nie ma tabeli alembic_version (nigdy nie uruchomiono migracji)"
+      - cmd: alembic history --verbose
+        desc: Pokaż historię migracji z detalami
+        detail:
+          what: Listuje wszystkie migracje w kolejności z revision ID, datą, opisem i powiązaniami (down_revision).
+          how: Bez --verbose pokazuje tylko krótki format. -r base:head ogranicza zakres.
+          tips:
+            - "alembic history -r -5:current — ostatnie 5 migracji"
+            - "alembic history -r rev1:rev2 — migracje między wersjami"
+      - cmd: alembic heads
+        desc: Pokaż wszystkie aktywne heads (końce historii)
+        detail:
+          what: W zdrowym projekcie powinien być jeden head. Wiele heads = branching lub merge conflicts z git pull.
+          how: Gdy widzisz wiele heads, użyj alembic merge heads -m "merge" by je połączyć przed deploymentem.
+          tips:
+            - "alembic branches — pokaż całe drzewo gałęzi"
+            - "Wiele heads na CI/CD = błąd deploymentu — napraw przed pushem"
+
+  - name: Zarządzanie wersjami
+    icon: "🏷️"
+    commands:
+      - cmd: alembic stamp head
+        desc: Oznacz bazę jako aktualną bez uruchamiania migracji
+        detail:
+          what: Ustawia wersję w tabeli alembic_version bez wykonywania jakichkolwiek operacji DDL na bazie.
+          how: Używaj gdy istniejąca baza ma już właściwy schemat (np. pierwsza migracja z istniejącej bazy).
+          tips:
+            - "alembic stamp base — oznacz jako przed-migracjami (reset)"
+            - "Przydatne przy migracji z innego narzędzia do Alembic"
+      - cmd: alembic merge heads -m "merge"
+        desc: Połącz wiele aktywnych heads w jedno
+        detail:
+          what: Tworzy merge revision łączącą wszystkie aktywne heads. Merge revision ma down_revision jako krotkę.
+          how: Uruchom gdy alembic heads pokazuje wiele heads. Wygenerowany plik merge ma puste upgrade/downgrade.
+          tips:
+            - "alembic merge a1b2c3 d4e5f6 -m 'merge branches' — merge konkretnych heads"
+            - "Merge revision commituj do git razem z oryginalnymi migracjami"
+      - cmd: alembic check
+        desc: Sprawdź czy są niezaaplikowane zmiany modeli (CI/CD)
+        detail:
+          what: Porównuje modele SQLAlchemy z bazą danych i zwraca błąd (exit code != 0) jeśli są zmiany bez migracji.
+          how: Używaj w pipeline CI/CD — jeśli developer zapomniał wygenerować migrację, CI/CD to wykryje.
+          tips:
+            - "Dodaj do pre-commit hooks lub CI pipeline"
+            - "alembic check — exit 0 = ok, exit 1 = są niezaaplikowane zmiany modeli"

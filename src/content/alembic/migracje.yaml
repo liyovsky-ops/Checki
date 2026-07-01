@@ -1,0 +1,122 @@
+items:
+  - name: Generowanie migracji — autogenerate
+    desc: >
+      alembic revision --autogenerate porównuje modele SQLAlchemy z aktualnym stanem bazy
+      i generuje plik migracji. Zawsze przejrzyj wygenerowany plik przed uruchomieniem —
+      autogenerate nie jest nieomylne.
+    code: |
+      # Generuj migrację automatycznie z modeli SQLAlchemy
+      alembic revision --autogenerate -m "add users table"
+
+      # Generuj pustą migrację (piszesz ręcznie)
+      alembic revision -m "custom data migration"
+
+      # Plik tworzony w migrations/versions/a1b2c3d4_add_users_table.py
+
+  - name: Struktura pliku migracji
+    desc: >
+      Każdy plik migracji ma unikalny revision ID i down_revision wskazujący na poprzednią
+      wersję — tak budowany jest łańcuch historii. Funkcje upgrade() i downgrade() muszą
+      być odwrotnością siebie nawzajem.
+    code: |
+      """add users table
+
+      Revision ID: a1b2c3d4e5f6
+      Revises: 9f8e7d6c5b4a
+      Create Date: 2024-01-15 10:30:00
+      """
+      from alembic import op
+      import sqlalchemy as sa
+
+      # Powiązanie z poprzednią migracją
+      revision = 'a1b2c3d4e5f6'
+      down_revision = '9f8e7d6c5b4a'
+      branch_labels = None
+      depends_on = None
+
+      def upgrade() -> None:
+          op.create_table(
+              'users',
+              sa.Column('id', sa.Integer(), primary_key=True),
+              sa.Column('email', sa.String(255), nullable=False),
+              sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
+          )
+
+      def downgrade() -> None:
+          op.drop_table('users')
+
+  - name: Operacje na tabelach i kolumnach
+    desc: >
+      Moduł op (alembic.op) dostarcza wszystkich operacji DDL: tworzenie/usuwanie tabel,
+      dodawanie/usuwanie kolumn, zmiany typów. Każda operacja ma swój odpowiednik w downgrade.
+    code: |
+      from alembic import op
+      import sqlalchemy as sa
+
+      def upgrade() -> None:
+          # Dodaj kolumnę do istniejącej tabeli
+          op.add_column('users',
+              sa.Column('username', sa.String(100), nullable=True)
+          )
+
+          # Usuń kolumnę
+          op.drop_column('users', 'old_field')
+
+          # Zmień typ kolumny (wymaga compare_type=True w env.py)
+          op.alter_column('users', 'email',
+              type_=sa.String(500),
+              existing_type=sa.String(255)
+          )
+
+          # Zmień nullable
+          op.alter_column('users', 'username', nullable=False)
+
+  - name: Indeksy i klucze obce
+    desc: >
+      Alembic obsługuje tworzenie indeksów, unikalnych ograniczeń i kluczy obcych.
+      Nazwy indeksów muszą być unikalne w bazie — używaj konwencji np. ix_tabela_kolumna.
+    code: |
+      from alembic import op
+      import sqlalchemy as sa
+
+      def upgrade() -> None:
+          # Utwórz indeks
+          op.create_index('ix_users_email', 'users', ['email'], unique=True)
+
+          # Usuń indeks
+          op.drop_index('ix_users_old', table_name='users')
+
+          # Klucz obcy
+          op.create_foreign_key(
+              'fk_posts_user_id',  # nazwa constraintu
+              'posts',             # tabela źródłowa
+              'users',             # tabela docelowa
+              ['user_id'],         # kolumna źródłowa
+              ['id']               # kolumna docelowa
+          )
+
+          # Usuń klucz obcy
+          op.drop_constraint('fk_posts_user_id', 'posts', type_='foreignkey')
+
+  - name: Raw SQL i batch_alter_table
+    desc: >
+      op.execute() pozwala uruchamiać surowy SQL gdy operacje DDL nie wystarczają.
+      batch_alter_table jest wymagany dla SQLite, który ma ograniczone wsparcie ALTER TABLE —
+      Alembic odtwarza wtedy całą tabelę.
+    code: |
+      from alembic import op
+
+      def upgrade() -> None:
+          # Surowy SQL — migracje danych, niestandardowe operacje
+          op.execute("UPDATE users SET role = 'user' WHERE role IS NULL")
+          op.execute("""
+              INSERT INTO settings (key, value)
+              VALUES ('version', '2.0')
+          """)
+
+          # SQLite: batch_alter_table zamiast alter_column
+          with op.batch_alter_table('users') as batch_op:
+              batch_op.add_column(sa.Column('age', sa.Integer(), nullable=True))
+              batch_op.drop_column('legacy_field')
+              batch_op.alter_column('name', nullable=False)
+          # Alembic: CREATE TABLE tmp → INSERT → DROP → RENAME

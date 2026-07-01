@@ -1,0 +1,118 @@
+items:
+  - name: Downloader Middleware — process_request/response
+    desc: >
+      Downloader Middleware przechwytuje requesty przed wysłaniem i odpowiedzi przed
+      przekazaniem do spidera. process_request() może modyfikować request lub zwrócić
+      Response (shortcircuit). process_response() modyfikuje lub zastępuje odpowiedź.
+    code: |
+      # middlewares.py
+
+      class CustomHeadersMiddleware:
+          """Dodaj niestandardowe nagłówki do każdego requestu"""
+
+          def process_request(self, request, spider):
+              request.headers["Accept-Language"] = "pl-PL,pl;q=0.9"
+              request.headers["Accept"] = "text/html,application/xhtml+xml"
+              # Zwróć None = kontynuuj normalnie
+              return None
+
+          def process_response(self, request, response, spider):
+              # Odrzuć strony z błędem 404
+              if response.status == 404:
+                  spider.logger.warning(f"404: {request.url}")
+                  raise scrapy.exceptions.IgnoreRequest()
+              return response
+
+          def process_exception(self, request, exception, spider):
+              # Loguj wyjątki i pozwól Scrapy obsłużyć retry
+              spider.logger.error(f"Error downloading {request.url}: {exception}")
+              return None  # None = Scrapy obsłuży normalnie
+
+      # settings.py
+      DOWNLOADER_MIDDLEWARES = {
+          "myproject.middlewares.CustomHeadersMiddleware": 543,
+      }
+
+  - name: Random User-Agent middleware
+    desc: >
+      Rotacja User-Agent pomaga unikać blokad — strony często blokują stały UA scraperów.
+      Middleware losuje UA z listy przy każdym requeście. Biblioteka scrapy-fake-useragent
+      ma gotową implementację z aktualną listą przeglądarek.
+    code: |
+      import random
+
+      # Własna implementacja rotacji User-Agent
+      class RandomUserAgentMiddleware:
+          USER_AGENTS = [
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0",
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/537.36",
+              "Mozilla/5.0 (X11; Linux x86_64) Firefox/121.0",
+              "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Mobile/15E148",
+          ]
+
+          def process_request(self, request, spider):
+              request.headers["User-Agent"] = random.choice(self.USER_AGENTS)
+
+      # Alternatywnie — scrapy-fake-useragent (polecane, automatycznie aktualizuje listę):
+      # pip install scrapy-fake-useragent
+      # settings.py:
+      # DOWNLOADER_MIDDLEWARES = {
+      #     "scrapy.downloadermiddlewares.useragent.UserAgentMiddleware": None,  # wyłącz domyślny
+      #     "scrapy_fake_useragent.middleware.RandomUserAgentMiddleware": 400,
+      # }
+      # FAKEUSERAGENT_PROVIDERS = ["scrapy_fake_useragent.providers.FakerProvider"]
+
+  - name: Proxy middleware — rotacja IP
+    desc: >
+      HttpProxyMiddleware wbudowany w Scrapy obsługuje proxy przez request.meta["proxy"].
+      Własny middleware może rotować listę proxy przy każdym requeście. Dla produkcji
+      rozważ usługi proxy jak Bright Data, Oxylabs lub scrapy-rotating-proxies.
+    code: |
+      import random
+
+      class RotatingProxyMiddleware:
+          """Rotuj przez listę proxy"""
+
+          PROXIES = [
+              "http://proxy1.example.com:8080",
+              "http://proxy2.example.com:8080",
+              "http://user:pass@proxy3.example.com:3128",
+          ]
+
+          def process_request(self, request, spider):
+              request.meta["proxy"] = random.choice(self.PROXIES)
+
+      # Wbudowany HttpProxyMiddleware — proxy przez zmienną środowiskową:
+      # HTTP_PROXY=http://proxy.example.com:8080 scrapy crawl myspider
+
+      # Alternatywnie w settings.py:
+      # HTTPPROXY_ENABLED = True
+      # Lub per-request w spider:
+      # yield scrapy.Request(url, meta={"proxy": "http://proxy.example.com:8080"})
+
+  - name: RetryMiddleware i ustawienia opóźnień
+    desc: >
+      Scrapy ma wbudowany RetryMiddleware — automatycznie ponawia requesty dla kodów 500, 502,
+      503 i timeoutów. Konfiguruj DOWNLOAD_DELAY i AUTOTHROTTLE żeby nie przeciążać serwera
+      i unikać blokad przez zbyt szybkie requesty.
+    code: |
+      # settings.py — konfiguracja retry i opóźnień
+
+      # Retry wbudowany
+      RETRY_ENABLED = True
+      RETRY_TIMES = 3                   # liczba prób
+      RETRY_HTTP_CODES = [500, 502, 503, 504, 408, 429]
+
+      # Opóźnienia między requestami (etykieta scrapy'ego)
+      DOWNLOAD_DELAY = 1.0              # 1 sekunda między requestami (per domain)
+      RANDOMIZE_DOWNLOAD_DELAY = True   # losowe 0.5*DELAY do 1.5*DELAY
+
+      # AutoThrottle — automatyczne dostosowanie tempa
+      AUTOTHROTTLE_ENABLED = True
+      AUTOTHROTTLE_START_DELAY = 1.0    # startowe opóźnienie
+      AUTOTHROTTLE_MAX_DELAY = 60.0     # maksymalne opóźnienie
+      AUTOTHROTTLE_TARGET_CONCURRENCY = 2.0  # ile równoległych requestów na serwer
+
+      # Concurrent requests
+      CONCURRENT_REQUESTS = 16          # globalne maximum równoległych requestów
+      CONCURRENT_REQUESTS_PER_DOMAIN = 2  # per domena

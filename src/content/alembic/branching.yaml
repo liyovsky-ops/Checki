@@ -1,0 +1,113 @@
+items:
+  - name: Tworzenie niezależnej gałęzi
+    desc: >
+      Branching w Alembic pozwala tworzyć niezależne linie migracji — np. osobne dla
+      różnych modułów aplikacji lub przy pracy równoległej w zespole. Gałąź tworzy się
+      przez wskazanie --head base lub innego punktu startowego.
+    code: |
+      # Utwórz migrację jako nową gałąź (nie powiązaną z obecnym head)
+      alembic revision --head base -m "separate branch"
+
+      # Utwórz gałąź od konkretnej wersji
+      alembic revision --head a1b2c3d4e5f6 -m "feature branch"
+
+      # Nadaj etykietę gałęzi (branch label)
+      alembic revision --head base --branch-label auth -m "auth schema"
+
+      # Teraz możesz applicować konkretną gałąź:
+      alembic upgrade auth@head
+
+  - name: Merge heads — łączenie gałęzi
+    desc: >
+      Gdy projekt ma wiele aktywnych heads (np. po pracy równoległej), musisz je złączyć
+      przed deploymentem. alembic merge tworzy specjalną "merge revision" która ma dwa
+      down_revision — wskazuje na oba heads.
+    code: |
+      # Pokaż wszystkie aktywne heads
+      alembic heads
+      # Output:
+      # a1b2c3d4e5f6 (head)
+      # b2c3d4e5f6a1 (head)
+
+      # Połącz dwa heads w jedną migrację
+      alembic merge -m "merge feature branches" a1b2c3d4e5f6 b2c3d4e5f6a1
+
+      # Połącz wszystkie heads automatycznie
+      alembic merge heads -m "merge all heads"
+
+      # Teraz jest jeden head — merge revision
+      alembic upgrade head
+
+  - name: down_revision jako tuple — merge point
+    desc: >
+      Merge revision ma down_revision ustawiony jako tuple (krotka) wskazującą na obie
+      gałęzie. Plik wygenerowany przez alembic merge jest zwykle pusty — upgrade i downgrade
+      nie mają operacji DDL, tylko łączą historię.
+    code: |
+      """merge feature branches
+
+      Revision ID: c3d4e5f6a1b2
+      Revises: a1b2c3d4e5f6, b2c3d4e5f6a1
+      Create Date: 2024-01-20 14:00:00
+      """
+      from alembic import op
+
+      # KLUCZOWE: down_revision jako krotka dla merge point
+      revision = 'c3d4e5f6a1b2'
+      down_revision = ('a1b2c3d4e5f6', 'b2c3d4e5f6a1')
+      branch_labels = None
+      depends_on = None
+
+      def upgrade() -> None:
+          # Zwykle pusta — merge tylko łączy historię
+          pass
+
+      def downgrade() -> None:
+          # Zwykle pusta
+          pass
+
+  - name: Branch labels — etykietowanie gałęzi
+    desc: >
+      Branch labels to nazwy symboliczne dla gałęzi — pozwalają upgradować/downgradować
+      konkretną gałąź bez podawania revision ID. Szczególnie przydatne w projektach
+      z wieloma modułami mającymi własne migracje.
+    code: |
+      # Utwórz gałąź z etykietą
+      alembic revision --head base --branch-label payments -m "payments schema"
+
+      # Aplikuj konkretną gałąź
+      alembic upgrade payments@head
+
+      # Cofnij konkretną gałąź
+      alembic downgrade payments@base
+
+      # Sprawdź stan gałęzi
+      alembic current
+      # Output: a1b2c3d4 (payments) (head)
+      #         b2c3d4e5 (core) (head)
+
+      # Merge po skończeniu pracy nad gałęzią
+      alembic merge payments@head core@head -m "merge payments into core"
+
+  - name: Konflikty — praca zespołowa
+    desc: >
+      W pracy zespołowej, gdy dwóch developerów stworzyło migracje od tego samego head,
+      powstają dwa heads. Standardowy workflow: pull, wykryj multiple heads, zrób merge,
+      przetestuj, commituj merge revision.
+    code: |
+      # Sytuacja: po git pull masz dwa heads
+      alembic heads
+      # a1b2c3d4 (head) — Twoja migracja
+      # b2c3d4e5 (head) — migracja kolegi
+
+      # Rozwiązanie 1: merge (zalecane)
+      alembic merge heads -m "merge concurrent migrations"
+      alembic upgrade head  # aplikuje obie + merge
+
+      # Rozwiązanie 2: rebaza ręczna
+      # Edytuj plik swojej migracji:
+      # down_revision = 'b2c3d4e5'  # wskaż na migrację kolegi
+
+      # Weryfikacja — jeden head:
+      alembic heads
+      # c3d4e5f6 (head) ✓

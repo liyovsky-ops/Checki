@@ -1,0 +1,119 @@
+items:
+  - name: Spider — podstawowa klasa
+    desc: >
+      Spider to serce scrapera — definiuje start_urls i metodę parse() która przetwarza
+      odpowiedź HTTP. Z parse() yielduj Items (dane) lub Request (kolejne URL do odwiedzenia).
+      Scrapy automatycznie kolejkuje i przetwarza oba typy.
+    code: |
+      import scrapy
+
+      class BooksSpider(scrapy.Spider):
+          name = "books"                          # unikalna nazwa — używana w scrapy crawl
+          allowed_domains = ["books.toscrape.com"]
+          start_urls = ["https://books.toscrape.com"]
+
+          def parse(self, response):
+              # Parsuj dane z każdej strony
+              for book in response.css("article.product_pod"):
+                  yield {
+                      "title": book.css("h3 a::attr(title)").get(),
+                      "price": book.css(".price_color::text").get(),
+                      "rating": book.css("p.star-rating::attr(class)").get(),
+                  }
+
+              # Podążaj za linkiem "next" — paginacja
+              next_page = response.css("li.next a::attr(href)").get()
+              if next_page:
+                  yield response.follow(next_page, callback=self.parse)
+
+  - name: CrawlSpider — automatyczny crawling z regułami
+    desc: >
+      CrawlSpider rozszerza Spider o system reguł — automatycznie odkrywa i podąża za
+      linkami pasującymi do wzorców. Idealne do crawlowania całych serwisów bez ręcznego
+      zarządzania kolejką URL.
+    code: |
+      from scrapy.spiders import CrawlSpider, Rule
+      from scrapy.linkextractors import LinkExtractor
+
+      class ShopCrawler(CrawlSpider):
+          name = "shop_crawler"
+          allowed_domains = ["example-shop.com"]
+          start_urls = ["https://example-shop.com"]
+
+          rules = (
+              # Podążaj za linkami kategorii (nie parsuj)
+              Rule(LinkExtractor(allow=r"/category/"), follow=True),
+
+              # Parsuj strony produktów
+              Rule(
+                  LinkExtractor(allow=r"/product/\d+"),
+                  callback="parse_product",
+              ),
+          )
+
+          def parse_product(self, response):
+              yield {
+                  "name": response.css("h1.product-title::text").get(),
+                  "price": response.css(".price::text").get(),
+                  "url": response.url,
+              }
+
+  - name: SitemapSpider — scrapowanie z sitemap.xml
+    desc: >
+      SitemapSpider czyta sitemap.xml lub robots.txt i automatycznie odwiedza wszystkie
+      URL ze strony. Idealny gdy strona ma dobrze utrzymany sitemap — zero ręcznego
+      zarządzania URL.
+    code: |
+      from scrapy.spiders import SitemapSpider
+
+      class BlogSpider(SitemapSpider):
+          name = "blog"
+          # Scrapy automatycznie wykryje sitemap z robots.txt
+          sitemap_urls = ["https://blog.example.com/robots.txt"]
+
+          # Filtruj tylko artykuły (opcjonalne)
+          sitemap_rules = [
+              ("/blog/", "parse_article"),  # URL zawiera /blog/ → parse_article
+              ("/", "parse_page"),          # reszta → parse_page
+          ]
+
+          def parse_article(self, response):
+              yield {
+                  "url": response.url,
+                  "title": response.css("h1::text").get(),
+                  "content": response.css("article p::text").getall(),
+                  "published": response.css("time::attr(datetime)").get(),
+              }
+
+  - name: Request z meta i callbackami
+    desc: >
+      Request() pozwala przekazywać dane między callbackami przez meta dict. Przydatne
+      gdy scrapejesz listę (ID, tytuł) i szczegóły (osobna strona) — łączysz dane
+      z obu stron przez meta.
+    code: |
+      import scrapy
+
+      class ProductSpider(scrapy.Spider):
+          name = "products"
+          start_urls = ["https://example.com/products"]
+
+          def parse(self, response):
+              for product in response.css(".product"):
+                  url = product.css("a::attr(href)").get()
+                  name = product.css(".name::text").get()
+
+                  # Przekaż dane do następnego callbacku przez meta
+                  yield scrapy.Request(
+                      url=response.urljoin(url),
+                      callback=self.parse_detail,
+                      meta={"product_name": name},    # dane z listy
+                  )
+
+          def parse_detail(self, response):
+              # Pobierz dane przekazane z poprzedniej strony
+              name = response.meta["product_name"]
+              yield {
+                  "name": name,
+                  "description": response.css(".desc::text").get(),
+                  "price": response.css(".price::text").get(),
+              }

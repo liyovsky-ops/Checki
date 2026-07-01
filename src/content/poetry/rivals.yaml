@@ -1,0 +1,80 @@
+title: Poetry vs inne narzędzia do zarządzania pakietami Python
+
+items:
+  - name: pip + venv
+    icon: "🐍"
+    color: "#3572a5"
+    tagline: Standardowe narzędzia Python — wbudowane, proste, bez lock file
+    pros:
+      - Wbudowane w Python — zero dodatkowej instalacji
+      - Każdy Python developer zna pip i venv
+      - Najszersze wsparcie narzędzi i dokumentacji
+      - Wystarczające dla prostych projektów
+    cons:
+      - Brak lock file — requirements.txt nie gwarantuje deterministycznych instalacji
+      - Brak zarządzania grupami zależności (dev/test/prod)
+      - Osobne narzędzia do budowania i publikowania (twine, build)
+      - pip install requirements.txt może dać różne wyniki na różnych maszynach
+    vs: pip+venv = gdy potrzebujesz minimum lub pracujesz z legacy kodem. Poetry = gdy chcesz lock file, grupy zależności i zarządzanie środowiskiem w jednym narzędziu. Do nowych projektów Poetry wygrywa.
+
+  - name: uv
+    icon: "⚡"
+    color: "#DE5FE9"
+    tagline: Rust-based package manager — 10-100x szybszy od pip, nowy standard
+    pros:
+      - Ekstremalnie szybki — Rust, 10-100x szybszy od pip
+      - Drop-in replacement dla pip, venv, pip-tools
+      - uv lock = lock file jak poetry.lock, ale szybszy
+      - Obsługuje pyproject.toml, requirements.txt, pip install
+      - Rozwijany przez Astral (twórcy ruff)
+    cons:
+      - Młodszy projekt — mniej stabilne API niż Poetry
+      - Niektóre zaawansowane funkcje Poetry (build, publish) są w trakcie rozwoju
+      - Mniejsza społeczność niż Poetry (choć szybko rośnie)
+    vs: uv jest przyszłością zarządzania pakietami Python i staje się nowym standardem. Jeśli szybkość jest priorytetem — uv. Dla stabilnego, dojrzałego narzędzia z build+publish — Poetry. W 2025+ wiele projektów migruje do uv.
+
+  - name: PDM
+    icon: "🔧"
+    color: "#F5A623"
+    tagline: PEP 582 package manager — podobny do Poetry, bez venv
+    pros:
+      - Obsługa PEP 582 (__pypackages__/) — brak venv, pakiety w katalogu projektu
+      - Kompatybilny ze standardem PEP 517/518 (pyproject.toml)
+      - Grupy zależności jak Poetry
+      - Szybszy niż Poetry dla niektórych operacji
+    cons:
+      - PEP 582 nie został zaakceptowany do Pythona — PDM bez venv to dead-end
+      - Mniejsza społeczność niż Poetry
+      - Mniejszy ekosystem pluginów
+    vs: PDM i Poetry mają podobne koncepcje (pyproject.toml, lock file, grupy). Poetry ma większą społeczność i lepszy ekosystem. PDM = jeśli znasz i lubisz, ale nie ma powodu go preferować nad Poetry lub uv.
+
+  - name: Hatch
+    icon: "🥚"
+    color: "#009485"
+    tagline: Oficjalny Python packaging tool — wielokrotne środowiska, flexible
+    pros:
+      - Oficjalnie wspierany przez Python Packaging Authority (PyPA)
+      - Środowiska matrycowe (hatch run test:pytest) — testuj na wielu Python wersjach
+      - Wbudowany build backend (hatchling)
+      - Pluginowy system — rozszerzalny
+    cons:
+      - Bardziej skomplikowana konfiguracja niż Poetry
+      - Brak "batteries included" w stylu Poetry (poetry add/publish jest prostsze)
+      - Mniejsza popularność — mniej zasobów i przykładów
+    vs: Hatch = gdy budujesz bibliotekę wymagającą testowania na wielu Python wersjach lub chcesz oficjalnie wspierany tool. Poetry = prostszy UX dla codziennej pracy. Hatch ma przewagę przy CI matrycy.
+
+  - name: Pipenv
+    icon: "🗂️"
+    color: "#2E7D32"
+    tagline: Pipfile + Pipfile.lock — popularny ale wolny, ustępuje Poetry
+    pros:
+      - Pionier lock file w Pythonie (Pipfile.lock)
+      - Automatyczne zarządzanie venv
+      - pipenv run, pipenv shell — podobne do poetry run/shell
+      - Integracja z .env przez python-decouple
+    cons:
+      - Znacznie wolniejszy od Poetry i uv przy instalacji
+      - Pipfile.lock bywa niestabilny — różne wyniki na różnych maszynach
+      - Nieaktywny development przez długi czas (2019-2022)
+      - Brak wbudowanego build/publish pakietów
+    vs: Poetry zastąpiło Pipenv jako preferowane narzędzie. Pipenv = jeśli masz legacy projekt który już go używa. Do nowych projektów — Poetry lub uv. Nie zaczynaj nowego projektu z Pipenv.

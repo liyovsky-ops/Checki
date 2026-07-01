@@ -1,0 +1,125 @@
+items:
+  - name: Version constraints — operatory wersji
+    desc: >
+      Poetry używa semver constraints do definiowania akceptowanych wersji. Znak daszka (^)
+      to najczęściej używany operator — pozwala na minor/patch updates ale blokuje major.
+      Tylda (~) jest bardziej restrykcyjna — tylko patch updates.
+    code: |
+      # pyproject.toml — [tool.poetry.dependencies]
+
+      # ^ (caret) — kompatybilność semantyczna (najczęściej używany)
+      # ^1.2.3  → >=1.2.3 <2.0.0  (dowolny minor/patch update)
+      # ^0.2.3  → >=0.2.3 <0.3.0  (przed 1.0: tylko patch)
+      requests = "^2.31.0"
+
+      # ~ (tilde) — patch updates tylko
+      # ~1.2.3  → >=1.2.3 <1.3.0
+      fastapi = "~0.104.0"
+
+      # Dokładna wersja
+      python = "3.11.0"
+
+      # Zakres ręczny
+      sqlalchemy = ">=2.0,<3.0"
+
+      # Dowolna wersja (niezalecane dla produkcji)
+      httpx = "*"
+
+      # Tylko konkretne wersje
+      pytest = "7.4.0 || 7.4.1"
+
+  - name: Grupy zależności — dev, test, docs
+    desc: >
+      Poetry grupuje zależności — main (runtime), dev (development tools), test, docs.
+      poetry install --without dev pomija grupy nie potrzebne na produkcji.
+      Każda grupa to osobna sekcja w pyproject.toml i osobny atrybut w poetry add.
+    code: |
+      # pyproject.toml — grupy zależności
+
+      [tool.poetry.dependencies]
+      python = "^3.11"
+      fastapi = "^0.104.0"
+      sqlalchemy = "^2.0"
+
+      [tool.poetry.group.dev.dependencies]
+      pytest = "^7.4"
+      ruff = "^0.1"
+      mypy = "^1.0"
+      pre-commit = "^3.0"
+
+      [tool.poetry.group.test.dependencies]
+      pytest-cov = "^4.0"
+      httpx = "^0.25"   # do testowania FastAPI
+
+      [tool.poetry.group.docs.dependencies]
+      mkdocs = "^1.5"
+      mkdocs-material = "^9.0"
+
+      # --- Komendy ---
+      # Zainstaluj wszystko (łącznie z dev):
+      # poetry install
+
+      # Zainstaluj tylko runtime (produkcja):
+      # poetry install --only main
+
+      # Pomiń konkretną grupę:
+      # poetry install --without docs
+
+  - name: Extras — opcjonalne zależności
+    desc: >
+      Extras pozwalają instalować opcjonalne rozszerzenia pakietu. Przydatne gdy biblioteka
+      ma dużo opcjonalnych backendsów (np. requests[security] dodaje SSL, cryptography).
+      Sam możesz definiować extras dla swojego pakietu.
+    code: |
+      # Instalacja z extras (CLI)
+      poetry add "requests[security]"
+      poetry add "celery[redis,mongodb]"
+      poetry add "pydantic[email]"
+
+      # W pyproject.toml — extras do Twoich zależności:
+      [tool.poetry.dependencies]
+      python = "^3.11"
+      requests = {version = "^2.31", extras = ["security"]}
+      celery = {version = "^5.3", extras = ["redis"]}
+
+      # Definiowanie własnych extras dla Twojego pakietu:
+      [tool.poetry.extras]
+      redis = ["redis"]
+      postgres = ["asyncpg", "psycopg2-binary"]
+      all = ["redis", "asyncpg", "psycopg2-binary"]
+
+      [tool.poetry.dependencies]
+      redis = {version = "^4.6", optional = true}
+      asyncpg = {version = "^0.29", optional = true}
+
+      # Użytkownik instaluje:
+      # pip install mypackage[redis]
+      # pip install mypackage[all]
+
+  - name: Platform-specific i Python version constraints
+    desc: >
+      Poetry pozwala definiować zależności specyficzne dla systemu operacyjnego lub wersji
+      Pythona. Przydatne dla bibliotek które mają różne implementacje na Windows/Linux
+      lub wymagają konkretnej wersji Pythona.
+    code: |
+      # pyproject.toml — platform i python markers
+
+      [tool.poetry.dependencies]
+      python = "^3.11"
+
+      # Tylko na Windows
+      pywin32 = {version = "^306", markers = "sys_platform == 'win32'"}
+
+      # Tylko na Linux/Mac
+      uvloop = {version = "^0.19", markers = "sys_platform != 'win32'"}
+
+      # Tylko dla konkretnej wersji Pythona
+      tomllib = {version = "^2.0", python = "<3.11"}
+      # (w Python 3.11+ tomllib jest w stdlib)
+
+      # Kombinacja: Python 3.12+ i nie Windows
+      some-lib = {version = "^1.0", python = ">=3.12", markers = "sys_platform != 'win32'"}
+
+      # Wersja Python wymagana przez projekt
+      python = "^3.11"   # Python 3.11+, <4.0
+      python = ">=3.9,<3.13"  # dokładny zakres
