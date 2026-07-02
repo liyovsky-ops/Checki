@@ -1,0 +1,114 @@
+title: CI/CD i integracje
+labels:
+  section: Integracja
+  example: Przykład
+
+intro: >
+  Ruff jest zaprojektowany do CI — exit code 1 gdy są błędy, 0 gdy OK. Szybkość <1s
+  na typowy projekt nie spowalnia pipeline'u. Oficjalny pre-commit hook, GitHub Action
+  i integracje z VS Code, PyCharm, neovim.
+
+items:
+  - name: GitHub Actions
+    desc: >
+      Ruff w GitHub Actions przez `uv run ruff` lub bezpośrednio. `--check` i `--output-format`
+      pozwalają zintegrować z GitHub Annotations (podświetlenia w PR).
+    code: |
+      # .github/workflows/lint.yml
+      # name: Lint
+      # on: [push, pull_request]
+      # jobs:
+      #   ruff:
+      #     runs-on: ubuntu-latest
+      #     steps:
+      #       - uses: actions/checkout@v4
+      #       - uses: astral-sh/setup-uv@v4
+      #
+      #       - name: Install deps
+      #         run: uv sync --frozen
+      #
+      #       - name: Ruff lint
+      #         run: uv run ruff check --output-format=github .
+      #
+      #       - name: Ruff format check
+      #         run: uv run ruff format --check .
+
+      # --output-format=github → GitHub Annotations (komentarze w PR!)
+      # exit code 1 = job failure, 0 = sukces
+
+  - name: pre-commit hook
+    desc: >
+      Oficjalny hook `astral-sh/ruff-pre-commit` uruchamia ruff check i ruff format
+      przed każdym commitem. Szybkość Ruffa (<100ms) nie spowalnia git commit.
+    code: |
+      # .pre-commit-config.yaml
+      # repos:
+      #   - repo: https://github.com/astral-sh/ruff-pre-commit
+      #     rev: v0.8.0           # sprawdź aktualną wersję
+      #     hooks:
+      #       - id: ruff           # linting
+      #         args: [--fix]      # auto-fix co się da
+      #       - id: ruff-format    # formatowanie
+
+      # Instalacja pre-commit
+      uvx pre-commit install        # instaluj hooki
+      uvx pre-commit run --all-files  # uruchom na wszystkich plikach
+
+      # Sprawdź aktualną wersję ruff-pre-commit:
+      # https://github.com/astral-sh/ruff-pre-commit/releases
+
+  - name: VS Code
+    desc: >
+      Ruff ma oficjalne rozszerzenie VS Code (astral-sh.ruff). Zastępuje pylint,
+      flake8 i black w VS Code. Auto-fix przy zapisie i formatowanie on save.
+    code: |
+      # settings.json — VS Code
+      # {
+      #   "[python]": {
+      #     "editor.defaultFormatter": "charliermarsh.ruff",
+      #     "editor.formatOnSave": true,
+      #     "editor.codeActionsOnSave": {
+      #       "source.fixAll.ruff": "explicit",
+      #       "source.organizeImports.ruff": "explicit"
+      #     }
+      #   },
+      #   "ruff.lint.enable": true,
+      #   "ruff.format.enable": true
+      # }
+
+      # Instalacja rozszerzenia VS Code:
+      # Extensions → szukaj "Ruff" (astral-sh.ruff)
+      # Lub: code --install-extension charliermarsh.ruff
+
+      # Wyłącz stare rozszerzenia gdy używasz Ruff:
+      # Wyłącz: pylint, flake8, black formatter
+
+  - name: Makefile i skrypty lokalne
+    desc: >
+      Typowe polecenia Makefile dla projektu z Ruff. Jeden target `check` który
+      uruchamia lint + format check. Target `fix` który naprawia automatycznie.
+    code: |
+      # Makefile
+      # .PHONY: lint format fix check
+      #
+      # lint:
+      #     uv run ruff check .
+      #
+      # format:
+      #     uv run ruff format .
+      #
+      # fix:
+      #     uv run ruff check --fix .
+      #     uv run ruff format .
+      #
+      # check:          # CI-ready (nie zmienia plików)
+      #     uv run ruff check .
+      #     uv run ruff format --check .
+
+      # Uruchamianie:
+      make lint        # sprawdź błędy
+      make fix         # napraw wszystko automatycznie
+      make check       # sprawdź bez zmian (CI)
+
+      # Bez Makefile — jeden-liner:
+      uv run ruff check --fix . && uv run ruff format .

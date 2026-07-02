@@ -1,0 +1,95 @@
+title: Podstawy
+labels:
+  section: Temat
+  example: Przykład
+
+intro: >
+  Ruff = linter + formatter dla Pythona, napisany w Rust. Zastępuje flake8, isort, pyupgrade, bandit
+  i black w jednym narzędziu. 10-100x szybszy od odpowiedników w Pythonie. Zero konfiguracji
+  wymagana — ruff check . działa od razu.
+
+items:
+  - name: Instalacja i pierwsze uruchomienie
+    desc: >
+      Ruff instaluje się przez pip, uv lub jako globalne narzędzie. Nie wymaga konfiguracji
+      do pierwszego uruchomienia — domyślnie stosuje bezpieczny zestaw reguł (E, F).
+    code: |
+      # Instalacja
+      pip install ruff           # przez pip
+      uv add --dev ruff          # przez uv (zalecane)
+      uvx ruff check .           # jednorazowo bez instalacji
+      uv tool install ruff       # globalnie (jak pipx)
+
+      # Pierwsze uruchomienie
+      ruff check .               # sprawdź błędy w projekcie
+      ruff check src/            # sprawdź konkretny katalog
+      ruff check app.py          # sprawdź jeden plik
+      ruff check --fix .         # napraw automatycznie co się da
+      ruff format .              # sformatuj kod (jak black)
+
+      # Sprawdź wersję
+      ruff --version
+
+  - name: Co zastępuje Ruff
+    desc: >
+      Ruff zastępuje kompletny stos narzędzi do lintowania i formatowania. Jeden `ruff check .`
+      to odpowiednik uruchomienia flake8 + isort + pyupgrade + pydocstyle + bandit w jednym kroku.
+    code: |
+      # Stary stos:
+      flake8 .           # linting PEP 8
+      isort .            # sortowanie importów
+      pyupgrade --py39-plus .    # modernizacja składni
+      bandit -r .        # bezpieczeństwo
+      black .            # formatowanie
+      pylint .           # głębszy linting
+
+      # Nowy sposób z Ruff:
+      ruff check .       # zastępuje flake8 + isort + pyupgrade + bandit + pylint
+      ruff format .      # zastępuje black
+
+      # Statystyki:
+      # flake8: ~20ms, isort: ~300ms, black: ~500ms per file
+      # Ruff: <1s na cały projekt (10x-100x szybciej)
+
+  - name: Integracja z pyproject.toml
+    desc: >
+      Ruff konfiguruje się w pyproject.toml (sekcja [tool.ruff]) lub w ruff.toml.
+      Minimalna konfiguracja to wybór wersji Pythona — reguły i inne opcje są opcjonalne.
+    code: |
+      # pyproject.toml (minimalna konfiguracja)
+      # [tool.ruff]
+      # target-version = "py312"
+      # line-length = 120  # domyślnie 88 (jak black)
+
+      # Lub ruff.toml (plik dedykowany)
+      # target-version = "py312"
+      # line-length = 88
+
+      # Sprawdź aktualną konfigurację
+      ruff check --show-settings .
+
+      # Jakie reguły są aktywne?
+      ruff rule --all | head -50
+
+  - name: Pre-commit i CI
+    desc: >
+      Ruff działa idealnie jako pre-commit hook i w CI. Szybkość (<1s) nie spowalnia
+      workflow. Oficjalny hook w repozytorium astral-sh/ruff-pre-commit.
+    code: |
+      # .pre-commit-config.yaml
+      # repos:
+      #   - repo: https://github.com/astral-sh/ruff-pre-commit
+      #     rev: v0.8.0
+      #     hooks:
+      #       - id: ruff             # linting + autofixes
+      #         args: [--fix]
+      #       - id: ruff-format      # formatowanie
+
+      # GitHub Actions:
+      # - name: Ruff lint
+      #   run: uv run ruff check .
+      # - name: Ruff format check
+      #   run: uv run ruff format --check .
+
+      # Instalacja pre-commit z uvx:
+      uvx pre-commit install

@@ -1,0 +1,103 @@
+title: Zarządzanie wersjami Pythona
+labels:
+  section: Feature
+  example: Przykład
+
+intro: >
+  uv zastępuje pyenv — potrafi pobierać i zarządzać wieloma wersjami Pythona bez
+  zewnętrznych narzędzi. `uv python install 3.12` pobiera Pythona z CPython builds
+  skompilowanych przez Astral. .python-version w projekcie definiuje wersję automatycznie.
+
+items:
+  - name: Instalacja Pythona
+    desc: >
+      `uv python install` pobiera precompilowane binaria Pythona — szybciej niż
+      kompilacja przez pyenv. Obsługuje wiele wersji jednocześnie. Wersje przechowywane
+      w ~/.local/share/uv/python/ (nie nadpisują systemowego Pythona).
+    code: |
+      # Zainstaluj konkretną wersję
+      uv python install 3.12
+      uv python install 3.11.9
+      uv python install 3.13
+
+      # Zainstaluj wiele wersji naraz
+      uv python install 3.11 3.12 3.13
+
+      # Lista dostępnych do instalacji
+      uv python list --all-versions
+
+      # Lista zainstalowanych
+      uv python list
+
+      # Gdzie jest zainstalowany?
+      uv python find 3.12
+      # → /home/user/.local/share/uv/python/cpython-3.12.8-.../bin/python
+
+  - name: .python-version — pin wersji projektu
+    desc: >
+      Plik .python-version (jeden wiersz z numerem wersji) pinuje wersję Pythona
+      dla projektu. uv automatycznie używa tej wersji przy uv venv, uv run, uv sync.
+      Kompatybilny z pyenv — oba narzędzia rozumieją ten plik.
+    code: |
+      # Ustaw wersję dla projektu
+      uv python pin 3.12
+      # tworzy plik .python-version z zawartością "3.12"
+
+      cat .python-version
+      # → 3.12
+
+      # uv automatycznie używa tej wersji:
+      uv venv           # tworzy venv z Python 3.12
+      uv run python     # uruchamia Python 3.12
+      uv sync           # instaluje z Python 3.12
+
+      # Override wersji (jednorazowo)
+      uv run --python 3.11 python --version
+
+  - name: Pinning w pyproject.toml
+    desc: >
+      `requires-python` w pyproject.toml definiuje jakie wersje są wspierane.
+      `uv python pin` ustawia konkretną wersję do użycia. Te dwa ustawienia
+      działają razem — pin musi spełniać requires-python constraint.
+    code: |
+      # pyproject.toml
+      # [project]
+      # requires-python = ">=3.11"  # wspieramy 3.11+
+      # (uv.lock pinuje konkretną wersję)
+
+      # Pin do konkretnej wersji (development)
+      uv python pin 3.12.3
+
+      # Zakres (bardziej elastyczny dla CI)
+      uv python pin ">=3.11,<3.14"
+
+      # Sprawdź aktualny pin
+      cat .python-version
+
+      # uv znajdzie odpowiednią zainstalowaną wersję automatycznie
+      uv sync  # użyje 3.12.3 jeśli zainstalowana, lub pobierze
+
+  - name: Użycie z tox i pytest (multi-version testing)
+    desc: >
+      uv świetnie nadaje się do testowania na wielu wersjach Pythona.
+      `uv run --python 3.11 pytest` uruchamia testy z konkretną wersją.
+      Można zastąpić tox przez prosty skrypt lub Makefile.
+    code: |
+      # Testuj na wielu wersjach bez tox
+      uv python install 3.11 3.12 3.13
+
+      uv run --python 3.11 pytest tests/
+      uv run --python 3.12 pytest tests/
+      uv run --python 3.13 pytest tests/
+
+      # Makefile target
+      # test-all:
+      #     uv run --python 3.11 pytest tests/
+      #     uv run --python 3.12 pytest tests/
+      #     uv run --python 3.13 pytest tests/
+
+      # GitHub Actions z uv
+      # - uses: astral-sh/setup-uv@v4
+      # - run: uv python install 3.12
+      # - run: uv sync --frozen
+      # - run: uv run pytest

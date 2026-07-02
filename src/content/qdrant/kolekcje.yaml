@@ -1,0 +1,141 @@
+items:
+  - name: Tworzenie kolekcji
+    desc: >
+      create_collection() definiuje schemat wektorów — size (wymiarowość) i distance (metryka podobieństwa).
+      Size musi pasować do modelu embeddings — OpenAI 1536, all-MiniLM-L6-v2 → 384, BGE-large → 1024.
+    code: |
+      from qdrant_client import QdrantClient
+      from qdrant_client.models import Distance, VectorParams
+
+      client = QdrantClient(url="http://localhost:6333")
+
+      # Kolekcja dla OpenAI text-embedding-3-small
+      client.create_collection(
+          collection_name="openai_docs",
+          vectors_config=VectorParams(
+              size=1536,
+              distance=Distance.COSINE,
+          ),
+      )
+
+      # Kolekcja dla sentence-transformers (all-MiniLM-L6-v2)
+      client.create_collection(
+          collection_name="minilm_docs",
+          vectors_config=VectorParams(
+              size=384,
+              distance=Distance.COSINE,
+          ),
+      )
+
+      # Kolekcja z hnsw_config (parametry indeksu)
+      from qdrant_client.models import HnswConfigDiff
+
+      client.create_collection(
+          collection_name="large_scale",
+          vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
+          hnsw_config=HnswConfigDiff(
+              m=16,           # więcej połączeń = wyższa precyzja
+              ef_construct=200,  # wyższa = wolniejsza indeksacja, lepsza jakość
+          ),
+      )
+
+  - name: Distance — metryki podobieństwa
+    desc: >
+      Distance.COSINE mierzy kąt między wektorami — niezależne od długości, idealne dla tekstu.
+      Distance.EUCLID mierzy euklidesową odległość — dla danych numerycznych. Distance.DOT dla dot product.
+    code: |
+      from qdrant_client.models import Distance, VectorParams
+
+      # COSINE — najczęściej dla embeddings tekstowych
+      # Zakres score: -1 do 1 (wyższy = bardziej podobny)
+      VectorParams(size=1536, distance=Distance.COSINE)
+
+      # EUCLID — odległość euklidesowa
+      # Zakres score: 0 do inf (niższy = bardziej podobny)
+      VectorParams(size=128, distance=Distance.EUCLID)
+
+      # DOT — iloczyn skalarny (embeddings znormalizowane)
+      # Zakres: -inf do inf (wyższy = bardziej podobny)
+      VectorParams(size=768, distance=Distance.DOT)
+
+      # Jaką wybrać?
+      # COSINE — tekst, semantyczne embeddings (OpenAI, HuggingFace)
+      # EUCLID — obrazy, audio, dane numeryczne
+      # DOT    — gdy embeddings są znormalizowane (l2 norm)
+      #          = COSINE ale szybszy dla znormalizowanych
+
+  - name: Zarządzanie kolekcjami
+    desc: >
+      get_collection() zwraca info o kolekcji — liczba punktów, config wektorów, status.
+      recreate_collection() usuwa i tworzy od nowa — bezpieczny reset danych. delete_collection() usuwa całkowicie.
+    code: |
+      from qdrant_client import QdrantClient
+
+      client = QdrantClient(url="http://localhost:6333")
+
+      # Lista wszystkich kolekcji
+      collections = client.get_collections()
+      for c in collections.collections:
+          print(c.name)
+
+      # Info o kolekcji
+      info = client.get_collection("docs")
+      print(f"Punktów: {info.points_count}")
+      print(f"Wymiarowość: {info.config.params.vectors.size}")
+      print(f"Status: {info.status}")
+
+      # Usuń kolekcję
+      client.delete_collection("docs")
+
+      # Sprawdź czy kolekcja istnieje
+      exists = client.collection_exists("docs")
+      print(f"Istnieje: {exists}")
+
+      # Bezpieczny create — tylko gdy nie istnieje
+      if not client.collection_exists("docs"):
+          client.create_collection(
+              collection_name="docs",
+              vectors_config=VectorParams(size=1536,
+                                          distance=Distance.COSINE),
+          )
+
+  - name: Named vectors — wiele wektorów na punkt
+    desc: >
+      Named vectors pozwalają przechowywać wiele typów embeddings dla tego samego dokumentu.
+      Jeden punkt może mieć wektor tytułu i wektor treści — wyszukujesz po konkretnym polu.
+    code: |
+      from qdrant_client.models import (
+          Distance, VectorParams, PointStruct, NamedVector
+      )
+
+      # Kolekcja z named vectors
+      client.create_collection(
+          collection_name="articles",
+          vectors_config={
+              "title": VectorParams(size=384, distance=Distance.COSINE),
+              "body": VectorParams(size=1536, distance=Distance.COSINE),
+          },
+      )
+
+      # Upsert punktu z named vectors
+      client.upsert(
+          collection_name="articles",
+          points=[
+              PointStruct(
+                  id=1,
+                  vector={
+                      "title": [0.1] * 384,   # embedding tytułu
+                      "body":  [0.2] * 1536,  # embedding treści
+                  },
+                  payload={"title": "FastAPI tutorial",
+                           "author": "tiangolo"},
+              )
+          ],
+      )
+
+      # Szukaj po tytule lub treści
+      results = client.search(
+          collection_name="articles",
+          query_vector=NamedVector(name="title", vector=[0.15] * 384),
+          limit=5,
+      )

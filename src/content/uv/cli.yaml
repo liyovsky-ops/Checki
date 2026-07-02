@@ -1,0 +1,78 @@
+title: Komendy
+labels:
+  section: Kategoria
+  example: Komenda
+
+intro: >
+  uv ma spójne CLI podzielone na grupy: pip (drop-in replacement), python (wersje),
+  venv (środowiska), project (add/remove/sync), tool (globalne narzędzia), run (uruchamianie).
+  Wszystkie komendy są szybkie — czas startu uv to <10ms.
+
+items:
+  - name: pip — zarządzanie pakietami
+    desc: Drop-in replacement dla pip
+    code: |
+      uv pip install requests             # instaluj pakiet
+      uv pip install "fastapi>=0.115"    # z constraint wersji
+      uv pip install -r requirements.txt  # z pliku
+      uv pip install -e .                # editable install (dev)
+      uv pip uninstall requests           # odinstaluj
+      uv pip list                        # lista zainstalowanych
+      uv pip show requests               # info o pakiecie
+      uv pip freeze                      # requirements.txt format
+      uv pip compile pyproject.toml -o requirements.txt  # lock file
+      uv pip sync requirements.txt       # sync (usuwa nieużywane!)
+      uv pip check                       # sprawdź konflikty
+
+  - name: python — wersje Pythona
+    desc: Zarządzanie wersjami Python (zastępuje pyenv)
+    code: |
+      uv python install 3.12             # zainstaluj wersję
+      uv python install 3.11 3.12 3.13  # kilka naraz
+      uv python list                     # lista zainstalowanych
+      uv python list --all-versions      # wszystkie dostępne
+      uv python find 3.12               # znajdź ścieżkę do Pythona
+      uv python pin 3.12                # stwórz .python-version
+      uv python uninstall 3.11          # odinstaluj
+
+  - name: project — zarządzanie projektem
+    desc: Zarządzanie pyproject.toml i lock file
+    code: |
+      uv init                           # nowy projekt
+      uv init --lib                     # biblioteka (src/ layout)
+      uv add requests fastapi           # dodaj zależności
+      uv add --dev pytest ruff          # zależności dev
+      uv add --group test pytest-cov    # custom grupa
+      uv remove requests                # usuń zależność
+      uv sync                          # sync z lock file
+      uv sync --frozen                 # strict (nie aktualizuj lock)
+      uv sync --no-dev                 # bez dev zależności
+      uv lock                          # regeneruj lock file
+      uv lock --check                  # sprawdź czy aktualny
+      uv tree                          # drzewo zależności
+      uv build                         # zbuduj pakiet
+      uv publish                       # opublikuj na PyPI
+      uv export -f requirements-txt     # eksportuj do requirements.txt
+
+  - name: tool i run — narzędzia i uruchamianie
+    desc: Globalne narzędzia i uruchamianie komend
+    code: |
+      # Tool — globalne narzędzia (zastępuje pipx)
+      uv tool install ruff               # zainstaluj globalnie
+      uv tool list                       # lista zainstalowanych
+      uv tool upgrade ruff               # zaktualizuj
+      uv tool upgrade --all              # zaktualizuj wszystkie
+      uv tool uninstall ruff             # odinstaluj
+      uvx ruff check .                   # jednorazowe uruchomienie
+      uvx ruff@0.8.0 check .            # konkretna wersja
+
+      # Run — uruchamianie w kontekście projektu
+      uv run python script.py           # uruchom skrypt
+      uv run pytest tests/ -v           # uruchom testy
+      uv run uvicorn app:app --reload   # uruchom serwer
+      uv run --python 3.11 pytest       # konkretna wersja Pythona
+      uv run moj_skrypt.py              # skrypt z inline deps (PEP 723)
+
+      # Cache
+      uv cache dir                      # gdzie jest cache
+      uv cache clean                    # wyczyść cache

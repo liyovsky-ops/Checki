@@ -1,0 +1,134 @@
+items:
+  - name: "select() — podstawowe zapytania"
+    desc: >
+      session.exec(select(Model)) zwraca ResultSet. .all() → lista, .first() → pierwszy lub None, .one() → jeden lub błąd.
+      select() to SQLAlchemy 2.0 API — typowane, bez string queries, z autocompletion IDE.
+    code: |
+      from sqlmodel import Session, select
+      from models import Hero
+
+      with Session(engine) as session:
+          # Wszystkie rekordy
+          heroes = session.exec(select(Hero)).all()
+
+          # Pierwszy pasujący
+          hero = session.exec(
+              select(Hero).where(Hero.name == "Spider-Man")
+          ).first()
+
+          # Jeden lub wyjątek gdy brak / więcej niż 1
+          hero = session.exec(
+              select(Hero).where(Hero.id == 1)
+          ).one()
+
+          # Get przez primary key — najszybsze
+          hero = session.get(Hero, 1)
+          if hero:
+              print(hero.name)
+
+  - name: ".where(), .offset(), .limit() — filtrowanie i paginacja"
+    desc: >
+      .where() akceptuje wyrażenia SQLAlchemy — ==, !=, >, <, .in_(), .like(), .isnull().
+      .offset().limit() to paginacja — offset=(page-1)*size, limit=size. Standard dla list API.
+    code: |
+      from sqlmodel import Session, select
+      from models import Hero
+
+      with Session(engine) as session:
+          # Filtrowanie
+          adults = session.exec(
+              select(Hero).where(Hero.age >= 18)
+          ).all()
+
+          # Wiele warunków (AND)
+          result = session.exec(
+              select(Hero)
+              .where(Hero.age >= 18)
+              .where(Hero.name.like("Spider%"))
+          ).all()
+
+          # IN
+          ids = [1, 2, 3]
+          heroes = session.exec(
+              select(Hero).where(Hero.id.in_(ids))
+          ).all()
+
+          # Paginacja — strona 2, po 10 rekordów
+          page, size = 2, 10
+          heroes = session.exec(
+              select(Hero)
+              .offset((page - 1) * size)
+              .limit(size)
+          ).all()
+
+  - name: Create, Update, Delete
+    desc: >
+      Dodawanie przez session.add() + commit(). Update przez pobranie, zmianę pól i commit().
+      Delete przez session.delete() + commit(). session.refresh() odświeża obiekt po commit().
+    code: |
+      from sqlmodel import Session
+      from models import Hero, HeroUpdate
+
+      with Session(engine) as session:
+          # CREATE
+          hero = Hero(name="Thor", secret_name="Thor Odinson", age=1500)
+          session.add(hero)
+          session.commit()
+          session.refresh(hero)  # załaduj id z DB
+          print(hero.id)  # np. 5
+
+          # UPDATE — pobierz, zmień, commit
+          hero = session.get(Hero, hero.id)
+          if hero:
+              hero.age = 1501
+              session.add(hero)
+              session.commit()
+              session.refresh(hero)
+
+          # UPDATE z Pydantic model_dump (PATCH pattern)
+          update_data = HeroUpdate(age=1502)
+          hero = session.get(Hero, 1)
+          if hero:
+              update_dict = update_data.model_dump(exclude_unset=True)
+              hero.sqlmodel_update(update_dict)
+              session.add(hero)
+              session.commit()
+
+          # DELETE
+          hero = session.get(Hero, 1)
+          if hero:
+              session.delete(hero)
+              session.commit()
+
+  - name: ".join() i count()"
+    desc: >
+      .join() łączy tabele przez FK — select(Hero).join(Team). Wymagane gdy filtrujesz po polach z innej tabeli.
+      func.count() z select() zwraca liczbę rekordów — przydatne do paginacji (total count).
+    code: |
+      from sqlmodel import Session, select, func
+      from models import Hero, Team
+
+      with Session(engine) as session:
+          # JOIN — hero + team
+          statement = (
+              select(Hero, Team)
+              .join(Team, Hero.team_id == Team.id)
+              .where(Team.name == "Avengers")
+          )
+          results = session.exec(statement).all()
+          for hero, team in results:
+              print(f"{hero.name} — {team.name}")
+
+          # Filtrowanie po polu z join
+          avengers = session.exec(
+              select(Hero)
+              .join(Team)
+              .where(Team.name == "Avengers")
+          ).all()
+
+          # COUNT — total dla paginacji
+          total = session.exec(
+              select(func.count()).select_from(Hero)
+              .where(Hero.age >= 18)
+          ).one()
+          print(f"Dorosłych bohaterów: {total}")

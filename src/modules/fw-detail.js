@@ -95,6 +95,11 @@ import { FW_HTTPX_DATA }      from '../data/fw_httpx.js';
 import { FW_ALEMBIC_DATA }   from '../data/fw_alembic.js';
 import { FW_SCRAPY_DATA }    from '../data/fw_scrapy.js';
 import { FW_POETRY_DATA }    from '../data/fw_poetry.js';
+import { FW_UV_DATA }        from '../data/fw_uv.js';
+import { FW_RUFF_DATA }      from '../data/fw_ruff.js';
+import { FW_TYPER_DATA }     from '../data/fw_typer.js';
+import { FW_SQLMODEL_DATA }  from '../data/fw_sqlmodel.js';
+import { FW_QDRANT_DATA }    from '../data/fw_qdrant.js';
 
 let activeTab = 'podstawy';
 let activeFw  = 'react';
@@ -178,6 +183,11 @@ const FW_DATA_MAP = {
   alembic:         FW_ALEMBIC_DATA,
   scrapy:          FW_SCRAPY_DATA,
   poetry:          FW_POETRY_DATA,
+  uv:              FW_UV_DATA,
+  ruff:            FW_RUFF_DATA,
+  typer:           FW_TYPER_DATA,
+  sqlmodel:        FW_SQLMODEL_DATA,
+  qdrant:          FW_QDRANT_DATA,
 };
 
 export function openFramework(fw) {
@@ -272,8 +282,8 @@ function renderTabContent(tabId, data) {
     case 'state':      el.innerHTML = isGeneric(data.content.state)      ? renderGenericSection(data.content.state, meta)      : renderState(data.content.state); break;
     case 'rywale':     el.innerHTML = isRivals(data.content.rywale) ? renderRivalsSection(data.content.rywale) : (isGeneric(data.content.rywale) ? renderGenericSection(data.content.rywale, meta) : renderRivals(data.content.rywale)); break;
     case 'pluginy':    el.innerHTML = isGeneric(data.content.pluginy) ? renderGenericSection(data.content.pluginy, meta) : renderPlugins(data.content.pluginy); break;
-    case 'komendy':    el.innerHTML = renderCommands(data.content.komendy); break;
-    default: el.innerHTML = '<div class="fwd-coming-soon"><div>Wkrótce...</div></div>';
+    case 'komendy': { const k = data.content.komendy; el.innerHTML = isGeneric(k) ? renderGenericSection(k, meta) : renderCommands(k); break; }
+    default: { const d = data.content[tabId]; el.innerHTML = isGeneric(d) ? renderGenericSection(d, meta) : '<div class="fwd-coming-soon"><div>Wkrótce...</div></div>'; }
   }
 }
 

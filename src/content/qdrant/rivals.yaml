@@ -1,0 +1,82 @@
+title: Qdrant vs inne wektorowe bazy danych
+
+items:
+  - name: Pinecone
+    icon: "🌲"
+    color: "#007bff"
+    tagline: Zarządzana chmura wektorowa — zero-ops, pay-per-use
+    pros:
+      - W pełni zarządzana — zero konfiguracji serwera
+      - Doskonała wydajność dla dużej skali (miliardy wektorów)
+      - Hybrid search (dense + sparse) natywnie
+      - Łatwa integracja z LangChain, LlamaIndex
+    cons:
+      - Płatne — darmowy tier bardzo ograniczony
+      - Brak self-hosting — vendor lock-in
+      - Dane wychodzą poza infrastrukturę (compliance)
+      - Drogie przy dużej liczbie requestów
+    vs: Qdrant gdy chcesz self-hosting, zero vendor lock-in i open-source. Pinecone gdy nie chcesz zarządzać infrastrukturą i nie szkodzi płatny cloud.
+
+  - name: Weaviate
+    icon: "🔷"
+    color: "#fa0050"
+    tagline: GraphQL-based vector DB ze schematem i modulami
+    pros:
+      - GraphQL API — bardziej ekspresywne zapytania
+      - Schema enforcement — typy danych wymuszane na wejściu
+      - Wbudowane moduły embeddingów (text2vec-openai)
+      - Hybrid search (BM25 + vector)
+    cons:
+      - Bardziej złożona konfiguracja niż Qdrant
+      - GraphQL learning curve dla Python deweloperów
+      - Wolniejszy start i większy footprint
+      - Payload schema musi być zdefiniowany z góry
+    vs: Qdrant prostszy w setup i pythonowy API. Weaviate gdy potrzebujesz schema enforcement i GraphQL queries.
+
+  - name: Chroma
+    icon: "🎨"
+    color: "#ff6b35"
+    tagline: Lokalny, Python-native vector DB — najprostszy setup
+    pros:
+      - Zero config — 2 linie kodu, in-memory lub lokalny plik
+      - Python-native API — najłatwiejszy start
+      - Świetna integracja z LangChain i LlamaIndex
+      - Wbudowane embeddingi (sentence-transformers)
+    cons:
+      - Słaba wydajność przy dużej skali (>1M wektorów)
+      - Brak zaawansowanych filtrów jak Qdrant
+      - Brak distributed setup — single node only
+      - Mniej dojrzały niż Qdrant — częste API zmiany
+    vs: Chroma dla prototypów i małych projektów (RAG demo, <100k dokumentów). Qdrant dla production z wydajnością, zaawansowanymi filtrami i skalowalnością.
+
+  - name: pgvector
+    icon: "🐘"
+    color: "#336791"
+    tagline: PostgreSQL extension — wektory w Twojej istniejącej bazie
+    pros:
+      - Zero nowej infrastruktury — rozszerza istniejący PostgreSQL
+      - SQL queries z wektorami — JOIN, WHERE, GROUP BY razem
+      - ACID transakcje — spójność z resztą danych
+      - Używasz istniejącego PostgreSQL stack (Alembic, SQLAlchemy)
+    cons:
+      - Wolniejszy niż dedykowane bazy wektorowe przy dużej skali
+      - Brak zaawansowanego HNSW tuningu jak Qdrant
+      - Payload to zwykłe kolumny SQL — mniej elastyczne niż JSON payload
+      - Brak distributed sharding
+    vs: pgvector gdy masz PostgreSQL i chcesz zero nowej infrastruktury. Qdrant gdy wektory to core produktu i zależy Ci na maksymalnej wydajności.
+
+  - name: FAISS
+    icon: "🏎️"
+    color: "#4267b2"
+    tagline: Facebook AI Similarity Search — najszybszy, in-memory, lokalny
+    pros:
+      - Najlepsza wydajność — napisany w C++ dla maksymalnej szybkości
+      - Ogromna skala — miliardy wektorów w pamięci RAM
+      - Wiele typów indeksów (IVF, HNSW, PQ) dla różnych tradeoffów
+      - Standard w badaniach AI i ML
+    cons:
+      - Brak persistence — dane giną po restarcie (lub musisz sam serializować)
+      - Brak REST API — biblioteka Python/C++, nie serwer
+      - Brak payload i filtrów — tylko wektory
+      - Trudne zarządzanie i deployment
+    vs: FAISS dla pipeline ML gdzie persistence nie jest kluczowe i zależy Ci na maksymalnej wydajności. Qdrant dla aplikacji produkcyjnych z persistence, filtrowaniem i REST API.

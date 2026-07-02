@@ -1,0 +1,63 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Typera?
+  firstComponent: Pierwsze CLI
+  firstComponentLang: Python
+
+intro:
+  title: Czym jest Typer?
+  desc: >
+    Typer to biblioteka do budowania CLI aplikacji w Pythonie przez type hints — od twórcy FastAPI.
+    Automatycznie generuje --help, konwertuje typy i waliduje argumenty bez konfiguracji.
+    Idealne gdy chcesz szybko zbudować profesjonalne CLI z autocompletionem i kolorowym outputem.
+
+concepts:
+  - title: "app = typer.Typer()"
+    desc: >
+      Typer app to kontener na komendy. Dekorujesz funkcje @app.command() i automatycznie stają się komendami CLI.
+      Jeden app może mieć wiele komend i sub-appów. Odpowiednik FastAPI app dla CLI.
+    icon: "🏗️"
+  - title: Type hints jako CLI spec
+    desc: >
+      Typer czyta type hints funkcji i automatycznie buduje parser CLI.
+      str → string argument, int → integer z walidacją, bool → --flag/--no-flag, Optional[str] → opcjonalny argument.
+    icon: "🔍"
+  - title: "typer.run() vs app()"
+    desc: >
+      typer.run(func) dla prostego CLI z jedną komendą — nie trzeba tworzyć app.
+      app() gdy masz wiele komend. Obie metody automatycznie obsługują --help i błędy.
+    icon: "▶️"
+  - title: Automatyczne --help
+    desc: >
+      Docstring funkcji staje się opisem komendy. Typy parametrów pokazują oczekiwany format.
+      typer[all] instaluje Rich który renderuje --help z kolorami i tabelami.
+    icon: "📖"
+
+whenToUse:
+  - Skrypty administracyjne — deploy, migracje, backup w jednym CLI narzędziu
+  - Narzędzia developerskie — init/build/test komendy dla projektu
+  - Gdy FastAPI to backend — Typer jako komplementarny CLI frontend
+  - Wszędzie gdzie argparse jest za verbose a Click za niskopoziomowy
+  - "NIE DO: interaktywnych TUI — tu używaj textual lub rich.live"
+
+firstComponent: |
+  import typer
+
+  app = typer.Typer()
+
+  @app.command()
+  def hello(name: str, count: int = 1, loud: bool = False):
+      """Przywitaj użytkownika N razy."""
+      for _ in range(count):
+          greeting = f"Hello, {name}!"
+          if loud:
+              greeting = greeting.upper()
+          typer.echo(greeting)
+
+  if __name__ == "__main__":
+      app()
+
+  # python main.py Łukasz --count 3 --loud
+  # HELLO, ŁUKASZ!
+  # HELLO, ŁUKASZ!
+  # HELLO, ŁUKASZ!

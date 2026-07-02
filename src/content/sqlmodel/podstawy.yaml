@@ -1,0 +1,68 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać SQLModel?
+  firstComponent: Pierwszy model
+  firstComponentLang: Python
+
+intro:
+  title: Czym jest SQLModel?
+  desc: >
+    SQLModel łączy SQLAlchemy (ORM) z Pydantic (walidacja) w jednej klasie — piszesz model raz, działa jako tabela i schemat API.
+    Stworzony przez autora FastAPI, perfekcyjnie współgra z FastAPI — modele są jednocześnie tabelami DB i schematami request/response.
+    Eliminuje duplikację kodu między warstwą danych a warstwą API.
+
+concepts:
+  - title: "table=True — model jako tabela"
+    desc: >
+      class Hero(SQLModel, table=True) tworzy klasę która jest jednocześnie tabelą SQLite/PostgreSQL i modelem Pydantic.
+      Bez table=True klasa jest tylko schematem Pydantic — idealne dla request/response body w FastAPI.
+    icon: "🗄️"
+  - title: create_engine i Session
+    desc: >
+      create_engine() tworzy połączenie z bazą. SQLModel.metadata.create_all(engine) tworzy tabele.
+      Session to kontekst transakcji — wszystkie operacje (add, exec, delete) wykonujesz wewnątrz Session.
+    icon: "🔌"
+  - title: "Field() — metadane kolumny"
+    desc: >
+      Field() rozszerza Pydantic Field o atrybuty bazodanowe — primary_key, index, unique, foreign_key.
+      Optional[str] = None tworzy nullable kolumnę. Field(default=None, index=True) = nullable + indeks.
+    icon: "🏷️"
+  - title: Schema separation pattern
+    desc: >
+      HeroCreate (bez id) → walidacja inputu. Hero (table=True, z id) → rekord w DB. HeroRead (bez hasła) → response.
+      Ten wzorzec eliminuje over-posting i chroni wrażliwe pola. Standard w FastAPI + SQLModel projektach.
+    icon: "🔄"
+
+whenToUse:
+  - FastAPI projekty — modele jako tabele i schematy API jednocześnie
+  - Gdy chcesz walidację Pydantic i persistence SQLAlchemy bez duplikacji kodu
+  - Projekty z PostgreSQL, SQLite, MySQL — SQLModel obsługuje wszystkie przez SQLAlchemy
+  - Gdy zespół zna FastAPI i chce spójny stack (tiangolo ecosystem)
+  - "NIE DO: zaawansowanych SQLAlchemy scenariuszy — pełne SQLAlchemy daje więcej kontroli"
+
+firstComponent: |
+  from typing import Optional
+  from sqlmodel import Field, Session, SQLModel, create_engine, select
+
+  class Hero(SQLModel, table=True):
+      id: Optional[int] = Field(default=None, primary_key=True)
+      name: str = Field(index=True)
+      secret_name: str
+      age: Optional[int] = None
+
+  engine = create_engine("sqlite:///heroes.db")
+  SQLModel.metadata.create_all(engine)
+
+  # Dodaj rekord
+  with Session(engine) as session:
+      hero = Hero(name="Spider-Man", secret_name="Peter Parker", age=25)
+      session.add(hero)
+      session.commit()
+      session.refresh(hero)
+      print(f"Saved: {hero.id} - {hero.name}")
+
+  # Odczytaj rekordy
+  with Session(engine) as session:
+      heroes = session.exec(select(Hero)).all()
+      for h in heroes:
+          print(h.name, h.age)

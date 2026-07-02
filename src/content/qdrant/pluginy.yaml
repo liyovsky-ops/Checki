@@ -1,0 +1,169 @@
+title: Ekosystem Qdrant
+items:
+  - name: LangChain QdrantVectorStore
+    icon: "🦜"
+    desc: |
+      LangChain integruje Qdrant jako vector store — from_texts() automatycznie embedduje i upsertuje.
+      Instalacja: pip install langchain-qdrant langchain-openai
+
+      QdrantVectorStore obsługuje similarity_search(), max_marginal_relevance_search() i as_retriever().
+      Retriever wpina się bezpośrednio do RetrievalQA i ConversationalRetrievalChain.
+    code: |
+      from langchain_qdrant import QdrantVectorStore
+      from langchain_openai import OpenAIEmbeddings
+      from qdrant_client import QdrantClient
+
+      embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+      client = QdrantClient(url="http://localhost:6333")
+
+      # Utwórz/załaduj vector store
+      vector_store = QdrantVectorStore(
+          client=client,
+          collection_name="langchain_docs",
+          embedding=embeddings,
+      )
+
+      # Dodaj dokumenty
+      texts = [
+          "FastAPI to szybki framework REST API",
+          "SQLModel łączy SQLAlchemy z Pydantic",
+      ]
+      vector_store.add_texts(texts)
+
+      # Semantic search
+      results = vector_store.similarity_search(
+          "jak zrobić REST API?", k=3
+      )
+      for doc in results:
+          print(doc.page_content)
+
+      # Retriever dla RAG
+      retriever = vector_store.as_retriever(
+          search_kwargs={"k": 5, "score_threshold": 0.7}
+      )
+
+  - name: LlamaIndex QdrantVectorStore
+    icon: "🦙"
+    desc: |
+      LlamaIndex używa Qdrant jako VectorStoreIndex — indeksuje dokumenty i szuka przez query engine.
+      Instalacja: pip install llama-index-vector-stores-qdrant
+
+      VectorStoreIndex + QdrantVectorStore = pełny RAG pipeline z kilku linii kodu.
+      query_engine.query() generuje odpowiedź z kontekstem z Qdrant.
+    code: |
+      from llama_index.vector_stores.qdrant import QdrantVectorStore
+      from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+      from llama_index.core import StorageContext
+      from qdrant_client import QdrantClient
+
+      client = QdrantClient(url="http://localhost:6333")
+
+      # Załaduj dokumenty z folderu
+      documents = SimpleDirectoryReader("./docs").load_data()
+
+      # Utwórz vector store
+      vector_store = QdrantVectorStore(
+          client=client,
+          collection_name="llamaindex_docs",
+      )
+      storage_context = StorageContext.from_defaults(
+          vector_store=vector_store
+      )
+
+      # Indeksuj dokumenty
+      index = VectorStoreIndex.from_documents(
+          documents,
+          storage_context=storage_context,
+      )
+
+      # Query engine — odpowiada na pytania
+      query_engine = index.as_query_engine()
+      response = query_engine.query(
+          "Czym jest FastAPI i kiedy go używać?"
+      )
+      print(response)
+
+  - name: "qdrant-client[fastembed] — lokalne embeddingi"
+    icon: "⚡"
+    desc: |
+      fastembed to lekka biblioteka Rust do lokalnych embeddings — szybsza niż sentence-transformers.
+      Instalacja: pip install "qdrant-client[fastembed]"
+
+      client.add() automatycznie generuje embeddingi i upsertuje. client.query() dla semantic search.
+      Obsługuje BAAI/bge-small-en-v1.5 (384 dim) jako domyślny model — zero OpenAI kosztów.
+    code: |
+      # pip install "qdrant-client[fastembed]"
+      from qdrant_client import QdrantClient
+
+      client = QdrantClient(":memory:")
+
+      # add() automatycznie embedduje i upsertuje
+      client.add(
+          collection_name="knowledge_base",
+          documents=[
+              "Python to język programowania ogólnego przeznaczenia",
+              "FastAPI tworzy REST API z type hints",
+              "Qdrant to wektorowa baza danych dla AI",
+              "SQLModel łączy SQLAlchemy z Pydantic",
+          ],
+          metadata=[
+              {"topic": "python", "level": "basic"},
+              {"topic": "fastapi", "level": "intermediate"},
+              {"topic": "qdrant", "level": "advanced"},
+              {"topic": "sqlmodel", "level": "intermediate"},
+          ],
+          ids=[1, 2, 3, 4],
+      )
+
+      # query() automatycznie embedduje pytanie
+      results = client.query(
+          collection_name="knowledge_base",
+          query_text="jak zrobić API w Pythonie?",
+          limit=3,
+      )
+      for r in results:
+          print(f"[{r.score:.3f}] {r.document}")
+
+  - name: Docker Compose — Qdrant + aplikacja
+    icon: "🐳"
+    desc: |
+      Docker Compose ułatwia uruchomienie Qdrant razem z aplikacją w development i production.
+      Qdrant przechowuje dane w wolumenie — persystują między restartami kontenera.
+
+      REST API na porcie 6333, gRPC na 6334. Dashboard dostępny na http://localhost:6333/dashboard.
+    code: |
+      # docker-compose.yml
+      # version: "3.9"
+      # services:
+      #   qdrant:
+      #     image: qdrant/qdrant:latest
+      #     ports:
+      #       - "6333:6333"   # REST API
+      #       - "6334:6334"   # gRPC
+      #     volumes:
+      #       - qdrant_data:/qdrant/storage
+      #     environment:
+      #       QDRANT__SERVICE__GRPC_PORT: "6334"
+      #   app:
+      #     build: .
+      #     ports:
+      #       - "8000:8000"
+      #     environment:
+      #       QDRANT_URL: "http://qdrant:6333"
+      #     depends_on:
+      #       - qdrant
+      # volumes:
+      #   qdrant_data:
+
+      # Uruchomienie:
+      # docker compose up -d
+
+      # Python klient:
+      from qdrant_client import QdrantClient
+      import os
+
+      client = QdrantClient(
+          url=os.getenv("QDRANT_URL", "http://localhost:6333"),
+          api_key=os.getenv("QDRANT_API_KEY"),  # dla Qdrant Cloud
+      )
+      print(client.get_collections())

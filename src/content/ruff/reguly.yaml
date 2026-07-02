@@ -1,0 +1,107 @@
+title: Reguły i kody błędów
+labels:
+  section: Kategoria
+  example: Przykład
+
+intro: >
+  Ruff implementuje 800+ reguł ze znanych narzędzi (flake8, pylint, isort, pyupgrade...).
+  Każda reguła ma kod: litera(y) + numer, np. E501, F401, I001. Domyślnie aktywne: E, F
+  (PEP 8 + pyflakes). Wybierz więcej przez `select` w konfiguracji.
+
+items:
+  - name: Najważniejsze kategorie reguł
+    desc: >
+      Ruff grupuje reguły w kategorie (prefiksy). E/W to PEP 8, F to pyflakes,
+      I to isort, N to nazewnictwo, UP to modernizacja składni, S to bezpieczeństwo.
+    code: |
+      # Prefiks → oryginalne narzędzie → co sprawdza
+      # E/W    → pycodestyle (flake8)    → styl PEP 8
+      # F      → pyflakes                → błędy logiczne (nieużywane importy)
+      # I      → isort                   → kolejność importów
+      # N      → pep8-naming             → nazewnictwo (klasy, funcje, zmienne)
+      # UP     → pyupgrade               → modernizacja składni (f-strings, union types)
+      # S      → flake8-bandit           → bezpieczeństwo
+      # B      → flake8-bugbear          → częste błędy i anty-wzorce
+      # C4     → flake8-comprehensions   → upraszczanie list comprehensions
+      # SIM    → flake8-simplify         → upraszczanie kodu
+      # RUF    → Ruff-specific           → reguły własne Ruffa
+      # ANN    → flake8-annotations      → type annotations
+      # D      → pydocstyle              → docstringi
+      # T20    → flake8-print           → blokada print() w kodzie produkcyjnym
+
+  - name: Włączanie i wyłączanie reguł
+    desc: >
+      `select` = lista aktywnych reguł, `ignore` = wyłączone reguły, `extend-select` =
+      dodaj do domyślnych bez listy kompletnej. Możesz używać prefiksu (ALL, E, F)
+      lub konkretnego kodu (E501).
+    code: |
+      # pyproject.toml — [tool.ruff.lint]
+      # select = ["E", "F", "I", "N", "UP", "B"]  # konkretne kategorie
+      # ignore = ["E501"]          # linie > 88 znaków — ignoruj
+      # extend-select = ["S", "C4"]  # dodaj do domyślnych
+
+      # Wszystkie reguły (ostrożnie!):
+      # select = ["ALL"]
+      # ignore = ["D", "ANN"]     # wyłącz docstringi i annotations
+
+      # Inline wyłączenie konkretnej linii:
+      x = 1  # noqa: E501
+      import os  # noqa: F401     # ignoruj nieużywany import
+      # noqa                       # ignoruj wszystkie reguły dla tej linii
+
+      # Plik wyłączony z lintowania:
+      # [tool.ruff.lint.per-file-ignores]
+      # "tests/*.py" = ["S101"]  # allow assert in tests
+
+  - name: Najczęstsze reguły — co wykrywają
+    desc: >
+      Kilkanaście reguł, które warto znać. F401 (nieużywany import) i E501 (długa linia)
+      to najczęściej spotykane. UP006/UP007 automatycznie modernizują type hints do Python 3.10+.
+    code: |
+      # F401 — nieużywany import
+      import os  # F401 jeśli os nie jest używany
+
+      # F841 — zmienna przypisana ale nieużyta
+      x = compute_something()  # F841 jeśli x nie użyte
+
+      # E501 — linia za długa (>88 znaków domyślnie)
+
+      # I001 — złe sortowanie importów (isort)
+
+      # UP006/UP007 — stare type hints
+      from typing import List, Optional  # UP035
+      def f(x: Optional[str]) -> List[int]:  # UP006, UP007
+      def f(x: str | None) -> list[int]:  # po modernizacji (UP007)
+
+      # B006 — mutable default argument
+      def f(items=[]):  # B006 — błąd!
+      def f(items=None):  # OK
+
+      # S101 — użycie assert (nie w testach)
+      assert x > 0  # S101 w kodzie produkcyjnym
+
+      # SIM108 — użyj ternary zamiast if/else
+      # if condition: x = 1
+      # else: x = 2
+      x = 1 if condition else 2  # SIM108 proponuje to
+
+  - name: Sprawdzanie konkretnych reguł
+    desc: >
+      `ruff rule` pokazuje opis konkretnej reguły. `ruff check --select` uruchamia
+      tylko wybrane reguły. Przydatne do eksperymentowania przed dodaniem do konfiguracji.
+    code: |
+      # Opis reguły
+      ruff rule E501           # co robi E501?
+      ruff rule B006           # opis mutable default argument
+      ruff rule --all          # lista wszystkich reguł
+
+      # Uruchom tylko wybrane reguły
+      ruff check --select E501 .
+      ruff check --select "E,F,I" .
+      ruff check --select "UP" .    # sprawdź tylko modernizację składni
+
+      # Sprawdź co zostałoby naprawione automatycznie
+      ruff check --select "UP" --diff .  # pokaż diff bez zmieniania pliku
+
+      # Statystyki błędów w projekcie
+      ruff check --statistics .

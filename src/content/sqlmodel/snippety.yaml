@@ -1,0 +1,155 @@
+title: Snippety SQLModel
+groups:
+  - name: Engine i Session setup
+    icon: "🔌"
+    commands:
+      - cmd: "engine = create_engine(DATABASE_URL, echo=True)"
+        desc: Utwórz engine z logowaniem SQL
+        detail:
+          what: create_engine() inicjalizuje połączenie z bazą. echo=True loguje wszystkie SQL queries — tylko dla debugowania.
+          how: "DATABASE_URL format: sqlite:///db.sqlite3 | postgresql://user:pass@host/db | mysql://user:pass@host/db"
+          tips:
+            - 'echo=False w production — nie loguj haseł i danych'
+            - 'pool_pre_ping=True dla PostgreSQL — sprawdza połączenie przed użyciem'
+      - cmd: SQLModel.metadata.create_all(engine)
+        desc: Utwórz wszystkie tabele
+        detail:
+          what: Tworzy tabele dla wszystkich modeli z table=True. Idempotentne — nie usuwa istniejących tabel.
+          how: Musi być wywołane po zaimportowaniu WSZYSTKICH modeli — inaczej nie widzi klas.
+          tips:
+            - 'W production używaj Alembic zamiast create_all'
+            - 'SQLModel.metadata.drop_all(engine) usuwa wszystkie tabele — tylko testy'
+      - cmd: "with Session(engine) as session: ..."
+        desc: Kontekst transakcji
+        detail:
+          what: Session zarządza transakcją — automatycznie rollback przy wyjątku, close po wyjściu z bloku.
+          how: Wszystkie operacje (add, exec, delete) wykonujesz wewnątrz with Session. commit() zatwierdza zmiany.
+          tips:
+            - 'session.commit() + session.refresh(obj) po dodaniu — załaduje wygenerowane id'
+            - 'Nie trzymaj Session dłużej niż jeden request w FastAPI'
+
+  - name: Operacje CRUD
+    icon: "✏️"
+    commands:
+      - cmd: "session.add(obj); session.commit(); session.refresh(obj)"
+        desc: Dodaj rekord i załaduj id
+        detail:
+          what: session.add() dodaje obiekt do transakcji. commit() wykonuje INSERT. refresh() ładuje wygenerowane pole (id, server_default).
+          how: Bez session.refresh() pole id jest None po commit() — SQLModel nie ładuje go automatycznie.
+          tips:
+            - 'session.add_all([obj1, obj2, obj3]) — bulk insert w jednej transakcji'
+            - 'Jeden commit na koniec transakcji — nie commituj po każdym add'
+      - cmd: "hero = session.get(Hero, hero_id)"
+        desc: Pobierz rekord przez primary key
+        detail:
+          what: Najszybszy sposób pobierania — korzysta z cache Session i bezpośrednio trafia w PK index.
+          how: Zwraca None gdy nie znaleziono. Typ jest poprawny — session.get(Hero, 1) zwraca Hero | None.
+          tips:
+            - 'session.get(Hero, hero_id) or raise HTTPException(404) — standard FastAPI'
+            - 'Szybsze niż session.exec(select(Hero).where(Hero.id == id))'
+      - cmd: "update_data = patch.model_dump(exclude_unset=True)"
+        desc: PATCH — aktualizuj tylko podane pola
+        detail:
+          what: exclude_unset=True zwraca tylko pola które użytkownik wysłał — nie nadpisuje pól które pominął.
+          how: "hero.sqlmodel_update(update_data) aplikuje dict do modelu. Następnie session.add(hero) + commit()."
+          tips:
+            - 'Bez exclude_unset PATCH zachowuje się jak PUT — nadpisuje wszystko'
+            - 'sqlmodel_update() to SQLModel helper — działał jak model.__dict__.update()'
+
+  - name: Pełny CRUD — gotowy szablon
+    icon: "🏗️"
+    commands:
+      - cmd: "# Kompletny setup SQLModel z FastAPI"
+        desc: Gotowy projekt — skopiuj i dostosuj
+        detail:
+          what: Pełny setup SQLModel + FastAPI z schematami, CRUD endpointami i SQLite. Punkt startowy dla nowego projektu.
+          how: Zastąp Hero swoim modelem, DATABASE_URL swoim URLem i rozszerz o dodatkowe pola.
+          tips:
+            - 'Przenieś modele do models.py, engine do db.py, endpointy do routers/'
+            - 'Dodaj Alembic dla migracji gdy projekt rośnie'
+        code: |
+          # main.py — kompletny SQLModel + FastAPI starter
+          from typing import Annotated, List, Optional
+          from fastapi import Depends, FastAPI, HTTPException
+          from sqlmodel import (Field, Session, SQLModel,
+                                create_engine, select)
+
+          # --- Modele ---
+          class ItemBase(SQLModel):
+              name: str = Field(min_length=1, max_length=200)
+              description: Optional[str] = None
+              price: float = Field(gt=0)
+
+          class Item(ItemBase, table=True):
+              id: Optional[int] = Field(default=None, primary_key=True)
+
+          class ItemCreate(ItemBase):
+              pass
+
+          class ItemRead(ItemBase):
+              id: int
+
+          class ItemUpdate(SQLModel):
+              name: Optional[str] = None
+              description: Optional[str] = None
+              price: Optional[float] = Field(default=None, gt=0)
+
+          # --- DB setup ---
+          engine = create_engine("sqlite:///items.db")
+
+          def get_session():
+              with Session(engine) as session:
+                  yield session
+
+          SessionDep = Annotated[Session, Depends(get_session)]
+
+          # --- App ---
+          app = FastAPI()
+
+          @app.on_event("startup")
+          def on_startup():
+              SQLModel.metadata.create_all(engine)
+
+          @app.post("/items/", response_model=ItemRead, status_code=201)
+          def create_item(item: ItemCreate, session: SessionDep):
+              db_item = Item.model_validate(item)
+              session.add(db_item)
+              session.commit()
+              session.refresh(db_item)
+              return db_item
+
+          @app.get("/items/", response_model=List[ItemRead])
+          def read_items(session: SessionDep,
+                         offset: int = 0, limit: int = 20):
+              return session.exec(
+                  select(Item).offset(offset).limit(limit)
+              ).all()
+
+          @app.get("/items/{item_id}", response_model=ItemRead)
+          def read_item(item_id: int, session: SessionDep):
+              item = session.get(Item, item_id)
+              if not item:
+                  raise HTTPException(404, "Item not found")
+              return item
+
+          @app.patch("/items/{item_id}", response_model=ItemRead)
+          def update_item(item_id: int, item: ItemUpdate,
+                          session: SessionDep):
+              db_item = session.get(Item, item_id)
+              if not db_item:
+                  raise HTTPException(404, "Item not found")
+              db_item.sqlmodel_update(
+                  item.model_dump(exclude_unset=True))
+              session.add(db_item)
+              session.commit()
+              session.refresh(db_item)
+              return db_item
+
+          @app.delete("/items/{item_id}")
+          def delete_item(item_id: int, session: SessionDep):
+              item = session.get(Item, item_id)
+              if not item:
+                  raise HTTPException(404, "Item not found")
+              session.delete(item)
+              session.commit()
+              return {"ok": True}

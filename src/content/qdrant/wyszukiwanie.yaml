@@ -1,0 +1,137 @@
+items:
+  - name: "client.search() — podstawowe wyszukiwanie"
+    desc: >
+      search() przyjmuje query_vector (embedding pytania) i zwraca listę ScoredPoint — id, score, payload.
+      limit to liczba wyników. score to podobieństwo cosine (0-1, wyższy = lepszy).
+    code: |
+      from qdrant_client import QdrantClient
+      from openai import OpenAI
+
+      qdrant = QdrantClient(url="http://localhost:6333")
+      openai_client = OpenAI()
+
+      def search(query: str, collection: str = "docs",
+                 limit: int = 5) -> list:
+          # 1. Generuj embedding pytania
+          response = openai_client.embeddings.create(
+              model="text-embedding-3-small",
+              input=query,
+          )
+          query_vector = response.data[0].embedding
+
+          # 2. Szukaj podobnych w Qdrant
+          results = qdrant.search(
+              collection_name=collection,
+              query_vector=query_vector,
+              limit=limit,
+              with_payload=True,   # zwróć payload
+              with_vectors=False,  # nie zwracaj wektorów (oszczędność)
+          )
+
+          # 3. Zwróć wyniki
+          return [
+              {
+                  "id": r.id,
+                  "score": r.score,
+                  "text": r.payload.get("text", ""),
+                  "source": r.payload.get("source", ""),
+              }
+              for r in results
+          ]
+
+      results = search("jak zrobić REST API w Pythonie?")
+      for r in results:
+          print(f"[{r['score']:.3f}] {r['text'][:80]}")
+
+  - name: score threshold — filtrowanie po minimalnym podobieństwie
+    desc: >
+      score_threshold odrzuca wyniki poniżej progu podobieństwa — eliminuje słabo pasujące wyniki.
+      Dla COSINE: 0.7+ = dobra jakość, 0.85+ = wysoka jakość. Dostosuj próg do swojego use-case.
+    code: |
+      from qdrant_client import QdrantClient
+
+      client = QdrantClient(url="http://localhost:6333")
+
+      # Szukaj tylko wyniki o podobieństwie >= 0.75
+      results = client.search(
+          collection_name="docs",
+          query_vector=[0.1] * 1536,
+          limit=10,
+          score_threshold=0.75,  # odrzuć słabe wyniki
+      )
+
+      print(f"Znaleziono {len(results)} wyników powyżej progu")
+      for r in results:
+          print(f"score={r.score:.3f} id={r.id}")
+
+      # Progowe wartości dla COSINE:
+      # >= 0.95 — niemal identyczne
+      # >= 0.85 — bardzo podobne (dobra jakość RAG)
+      # >= 0.75 — podobne (akceptowalne)
+      # >= 0.60 — słabo powiązane (zwykle za nisko)
+      # < 0.60  — prawdopodobnie niespokrewnione
+
+  - name: "query_filter — wyszukiwanie z filtrem"
+    desc: >
+      Łącz similarity search z filtrem payload — szukaj podobnych dokumentów ale tylko z kategorii "python".
+      Filter w search() nie spowalnia wyszukiwania tak jak WHERE w SQL — Qdrant optymalizuje pre-filtring.
+    code: |
+      from qdrant_client import QdrantClient
+      from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+      client = QdrantClient(url="http://localhost:6333")
+
+      # Szukaj podobnych TYLKO w kategorii "python"
+      results = client.search(
+          collection_name="docs",
+          query_vector=[0.1] * 1536,
+          query_filter=Filter(
+              must=[
+                  FieldCondition(
+                      key="category",
+                      match=MatchValue(value="python"),
+                  )
+              ]
+          ),
+          limit=5,
+      )
+
+      # Filtrowanie po wielu polach
+      results = client.search(
+          collection_name="docs",
+          query_vector=[0.1] * 1536,
+          query_filter=Filter(
+              must=[
+                  FieldCondition(key="language",
+                                  match=MatchValue(value="pl")),
+                  FieldCondition(key="category",
+                                  match=MatchValue(value="python")),
+              ]
+          ),
+          limit=5,
+      )
+
+  - name: recommend — wyszukiwanie przez przykładowe punkty
+    desc: >
+      recommend() szuka punktów podobnych do podanych positive i niepodobnych do negative.
+      Idealne dla rekomendacji — "pokaż więcej jak ten artykuł, mniej jak tamten". Bez generowania embeddings.
+    code: |
+      from qdrant_client import QdrantClient
+
+      client = QdrantClient(url="http://localhost:6333")
+
+      # Rekomenduj podobne do punktu id=1
+      results = client.recommend(
+          collection_name="articles",
+          positive=[1, 2],    # podobne do tych
+          negative=[5],       # niepodobne do tego
+          limit=5,
+      )
+
+      for r in results:
+          print(f"score={r.score:.3f} | {r.payload.get('title')}")
+
+      # Zastosowania:
+      # - "Więcej podobnych artykułów" (positive=[obecny_artykuł])
+      # - "Lubię X i Y, nie lubię Z" (positive=[x,y], negative=[z])
+      # - Collaborative filtering (positive=lubiane_przez_usera)

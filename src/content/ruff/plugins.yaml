@@ -1,0 +1,114 @@
+title: Ekosystem i integracje
+labels:
+  section: Integracja
+  example: Przykład
+
+intro: >
+  Ruff integruje się z VS Code, PyCharm, neovim, Emacs i wszystkimi popularnymi edytorami
+  przez LSP (Language Server Protocol). Oficjalne rozszerzenia dla VS Code i PyCharm.
+  Ruff LSP (`ruff server`) zastępuje pylsp i python-lsp-black.
+
+items:
+  - name: VS Code — oficjalne rozszerzenie
+    desc: >
+      Rozszerzenie `charliermarsh.ruff` (astral-sh.ruff) to oficjalne rozszerzenie Ruffa
+      dla VS Code. Zapewnia diagnostykę, quick-fix (auto-fix), format on save i organizeImports.
+      Zastępuje ms-python.pylint, ms-python.flake8, ms-python.black-formatter.
+    code: |
+      # Instalacja rozszerzenia
+      # Extensions marketplace → "Ruff" (charliermarsh.ruff)
+      # lub CLI:
+      code --install-extension charliermarsh.ruff
+
+      # settings.json — konfiguracja
+      # {
+      #   "[python]": {
+      #     "editor.defaultFormatter": "charliermarsh.ruff",
+      #     "editor.formatOnSave": true,
+      #     "editor.codeActionsOnSave": {
+      #       "source.fixAll.ruff": "explicit",
+      #       "source.organizeImports.ruff": "explicit"
+      #     }
+      #   },
+      #   "ruff.lint.enable": true,
+      #   "ruff.format.enable": true,
+      #   "ruff.showNotifications": "onError"
+      # }
+
+      # Wyłącz stare rozszerzenia (konflikty):
+      # - pylint, flake8, pycodestyle, pydocstyle
+      # - ms-python.black-formatter
+      # Zostaw: Pylance (types), Python (runner)
+
+  - name: PyCharm
+    desc: >
+      Ruff w PyCharm przez plugin "Ruff" (Marketplace). Alternatywnie przez
+      File Watcher — uruchamia `ruff check --fix` i `ruff format` przy zapisie.
+    code: |
+      # Plugin Ruff (File → Settings → Plugins → Marketplace → "Ruff")
+      # Następnie: Settings → Tools → Ruff
+
+      # Alternatywnie — File Watcher:
+      # File → Settings → Tools → File Watchers → + → Python
+      # Program: ruff
+      # Arguments: check --fix $FilePath$
+      # Working directory: $ProjectFileDir$
+      # Advanced: Output filters: $FILE_PATH$:$LINE$:$COLUMN$: $MESSAGE$
+
+      # Format on save przez File Watcher:
+      # Program: ruff
+      # Arguments: format $FilePath$
+      # Working directory: $ProjectFileDir$
+
+  - name: Neovim i inne edytory (LSP)
+    desc: >
+      `ruff server` to wbudowany LSP w Ruff. Zastępuje pylsp (python-language-server).
+      Konfiguracja w neovim przez nvim-lspconfig, w Emacs przez lsp-mode lub eglot.
+    code: |
+      # Neovim — nvim-lspconfig
+      # require('lspconfig').ruff.setup({
+      #   init_options = {
+      #     settings = {
+      #       lint = {
+      #         select = {"E", "F", "I", "UP"},
+      #       },
+      #       format = {
+      #         args = {"--line-length=120"},
+      #       },
+      #     },
+      #   },
+      # })
+
+      # Emacs — eglot
+      # (add-to-list 'eglot-server-programs
+      #   '(python-mode . ("ruff" "server")))
+
+      # Vim — ALE
+      # let g:ale_linters = {'python': ['ruff']}
+      # let g:ale_fixers = {'python': ['ruff', 'ruff_format']}
+
+      # Sublime Text — LSP-ruff package
+
+  - name: Jupyter Notebooks
+    desc: >
+      Ruff obsługuje lintowanie i formatowanie Jupyter Notebooks (.ipynb).
+      `ruff check notebook.ipynb` i `ruff format notebook.ipynb` działają bezpośrednio.
+      Wymaga ruff >= 0.6.0.
+    code: |
+      # Ruff natywnie obsługuje .ipynb
+      ruff check notebook.ipynb         # lint notebooka
+      ruff check --fix notebook.ipynb   # auto-fix
+      ruff format notebook.ipynb        # formatuj komórki kodu
+
+      # Cały projekt z notebookami:
+      ruff check .                      # automatycznie wykrywa .py i .ipynb
+
+      # Wyłącz obsługę notebooków (jeśli nie potrzebujesz):
+      # [tool.ruff]
+      # exclude = ["*.ipynb"]
+
+      # Reguły specyficzne dla notebooków:
+      # E402 — import nie na początku (naturalne w notebookach)
+      # Polecane do ignorowania w .ipynb:
+      # [tool.ruff.lint.per-file-ignores]
+      # "*.ipynb" = ["E402", "F401"]

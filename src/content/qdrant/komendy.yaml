@@ -1,0 +1,139 @@
+title: Komendy Qdrant
+groups:
+  - name: Instalacja i setup
+    icon: "📦"
+    commands:
+      - cmd: pip install qdrant-client
+        desc: Zainstaluj klienta Qdrant
+        detail:
+          what: Oficjalny Python klient do Qdrant — REST i gRPC API.
+          how: Minimalna instalacja bez dodatkowych zależności. Dla lokalnych embeddings dodaj fastembed extra.
+          tips:
+            - 'pip install "qdrant-client[fastembed]" — z lokalnymi embeddings'
+            - 'pip install qdrant-client openai — z OpenAI embeddings'
+      - cmd: docker run -p 6333:6333 qdrant/qdrant
+        desc: Uruchom Qdrant przez Docker
+        detail:
+          what: Qdrant dostępny na http://localhost:6333. Dashboard na http://localhost:6333/dashboard.
+          how: Bez volume dane giną po zatrzymaniu kontenera. Dodaj -v ./storage:/qdrant/storage dla persistence.
+          tips:
+            - 'docker run -p 6333:6333 -v $(pwd)/qdrant_storage:/qdrant/storage qdrant/qdrant'
+            - 'gRPC port 6334: docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant'
+      - cmd: "QdrantClient(\":memory:\")"
+        desc: In-memory klient — testy i prototypy
+        detail:
+          what: Qdrant w pamięci RAM — zero setup, dane giną po zakończeniu programu. Idealne do testów.
+          how: Zachowuje się identycznie jak serwer Qdrant — te same metody, ten sam API. Tylko persistence brak.
+          tips:
+            - 'QdrantClient(path="./qdrant_data") — lokalna persistence bez serwera'
+            - 'QdrantClient(url="http://localhost:6333") — połączenie z serwerem Docker'
+      - cmd: "QdrantClient(url=\"https://xyz.cloud.qdrant.io\", api_key=\"KEY\")"
+        desc: Połącz z Qdrant Cloud
+        detail:
+          what: Qdrant Cloud to zarządzany serwer — bezpłatny tier z 1GB storage.
+          how: URL i API key z dashboardu cloud.qdrant.io. api_key wymagany dla cloud.
+          tips:
+            - 'Przechowuj api_key w env var QDRANT_API_KEY — nie hardcode w kodzie'
+            - 'Darmowy tier wystarczy dla 1M wektorów 384-dim'
+
+  - name: Pełny RAG pipeline
+    icon: "🔍"
+    commands:
+      - cmd: "# Kompletny RAG: embed + store + search + generate"
+        desc: Pełny Retrieval-Augmented Generation z Qdrant
+        detail:
+          what: Kompletny RAG pipeline — wczytaj dokumenty, zaindeksuj w Qdrant, szukaj kontekstu, generuj odpowiedź LLM.
+          how: Zastąp dokumenty swoimi plikami. MODEL_NAME i COLLECTION_NAME dostosuj do projektu.
+          tips:
+            - 'Chunking dokumentów na 512-1024 tokenów dla lepszej jakości'
+            - 'Zapisuj doc_id w payload — możesz filtrować search po źródle'
+        code: |
+          from openai import OpenAI
+          from qdrant_client import QdrantClient
+          from qdrant_client.models import (
+              Distance, VectorParams, PointStruct, Filter,
+              FieldCondition, MatchValue
+          )
+
+          # --- Konfiguracja ---
+          COLLECTION = "rag_docs"
+          EMBED_MODEL = "text-embedding-3-small"
+          EMBED_DIM = 1536
+          CHAT_MODEL = "gpt-4o-mini"
+
+          openai = OpenAI()
+          qdrant = QdrantClient(":memory:")
+
+          # --- 1. Setup kolekcji ---
+          qdrant.create_collection(
+              collection_name=COLLECTION,
+              vectors_config=VectorParams(
+                  size=EMBED_DIM,
+                  distance=Distance.COSINE,
+              ),
+          )
+
+          # --- 2. Indeksowanie dokumentów ---
+          documents = [
+              {"id": 1, "text": "FastAPI to framework REST API dla Pythona",
+               "source": "fastapi_docs"},
+              {"id": 2, "text": "SQLModel łączy SQLAlchemy z Pydantic",
+               "source": "sqlmodel_docs"},
+              {"id": 3, "text": "Qdrant to wektorowa baza danych dla AI",
+               "source": "qdrant_docs"},
+          ]
+
+          def embed(texts: list[str]) -> list[list[float]]:
+              resp = openai.embeddings.create(
+                  model=EMBED_MODEL, input=texts)
+              return [r.embedding for r in resp.data]
+
+          texts = [d["text"] for d in documents]
+          vectors = embed(texts)
+
+          qdrant.upsert(
+              collection_name=COLLECTION,
+              points=[
+                  PointStruct(
+                      id=doc["id"],
+                      vector=vec,
+                      payload={"text": doc["text"],
+                               "source": doc["source"]},
+                  )
+                  for doc, vec in zip(documents, vectors)
+              ],
+          )
+
+          # --- 3. RAG Query ---
+          def rag_query(question: str, top_k: int = 3) -> str:
+              # Embed pytania
+              q_vec = embed([question])[0]
+
+              # Szukaj kontekstu w Qdrant
+              results = qdrant.search(
+                  collection_name=COLLECTION,
+                  query_vector=q_vec,
+                  limit=top_k,
+                  score_threshold=0.6,
+              )
+
+              # Buduj kontekst
+              context = "\n".join(
+                  f"[{r.score:.2f}] {r.payload['text']}"
+                  for r in results
+              )
+
+              # Generuj odpowiedź
+              response = openai.chat.completions.create(
+                  model=CHAT_MODEL,
+                  messages=[
+                      {"role": "system",
+                       "content": "Odpowiadaj na pytania korzystając z kontekstu."},
+                      {"role": "user",
+                       "content": f"Kontekst:\n{context}\n\nPytanie: {question}"},
+                  ],
+              )
+              return response.choices[0].message.content
+
+          answer = rag_query("Co to jest FastAPI?")
+          print(answer)

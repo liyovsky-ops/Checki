@@ -1,0 +1,110 @@
+title: Zarządzanie pakietami
+labels:
+  section: Komenda
+  example: Przykład
+
+intro: >
+  uv rozróżnia dwa tryby: pip-compatible (uv pip install — zarządzasz venv ręcznie)
+  i project mode (uv add/remove — zarządza pyproject.toml i lock file automatycznie).
+  Project mode jest zalecany dla nowych projektów — lock file gwarantuje reproducibility.
+
+items:
+  - name: uv add / remove (project mode)
+    desc: >
+      `uv add` modyfikuje pyproject.toml, aktualizuje uv.lock i instaluje pakiet —
+      wszystko w jednym poleceniu. Grupy zależności jak w Poetry (--dev, --group test).
+      `uv remove` usuwa pakiet i czyści lock file z nieużywanych zależności.
+    code: |
+      # Dodaj zależność produkcyjną
+      uv add requests
+      uv add "fastapi>=0.115"
+      uv add "sqlalchemy[asyncio]"
+
+      # Zależności developerskie
+      uv add --dev pytest ruff mypy
+      uv add --group test pytest-cov httpx
+      uv add --group docs mkdocs
+
+      # Usuń zależność
+      uv remove requests
+
+      # Zaktualizuj do najnowszej wersji
+      uv add "requests>=2.32" --upgrade-package requests
+
+      # Pokaż co jest zainstalowane
+      uv tree        # drzewo zależności
+      uv pip list    # płaska lista
+
+  - name: uv sync — deterministyczna instalacja
+    desc: >
+      `uv sync` synchronizuje środowisko z uv.lock — instaluje dokładnie te wersje
+      co w lock file. Idealne dla CI/CD: gwarantuje identyczne środowisko jak
+      deweloper miał lokalnie. `--frozen` nie aktualizuje lock file (tylko instaluje).
+    code: |
+      # Sync z lock file (główne użycie w CI/CD)
+      uv sync
+
+      # Sync bez grup dev
+      uv sync --no-dev
+      uv sync --without dev,test
+
+      # Sync tylko konkretnej grupy
+      uv sync --only-group docs
+
+      # Nie aktualizuj lock file (strict mode dla CI)
+      uv sync --frozen
+
+      # Wygeneruj lock file bez instalowania
+      uv lock
+
+      # Sprawdź czy lock file jest up-to-date
+      uv lock --check
+
+  - name: uv pip compile — requirements.txt
+    desc: >
+      `uv pip compile` = pip-tools compile — generuje requirements.txt z pinowanymi
+      wersjami z requirements.in lub pyproject.toml. Szybsza alternatywa dla pip-compile.
+      Przydatne w projektach które muszą mieć requirements.txt (np. Docker bez uv).
+    code: |
+      # Z requirements.in (pip-tools styl)
+      uv pip compile requirements.in -o requirements.txt
+      uv pip compile requirements.in --upgrade -o requirements.txt
+
+      # Z pyproject.toml
+      uv pip compile pyproject.toml -o requirements.txt
+      uv pip compile pyproject.toml --extra dev -o requirements-dev.txt
+
+      # Instaluj z wygenerowanego pliku
+      uv pip sync requirements.txt  # usuwa nadmiarowe pakiety!
+
+      # Multi-platform lock (dla Docker)
+      uv pip compile pyproject.toml \
+        --python-platform linux \
+        --python-version 3.12 \
+        -o requirements-linux.txt
+
+  - name: Extras i opcjonalne zależności
+    desc: >
+      uv obsługuje extras (dodatkowe opcjonalne zależności) tak samo jak pip.
+      Extras definiuje się w pyproject.toml pod [project.optional-dependencies].
+      `uv add "package[extra1,extra2]"` instaluje pakiet z extras.
+    code: |
+      # Instaluj z extras
+      uv add "httpx[http2]"
+      uv add "sqlalchemy[asyncio,mypy]"
+      uv add "langchain[anthropic,openai]"
+
+      # Definiuj własne extras w pyproject.toml
+      # [project.optional-dependencies]
+      # gpu = ["torch>=2.0", "torchvision"]
+      # api = ["fastapi>=0.115", "uvicorn"]
+
+      # Instaluj własne extras
+      uv sync --extra gpu
+      uv sync --extra api
+
+      # Instaluj wszystkie extras naraz
+      uv sync --all-extras
+
+      # W requirements.in
+      # package[extra1,extra2]>=1.0

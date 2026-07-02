@@ -1,0 +1,164 @@
+items:
+  - name: upsert — dodawanie i aktualizacja punktów
+    desc: >
+      upsert() dodaje nowe punkty lub aktualizuje istniejące po id. Bezpieczny — nie wymaga sprawdzania czy id istnieje.
+      PointStruct zawiera id (int lub UUID string), vector (lista floatów) i opcjonalny payload (dict).
+    code: |
+      from qdrant_client import QdrantClient
+      from qdrant_client.models import PointStruct
+
+      client = QdrantClient(url="http://localhost:6333")
+
+      # Upsert pojedynczego punktu
+      client.upsert(
+          collection_name="docs",
+          points=[
+              PointStruct(
+                  id=1,
+                  vector=[0.1, 0.2, 0.3, 0.4],  # 4-dim dla przykładu
+                  payload={
+                      "text": "FastAPI to nowoczesny framework REST API",
+                      "source": "docs",
+                      "language": "pl",
+                      "category": "web",
+                  },
+              )
+          ],
+      )
+
+      # Batch upsert — wiele punktów naraz (zalecane dla >100 punktów)
+      points = [
+          PointStruct(
+              id=i,
+              vector=[float(i % 10) * 0.1] * 1536,
+              payload={"chunk_id": i, "doc_id": i // 10},
+          )
+          for i in range(1000)
+      ]
+
+      # Upsert w batch po 100
+      batch_size = 100
+      for i in range(0, len(points), batch_size):
+          client.upsert(
+              collection_name="docs",
+              points=points[i:i + batch_size],
+          )
+
+  - name: Embeddingi z OpenAI
+    desc: >
+      Embeddingi to wektory wygenerowane przez model. OpenAI text-embedding-3-small → 1536-dim.
+      Każdy tekst (chunk dokumentu, pytanie) przepuszczasz przez embedding model przed upsert/search.
+    code: |
+      from openai import OpenAI
+      from qdrant_client import QdrantClient
+      from qdrant_client.models import PointStruct
+
+      openai_client = OpenAI()
+      qdrant_client = QdrantClient(url="http://localhost:6333")
+
+      def embed(texts: list[str]) -> list[list[float]]:
+          """Generuj embeddingi przez OpenAI."""
+          response = openai_client.embeddings.create(
+              model="text-embedding-3-small",
+              input=texts,
+          )
+          return [item.embedding for item in response.data]
+
+      # Dokumenty do zaindeksowania
+      documents = [
+          {"id": 1, "text": "Python to język programowania ogólnego przeznaczenia"},
+          {"id": 2, "text": "FastAPI tworzy REST API z type hints"},
+          {"id": 3, "text": "Qdrant to wektorowa baza danych dla AI"},
+      ]
+
+      # Generuj embeddingi i upsert
+      texts = [d["text"] for d in documents]
+      embeddings = embed(texts)
+
+      points = [
+          PointStruct(
+              id=doc["id"],
+              vector=emb,
+              payload={"text": doc["text"]},
+          )
+          for doc, emb in zip(documents, embeddings)
+      ]
+
+      qdrant_client.upsert(collection_name="docs", points=points)
+
+  - name: Embeddingi z sentence-transformers (lokalnie)
+    desc: >
+      sentence-transformers to open-source biblioteka do lokalnych embeddings — zero kosztów API.
+      all-MiniLM-L6-v2 (384-dim) to dobry balans prędkości i jakości. BGE-large-en dla wyższej precyzji.
+    code: |
+      from sentence_transformers import SentenceTransformer
+      from qdrant_client import QdrantClient
+      from qdrant_client.models import (
+          Distance, VectorParams, PointStruct
+      )
+
+      # Załaduj model lokalnie (pobiera przy pierwszym uruchomieniu)
+      model = SentenceTransformer("all-MiniLM-L6-v2")
+      # all-MiniLM-L6-v2 → 384 dim, szybki, dobra jakość
+      # BAAI/bge-large-en-v1.5 → 1024 dim, lepsza jakość
+
+      client = QdrantClient(":memory:")
+      client.create_collection(
+          collection_name="docs",
+          vectors_config=VectorParams(
+              size=384,
+              distance=Distance.COSINE,
+          ),
+      )
+
+      texts = [
+          "Python is a general-purpose programming language",
+          "FastAPI creates REST APIs with type hints",
+          "Qdrant is a vector database for AI applications",
+      ]
+
+      # Batch encoding — wydajne
+      embeddings = model.encode(texts, batch_size=32,
+                                show_progress_bar=True)
+
+      points = [
+          PointStruct(id=i, vector=emb.tolist(),
+                      payload={"text": t})
+          for i, (t, emb) in enumerate(zip(texts, embeddings))
+      ]
+      client.upsert("docs", points=points)
+
+  - name: "fastembed — lokalne embeddingi bez OpenAI"
+    desc: >
+      fastembed to lekka biblioteka embeddings w Rust — szybsza niż sentence-transformers, zero GPU.
+      qdrant-client[fastembed] instaluje ją automatycznie. Qdrant może generować embeddingi automatycznie.
+    code: |
+      # pip install "qdrant-client[fastembed]"
+      from qdrant_client import QdrantClient
+
+      client = QdrantClient(":memory:")
+
+      # add_texts automatycznie generuje embeddingi i upsertuje
+      client.add(
+          collection_name="docs",
+          documents=[
+              "FastAPI to nowoczesny framework REST API",
+              "SQLModel łączy SQLAlchemy z Pydantic",
+              "Qdrant to wektorowa baza danych",
+          ],
+          metadata=[
+              {"source": "fastapi"},
+              {"source": "sqlmodel"},
+              {"source": "qdrant"},
+          ],
+          ids=[1, 2, 3],
+      )
+
+      # Wyszukiwanie przez tekst — automatyczne embeddingi
+      results = client.query(
+          collection_name="docs",
+          query_text="REST API framework Python",
+          limit=3,
+      )
+      for r in results:
+          print(f"score={r.score:.3f} | {r.document}")

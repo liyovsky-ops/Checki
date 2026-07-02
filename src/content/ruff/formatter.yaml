@@ -1,0 +1,99 @@
+title: Formatter
+labels:
+  section: Feature
+  example: Przykład
+
+intro: >
+  `ruff format` = formatter kompatybilny z Black. Różnice są minimalne — 99.9% kodu
+  sformatowanego przez Black i Ruff wygląda identycznie. Ruff format jest 10-100x szybszy
+  od Black. Można go używać jako drop-in replacement bez ryzyka.
+
+items:
+  - name: Podstawowe użycie
+    desc: >
+      `ruff format` formatuje pliki in-place. `--check` tylko sprawdza bez zmian
+      (do CI). `--diff` pokazuje co by się zmieniło. Bez argumentów formatuje bieżący katalog.
+    code: |
+      # Formatuj in-place
+      ruff format .                    # cały projekt
+      ruff format src/ tests/          # konkretne katalogi
+      ruff format app.py models.py    # konkretne pliki
+      ruff format -                    # stdin → stdout (potok)
+
+      # Sprawdź bez zmian
+      ruff format --check .            # exit code 1 jeśli jest coś do zmiany
+
+      # Podgląd zmian
+      ruff format --diff .             # pokaż diff
+      ruff format --diff app.py       # diff jednego pliku
+
+      # Razem z lintingiem (typowy CI)
+      ruff check --fix . && ruff format .
+
+  - name: Konfiguracja formattera
+    desc: >
+      Ruff format konfiguruje się w `[tool.ruff.format]`. Najważniejsze opcje:
+      quote-style (double/single), indent-style (space/tab), line-length.
+      Domyślnie zachowuje się jak Black (double quotes, 88 chars).
+    code: |
+      # pyproject.toml — [tool.ruff.format]
+      # quote-style = "double"    # domyślnie (jak Black)
+      # quote-style = "single"    # dla projektów preferujących '
+      # indent-style = "space"    # domyślnie (4 spaces)
+      # indent-style = "tab"      # rzadko używane
+      # line-length = 88          # domyślnie (jak Black)
+      # line-length = 120         # dla szerszych ekranów
+
+      # Wykluczanie plików z formatowania
+      # [tool.ruff]
+      # exclude = ["migrations/", "*.pyi"]
+
+      # Preview mode (eksperymentalne reguły formatu)
+      # [tool.ruff.format]
+      # preview = true
+
+  - name: Kompatybilność z Black
+    desc: >
+      Ruff format jest zaprojektowany jako drop-in replacement dla Black. Wszystkie
+      ustawienia Black można przetłumaczyć na Ruff. Różnice są marginalne i dotyczą
+      edge case'ów ze starszych wersji Black.
+    code: |
+      # Black → Ruff format odpowiedniki:
+      # black --line-length 120 .    → ruff format --line-length 120 .
+      # black --skip-string-norm .   → [tool.ruff.format] quote-style = "preserve"
+      # black --target-version py312 → [tool.ruff] target-version = "py312"
+      # black --check .              → ruff format --check .
+      # black --diff .               → ruff format --diff .
+
+      # Migracja z Black do Ruff:
+      # 1. pip uninstall black (lub zostaw obok)
+      # 2. pip install ruff (lub uv add --dev ruff)
+      # 3. Zmień w pyproject.toml [tool.black] → [tool.ruff.format]
+      # 4. Zmień w pre-commit: black-pre-commit → ruff-pre-commit
+
+  - name: Magic trailing comma
+    desc: >
+      Zarówno Black jak i Ruff respektują "magic trailing comma" — jeśli ostatni
+      element listy/funkcji ma przecinek, formatter nie złapie tego w jedną linię.
+      To mechanizm wymuszania rozpisanego formatu przez programistę.
+    code: |
+      # Bez trailing comma — formatter może zwinąć do jednej linii
+      my_list = [
+          "item1",
+          "item2",
+          "item3"
+      ]
+      # Po formacie może stać się: my_list = ["item1", "item2", "item3"]
+
+      # Z trailing comma — formatter ZACHOWUJE rozpisany format
+      my_list = [
+          "item1",
+          "item2",
+          "item3",   # <-- trailing comma = sygnał "zostaw tak"
+      ]
+
+      # To samo działa dla wywołań funkcji i definicji
+      result = my_function(
+          argument_one,
+          argument_two,   # <-- trailing comma
+      )

@@ -1,0 +1,121 @@
+title: Skrypty i narzędzia
+labels:
+  section: Feature
+  example: Przykład
+
+intro: >
+  uv obsługuje uruchamianie jednorazowych skryptów Python z inline deklaracją zależności
+  (PEP 723) oraz instalację narzędzi CLI bez globalnego zanieczyszczania środowiska.
+  `uvx` (alias uv tool run) uruchamia narzędzia w izolowanym środowisku — jak npx dla Node.
+
+items:
+  - name: uvx — narzędzia bez instalacji
+    desc: >
+      `uvx` (skrót od `uv tool run`) uruchamia narzędzia CLI w tymczasowym izolowanym
+      środowisku. Nie instaluje globalnie — każde uruchomienie pobiera i usuwa środowisko.
+      Idealne dla jednorazowych narzędzi jak ruff, black, mypy bez zanieczyszczania globalnego Pythona.
+    code: |
+      # Uruchom bez instalacji (jak npx)
+      uvx ruff check .
+      uvx black --check .
+      uvx mypy src/
+      uvx pytest tests/
+      uvx httpie GET https://httpbin.org/json
+
+      # Konkretna wersja
+      uvx ruff@0.8.0 check .
+      uvx "black>=24.0" .
+
+      # Z extras
+      uvx "rich-cli[pygments]" --head 50 README.md
+
+      # Aliasy (skrót uvx = uv tool run)
+      uv tool run ruff check .   # to samo co uvx ruff check .
+
+  - name: uv tool install — globalne narzędzia
+    desc: >
+      `uv tool install` instaluje narzędzia CLI globalnie w izolowanych środowiskach —
+      każde narzędzie ma własny venv. Nie mieszają się ze sobą ani z projektem.
+      Zastępuje `pip install --user` i pipx.
+    code: |
+      # Instaluj globalnie (izolowane środowisko per narzędzie)
+      uv tool install ruff
+      uv tool install black
+      uv tool install mypy
+      uv tool install httpie
+      uv tool install "poetry>=1.8"
+
+      # Lista zainstalowanych narzędzi
+      uv tool list
+
+      # Zaktualizuj narzędzie
+      uv tool upgrade ruff
+      uv tool upgrade --all
+
+      # Odinstaluj
+      uv tool uninstall black
+
+      # Gdzie są zainstalowane?
+      # ~/.local/bin/ruff → izolowany venv z ruff
+      # Binarki w PATH automatycznie
+
+  - name: Skrypty z inline zależnościami (PEP 723)
+    desc: >
+      PEP 723 pozwala deklarować zależności bezpośrednio w pliku .py przez komentarz
+      `# /// script`. `uv run script.py` automatycznie tworzy izolowane środowisko
+      z tymi zależnościami. Zero konfiguracji — skrypt jest samowystarczalny.
+    code: |
+      # moj_skrypt.py
+      # /// script
+      # requires-python = ">=3.12"
+      # dependencies = [
+      #     "requests>=2.32",
+      #     "rich>=13.0",
+      # ]
+      # ///
+
+      import requests
+      from rich.console import Console
+
+      console = Console()
+      r = requests.get("https://httpbin.org/json")
+      console.print_json(r.text)
+
+      # --- Uruchomienie ---
+      # uv run moj_skrypt.py
+      # uv automatycznie: tworzy venv, instaluje requests+rich, uruchamia
+
+      # Możesz też uruchomić bezpośrednio z URL (ostrożnie!)
+      # uv run https://gist.github.com/user/xxx/script.py
+
+  - name: GitHub Actions z uv
+    desc: >
+      astral-sh/setup-uv@v4 to oficjalny action który instaluje uv i konfiguruje cache.
+      Znacząco przyspiesza CI przez cachowanie pakietów między runami.
+    code: |
+      # .github/workflows/ci.yml
+      # name: CI
+      # on: [push, pull_request]
+      # jobs:
+      #   test:
+      #     runs-on: ubuntu-latest
+      #     steps:
+      #       - uses: actions/checkout@v4
+      #
+      #       - name: Install uv
+      #         uses: astral-sh/setup-uv@v4
+      #         with:
+      #           enable-cache: true        # cache ~/.cache/uv
+      #           cache-dependency-glob: "uv.lock"
+      #
+      #       - name: Install Python
+      #         run: uv python install 3.12
+      #
+      #       - name: Install dependencies
+      #         run: uv sync --frozen --no-dev
+      #
+      #       - name: Run tests
+      #         run: uv run pytest tests/ -v
+      #
+      #       - name: Lint
+      #         run: uv run ruff check .

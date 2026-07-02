@@ -1,0 +1,82 @@
+title: Typer vs inne biblioteki CLI
+
+items:
+  - name: Click
+    icon: "🖱️"
+    color: "#cc2936"
+    tagline: Dojrzały framework CLI — Typer go owija i upraszcza
+    pros:
+      - Bardzo dojrzały — 10+ lat, ogromna baza użytkowników
+      - Pełna kontrola nad parserem — zaawansowane use-case'y
+      - Własne typy parametrów (click.Path, click.Choice, click.File)
+      - Integruje się z każdą biblioteką Python
+    cons:
+      - Verbose dekoratory — @click.option('@click.argument dla każdego parametru
+      - Brak automatycznej konwersji typów z type hints
+      - Trzeba ręcznie definiować --help dla każdej opcji
+      - Typer jest de facto abstrakcją nad Click — Click pod spodem
+    vs: Typer używa Click wewnętrznie — możesz miksować Click i Typer. Jeśli coś nie działa w Typerze, sięgnij do Click API. Dla nowych projektów Typer jest szybszy w pisaniu.
+
+  - name: argparse
+    icon: "📋"
+    color: "#3572a5"
+    tagline: Wbudowany stdlib — działa wszędzie, konfiguracja ręczna
+    pros:
+      - Wbudowany w Python — zero instalacji
+      - Działa w każdym środowisku (Docker, Lambda, embedded)
+      - Pełna kontrola nad każdym aspektem parsowania
+      - Dobra dokumentacja w oficjalnych docs Pythona
+    cons:
+      - Bardzo verbose — 5-10 linii na jeden argument
+      - Brak type hints — typy przez type= parametr, nie annotations
+      - "--help generowane ręcznie, brak automatyzacji"
+      - Brak kolorów, Rich, autocompletion bez dodatkowych bibliotek
+    vs: argparse gdy zależności są zakazane lub piszesz stdlib-only narzędzie. Typer dla każdego projektu gdzie możesz instalować pakiety.
+
+  - name: Fire
+    icon: "🔥"
+    color: "#f4511e"
+    tagline: Google Fire — automatyczne CLI z dowolnej klasy lub funkcji
+    pros:
+      - Zero konfiguracji — python app.py funkcja arg1 arg2
+      - Automatycznie eksponuje wszystkie metody klasy jako komendy
+      - Idealne do szybkiego prototypowania i skryptów
+      - Obsługuje zagnieżdżone obiekty jako subkomendy
+    cons:
+      - Słabe --help — generowane z docstringów, bez typów
+      - Brak walidacji typów i prompt dla brakujących wartości
+      - Trudne do kontrolowania — magiczne zachowanie
+      - Nie nadaje się do production CLI z dobrym UX
+    vs: Fire do szybkich skryptów i eksperymentów. Typer gdy zależy ci na dobrej dokumentacji CLI, walidacji i profesjonalnym UX.
+
+  - name: docopt
+    icon: "📄"
+    color: "#607d8b"
+    tagline: Docstring-based CLI — spec w docstringu, parser automatyczny
+    pros:
+      - Unikalny model — piszesz --help a docopt parsuje go jako spec
+      - Bardzo czytelna definicja CLI w tekście
+      - Zero boilerplate — 2-3 linie kodu
+      - Deterministyczny parser — WYSIWYG
+    cons:
+      - Nienaturalny dla Pythona — spec w stringu zamiast w kodzie
+      - Brak type hints i walidacji typów
+      - Słabo utrzymywany — ostatni release dawno temu
+      - Trudniejsze refactoring — spec w stringu nie podlega IDE
+    vs: docopt to ciekawostka — Typer jest lepszy w każdym praktycznym aspekcie. Jedyny powód to legacy kod z docopt.
+
+  - name: Plumbum
+    icon: "🔧"
+    color: "#4a4a4a"
+    tagline: Shell w Pythonie — CLI + pipe + process management
+    pros:
+      - Obsługuje CLI, pipe i procesy systemowe w jednym
+      - Lokalne i zdalne SSH komendy jednakowym API
+      - Deklaratywne łączenie komend jak w bash
+      - Własny CLI framework (cli.Application)
+    cons:
+      - Duża biblioteka — pełny shell replacement, nie tylko CLI
+      - Mniejsza społeczność i dokumentacja niż Click/Typer
+      - Bardziej złożone API niż Typer dla prostych CLI
+      - Brak Rich/autocompletion out-of-the-box
+    vs: Plumbum gdy budujesz skrypty które mocno korzystają z procesów systemowych i pipe. Typer dla CLI aplikacji zorientowanych na użytkownika.

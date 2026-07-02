@@ -1,0 +1,138 @@
+title: Ekosystem Typera
+items:
+  - name: "typer[all] — Rich + shellingham"
+    icon: "📦"
+    desc: |
+      Pełna instalacja Typera z Rich (kolorowy output) i shellingham (auto-detekcja shella).
+      Instalacja: pip install "typer[all]"
+
+      Rich renderuje --help z kolorami, tabelami i panelami.
+      Shellingham wykrywa używany shell do instalacji autocompletion.
+    code: |
+      # pip install "typer[all]"
+
+      import typer
+      from rich.console import Console
+      from rich.panel import Panel
+
+      app = typer.Typer(rich_markup_mode="rich")
+      console = Console()
+
+      @app.command()
+      def hello(name: str):
+          """
+          Przywitaj użytkownika.
+
+          [green]Przykład:[/green] python app.py Łukasz
+          """
+          console.print(Panel(
+              f"[bold green]Cześć, {name}![/bold green]",
+              title="Powitanie",
+              border_style="green",
+          ))
+
+      if __name__ == "__main__":
+          app()
+
+  - name: rich — piękny terminal output
+    icon: "🎨"
+    desc: |
+      Rich to biblioteka do bogatego formatowania terminalu — tabele, progress bary, Markdown, syntax highlighting.
+      Instalacja: pip install rich (lub przez typer[all])
+
+      Typer automatycznie używa Rich dla --help gdy jest zainstalowany.
+      W kodzie importujesz Rich bezpośrednio — Console, Table, Progress, Spinner.
+    code: |
+      import typer
+      from rich.console import Console
+      from rich.table import Table
+      from rich.progress import Progress, SpinnerColumn, TextColumn
+      import time
+
+      app = typer.Typer()
+      console = Console()
+
+      @app.command()
+      def deploy(services: list[str] = typer.Argument(...)):
+          """Wdróż wybrane serwisy."""
+          with Progress(
+              SpinnerColumn(),
+              TextColumn("[progress.description]{task.description}"),
+              console=console,
+          ) as progress:
+              for svc in services:
+                  task = progress.add_task(f"Deploying {svc}...", total=None)
+                  time.sleep(1)  # symulacja
+                  progress.remove_task(task)
+                  console.print(f"[green]✓[/green] {svc} deployed")
+
+      if __name__ == "__main__":
+          app()
+
+  - name: pytest + CliRunner — testowanie CLI
+    icon: "🧪"
+    desc: |
+      typer.testing.CliRunner pozwala testować komendy CLI bez uruchamiania procesu.
+      Instalacja: pip install pytest (CliRunner jest wbudowany w Typer)
+
+      result.exit_code sprawdza kod wyjścia. result.output zawiera stdout.
+      Idealne do testowania walidacji, komunikatów błędów i logiki komend.
+    code: |
+      import pytest
+      from typer.testing import CliRunner
+      from myapp import app  # twój typer app
+
+      runner = CliRunner()
+
+      def test_hello():
+          result = runner.invoke(app, ["hello", "Łukasz"])
+          assert result.exit_code == 0
+          assert "Łukasz" in result.output
+
+      def test_deploy_dry_run():
+          result = runner.invoke(app, ["deploy", "--env", "staging",
+                                        "--dry-run"])
+          assert result.exit_code == 0
+          assert "dry" in result.output.lower()
+
+      def test_missing_argument():
+          result = runner.invoke(app, ["process"])  # brak wymaganego arg
+          assert result.exit_code != 0
+
+      def test_confirm_abort():
+          result = runner.invoke(app, ["delete-db", "prod"],
+                                  input="n\n")  # odpowiedź "nie"
+          assert result.exit_code == 1
+
+  - name: shellingham — autocompletion
+    icon: "🐚"
+    desc: |
+      shellingham wykrywa aktywny shell (bash/zsh/fish) i instaluje autocompletion dla CLI.
+      Instalacja: pip install shellingham (lub przez typer[all])
+
+      typer --install-completion instaluje completion dla wykrytego shella.
+      Typer automatycznie obsługuje --install-completion i --show-completion.
+    code: |
+      # typer[all] instaluje shellingham automatycznie
+      # pip install "typer[all]"
+
+      import typer
+
+      app = typer.Typer()
+
+      @app.command()
+      def process(
+          env: str = typer.Option(
+              "prod",
+              autocompletion=lambda: ["prod", "staging", "dev"]
+          ),
+      ):
+          """Przetwórz z autocompletionem dla --env."""
+          typer.echo(f"Processing on {env}")
+
+      if __name__ == "__main__":
+          app()
+
+      # Instalacja completion dla wykrytego shella:
+      # python app.py --install-completion
+      # Teraz python app.py --env <TAB> podpowiada: prod, staging, dev

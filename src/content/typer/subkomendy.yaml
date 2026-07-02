@@ -1,0 +1,163 @@
+items:
+  - name: "app.add_typer() — zagnieżdżone CLI"
+    desc: >
+      add_typer() dodaje sub-app jako grupę komend z prefixem. Tworzy hierarchię CLI — app → db init/migrate/drop.
+      Każdy sub-app ma własne komendy i callback. Identyczna struktura jak Django management commands.
+    code: |
+      import typer
+
+      app = typer.Typer()
+      db_app = typer.Typer()
+      server_app = typer.Typer()
+
+      app.add_typer(db_app, name="db")
+      app.add_typer(server_app, name="server")
+
+      @db_app.command("init")
+      def db_init():
+          """Zainicjuj bazę danych."""
+          typer.echo("Database initialized")
+
+      @db_app.command("migrate")
+      def db_migrate(revision: str = "head"):
+          """Uruchom migracje."""
+          typer.echo(f"Migrating to {revision}")
+
+      @db_app.command("drop")
+      def db_drop(force: bool = False):
+          """Usuń bazę danych."""
+          if force or typer.confirm("Na pewno?"):
+              typer.echo("Database dropped!")
+
+      @server_app.command("start")
+      def server_start(port: int = 8000):
+          """Uruchom serwer."""
+          typer.echo(f"Server started on port {port}")
+
+      @server_app.command("stop")
+      def server_stop():
+          """Zatrzymaj serwer."""
+          typer.echo("Server stopped")
+
+      if __name__ == "__main__":
+          app()
+
+      # python app.py db init
+      # python app.py db migrate --revision v2
+      # python app.py server start --port 9000
+
+  - name: Callback dla grupy subkomend
+    desc: >
+      @sub_app.callback() uruchamia się przed każdą komendą w grupie. Idealne do wspólnej konfiguracji jak połączenie z bazą.
+      Parametry callbacka są dostępne jako opcje przed subkomendą — python app.py db --url sqlite:// init.
+    code: |
+      import typer
+
+      app = typer.Typer()
+      db_app = typer.Typer()
+      app.add_typer(db_app, name="db")
+
+      DB_URL = ""
+
+      @db_app.callback()
+      def db_callback(
+          url: str = typer.Option(
+              "postgresql://localhost/mydb",
+              envvar="DATABASE_URL",
+              help="URL bazy danych",
+          )
+      ):
+          """Komendy bazy danych."""
+          global DB_URL
+          DB_URL = url
+          typer.echo(f"Connecting to: {url[:20]}...")
+
+      @db_app.command()
+      def status():
+          """Status połączenia."""
+          typer.echo(f"Connected to {DB_URL}")
+
+      @db_app.command()
+      def migrate():
+          """Uruchom migracje."""
+          typer.echo(f"Migrating {DB_URL}")
+
+      if __name__ == "__main__":
+          app()
+
+      # python app.py db --url sqlite:///test.db status
+
+  - name: Trzypoziomowa hierarchia komend
+    desc: >
+      Możesz zagnieżdżać app w nieskończoność. app → infra → k8s deploy/scale — pełna hierarchia jak kubectl.
+      Każdy poziom ma własne opcje i callback. Context przekazuje dane między poziomami.
+    code: |
+      import typer
+
+      app = typer.Typer(help="Platforma deployment")
+      infra_app = typer.Typer(help="Zarządzanie infrastrukturą")
+      k8s_app = typer.Typer(help="Kubernetes")
+
+      app.add_typer(infra_app, name="infra")
+      infra_app.add_typer(k8s_app, name="k8s")
+
+      @k8s_app.command()
+      def deploy(image: str, replicas: int = 1):
+          """Wdróż na Kubernetes."""
+          typer.echo(f"Deploying {image} x{replicas}")
+
+      @k8s_app.command()
+      def scale(deployment: str, replicas: int):
+          """Skaluj deployment."""
+          typer.echo(f"Scaling {deployment} to {replicas}")
+
+      @k8s_app.command()
+      def logs(pod: str, follow: bool = False):
+          """Wyświetl logi poda."""
+          flag = " --follow" if follow else ""
+          typer.echo(f"kubectl logs {pod}{flag}")
+
+      if __name__ == "__main__":
+          app()
+
+      # python app.py infra k8s deploy nginx:latest --replicas 3
+      # python app.py infra k8s scale web 5
+      # python app.py infra k8s logs web-abc123 --follow
+
+  - name: Context do przekazywania danych między komendami
+    desc: >
+      typer.Context pozwala przekazywać dane między callbackiem a komendami przez ctx.obj.
+      Idealne gdy callback inicjalizuje klienta (baza, API) a komendy go używają.
+    code: |
+      import typer
+      from dataclasses import dataclass
+
+      @dataclass
+      class AppConfig:
+          verbose: bool
+          env: str
+
+      app = typer.Typer()
+
+      @app.callback()
+      def main(
+          ctx: typer.Context,
+          verbose: bool = False,
+          env: str = "prod",
+      ):
+          """Globalna konfiguracja."""
+          ctx.ensure_object(dict)
+          ctx.obj = AppConfig(verbose=verbose, env=env)
+
+      @app.command()
+      def deploy(ctx: typer.Context):
+          """Wdróż aplikację."""
+          cfg: AppConfig = ctx.obj
+          if cfg.verbose:
+              typer.echo(f"Verbose mode on env={cfg.env}")
+          typer.echo(f"Deploying to {cfg.env}")
+
+      if __name__ == "__main__":
+          app()
+
+      # python app.py --verbose --env staging deploy

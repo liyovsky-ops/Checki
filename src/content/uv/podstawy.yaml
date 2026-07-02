@@ -1,0 +1,105 @@
+title: uv — podstawy
+labels:
+  section: Koncept
+  example: Przykład
+
+intro: >
+  uv to napisany w Rust replacement dla pip, pip-tools, virtualenv, pyenv i Poetry
+  jednocześnie — 10-100x szybszy od pip dzięki równoległemu pobieraniu i Rust resolver.
+  Jeden binarny plik bez zależności. Astral (twórcy Ruff) wydali w 2024 i w ciągu
+  roku zebrał 50k+ gwiazdek na GitHub.
+
+items:
+  - name: Instalacja i pierwsze kroki
+    desc: >
+      uv instaluje się jako pojedynczy binarny plik. Nie wymaga Pythona do instalacji —
+      sam pobiera odpowiednią wersję. `uv pip install` to drop-in replacement dla pip
+      z identycznym API ale wielokrotnie szybszy.
+    code: |
+      # Instalacja (Linux/Mac)
+      curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      # Windows
+      powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+      # Sprawdź wersję
+      uv --version
+      # → uv 0.5.x (...)
+
+      # Drop-in replacement dla pip
+      uv pip install requests fastapi sqlalchemy
+      uv pip install -r requirements.txt
+      uv pip uninstall requests
+      uv pip list
+      uv pip freeze > requirements.txt
+
+  - name: Wirtualne środowisko
+    desc: >
+      `uv venv` tworzy virtualenv — szybciej niż python -m venv bo nie kopiuje plików.
+      Automatycznie wykrywa wersję Pythona. Możesz podać konkretną wersję przez --python.
+      uv sam aktywuje środowisko gdy jest w katalogu projektu.
+    code: |
+      # Utwórz venv (domyślnie .venv w bieżącym katalogu)
+      uv venv
+
+      # Z konkretną wersją Pythona
+      uv venv --python 3.12
+      uv venv --python 3.11.9  # dokładna wersja
+
+      # Aktywacja (standardowa)
+      source .venv/bin/activate   # Linux/Mac
+      .venv\Scripts\activate      # Windows
+
+      # LUB: uv run — bez aktywacji
+      uv run python script.py
+      uv run pytest
+      uv run uvicorn app:main --reload
+
+  - name: uv pip vs pip — szybkość
+    desc: >
+      uv jest 10-100x szybszy od pip dzięki: równoległemu pobieraniu pakietów,
+      Rust-owemu resolverowi zależności, globalnemu cache pakietów (nie pobiera ponownie
+      tego samego pakietu w różnych projektach). Instalacja PyTorch/NumPy trwa sekundy.
+    code: |
+      # Benchmark (przykładowe czasy)
+      # pip install torch            → ~120s (zależy od połączenia)
+      # uv pip install torch         → ~8s   (global cache po pierwszym razie)
+      # pip install torch (cache)    → ~15s
+      # uv pip install torch (cache) → <1s
+
+      # Global cache — pakiety nie są pobierane ponownie
+      # Cache lokalizacja:
+      uv cache dir
+      # → ~/.cache/uv
+
+      # Wyczyść cache
+      uv cache clean
+
+      # Rozmiar cache
+      uv cache dir && du -sh $(uv cache dir)
+
+  - name: Szybki start projektu
+    desc: >
+      `uv init` tworzy projekt z pyproject.toml bez interaktywnego pytania (w przeciwieństwie
+      do `poetry init`). `uv add` dodaje zależności i automatycznie aktualizuje
+      pyproject.toml i uv.lock. Nie musisz tworzyć venv — uv robi to automatycznie.
+    code: |
+      # Nowy projekt
+      uv init moja-apka
+      cd moja-apka
+
+      # Dodaj zależności (automatycznie tworzy venv i uv.lock)
+      uv add fastapi uvicorn
+      uv add --dev pytest ruff mypy
+
+      # Zainstaluj z lock file (deterministycznie)
+      uv sync
+
+      # Uruchom w kontekście projektu
+      uv run python -m pytest
+      uv run uvicorn app:app --reload
+
+      # pyproject.toml jest tworzony automatycznie:
+      # [project]
+      # name = "moja-apka"
+      # dependencies = ["fastapi>=0.115", "uvicorn>=0.32"]

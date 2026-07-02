@@ -1,0 +1,124 @@
+title: Projekty — pyproject.toml
+labels:
+  section: Feature
+  example: Przykład
+
+intro: >
+  uv projects to kompletny system zarządzania projektem Python — init, add, sync, run,
+  build, publish. pyproject.toml jest jedynym plikiem konfiguracyjnym, uv.lock gwarantuje
+  reproducibility. Odpowiednik Poetry ale 10-100x szybszy i z lepszą kompatybilnością.
+
+items:
+  - name: Struktura projektu
+    desc: >
+      `uv init` tworzy projekt z pyproject.toml zgodnym ze standardem PEP 517/518.
+      Automatycznie tworzy .venv, .python-version, uv.lock. `uv init --lib` dla
+      biblioteki (z src/ layout i __init__.py).
+    code: |
+      # Nowa aplikacja
+      uv init moja-apka
+      # moja-apka/
+      # ├── pyproject.toml
+      # ├── .python-version  (np. "3.12")
+      # ├── README.md
+      # └── hello.py
+
+      # Nowa biblioteka (src layout)
+      uv init --lib moja-biblioteka
+      # moja-biblioteka/
+      # ├── pyproject.toml
+      # ├── src/
+      # │   └── moja_biblioteka/
+      # │       └── __init__.py
+      # └── tests/
+
+      # pyproject.toml (auto-generowany):
+      # [project]
+      # name = "moja-apka"
+      # version = "0.1.0"
+      # requires-python = ">=3.12"
+      # dependencies = []
+      #
+      # [build-system]
+      # requires = ["hatchling"]
+      # build-backend = "hatchling.build"
+
+  - name: uv run — uruchamianie bez aktywacji
+    desc: >
+      `uv run` wykonuje komendę w wirtualnym środowisku projektu bez konieczności
+      ręcznej aktywacji. Jeśli venv nie istnieje — tworzy je automatycznie.
+      Idealny do Makefile, skryptów CI i pre-commit hooks.
+    code: |
+      # Zamiast: source .venv/bin/activate && python ...
+      uv run python app.py
+      uv run pytest tests/ -v
+      uv run uvicorn main:app --reload
+      uv run mypy src/
+      uv run ruff check .
+
+      # Uruchom moduł
+      uv run python -m pytest
+      uv run python -m mypackage
+
+      # Makefile z uv
+      # test:
+      #     uv run pytest tests/ -v --cov=src
+      # lint:
+      #     uv run ruff check . && uv run mypy src/
+      # dev:
+      #     uv run uvicorn app:app --reload
+
+  - name: Workspaces (monorepo)
+    desc: >
+      uv workspaces umożliwia zarządzanie monorepo z wieloma pakietami Pythona.
+      Jeden uv.lock dla całego workspace — spójne wersje we wszystkich pakietach.
+      Definiuj workspace w root pyproject.toml przez [tool.uv.workspace].
+    code: |
+      # Struktura workspace
+      # monorepo/
+      # ├── pyproject.toml          (root — workspace config)
+      # ├── packages/
+      # │   ├── core/
+      # │   │   └── pyproject.toml
+      # │   └── api/
+      # │       └── pyproject.toml
+      # └── uv.lock                 (jeden lock file dla wszystkich!)
+
+      # root pyproject.toml:
+      # [tool.uv.workspace]
+      # members = ["packages/*"]
+
+      # packages/api/pyproject.toml:
+      # [project]
+      # name = "api"
+      # dependencies = [
+      #     "core",          # lokalna zależność!
+      #     "fastapi>=0.115"
+      # ]
+      # [tool.uv.sources]
+      # core = { workspace = true }
+
+      # Instaluj wszystkie pakiety workspace
+      uv sync --all-packages
+
+  - name: Build i publish
+    desc: >
+      `uv build` tworzy distributable (sdist + wheel). `uv publish` wysyła na PyPI
+      lub prywatne repo. Wymaga tokenu w PYPI_TOKEN lub UV_PUBLISH_TOKEN env var.
+    code: |
+      # Build pakietu
+      uv build
+      # → dist/
+      #    moja-apka-0.1.0.tar.gz
+      #    moja-apka-0.1.0-py3-none-any.whl
+
+      # Publish na PyPI
+      uv publish
+      # Lub z tokenem:
+      UV_PUBLISH_TOKEN=pypi-xxx uv publish
+
+      # Publish na TestPyPI (testowanie przed prawdziwym publish)
+      uv publish --publish-url https://test.pypi.org/legacy/
+
+      # Prywatne repo
+      uv publish --index-url https://my-private-pypi.com/simple/

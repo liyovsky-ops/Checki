@@ -1,0 +1,103 @@
+title: Konfiguracja
+labels:
+  section: Opcja
+  example: Przykład
+
+intro: >
+  Ruff konfiguruje się w pyproject.toml (sekcja [tool.ruff]) lub w dedykowanym ruff.toml.
+  Konfiguracja jest hierarchiczna — reguły globalne można nadpisać per plik (per-file-ignores).
+  `ruff check --show-settings` wyświetla aktualną konfigurację.
+
+items:
+  - name: Struktura konfiguracji
+    desc: >
+      Dwie sekcje: `[tool.ruff]` (globalne) i `[tool.ruff.lint]` (linting) i `[tool.ruff.format]`
+      (formatowanie). Można też użyć ruff.toml bez prefiksu [tool.ruff].
+    code: |
+      # pyproject.toml — kompletna konfiguracja
+      # [tool.ruff]
+      # target-version = "py312"     # wersja Pythona
+      # line-length = 88             # długość linii (domyślnie 88)
+      # exclude = [                  # pliki/katalogi do pominięcia
+      #     ".git",
+      #     ".venv",
+      #     "migrations",
+      #     "__pycache__",
+      # ]
+      #
+      # [tool.ruff.lint]
+      # select = ["E", "F", "I", "N", "UP", "B", "SIM"]
+      # ignore = ["E501", "B008"]
+      # fixable = ["ALL"]            # wszystkie reguły mogą być auto-fixed
+      # unfixable = ["F401"]         # ale nie F401 (ręczna decyzja)
+      #
+      # [tool.ruff.format]
+      # quote-style = "double"
+      # indent-style = "space"
+      # skip-magic-trailing-comma = false
+
+  - name: per-file-ignores — reguły per plik
+    desc: >
+      `per-file-ignores` pozwala mieć inne reguły dla różnych plików lub katalogów.
+      Najczęstszy przypadek: testy mogą używać assert (S101), pliki __init__.py
+      mogą mieć nieużywane importy (F401) dla re-eksportu.
+    code: |
+      # pyproject.toml — [tool.ruff.lint]
+      # [tool.ruff.lint.per-file-ignores]
+      # "tests/*.py" = ["S101"]          # assert OK w testach
+      # "tests/**/*.py" = ["S101", "S106"]
+      # "__init__.py" = ["F401"]         # re-eksport — nieużywane importy OK
+      # "migrations/*.py" = ["ALL"]      # alembic migrations — ignoruj wszystko
+      # "conftest.py" = ["ANN"]         # fixtures bez annotations OK
+      # "scripts/*.py" = ["T20"]        # print() OK w skryptach
+
+      # Alternatywnie inline (jeden plik):
+      # # ruff: noqa: S101
+      # (na początku pliku — wyłącza regułę dla całego pliku)
+
+  - name: isort — konfiguracja sortowania importów
+    desc: >
+      Ruff zawiera isort jako reguły I*. Konfiguracja isort przenosi się do
+      `[tool.ruff.lint.isort]`. Najważniejsze: known-first-party (twoje paczki),
+      force-sort-within-sections, lines-after-imports.
+    code: |
+      # pyproject.toml — [tool.ruff.lint.isort]
+      # known-first-party = ["myapp", "mylib"]  # twoje paczki = sekcja first-party
+      # force-sort-within-sections = true
+      # lines-after-imports = 2              # puste linie po importach
+      # required-imports = ["from __future__ import annotations"]
+
+      # Jak isort grupuje importy (kolejność):
+      # 1. __future__ imports
+      # 2. stdlib (os, sys, pathlib...)
+      # 3. third-party (fastapi, pydantic...)
+      # 4. first-party (myapp...)
+      # 5. local (relatywne: from . import ...)
+
+      # Aktywacja reguł isort:
+      # [tool.ruff.lint]
+      # select = ["I"]  # lub "I001" konkretnie
+
+  - name: Extend — rozszerzanie konfiguracji
+    desc: >
+      `extend` pozwala dziedziczyć konfigurację z innego pliku. Przydatne w monorepo
+      — wspólna konfiguracja w rocie, każdy subprojekt może nadpisać to co potrzebuje.
+    code: |
+      # Monorepo — root ruff.toml:
+      # target-version = "py312"
+      # line-length = 88
+      # [lint]
+      # select = ["E", "F", "I"]
+
+      # packages/api/pyproject.toml — rozszerz root config:
+      # [tool.ruff]
+      # extend = "../../ruff.toml"
+      # [tool.ruff.lint]
+      # extend-select = ["S"]        # dodaj security dla API
+      # ignore = ["S104"]            # ale ignoruj bind 0.0.0.0
+
+      # packages/scripts/pyproject.toml:
+      # [tool.ruff]
+      # extend = "../../ruff.toml"
+      # [tool.ruff.lint.per-file-ignores]
+      # "*.py" = ["T20"]             # print OK w skryptach

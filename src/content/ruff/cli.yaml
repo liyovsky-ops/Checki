@@ -1,0 +1,81 @@
+title: Komendy
+labels:
+  section: Kategoria
+  example: Komenda
+
+intro: >
+  Ruff CLI ma dwie główne komendy: `ruff check` (linting) i `ruff format` (formatowanie).
+  Plus `ruff rule` (info o regule), `ruff clean` (cache), `ruff config` (konfiguracja).
+  Wszystkie komendy respektują pyproject.toml / ruff.toml automatycznie.
+
+items:
+  - name: ruff check — linting
+    desc: Główna komenda lintowania
+    code: |
+      ruff check .                   # sprawdź cały projekt
+      ruff check src/ tests/         # konkretne katalogi
+      ruff check app.py              # jeden plik
+      ruff check --fix .             # auto-napraw co się da
+      ruff check --fix --unsafe-fixes .  # napraw też "niebezpieczne" (np. F401)
+      ruff check --diff .            # pokaż co by się zmieniło (bez zmian)
+      ruff check --show-fixes .      # pokaż jakie fixy są dostępne
+      ruff check --statistics .      # statystyki błędów per reguła
+      ruff check --select E501 .     # tylko konkretna reguła
+      ruff check --select "E,F" .    # konkretne kategorie
+      ruff check --ignore E501 .     # pomiń regułę
+      ruff check --extend-select S . # dodaj bezpieczeństwo do domyślnych
+      ruff check --output-format=github .   # dla GitHub Actions annotations
+      ruff check --output-format=json .     # output JSON (dla narzędzi)
+      ruff check -q .                # cicho (tylko błędy, bez progress)
+      ruff check --watch .           # watch mode (re-check przy zmianach)
+      ruff check --stdin-filename app.py -  # lint ze stdin
+
+  - name: ruff format — formatowanie
+    desc: Formatowanie kodu (Black-compatible)
+    code: |
+      ruff format .                  # formatuj cały projekt
+      ruff format src/               # konkretny katalog
+      ruff format app.py models.py   # konkretne pliki
+      ruff format --check .          # sprawdź bez zmian (CI)
+      ruff format --diff .           # pokaż diff bez zmian
+      ruff format --line-length 120 .  # override długości linii
+      ruff format -                  # formatuj stdin → stdout
+
+  - name: ruff rule i ruff config
+    desc: Narzędzia diagnostyczne i informacyjne
+    code: |
+      # Informacje o regułach
+      ruff rule E501               # opis reguły E501 (line-too-long)
+      ruff rule B006               # opis mutable default argument
+      ruff rule --all              # lista wszystkich 800+ reguł
+      ruff rule --all --output-format=json  # w JSON
+
+      # Konfiguracja
+      ruff check --show-settings . # wyświetl aktualną konfigurację
+      ruff config                  # wyświetl domyślną konfigurację
+      ruff config target-version   # konkretna opcja
+
+      # Cache
+      ruff clean                   # wyczyść cache
+      ruff cache dir               # gdzie jest cache (~/.cache/ruff)
+
+      # Wersja
+      ruff --version
+      ruff version                 # to samo
+
+  - name: Flagi globalne
+    desc: Flagi działające z każdą subkomendą
+    code: |
+      ruff check . --config pyproject.toml  # konkretny plik konfiguracji
+      ruff check . --config ruff.toml
+      ruff check . --no-cache          # pomiń cache (wolniejsze)
+      ruff check . --isolated          # ignoruj konfigurację projektu
+      ruff check . -q                  # quiet (bez nagłówków)
+      ruff check . --verbose           # więcej info (debug)
+      ruff check . --exit-zero         # zawsze exit 0 (dla niektórych CI)
+      ruff check . --no-fix            # nawet jeśli konfiguracja ma fix=true
+
+      # Przydatne kombinacje
+      ruff check --select ALL --statistics .    # audit wszystkich reguł
+      ruff check --fix --show-fixes .           # napraw i pokaż co naprawiłeś
+      ruff format --check . && echo "OK"        # check z własnym komunikatem

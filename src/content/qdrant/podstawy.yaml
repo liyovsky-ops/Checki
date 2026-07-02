@@ -1,0 +1,75 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Qdrant?
+  firstComponent: Pierwsze kroki
+  firstComponentLang: Python
+
+intro:
+  title: Czym jest Qdrant?
+  desc: >
+    Qdrant to wektorowa baza danych napisana w Rust — przechowuje embeddingi i umożliwia similarity search po semantycznym znaczeniu.
+    Używana do RAG (Retrieval-Augmented Generation), semantic search, rekomendacji i wykrywania duplikatów w aplikacjach AI.
+    Dostępna jako lokalna baza (Docker, in-memory) i zarządzana chmura z REST i gRPC API.
+
+concepts:
+  - title: Wektor embeddings
+    desc: >
+      Wektor to lista liczb (np. 1536 floatów) reprezentująca semantyczne znaczenie tekstu, obrazu lub danych.
+      "King - Man + Woman ≈ Queen" w przestrzeni wektorowej. Qdrant przechowuje te wektory i szuka najbliższych sąsiadów.
+    icon: "📐"
+  - title: Collection — kontener na punkty
+    desc: >
+      Collection to odpowiednik tabeli w SQL — zbiór punktów (wektorów) o tej samej wymiarowości.
+      Każda collection ma stały rozmiar wektora (size) i metrykę odległości (COSINE, EUCLID, DOT).
+    icon: "📦"
+  - title: Point — wektor z payload
+    desc: >
+      Point to podstawowy element — id, vector (lista floatów) i opcjonalny payload (dict z metadanymi).
+      Payload może zawierać dowolne dane JSON — source, date, category — do filtrowania wyników.
+    icon: "📍"
+  - title: Similarity search
+    desc: >
+      Zamiast "znajdź dokument z id=5", Qdrant szuka "znajdź 5 najbardziej podobnych semantycznie do tego wektora".
+      Podobieństwo mierzone przez cosine similarity (najczęstsze), euclid distance lub dot product.
+    icon: "🔍"
+
+whenToUse:
+  - RAG — przechowuj embeddingi dokumentów, szukaj kontekstu dla LLM
+  - Semantic search — wyszukiwarka przez znaczenie, nie słowa kluczowe
+  - Rekomendacje — znajdź podobne produkty, filmy, artykuły
+  - Wykrywanie duplikatów — znajdź podobne dokumenty w kolekcji
+  - Question answering — znajdź fragmenty które odpowiadają na pytanie
+  - "NIE DO: transakcyjnych danych relacyjnych — tu PostgreSQL"
+
+firstComponent: |
+  from qdrant_client import QdrantClient
+  from qdrant_client.models import Distance, VectorParams, PointStruct
+
+  # In-memory — idealne do testów i nauki
+  client = QdrantClient(":memory:")
+
+  # Utwórz kolekcję (1536 dim = OpenAI text-embedding-3-small)
+  client.create_collection(
+      collection_name="docs",
+      vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
+  )
+
+  # Dodaj punkty (wektory z payload)
+  client.upsert(
+      collection_name="docs",
+      points=[
+          PointStruct(id=1, vector=[0.1] * 1536,
+                      payload={"text": "FastAPI to framework REST API"}),
+          PointStruct(id=2, vector=[0.2] * 1536,
+                      payload={"text": "SQLModel łączy SQLAlchemy z Pydantic"}),
+      ],
+  )
+
+  # Szukaj podobnych (query_vector = embedding pytania)
+  results = client.search(
+      collection_name="docs",
+      query_vector=[0.15] * 1536,
+      limit=2,
+  )
+  for r in results:
+      print(f"score={r.score:.3f} | {r.payload['text']}")

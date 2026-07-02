@@ -1,0 +1,88 @@
+title: Rywale — pip, Poetry, pyenv, pipx
+labels:
+  section: Narzędzie
+  example: Porównanie
+
+intro: >
+  uv zastępuje w zasadzie cały stos narzędzi Python: pip (pakiety), virtualenv (środowiska),
+  pyenv (wersje Pythona), pip-tools (lock files), pipx (globalne narzędzia), Poetry
+  (project management). Jedno narzędzie zamiast 5.
+
+items:
+  - name: pip + virtualenv
+    desc: >
+      Standardowy stos. Brak lock file managementu — requirements.txt nie pinuje
+      zależności tranzytywnych. pip jest wolny (single-threaded resolver w Pythonie).
+      uv pip = identyczny API, wielokrotnie szybszy.
+    code: |
+      # pip + virtualenv (stary sposób)
+      python -m venv .venv
+      source .venv/bin/activate
+      pip install fastapi uvicorn
+      pip freeze > requirements.txt
+
+      # uv (nowy sposób — to samo ale 10x szybciej)
+      uv venv
+      uv pip install fastapi uvicorn
+      uv pip freeze > requirements.txt
+
+      # Migracja: po prostu zmień pip → uv pip
+      # Wszystko inne zostaje bez zmian
+
+  - name: Poetry
+    desc: >
+      Poetry = zarządzanie projektem (pyproject.toml + poetry.lock). uv ma identyczne
+      możliwości (uv add/lock/sync) ale jest 10-100x szybszy i nie ma własnego
+      build backend (używa hatchling/setuptools). uv.lock jest kompatybilny tylko z uv.
+    code: |
+      # Poetry                          # uv equivalent
+      poetry new projekt               # uv init projekt
+      poetry add requests              # uv add requests
+      poetry add --dev pytest          # uv add --dev pytest
+      poetry install                   # uv sync
+      poetry run python app.py         # uv run python app.py
+      poetry shell                     # source .venv/bin/activate
+      poetry build                     # uv build
+      poetry publish                   # uv publish
+
+      # Migracja z Poetry do uv:
+      # 1. uv init (lub użyj istniejącego pyproject.toml)
+      # 2. uv add $(cat pyproject.toml | grep -E '^\w+ = ' | ...)
+      # Lub: poetry export -f requirements.txt | uv pip sync -
+
+  - name: pyenv
+    desc: >
+      pyenv = zarządzanie wieloma wersjami Pythona. Wymaga kompilacji (wolne).
+      uv python install pobiera precompilowane binaria — szybciej i prostsze.
+      .python-version kompatybilny — oba narzędzia czytają ten sam plik.
+    code: |
+      # pyenv                           # uv equivalent
+      pyenv install 3.12               # uv python install 3.12
+      pyenv local 3.12                 # uv python pin 3.12
+      pyenv versions                   # uv python list
+      pyenv global 3.12                # (globalny Python — zostawić systemowy)
+
+      # Współistnienie pyenv + uv:
+      # Możesz używać obu — .python-version jest wspólny
+      # uv szuka Pythona w kolejności:
+      # 1. .python-version (local)
+      # 2. PYTHON_VERSION env var
+      # 3. Zainstalowane przez uv python install
+      # 4. Systemowy Python
+
+  - name: pipx
+    desc: >
+      pipx = izolowana instalacja narzędzi CLI w osobnych środowiskach.
+      `uv tool install` to dokładnie to samo ale szybciej. `uvx` = jednorazowe
+      uruchomienie bez trwałej instalacji (jak npx). pipx nie ma odpowiednika uvx.
+    code: |
+      # pipx                            # uv equivalent
+      pipx install ruff                # uv tool install ruff
+      pipx run ruff check .            # uvx ruff check .
+      pipx upgrade ruff                # uv tool upgrade ruff
+      pipx list                        # uv tool list
+      pipx uninstall ruff              # uv tool uninstall ruff
+      pipx upgrade-all                 # uv tool upgrade --all
+
+      # uvx (brak odpowiednika w pipx)
+      uvx ruff@0.8.0 check .   # jednorazowe uruchomienie konkretnej wersji

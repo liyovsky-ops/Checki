@@ -1,0 +1,116 @@
+title: Ekosystem i integracje
+labels:
+  section: Integracja
+  example: Przykład
+
+intro: >
+  uv integruje się z całym ekosystemem Python — GitHub Actions, Docker, pre-commit,
+  VS Code, PyCharm. astral-sh/setup-uv to oficjalny GitHub Action. Dockerfile z uv
+  jest znacznie szybszy niż z pip przez cache layers.
+
+items:
+  - name: Docker z uv
+    desc: >
+      uv w Dockerfile drastycznie przyspiesza budowanie obrazów przez efektywne
+      cache layers. Instalacja zależności oddzielnie od kodu = cache nie jest
+      invalidowany przy każdej zmianie kodu. Użyj `ghcr.io/astral-sh/uv` jako base.
+    code: |
+      # Dockerfile z uv (multi-stage, produkcyjny)
+      FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
+
+      WORKDIR /app
+
+      # Skopiuj tylko pliki zależności (cache layer)
+      COPY pyproject.toml uv.lock ./
+
+      # Instaluj zależności (cached jeśli pyproject.toml/uv.lock się nie zmieniło)
+      RUN uv sync --frozen --no-dev --no-install-project
+
+      # Skopiuj kod (nowa warstwa — tylko tu cache jest invalidowany)
+      COPY src/ ./src/
+
+      # Instaluj projekt
+      RUN uv sync --frozen --no-dev
+
+      # Runtime image (bez uv)
+      FROM python:3.12-slim
+      COPY --from=builder /app/.venv /app/.venv
+      COPY --from=builder /app/src /app/src
+      ENV PATH="/app/.venv/bin:$PATH"
+      CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0"]
+
+  - name: pre-commit z uv
+    desc: >
+      uv świetnie działa z pre-commit — `uv run` w hooks gwarantuje użycie
+      właściwego środowiska projektu. Możesz też użyć `repo: local` z uvx.
+    code: |
+      # .pre-commit-config.yaml
+      # repos:
+      #   - repo: local
+      #     hooks:
+      #       - id: ruff
+      #         name: ruff lint
+      #         entry: uvx ruff check --fix
+      #         language: system
+      #         types: [python]
+      #
+      #       - id: ruff-format
+      #         name: ruff format
+      #         entry: uvx ruff format
+      #         language: system
+      #         types: [python]
+      #
+      #       - id: mypy
+      #         name: mypy type check
+      #         entry: uv run mypy src/
+      #         language: system
+      #         pass_filenames: false
+
+      # Instalacja pre-commit przez uvx
+      uvx pre-commit install
+      uvx pre-commit run --all-files
+
+  - name: VS Code i PyCharm
+    desc: >
+      Oba IDE automatycznie wykrywają venv w .venv/. uv tworzy venv właśnie tam
+      domyślnie (lub po ustawieniu uv config virtualenvs.in-project true).
+      Nie potrzebujesz żadnej dodatkowej konfiguracji.
+    code: |
+      # VS Code — automatyczne wykrycie
+      # 1. uv venv         (tworzy .venv/)
+      # 2. VS Code pyta "Select Python Interpreter"
+      # 3. Wybierz .venv/bin/python
+      # Lub w settings.json:
+      # "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
+
+      # Konfiguracja żeby venv zawsze był w .venv
+      uv config set virtualenvs.in-project true
+      # Lub env var:
+      # UV_PROJECT_ENVIRONMENT=.venv
+
+      # PyCharm — Settings → Project → Python Interpreter
+      # → Add Interpreter → Existing Environment
+      # → .venv/bin/python
+
+  - name: Konfiguracja uv.toml
+    desc: >
+      uv.toml (lub [tool.uv] w pyproject.toml) = globalna/per-projekt konfiguracja uv.
+      Ustawienia: index-url, extra-index-url, virtualenvs.in-project, python-preference.
+    code: |
+      # ~/.config/uv/uv.toml (globalna konfiguracja)
+      # [pip]
+      # index-url = "https://my-private-pypi.com/simple/"
+      # extra-index-url = ["https://pypi.org/simple/"]
+      #
+      # [virtualenvs]
+      # in-project = true     # zawsze .venv obok pyproject.toml
+
+      # pyproject.toml (per-projekt)
+      # [tool.uv]
+      # index-url = "https://my-private-pypi.com/simple/"
+      # constraint-dependencies = ["numpy<2.0"]  # wymuszaj constraint
+
+      # Env vars (override wszystkiego)
+      export UV_INDEX_URL="https://my-private-pypi.com/simple/"
+      export UV_EXTRA_INDEX_URL="https://pypi.org/simple/"
+      export UV_CACHE_DIR="/fast-ssd/uv-cache"

@@ -1,0 +1,123 @@
+items:
+  - name: "Field() — atrybuty kolumny"
+    desc: >
+      Field() łączy Pydantic walidację z SQLAlchemy atrybutami kolumny w jednym wywołaniu.
+      primary_key, index, unique, foreign_key to atrybuty SQLAlchemy. min_length, regex to Pydantic.
+    code: |
+      from typing import Optional
+      from sqlmodel import Field, SQLModel
+
+      class User(SQLModel, table=True):
+          id: Optional[int] = Field(default=None, primary_key=True)
+          # Indeks dla szybkiego wyszukiwania
+          email: str = Field(unique=True, index=True)
+          # Pydantic walidacja + SQLAlchemy default
+          username: str = Field(min_length=3, max_length=50, index=True)
+          # Nullable kolumna
+          bio: Optional[str] = Field(default=None, max_length=500)
+          # Kolumna z wartością domyślną
+          is_active: bool = Field(default=True)
+          # Ukryte przed Pydantic (server_default)
+          created_at: Optional[str] = Field(
+              default=None,
+              sa_column_kwargs={"server_default": "CURRENT_TIMESTAMP"},
+          )
+
+  - name: Schema separation — Create/Read/Update
+    desc: >
+      table=True tylko dla modelu bazy. Modele bez table=True to czyste Pydantic schematy — dla API.
+      HeroCreate → input (bez id). Hero → DB (z id). HeroRead → response (bez hasła). HeroUpdate → PATCH.
+    code: |
+      from typing import Optional
+      from sqlmodel import Field, SQLModel
+
+      # Wspólna baza — pola do walidacji
+      class HeroBase(SQLModel):
+          name: str = Field(min_length=1, max_length=100)
+          age: Optional[int] = Field(default=None, ge=0, le=150)
+
+      # Tabela w DB — dziedziczy bazę + dodaje id i secret_name
+      class Hero(HeroBase, table=True):
+          id: Optional[int] = Field(default=None, primary_key=True)
+          secret_name: str  # wrażliwe pole — nie eksponujemy w Read
+
+      # Input do POST /heroes — bez id (generuje DB)
+      class HeroCreate(HeroBase):
+          secret_name: str
+
+      # Response z GET /heroes — bez secret_name
+      class HeroRead(HeroBase):
+          id: int
+
+      # Input do PATCH /heroes/{id} — wszystkie pola opcjonalne
+      class HeroUpdate(SQLModel):
+          name: Optional[str] = None
+          age: Optional[int] = None
+
+  - name: model_validate — konwersja między schematami
+    desc: >
+      model_validate() (Pydantic v2) tworzy instancję z dict, innego modelu lub ORM obiektu.
+      Używane do konwersji Hero (DB) → HeroRead (response) lub HeroCreate (input) → Hero (DB).
+    code: |
+      from typing import Optional
+      from sqlmodel import Field, Session, SQLModel, create_engine
+
+      class Hero(SQLModel, table=True):
+          id: Optional[int] = Field(default=None, primary_key=True)
+          name: str
+          secret_name: str
+          age: Optional[int] = None
+
+      class HeroCreate(SQLModel):
+          name: str
+          secret_name: str
+          age: Optional[int] = None
+
+      class HeroRead(SQLModel):
+          id: int
+          name: str
+          age: Optional[int]
+
+      engine = create_engine("sqlite:///heroes.db")
+      SQLModel.metadata.create_all(engine)
+
+      # HeroCreate → Hero (DB)
+      hero_data = HeroCreate(name="Batman", secret_name="Bruce Wayne")
+      hero = Hero.model_validate(hero_data)
+
+      with Session(engine) as session:
+          session.add(hero)
+          session.commit()
+          session.refresh(hero)
+          # Hero (DB) → HeroRead (response)
+          response = HeroRead.model_validate(hero)
+          print(response.model_dump())  # bez secret_name
+
+  - name: sa_column — pełna kontrola SQLAlchemy
+    desc: >
+      sa_column= pozwala użyć pełnego SQLAlchemy Column z typem, indeksem i ograniczeniami.
+      Gdy Field() nie wystarcza — np. JSON column, Enum, pełna specyfikacja indeksu złożonego.
+    code: |
+      from typing import Optional
+      from sqlalchemy import Column, String, JSON
+      from sqlmodel import Field, SQLModel
+
+      class Product(SQLModel, table=True):
+          id: Optional[int] = Field(default=None, primary_key=True)
+          name: str
+
+          # JSON kolumna przez sa_column
+          metadata_: Optional[dict] = Field(
+              default=None,
+              sa_column=Column("metadata", JSON, nullable=True),
+          )
+
+          # Enum z ograniczeniem CHECK
+          status: str = Field(
+              default="active",
+              sa_column=Column(
+                  String(20),
+                  nullable=False,
+                  server_default="active",
+              ),
+          )

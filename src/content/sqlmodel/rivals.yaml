@@ -1,0 +1,82 @@
+title: SQLModel vs inne ORM i biblioteki bazodanowe
+
+items:
+  - name: SQLAlchemy
+    icon: "🏛️"
+    color: "#ca2b1e"
+    tagline: Dojrzały, pełny ORM — SQLModel go owija i upraszcza
+    pros:
+      - Pełna kontrola — każdy aspekt konfigurowalny
+      - Ogromny ekosystem — Alembic, Flask-SQLAlchemy, FastAPI
+      - Najlepsza wydajność zaawansowanych zapytań
+      - 20+ lat dojrzałości — bardzo stabilny
+    cons:
+      - Verbose — osobne Column(), mapper(), session setup
+      - Brak natywnej walidacji Pydantic — trzeba mapować ręcznie
+      - Więcej boilerplate dla FastAPI CRUD
+      - Wyższa krzywa uczenia dla początkujących
+    vs: SQLModel używa SQLAlchemy pod spodem — możesz miksować oba. SQLAlchemy gdy potrzebujesz zaawansowanych funkcji (events, custom types, complex relationships). SQLModel dla szybkiego startu z FastAPI.
+
+  - name: Tortoise ORM
+    icon: "🐢"
+    color: "#7fd8be"
+    tagline: Async-native ORM inspirowany Django ORM
+    pros:
+      - Natywnie async — zaprojektowany dla asyncio
+      - API podobne do Django ORM — łatwe dla Django deweloperów
+      - Aerich dla migracji (jak Alembic dla Tortoise)
+      - Dobra integracja z FastAPI przez fastapi-tortoise
+    cons:
+      - Brak Pydantic integracji — osobne modele dla API i DB
+      - Mniejszy ekosystem niż SQLAlchemy
+      - Mniej stabilny — częste breaking changes
+      - Słabsza dokumentacja
+    vs: SQLModel gdy już znasz FastAPI i Pydantic — bezproblemowa integracja. Tortoise gdy projektujesz od zera async-first bez Pydantic w centrum.
+
+  - name: Peewee
+    icon: "🐣"
+    color: "#4b8b3b"
+    tagline: Prosty, lekki ORM — minimalistyczny i łatwy w nauce
+    pros:
+      - Prosty API — łatwy do nauki dla początkujących
+      - Mały — minimalne zależności
+      - Dobra dokumentacja i wiele przykładów
+      - Działa bez FastAPI — standalone scripts, Flask
+    cons:
+      - Brak Pydantic — osobne modele dla walidacji
+      - Brak async — sync-only
+      - Gorszy performance niż SQLAlchemy dla złożonych zapytań
+      - Mniejszy ekosystem migracji
+    vs: SQLModel gdy projektujesz z FastAPI. Peewee dla prostych skryptów, Flask aplikacji lub gdy nie potrzebujesz Pydantic.
+
+  - name: Beanie
+    icon: "☕"
+    color: "#8b5cf6"
+    tagline: ODM dla MongoDB z Pydantic — async-native
+    pros:
+      - Pydantic natywnie — Document dziedziczy z BaseModel
+      - Async-native z Motor pod spodem
+      - Doskonała integracja z FastAPI
+      - Prosta składnia dla MongoDB operacji
+    cons:
+      - Tylko MongoDB — nie PostgreSQL, SQLite
+      - Mniejsza społeczność niż SQLAlchemy
+      - Brak relacji jak w SQL — embeds i references zamiast JOIN
+      - Nie dla projektów które mogą zmienić DB na SQL
+    vs: SQLModel dla relacyjnych baz (PostgreSQL, SQLite). Beanie gdy MongoDB to wymaganie projektowe — oba mają świetną Pydantic integrację.
+
+  - name: Prisma (Python client)
+    icon: "🔺"
+    color: "#2d3748"
+    tagline: TypeScript-origin ORM z generowanym Python klientem
+    pros:
+      - Najlepsza type safety — klient generowany ze schematu
+      - Prisma Studio — wizualny browser danych
+      - Migracje przez prisma migrate
+      - Dobry dla fullstack TypeScript + Python monorepo
+    cons:
+      - Wymaga Node.js — dodatkowa zależność
+      - Wolniejszy niż SQLAlchemy dla skomplikowanych zapytań
+      - Mała społeczność Python — dokumentacja TypeScript-first
+      - Brak natywnej Pydantic integracji
+    vs: SQLModel dla czystych Python projektów z FastAPI. Prisma gdy masz TypeScript frontend i chcesz dzielić schemat DB między TS i Python.

@@ -1,0 +1,141 @@
+title: Ekosystem SQLModel
+items:
+  - name: Alembic — migracje schematu
+    icon: "🔄"
+    desc: |
+      Alembic generuje i stosuje migracje schematu — jak git dla struktury bazy danych.
+      Instalacja: pip install alembic
+
+      Wymaga podpięcia SQLModel metadata jako target_metadata w alembic/env.py.
+      alembic revision --autogenerate generuje migrację z różnic między modelem a DB.
+    code: |
+      # alembic/env.py — kluczowe fragmenty
+      from sqlmodel import SQLModel
+      from myapp.models import Hero, Team  # importuj WSZYSTKIE modele
+
+      target_metadata = SQLModel.metadata  # <-- to jest klucz
+
+      # Generowanie migracji:
+      # alembic revision --autogenerate -m "add heroes table"
+      # alembic upgrade head
+
+      # Przykład wygenerowanej migracji:
+      def upgrade() -> None:
+          op.create_table(
+              "hero",
+              sa.Column("id", sa.Integer(), nullable=False),
+              sa.Column("name", sa.String(), nullable=False),
+              sa.Column("age", sa.Integer(), nullable=True),
+              sa.PrimaryKeyConstraint("id"),
+          )
+          op.create_index("ix_hero_name", "hero", ["name"])
+
+      def downgrade() -> None:
+          op.drop_index("ix_hero_name", table_name="hero")
+          op.drop_table("hero")
+
+  - name: pytest — fixtures z SQLite in-memory
+    icon: "🧪"
+    desc: |
+      SQLite :memory: pozwala testować SQLModel bez pliku — szybkie i izolowane testy per test function.
+      Instalacja: pip install pytest
+
+      session fixture tworzy engine i tabele, potem je czyści. dependency_overrides podmienia Session w FastAPI.
+      StaticPool gwarantuje tę samą połączenie wewnątrz testu — konieczne dla SQLite :memory:.
+    code: |
+      import pytest
+      from sqlmodel import Session, SQLModel, create_engine
+      from sqlmodel.pool import StaticPool
+
+      @pytest.fixture(name="engine")
+      def engine_fixture():
+          engine = create_engine(
+              "sqlite://",  # in-memory
+              connect_args={"check_same_thread": False},
+              poolclass=StaticPool,
+          )
+          SQLModel.metadata.create_all(engine)
+          yield engine
+          SQLModel.metadata.drop_all(engine)
+
+      @pytest.fixture(name="session")
+      def session_fixture(engine):
+          with Session(engine) as session:
+              yield session
+
+      # Użycie:
+      def test_create_hero(session: Session):
+          from myapp.models import Hero
+          hero = Hero(name="Spider-Man", secret_name="Peter Parker")
+          session.add(hero)
+          session.commit()
+          session.refresh(hero)
+          assert hero.id is not None
+          assert hero.name == "Spider-Man"
+
+  - name: fastapi-pagination — paginacja CRUD
+    icon: "📄"
+    desc: |
+      fastapi-pagination dodaje Page[HeroRead] response model z total, items, page, size.
+      Instalacja: pip install fastapi-pagination
+
+      paginate() działa z SQLModel session.exec() — automatycznie dodaje .offset().limit().
+      Standardowy sposób na paginację w FastAPI + SQLModel bez ręcznego liczenia offset.
+    code: |
+      from fastapi import FastAPI, Depends
+      from fastapi_pagination import Page, add_pagination
+      from fastapi_pagination.ext.sqlmodel import paginate
+      from sqlmodel import Session, select
+      from myapp.models import Hero, HeroRead
+      from myapp.db import get_session
+
+      app = FastAPI()
+      add_pagination(app)
+
+      @app.get("/heroes/", response_model=Page[HeroRead])
+      def read_heroes(session: Session = Depends(get_session)):
+          return paginate(session, select(Hero))
+
+      # Response:
+      # {
+      #   "items": [...],
+      #   "total": 42,
+      #   "page": 1,
+      #   "size": 50,
+      #   "pages": 1
+      # }
+
+  - name: SQLModel z PostgreSQL — production setup
+    icon: "🐘"
+    desc: |
+      Production setup z PostgreSQL, connection pooling i async support przez asyncpg.
+      Instalacja: pip install sqlmodel asyncpg psycopg2-binary
+
+      NullPool dla serverless (Lambda, Cloud Run). QueuePool dla long-running serwisów.
+      DATABASE_URL z zmiennej środowiskowej — nigdy hardcode w kodzie.
+    code: |
+      import os
+      from sqlmodel import SQLModel, create_engine, Session
+      from sqlalchemy.pool import NullPool, QueuePool
+
+      DATABASE_URL = os.environ["DATABASE_URL"]
+      # postgresql://user:pass@host:5432/dbname
+
+      # Long-running serwis (FastAPI, uvicorn)
+      engine = create_engine(
+          DATABASE_URL,
+          pool_size=10,
+          max_overflow=20,
+          pool_pre_ping=True,   # sprawdź połączenie przed użyciem
+          echo=False,
+      )
+
+      # Serverless / lambda (każde wywołanie = nowe połączenie)
+      # engine = create_engine(DATABASE_URL, poolclass=NullPool)
+
+      def get_session():
+          with Session(engine) as session:
+              yield session
+
+      # Startup — tworzenie tabel (tylko dev; prod używa Alembic)
+      # SQLModel.metadata.create_all(engine)

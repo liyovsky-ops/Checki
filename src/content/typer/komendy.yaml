@@ -1,0 +1,115 @@
+items:
+  - name: Wiele komend w jednym app
+    desc: >
+      Każda funkcja z @app.command() staje się osobną komendą CLI.
+      Nazwa komendy to nazwa funkcji (z _ zamienione na -). python app.py deploy, python app.py status.
+    code: |
+      import typer
+
+      app = typer.Typer()
+
+      @app.command()
+      def deploy(env: str = "prod", dry_run: bool = False):
+          """Wdróż aplikację na środowisko."""
+          typer.echo(f"Deploying to {env}... dry_run={dry_run}")
+
+      @app.command()
+      def status(env: str = "prod"):
+          """Sprawdź status wdrożenia."""
+          typer.echo(f"Status for {env}: running")
+
+      @app.command()
+      def rollback(version: str, env: str = "prod"):
+          """Cofnij do poprzedniej wersji."""
+          typer.echo(f"Rolling back {env} to {version}")
+
+      if __name__ == "__main__":
+          app()
+
+      # python app.py deploy --env staging --dry-run
+      # python app.py status
+      # python app.py rollback v1.2.3
+
+  - name: Callback na app — kod przed komendą
+    desc: >
+      @app.callback() uruchamia się przed każdą komendą. Idealne dla --version, inicjalizacji loggera, wczytania configu.
+      invoke_without_command=True pozwala uruchomić callback gdy nie podano żadnej komendy.
+    code: |
+      import typer
+
+      app = typer.Typer()
+
+      @app.callback()
+      def main(
+          verbose: bool = typer.Option(False, "--verbose", "-v",
+                                       help="Włącz szczegółowe logi"),
+          version: bool = typer.Option(False, "--version",
+                                       help="Wyświetl wersję"),
+      ):
+          """Narzędzie do zarządzania projektami."""
+          if version:
+              typer.echo("myapp v1.0.0")
+              raise typer.Exit()
+          if verbose:
+              typer.echo("Tryb verbose włączony")
+
+      @app.command()
+      def build():
+          """Zbuduj projekt."""
+          typer.echo("Building...")
+
+      if __name__ == "__main__":
+          app()
+
+  - name: Niestandardowa nazwa komendy
+    desc: >
+      Domyślnie nazwa komendy = nazwa funkcji. Możesz ją zmienić przez app.command(name="...").
+      Przydatne gdy chcesz komendy z myślnikiem lub słowem kluczowym Pythona.
+    code: |
+      import typer
+
+      app = typer.Typer()
+
+      @app.command(name="init-project")
+      def init_project(name: str, template: str = "default"):
+          """Zainicjuj nowy projekt."""
+          typer.echo(f"Initializing {name} with template {template}")
+
+      @app.command(name="clean-cache")
+      def clean_cache(force: bool = False):
+          """Wyczyść cache projektu."""
+          if force or typer.confirm("Czy na pewno wyczyścić cache?"):
+              typer.echo("Cache wyczyszczony!")
+
+      if __name__ == "__main__":
+          app()
+
+      # python app.py init-project moj-projekt --template fastapi
+      # python app.py clean-cache --force
+
+  - name: invoke_without_command — app jako komenda
+    desc: >
+      invoke_without_command=True pozwala wywołać app bez subkomendy — callback uruchamia się samodzielnie.
+      Przydatne gdy --help lub --version ma działać bez komendy, a komendy są opcjonalne.
+    code: |
+      import typer
+
+      app = typer.Typer(invoke_without_command=True)
+
+      @app.callback()
+      def main(ctx: typer.Context):
+          """Moje narzędzie CLI."""
+          if ctx.invoked_subcommand is None:
+              typer.echo("Nie podano komendy. Użyj --help.")
+              raise typer.Exit()
+
+      @app.command()
+      def run():
+          """Uruchom aplikację."""
+          typer.echo("Running...")
+
+      if __name__ == "__main__":
+          app()
+
+      # python app.py          → "Nie podano komendy. Użyj --help."
+      # python app.py run      → "Running..."

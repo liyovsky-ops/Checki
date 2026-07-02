@@ -1,0 +1,119 @@
+items:
+  - name: One-to-many — Relationship
+    desc: >
+      Relationship(back_populates=) tworzy relację między tabelami. foreign_key w Field łączy kolumny.
+      Team ma wiele Heroes (one-to-many). Hero ma jeden Team. back_populates łączy oba kierunki.
+    code: |
+      from typing import Optional, List
+      from sqlmodel import Field, Relationship, Session, SQLModel, create_engine
+
+      class Team(SQLModel, table=True):
+          id: Optional[int] = Field(default=None, primary_key=True)
+          name: str
+          # Relacja odwrotna — lista heroes w tym teamie
+          heroes: List["Hero"] = Relationship(back_populates="team")
+
+      class Hero(SQLModel, table=True):
+          id: Optional[int] = Field(default=None, primary_key=True)
+          name: str
+          # FK do Team
+          team_id: Optional[int] = Field(default=None,
+                                          foreign_key="team.id")
+          # Relacja — dostęp do obiektu Team
+          team: Optional[Team] = Relationship(back_populates="heroes")
+
+      engine = create_engine("sqlite:///heroes.db")
+      SQLModel.metadata.create_all(engine)
+
+      with Session(engine) as session:
+          team = Team(name="Avengers")
+          hero = Hero(name="Iron Man", team=team)
+          session.add(hero)
+          session.commit()
+          session.refresh(team)
+          print([h.name for h in team.heroes])  # ['Iron Man']
+
+  - name: Many-to-many — link table
+    desc: >
+      Many-to-many wymaga tabeli łączącej (link model). HeroTeamLink ma hero_id i team_id jako FK.
+      Relationship(link_model=) wskazuje na tabelę łączącą — SQLModel obsługuje automatycznie.
+    code: |
+      from typing import Optional, List
+      from sqlmodel import Field, Relationship, SQLModel
+
+      # Tabela łącząca
+      class HeroTeamLink(SQLModel, table=True):
+          hero_id: Optional[int] = Field(
+              default=None, foreign_key="hero.id", primary_key=True)
+          team_id: Optional[int] = Field(
+              default=None, foreign_key="team.id", primary_key=True)
+
+      class Team(SQLModel, table=True):
+          id: Optional[int] = Field(default=None, primary_key=True)
+          name: str
+          heroes: List["Hero"] = Relationship(
+              back_populates="teams",
+              link_model=HeroTeamLink,
+          )
+
+      class Hero(SQLModel, table=True):
+          id: Optional[int] = Field(default=None, primary_key=True)
+          name: str
+          teams: List[Team] = Relationship(
+              back_populates="heroes",
+              link_model=HeroTeamLink,
+          )
+
+  - name: selectin loading — eager vs lazy
+    desc: >
+      Domyślnie relacje są lazy — SQLModel nie ładuje powiązanych obiektów dopóki nie zapytasz.
+      selectinload() ładuje relacje w osobnym SELECT — bezpieczne poza Session. Alternatywa dla joinedload.
+    code: |
+      from sqlmodel import Session, select
+      from sqlalchemy.orm import selectinload
+
+      # Lazy loading — błąd gdy Session zamknięta
+      with Session(engine) as session:
+          team = session.get(Team, 1)
+          # team.heroes dostępne TYLKO wewnątrz with Session
+          heroes = team.heroes  # OK tu
+      # poza with — DetachedInstanceError!
+
+      # Eager loading z selectinload
+      with Session(engine) as session:
+          statement = (
+              select(Team)
+              .where(Team.id == 1)
+              .options(selectinload(Team.heroes))
+          )
+          team = session.exec(statement).first()
+          heroes = team.heroes  # załadowane eagerly
+
+      # Możesz używać heroes POZA Session
+      print([h.name for h in heroes])  # działa!
+
+  - name: Relationship z dodatkowymi polami w link table
+    desc: >
+      Gdy tabela łącząca ma dodatkowe pola (np. role, joined_at), link_model nie wystarczy.
+      Trzeba ręcznie zarządzać przez osobny model i query — standardowy wzorzec SQLAlchemy.
+    code: |
+      from typing import Optional
+      from datetime import datetime
+      from sqlmodel import Field, SQLModel
+
+      # Link table z dodatkowymi polami
+      class HeroTeamLink(SQLModel, table=True):
+          hero_id: Optional[int] = Field(
+              default=None, foreign_key="hero.id", primary_key=True)
+          team_id: Optional[int] = Field(
+              default=None, foreign_key="team.id", primary_key=True)
+          # Dodatkowe pola relacji
+          role: str = Field(default="member")
+          joined_at: datetime = Field(default_factory=datetime.utcnow)
+          is_captain: bool = Field(default=False)
+
+      # Użycie:
+      # link = HeroTeamLink(hero_id=1, team_id=2,
+      #                     role="leader", is_captain=True)
+      # session.add(link)
+      # session.commit()

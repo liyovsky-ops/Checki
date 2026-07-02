@@ -1,0 +1,188 @@
+items:
+  - name: get_session — dependency z yield
+    desc: >
+      get_session() jako FastAPI dependency zarządza cyklem życia Session — otwiera przed requestem, zamyka po.
+      yield pattern gwarantuje zamknięcie Session nawet gdy request rzuci wyjątek. Standard w FastAPI+SQLModel.
+    code: |
+      from typing import Annotated, Generator
+      from fastapi import Depends, FastAPI
+      from sqlmodel import Session, SQLModel, create_engine
+
+      DATABASE_URL = "sqlite:///heroes.db"
+      engine = create_engine(DATABASE_URL, echo=False)
+
+      def create_db():
+          SQLModel.metadata.create_all(engine)
+
+      def get_session() -> Generator[Session, None, None]:
+          with Session(engine) as session:
+              yield session
+
+      # Skrócona forma z Annotated
+      SessionDep = Annotated[Session, Depends(get_session)]
+
+      app = FastAPI(lifespan=lambda app: (create_db(), None))
+
+      @app.get("/health")
+      def health(session: SessionDep):
+          # session jest już otwarta przez dependency
+          return {"status": "ok"}
+
+  - name: Pełne CRUD endpoints
+    desc: >
+      Pełny wzorzec CRUD z schema separation — HeroCreate dla POST, HeroRead dla response, HeroUpdate dla PATCH.
+      session.get() dla pojedynczego rekordu, session.exec(select()) dla listy. 404 gdy brak rekordu.
+    code: |
+      from typing import Annotated, List, Optional
+      from fastapi import Depends, FastAPI, HTTPException
+      from sqlmodel import Field, Session, SQLModel, select, create_engine
+
+      class HeroBase(SQLModel):
+          name: str
+          age: Optional[int] = None
+
+      class Hero(HeroBase, table=True):
+          id: Optional[int] = Field(default=None, primary_key=True)
+          secret_name: str
+
+      class HeroCreate(HeroBase):
+          secret_name: str
+
+      class HeroRead(HeroBase):
+          id: int
+
+      class HeroUpdate(SQLModel):
+          name: Optional[str] = None
+          age: Optional[int] = None
+
+      engine = create_engine("sqlite:///heroes.db")
+      SQLModel.metadata.create_all(engine)
+
+      def get_session():
+          with Session(engine) as session:
+              yield session
+
+      SessionDep = Annotated[Session, Depends(get_session)]
+      app = FastAPI()
+
+      @app.post("/heroes/", response_model=HeroRead)
+      def create_hero(hero: HeroCreate, session: SessionDep):
+          db_hero = Hero.model_validate(hero)
+          session.add(db_hero)
+          session.commit()
+          session.refresh(db_hero)
+          return db_hero
+
+      @app.get("/heroes/", response_model=List[HeroRead])
+      def read_heroes(session: SessionDep,
+                      offset: int = 0, limit: int = 10):
+          heroes = session.exec(
+              select(Hero).offset(offset).limit(limit)
+          ).all()
+          return heroes
+
+      @app.get("/heroes/{hero_id}", response_model=HeroRead)
+      def read_hero(hero_id: int, session: SessionDep):
+          hero = session.get(Hero, hero_id)
+          if not hero:
+              raise HTTPException(status_code=404,
+                                  detail="Hero not found")
+          return hero
+
+      @app.patch("/heroes/{hero_id}", response_model=HeroRead)
+      def update_hero(hero_id: int, hero: HeroUpdate,
+                      session: SessionDep):
+          db_hero = session.get(Hero, hero_id)
+          if not db_hero:
+              raise HTTPException(status_code=404,
+                                  detail="Hero not found")
+          update_data = hero.model_dump(exclude_unset=True)
+          db_hero.sqlmodel_update(update_data)
+          session.add(db_hero)
+          session.commit()
+          session.refresh(db_hero)
+          return db_hero
+
+      @app.delete("/heroes/{hero_id}")
+      def delete_hero(hero_id: int, session: SessionDep):
+          hero = session.get(Hero, hero_id)
+          if not hero:
+              raise HTTPException(status_code=404,
+                                  detail="Hero not found")
+          session.delete(hero)
+          session.commit()
+          return {"ok": True}
+
+  - name: PostgreSQL z asyncpg — async SQLModel
+    desc: >
+      SQLModel obsługuje async przez SQLAlchemy async engine z asyncpg.
+      AsyncSession i create_async_engine zamiast sync odpowiedników. await przy exec, commit, refresh.
+    code: |
+      from typing import AsyncGenerator
+      from fastapi import Depends, FastAPI
+      from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+      from sqlmodel import SQLModel, select
+
+      DATABASE_URL = "postgresql+asyncpg://user:pass@localhost/db"
+      async_engine = create_async_engine(DATABASE_URL)
+
+      async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+          async with AsyncSession(async_engine) as session:
+              yield session
+
+      app = FastAPI()
+
+      @app.on_event("startup")
+      async def on_startup():
+          async with async_engine.begin() as conn:
+              await conn.run_sync(SQLModel.metadata.create_all)
+
+      @app.get("/heroes/")
+      async def read_heroes(
+          session: AsyncSession = Depends(get_async_session)
+      ):
+          result = await session.exec(select(Hero))
+          return result.all()
+
+  - name: Testy z SQLite in-memory
+    desc: >
+      SQLite :memory: jako test engine — szybkie testy bez pliku na dysku, izolowane per test.
+      Fixture tworzy tabele przed testem i czyści po. TestClient z FastAPI do integracyjnych testów.
+    code: |
+      import pytest
+      from fastapi.testclient import TestClient
+      from sqlmodel import Session, SQLModel, create_engine
+      from sqlmodel.pool import StaticPool
+      from main import app, get_session
+
+      @pytest.fixture(name="session")
+      def session_fixture():
+          engine = create_engine(
+              "sqlite://",
+              connect_args={"check_same_thread": False},
+              poolclass=StaticPool,
+          )
+          SQLModel.metadata.create_all(engine)
+          with Session(engine) as session:
+              yield session
+          SQLModel.metadata.drop_all(engine)
+
+      @pytest.fixture(name="client")
+      def client_fixture(session: Session):
+          def get_session_override():
+              return session
+          app.dependency_overrides[get_session] = get_session_override
+          client = TestClient(app)
+          yield client
+          app.dependency_overrides.clear()
+
+      def test_create_hero(client: TestClient):
+          response = client.post(
+              "/heroes/",
+              json={"name": "Spider-Man",
+                    "secret_name": "Peter Parker"},
+          )
+          assert response.status_code == 200
+          data = response.json()
+          assert data["name"] == "Spider-Man"
+          assert "id" in data

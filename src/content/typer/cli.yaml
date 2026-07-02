@@ -1,0 +1,126 @@
+title: Komendy Typer
+groups:
+  - name: Instalacja i setup
+    icon: "📦"
+    commands:
+      - cmd: pip install "typer[all]"
+        desc: Instaluj Typer z Rich i shellingham
+        detail:
+          what: Instaluje Typer z pełnym zestawem — Rich (kolory, tabele) i shellingham (autocompletion).
+          how: typer[all] to zalecana instalacja dla production CLI. Samo typer bez extras działa ale bez kolorów.
+          tips:
+            - 'typer — tylko core, bez Rich/shellingham'
+            - '"typer[all]" — zalecane dla production CLI'
+      - cmd: typer run script.py
+        desc: Uruchom skrypt jako CLI bez if __name__
+        detail:
+          what: Typer CLI pozwala uruchomić dowolną funkcję Python jako CLI bez tworzenia app.
+          how: Szuka pierwszej async def lub def w pliku i buduje CLI z jej type hints.
+          tips:
+            - 'typer run script.py --help — pokaż automatyczne --help'
+            - 'Działa z typer zainstalowanym globalnie lub przez pipx'
+      - cmd: python app.py --install-completion
+        desc: Zainstaluj autocompletion dla aktualnego shella
+        detail:
+          what: Typer wykrywa shell (bash/zsh/fish) i instaluje odpowiednie pliki completion.
+          how: Wymaga shellingham (wchodzi w typer[all]). Completion działa dla nazw komend i wartości opcji.
+          tips:
+            - 'python app.py --show-completion — pokaż skrypt completion bez instalacji'
+            - 'Źródło pliku ~/.bashrc lub ~/.zshrc po instalacji'
+      - cmd: python app.py --help
+        desc: Pokaż automatycznie generowany help
+        detail:
+          what: Typer generuje --help z docstringów funkcji, type hints i parametrów Option/Argument.
+          how: Z typer[all] help jest renderowany przez Rich z kolorami. Każda subkomenda ma własny --help.
+          tips:
+            - 'python app.py komenda --help — help dla konkretnej komendy'
+            - 'rich_markup_mode="rich" w Typer() włącza [bold][/bold] w docstringach'
+
+  - name: Testowanie CLI
+    icon: "🧪"
+    commands:
+      - cmd: "from typer.testing import CliRunner; runner = CliRunner()"
+        desc: Utwórz runner do testowania komend
+        detail:
+          what: CliRunner pozwala wywoływać komendy CLI w testach bez uruchamiania procesu.
+          how: runner.invoke(app, ["komenda", "arg", "--option", "val"]) zwraca Result z output i exit_code.
+          tips:
+            - 'result.exit_code == 0 — sukces'
+            - 'result.output — stdout jako string'
+      - cmd: "result = runner.invoke(app, [\"deploy\"], input=\"y\\n\")"
+        desc: Testuj komendy z interaktywnym inputem
+        detail:
+          what: input= symuluje wpisanie tekstu przez użytkownika — odpowiedzi na typer.confirm() i typer.prompt().
+          how: '"y\n" — potwierdza. "n\n" — odmawia. Możesz łączyć wieloliniowo: "admin\nsecret\nsecret\n"'
+          tips:
+            - 'Testuj zarówno ścieżkę "tak" jak i "nie" dla confirm()'
+            - 'mix_stderr=False w CliRunner() rozdziela stdout i stderr'
+
+  - name: Pełny przykład — CLI narzędzie
+    icon: "🏗️"
+    commands:
+      - cmd: "# Pełny przykład: CLI z init/build/deploy/status"
+        desc: Kompletne CLI narzędzie z subkomendami
+        detail:
+          what: Pełny przykład CLI z wieloma komendami, kolorowym outputem, konfiguracją przez env i testami.
+          how: Skopiuj jako punkt startowy dla własnego CLI projektu.
+          tips:
+            - 'app = typer.Typer(name="mytool", help="Opis narzędzia")'
+            - 'Używaj typer.Exit(code=1) dla błędów — CI/CD wykryje niezerowy kod'
+        code: |
+          import typer
+          from rich.console import Console
+          from rich.table import Table
+          from pathlib import Path
+
+          app = typer.Typer(
+              name="mytool",
+              help="Narzędzie do zarządzania projektem",
+              rich_markup_mode="rich",
+          )
+          console = Console()
+
+          @app.command()
+          def init(
+              name: str = typer.Argument(..., help="Nazwa projektu"),
+              template: str = typer.Option("default", help="Szablon"),
+          ):
+              """Zainicjuj nowy projekt."""
+              Path(name).mkdir(exist_ok=True)
+              console.print(f"[green]✓[/green] Projekt '{name}' gotowy!")
+
+          @app.command()
+          def build(
+              env: str = typer.Option("prod", envvar="BUILD_ENV"),
+              verbose: bool = typer.Option(False, "-v"),
+          ):
+              """Zbuduj projekt."""
+              console.print(f"Buduję dla [bold]{env}[/bold]...")
+              if verbose:
+                  console.print("Szczegóły budowania...")
+              console.print("[green]Build zakończony![/green]")
+
+          @app.command()
+          def deploy(
+              env: str = typer.Option("prod", envvar="DEPLOY_ENV"),
+              dry_run: bool = typer.Option(False, "--dry-run"),
+          ):
+              """Wdróż aplikację."""
+              action = "DRY RUN" if dry_run else "DEPLOY"
+              console.print(f"[yellow]{action}[/yellow] na {env}...")
+              if not dry_run:
+                  console.print("[green]Wdrożono![/green]")
+
+          @app.command()
+          def status():
+              """Sprawdź status serwisów."""
+              table = Table(title="Status serwisów")
+              table.add_column("Serwis", style="cyan")
+              table.add_column("Status")
+              table.add_row("API", "[green]running[/green]")
+              table.add_row("DB", "[green]running[/green]")
+              table.add_row("Cache", "[red]stopped[/red]")
+              console.print(table)
+
+          if __name__ == "__main__":
+              app()

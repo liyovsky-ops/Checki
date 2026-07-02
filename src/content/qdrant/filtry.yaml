@@ -1,0 +1,186 @@
+items:
+  - name: "must / should / must_not"
+    desc: >
+      must = AND (wszystkie warunki muszą pasować). should = OR (przynajmniej jeden). must_not = NOT.
+      Możesz łączyć — must=[warunek1] + should=[warunek2, warunek3] = warunek1 AND (warunek2 OR warunek3).
+    code: |
+      from qdrant_client.models import (
+          Filter, FieldCondition, MatchValue, MatchAny
+      )
+
+      # must — AND (wszystkie muszą pasować)
+      f_and = Filter(
+          must=[
+              FieldCondition(key="language",
+                              match=MatchValue(value="pl")),
+              FieldCondition(key="category",
+                              match=MatchValue(value="python")),
+          ]
+      )
+
+      # should — OR (przynajmniej jeden)
+      f_or = Filter(
+          should=[
+              FieldCondition(key="category",
+                              match=MatchValue(value="python")),
+              FieldCondition(key="category",
+                              match=MatchValue(value="fastapi")),
+          ]
+      )
+
+      # must_not — wykluczenie
+      f_not = Filter(
+          must_not=[
+              FieldCondition(key="status",
+                              match=MatchValue(value="draft")),
+          ]
+      )
+
+      # Kombinacja
+      f_combined = Filter(
+          must=[
+              FieldCondition(key="language",
+                              match=MatchValue(value="pl")),
+          ],
+          must_not=[
+              FieldCondition(key="status",
+                              match=MatchValue(value="archived")),
+          ],
+      )
+
+  - name: Range i MatchAny filtry
+    desc: >
+      Range filtruje po zakresie numerycznym — cena między X a Y, data po określonym timestamp.
+      MatchAny to odpowiednik SQL IN — match wartości z listy. Przydatne dla kategorii i tagów.
+    code: |
+      from qdrant_client.models import (
+          Filter, FieldCondition, MatchValue, MatchAny, Range
+      )
+      from datetime import datetime
+
+      # Range — zakres numeryczny
+      recent_and_cheap = Filter(
+          must=[
+              # Cena między 10 a 100
+              FieldCondition(
+                  key="price",
+                  range=Range(gte=10, lte=100),
+              ),
+              # Score powyżej 4.0
+              FieldCondition(
+                  key="rating",
+                  range=Range(gte=4.0),
+              ),
+          ]
+      )
+
+      # MatchAny — wartość z listy (jak SQL IN)
+      in_categories = Filter(
+          must=[
+              FieldCondition(
+                  key="category",
+                  match=MatchAny(any=["python", "fastapi", "sqlmodel"]),
+              )
+          ]
+      )
+
+      # Filtrowanie po timestamp (unix epoch)
+      import time
+      week_ago = time.time() - 7 * 24 * 3600
+      recent = Filter(
+          must=[
+              FieldCondition(
+                  key="created_at",
+                  range=Range(gte=week_ago),
+              )
+          ]
+      )
+
+  - name: "client.scroll() — przeglądanie bez wektora"
+    desc: >
+      scroll() iteruje przez punkty bez wektora zapytania — odpowiednik SQL SELECT z WHERE i LIMIT/OFFSET.
+      Przydatne do eksportu danych, aktualizacji payload, lub gdy chcesz filtrować bez similarity search.
+    code: |
+      from qdrant_client import QdrantClient
+      from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+      client = QdrantClient(url="http://localhost:6333")
+
+      # Pobierz pierwsze 100 dokumentów z kategorii "python"
+      points, next_offset = client.scroll(
+          collection_name="docs",
+          scroll_filter=Filter(
+              must=[
+                  FieldCondition(key="category",
+                                  match=MatchValue(value="python"))
+              ]
+          ),
+          limit=100,
+          with_payload=True,
+          with_vectors=False,
+      )
+
+      print(f"Pobrano: {len(points)} punktów")
+      print(f"Następny offset: {next_offset}")  # None jeśli koniec
+
+      # Iteracja przez wszystkie punkty (paginacja)
+      offset = None
+      all_points = []
+      while True:
+          points, offset = client.scroll(
+              collection_name="docs",
+              offset=offset,
+              limit=100,
+              with_payload=True,
+          )
+          all_points.extend(points)
+          if offset is None:
+              break
+
+      print(f"Łącznie: {len(all_points)} punktów")
+
+  - name: Usuwanie punktów przez filtr
+    desc: >
+      delete() z FilterSelector usuwa punkty które pasują do filtra — bez pobierania id.
+      set_payload() aktualizuje payload wybranych punktów — aktualizacja metadanych bez re-embeddingu.
+    code: |
+      from qdrant_client import QdrantClient
+      from qdrant_client.models import (
+          Filter, FieldCondition, MatchValue, FilterSelector,
+          PointIdsList
+      )
+
+      client = QdrantClient(url="http://localhost:6333")
+
+      # Usuń punkty przez filtr
+      client.delete(
+          collection_name="docs",
+          points_selector=FilterSelector(
+              filter=Filter(
+                  must=[
+                      FieldCondition(key="status",
+                                      match=MatchValue(value="deleted"))
+                  ]
+              )
+          ),
+      )
+
+      # Usuń konkretne id
+      client.delete(
+          collection_name="docs",
+          points_selector=PointIdsList(points=[1, 2, 3]),
+      )
+
+      # Aktualizuj payload bez re-embeddingu
+      client.set_payload(
+          collection_name="docs",
+          payload={"status": "archived", "archived_at": 1700000000},
+          points=FilterSelector(
+              filter=Filter(
+                  must=[
+                      FieldCondition(key="category",
+                                      match=MatchValue(value="old"))
+                  ]
+              )
+          ),
+      )

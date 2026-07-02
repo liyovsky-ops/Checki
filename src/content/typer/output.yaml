@@ -1,0 +1,136 @@
+items:
+  - name: "typer.echo i typer.style — kolorowy output"
+    desc: >
+      typer.echo() to wrapper na print() z obsługą kolorów i err=True dla stderr.
+      typer.style() opakowuje tekst w kody ANSI — typer.colors.GREEN, RED, YELLOW, BLUE.
+    code: |
+      import typer
+
+      app = typer.Typer()
+
+      @app.command()
+      def status():
+          """Pokaż status systemu."""
+          # Normalny output
+          typer.echo("Sprawdzam status...")
+
+          # Kolorowy tekst
+          typer.echo(typer.style("OK", fg=typer.colors.GREEN, bold=True)
+                     + " Baza danych: połączona")
+          typer.echo(typer.style("WARN", fg=typer.colors.YELLOW, bold=True)
+                     + " Cache: 85% pojemności")
+          typer.echo(typer.style("ERROR", fg=typer.colors.RED, bold=True)
+                     + " Redis: brak połączenia")
+
+          # Stderr (nie wchodzi do pipe)
+          typer.echo("Debug info", err=True)
+
+      if __name__ == "__main__":
+          app()
+
+  - name: "typer.confirm i typer.prompt — interaktywność"
+    desc: >
+      typer.confirm() pyta o tak/nie i zwraca bool. abort=True automatycznie kończy przy odpowiedzi nie.
+      typer.prompt() prosi o dowolną wartość — alternatywa dla Option(prompt=True) poza dekoratorem.
+    code: |
+      import typer
+
+      app = typer.Typer()
+
+      @app.command()
+      def delete_db(name: str):
+          """Usuń bazę danych."""
+          # abort=True = rzuca Abort() gdy użytkownik odpowie N
+          typer.confirm(
+              f"Na pewno usunąć bazę '{name}'? Tej operacji nie można cofnąć!",
+              abort=True,
+          )
+          typer.echo(f"Usuwam {name}...")
+
+          # Manualne pytanie z powrotem bool
+          backup = typer.confirm("Zrobić backup przed usunięciem?")
+          if backup:
+              typer.echo("Tworzę backup...")
+
+          # Pytanie o wartość tekstową
+          reason = typer.prompt("Podaj powód usunięcia")
+          typer.echo(f"Logowanie: {reason}")
+
+      if __name__ == "__main__":
+          app()
+
+  - name: Integracja z Rich — tabele i progress
+    desc: >
+      typer[all] instaluje Rich automatycznie. Możesz używać rich.console.Console, Table, Progress w komendach.
+      Rich renderuje tabele, progress bary, panele i Markdown bezpośrednio w terminalu.
+    code: |
+      import typer
+      from rich.console import Console
+      from rich.table import Table
+      from rich.progress import track
+
+      app = typer.Typer()
+      console = Console()
+
+      @app.command()
+      def list_servers():
+          """Lista serwerów."""
+          table = Table(title="Serwery produkcyjne")
+          table.add_column("Nazwa", style="cyan")
+          table.add_column("Status", style="green")
+          table.add_column("CPU", justify="right")
+
+          table.add_row("web-01", "running", "23%")
+          table.add_row("web-02", "running", "45%")
+          table.add_row("db-01",  "running", "67%")
+          table.add_row("cache-01", "[red]stopped[/red]", "0%")
+
+          console.print(table)
+
+      @app.command()
+      def process_files(count: int = 10):
+          """Przetwórz pliki z progress barem."""
+          import time
+          for i in track(range(count), description="Przetwarzam..."):
+              time.sleep(0.1)
+          console.print("[green]Gotowe![/green]")
+
+      if __name__ == "__main__":
+          app()
+
+  - name: "typer.Exit i typer.Abort — kody wyjścia"
+    desc: >
+      typer.Exit(code=1) kończy program z podanym kodem wyjścia — ważne dla skryptów CI/CD.
+      typer.Abort() przerywa z komunikatem "Aborted!" i kodem 1. Standardowy sposób na błędy.
+    code: |
+      import typer
+      import sys
+
+      app = typer.Typer()
+
+      @app.command()
+      def check_health(url: str = "http://localhost:8000"):
+          """Sprawdź dostępność serwera."""
+          import urllib.request
+          try:
+              urllib.request.urlopen(url, timeout=5)
+              typer.echo(typer.style("OK", fg=typer.colors.GREEN)
+                         + f" {url} działa")
+              raise typer.Exit(code=0)   # sukces
+          except Exception as e:
+              typer.echo(
+                  typer.style("FAIL", fg=typer.colors.RED)
+                  + f" {url}: {e}",
+                  err=True,
+              )
+              raise typer.Exit(code=1)  # błąd — CI/CD wykryje
+
+      @app.command()
+      def dangerous(confirmed: bool = False):
+          """Niebezpieczna operacja."""
+          if not confirmed:
+              typer.echo("Użyj --confirmed aby potwierdzić", err=True)
+              raise typer.Abort()  # Aborted! + code 1
+
+      if __name__ == "__main__":
+          app()

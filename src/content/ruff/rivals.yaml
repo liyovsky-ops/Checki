@@ -1,0 +1,115 @@
+title: Rywale — flake8, Black, pylint, isort
+labels:
+  section: Narzędzie
+  example: Porównanie
+
+intro: >
+  Ruff zastępuje cały stos lintowania/formatowania w jednym binarnym pliku napisanym w Rust.
+  Główni rywale to flake8 (linting), Black (formatowanie), pylint (głębszy linting), isort
+  (sortowanie importów). Ruff jest od nich 10-100x szybszy i spójniej skonfigurowany.
+
+items:
+  - name: flake8
+    desc: >
+      flake8 to najpopularniejszy linter Python (E/W/F reguły). Ruff implementuje
+      wszystkie reguły flake8 + setki plugin'ów w jednym binarnym pliku.
+      Migracja jest trywialna — zwykle wystarczy zamienić `flake8` na `ruff check`.
+    code: |
+      # flake8 → Ruff
+      flake8 .                    # ruff check .
+      flake8 --max-line-length 120 .  # ruff check --line-length 120 .
+      flake8 --extend-ignore E501 .   # [tool.ruff.lint] ignore = ["E501"]
+
+      # setup.cfg lub .flake8:
+      # [flake8]
+      # max-line-length = 120
+      # extend-ignore = E501, W503
+
+      # Ekwiwalent w pyproject.toml:
+      # [tool.ruff.lint]
+      # ignore = ["E501", "W503"]
+      # [tool.ruff]
+      # line-length = 120
+
+      # flake8 plugins → Ruff rule sets:
+      # flake8-bugbear     → B
+      # flake8-comprehensions → C4
+      # flake8-simplify    → SIM
+      # flake8-bandit      → S
+      # pep8-naming        → N
+
+  - name: Black
+    desc: >
+      Black = "opinionated formatter" — jedna słuszna forma kodu. Ruff format to
+      Black-compatible replacement (99.9% identyczne outputy). Ruff format jest
+      10-100x szybszy. Konfiguracja jest niemal identyczna.
+    code: |
+      # Black → Ruff format
+      black .                     # ruff format .
+      black --check .             # ruff format --check .
+      black --diff .              # ruff format --diff .
+      black --line-length 120 .   # ruff format --line-length 120 .
+      black --skip-string-norm .  # [tool.ruff.format] quote-style = "preserve"
+
+      # pyproject.toml migracja:
+      # Stare: [tool.black]
+      # line-length = 88
+      # target-version = ['py312']
+      #
+      # Nowe: [tool.ruff.format]
+      # (line-length i target-version są w [tool.ruff])
+
+      # Różnice Black vs Ruff format (edge cases):
+      # - Ruff może zachować inny format dla paren w return
+      # - Ruff jest bardziej agresywny w trailing whitespace
+      # - Marginalnie różne traktowanie long string literals
+
+  - name: pylint
+    desc: >
+      pylint = głęboki linter (analiza semantyczna, metryki złożoności). Wolny i
+      generuje dużo false positives. Ruff implementuje podzbiór pylint (PL prefix) —
+      najczęściej używane reguły bez false positives. pylint ma unikalne reguły
+      (analiza klas, metryki) które Ruff nie ma.
+    code: |
+      # pylint → Ruff (podzbiór)
+      pylint src/                 # ruff check --select PL src/
+
+      # Reguły pylint zaimplementowane w Ruff (PL):
+      # PLC — pylint Convention
+      # PLE — pylint Error
+      # PLR — pylint Refactor
+      # PLW — pylint Warning
+
+      # Aktywacja:
+      # [tool.ruff.lint]
+      # select = ["PL"]  # lub select = ["ALL"]
+
+      # Czego Ruff NIE ma (zostań z pylint jeśli potrzebujesz):
+      # - Analiza MRO (method resolution order)
+      # - Metryki złożoności (radon jest tu lepszy)
+      # - Sprawdzanie klas abstrakcyjnych
+
+  - name: isort
+    desc: >
+      isort = sortowanie importów (stdlib → third-party → local). Ruff implementuje
+      isort jako reguły I*. Konfiguracja isort w [tool.isort] przenosi się do
+      [tool.ruff.lint.isort] z minimalnymi zmianami.
+    code: |
+      # isort → Ruff
+      isort .                     # ruff check --select I --fix .
+      isort --check .             # ruff check --select I .
+      isort --diff .              # ruff check --select I --diff .
+
+      # setup.cfg/pyproject.toml migracja:
+      # Stare: [tool.isort]
+      # known_first_party = ["myapp"]
+      # force_sort_within_sections = true
+      #
+      # Nowe: [tool.ruff.lint.isort]
+      # known-first-party = ["myapp"]
+      # force-sort-within-sections = true
+      # (nazwy z _ → - w Ruff)
+
+      # Aktywacja reguł isort:
+      # [tool.ruff.lint]
+      # select = ["I"]  # lub extend-select = ["I"]

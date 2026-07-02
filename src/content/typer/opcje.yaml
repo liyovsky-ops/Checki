@@ -1,0 +1,138 @@
+items:
+  - name: "typer.Argument vs typer.Option"
+    desc: >
+      Argument to pozycyjny parametr CLI — wymagany, bez flagi. Option to --flaga z wartością — opcjonalna lub z defaultem.
+      Argument(help="...") dodaje opis w --help. Option(...) bez defaultu = wymagana opcja.
+    code: |
+      import typer
+
+      app = typer.Typer()
+
+      @app.command()
+      def process(
+          # Argument — pozycyjny, wymagany
+          filename: str = typer.Argument(..., help="Plik do przetworzenia"),
+          # Option — z flagą, opcjonalny
+          output: str = typer.Option("result.txt", "--output", "-o",
+                                     help="Plik wyjściowy"),
+          verbose: bool = typer.Option(False, "--verbose", "-v"),
+      ):
+          """Przetwórz plik."""
+          typer.echo(f"Processing {filename} → {output}")
+          if verbose:
+              typer.echo("Tryb szczegółowy włączony")
+
+      if __name__ == "__main__":
+          app()
+
+      # python app.py dane.csv
+      # python app.py dane.csv --output wynik.csv --verbose
+
+  - name: prompt i confirmation_prompt
+    desc: >
+      prompt=True pyta użytkownika o wartość interaktywnie gdy nie podał jej jako argument.
+      confirmation_prompt=True prosi o wpisanie wartości dwa razy — idealne dla haseł i destruktywnych operacji.
+    code: |
+      import typer
+
+      app = typer.Typer()
+
+      @app.command()
+      def create_user(
+          username: str = typer.Option(..., prompt=True,
+                                        help="Nazwa użytkownika"),
+          password: str = typer.Option(
+              ...,
+              prompt=True,
+              confirmation_prompt=True,
+              hide_input=True,
+              help="Hasło użytkownika",
+          ),
+      ):
+          """Utwórz nowego użytkownika."""
+          typer.echo(f"Tworzenie użytkownika: {username}")
+          # password nie pokazujemy
+
+      if __name__ == "__main__":
+          app()
+
+      # python app.py
+      # Username: admin
+      # Password:
+      # Repeat for confirmation:
+
+  - name: envvar — opcje ze zmiennych środowiskowych
+    desc: >
+      envvar="VAR_NAME" pozwala przekazać wartość przez zmienną środowiskową zamiast flagi.
+      Priorytet: flaga CLI > zmienna env > default. Idealne dla tokenów i konfiguracji w CI/CD.
+    code: |
+      import typer
+      import os
+
+      app = typer.Typer()
+
+      @app.command()
+      def deploy(
+          token: str = typer.Option(
+              ...,
+              envvar="DEPLOY_TOKEN",
+              help="Token autoryzacyjny (lub DEPLOY_TOKEN env)",
+          ),
+          env: str = typer.Option(
+              "prod",
+              envvar="DEPLOY_ENV",
+              help="Środowisko (lub DEPLOY_ENV env)",
+          ),
+      ):
+          """Wdróż aplikację."""
+          typer.echo(f"Deploying to {env} with token {token[:4]}...")
+
+      if __name__ == "__main__":
+          app()
+
+      # export DEPLOY_TOKEN=abc123
+      # python app.py                     # używa tokenu z env
+      # python app.py --token xyz789      # nadpisuje env
+
+  - name: show_default i rich_help_panel
+    desc: >
+      show_default=True pokazuje wartość domyślną w --help. rich_help_panel grupuje opcje w panelach.
+      Razem sprawiają że --help wygląda profesjonalnie z Rich — czytelne sekcje i domyślne wartości.
+    code: |
+      import typer
+      from typing import Optional
+
+      app = typer.Typer()
+
+      @app.command()
+      def server(
+          host: str = typer.Option(
+              "0.0.0.0",
+              show_default=True,
+              help="Adres nasłuchiwania",
+              rich_help_panel="Serwer",
+          ),
+          port: int = typer.Option(
+              8000,
+              show_default=True,
+              help="Port serwera",
+              rich_help_panel="Serwer",
+          ),
+          workers: int = typer.Option(
+              4,
+              show_default=True,
+              help="Liczba workerów",
+              rich_help_panel="Wydajność",
+          ),
+          log_level: str = typer.Option(
+              "info",
+              show_default=True,
+              help="Poziom logowania",
+              rich_help_panel="Wydajność",
+          ),
+      ):
+          """Uruchom serwer aplikacji."""
+          typer.echo(f"Starting server on {host}:{port}")
+
+      if __name__ == "__main__":
+          app()
