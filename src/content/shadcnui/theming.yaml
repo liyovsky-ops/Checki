@@ -1,0 +1,283 @@
+title: "Theming & Style"
+
+items:
+  - name: CSS Variables — system kolorów
+    desc: >
+      Shadcn/ui używa CSS custom properties zamiast hardkodowanych wartości Tailwind.
+      globals.css definiuje zmienne dla light i dark mode. Tailwind config mapuje
+      te zmienne na klasy. Dzięki temu zmiana koloru primary to edycja jednej linii
+      w CSS, nie szukanie po całym projekcie.
+    code: |
+      /* globals.css — domyślny motyw Zinc */
+      @layer base {
+        :root {
+          --background: 0 0% 100%;
+          --foreground: 240 10% 3.9%;
+          --card: 0 0% 100%;
+          --card-foreground: 240 10% 3.9%;
+          --popover: 0 0% 100%;
+          --popover-foreground: 240 10% 3.9%;
+          --primary: 240 5.9% 10%;
+          --primary-foreground: 0 0% 98%;
+          --secondary: 240 4.8% 95.9%;
+          --secondary-foreground: 240 5.9% 10%;
+          --muted: 240 4.8% 95.9%;
+          --muted-foreground: 240 3.8% 46.1%;
+          --accent: 240 4.8% 95.9%;
+          --accent-foreground: 240 5.9% 10%;
+          --destructive: 0 84.2% 60.2%;
+          --destructive-foreground: 0 0% 98%;
+          --border: 240 5.9% 90%;
+          --input: 240 5.9% 90%;
+          --ring: 240 10% 3.9%;
+          --radius: 0.5rem;
+        }
+
+        .dark {
+          --background: 240 10% 3.9%;
+          --foreground: 0 0% 98%;
+          --primary: 0 0% 98%;
+          --primary-foreground: 240 5.9% 10%;
+          --secondary: 240 3.7% 15.9%;
+          --muted: 240 3.7% 15.9%;
+          --muted-foreground: 240 5% 64.9%;
+          --border: 240 3.7% 15.9%;
+          /* ... pozostałe zmienne dark mode */
+        }
+      }
+
+  - name: tailwind.config.ts — mapowanie zmiennych
+    desc: >
+      tailwind.config.ts rozszerza theme o zmienne CSS shadcn. Dzięki temu
+      możesz używać klas jak bg-background, text-foreground, border-border,
+      bg-primary, text-primary-foreground — wszystkie mapują na CSS variables.
+    code: |
+      // tailwind.config.ts
+      import type { Config } from "tailwindcss"
+
+      const config: Config = {
+        darkMode: ["class"],
+        content: ["./src/**/*.{ts,tsx}"],
+        theme: {
+          container: {
+            center: true,
+            padding: "2rem",
+            screens: { "2xl": "1400px" },
+          },
+          extend: {
+            colors: {
+              border: "hsl(var(--border))",
+              input: "hsl(var(--input))",
+              ring: "hsl(var(--ring))",
+              background: "hsl(var(--background))",
+              foreground: "hsl(var(--foreground))",
+              primary: {
+                DEFAULT: "hsl(var(--primary))",
+                foreground: "hsl(var(--primary-foreground))",
+              },
+              secondary: {
+                DEFAULT: "hsl(var(--secondary))",
+                foreground: "hsl(var(--secondary-foreground))",
+              },
+              destructive: {
+                DEFAULT: "hsl(var(--destructive))",
+                foreground: "hsl(var(--destructive-foreground))",
+              },
+              muted: {
+                DEFAULT: "hsl(var(--muted))",
+                foreground: "hsl(var(--muted-foreground))",
+              },
+              accent: {
+                DEFAULT: "hsl(var(--accent))",
+                foreground: "hsl(var(--accent-foreground))",
+              },
+            },
+            borderRadius: {
+              lg: "var(--radius)",
+              md: "calc(var(--radius) - 2px)",
+              sm: "calc(var(--radius) - 4px)",
+            },
+          },
+        },
+        plugins: [require("tailwindcss-animate")],
+      }
+
+      export default config
+
+  - name: "cn() — łączenie klas bez konfliktów"
+    desc: >
+      Funkcja cn() z lib/utils.ts to kombinacja clsx (warunkowe klasy) i
+      tailwind-merge (eliminacja konfliktów). Bez tailwind-merge klasy jak
+      "px-2 px-4" oba się aplikują, z tailwind-merge wygrywa ostatnia — "px-4".
+      Niezbędne przy budowaniu komponentów z wariantami.
+    code: |
+      // lib/utils.ts (auto-generowany przez shadcn init)
+      import { type ClassValue, clsx } from "clsx"
+      import { twMerge } from "tailwind-merge"
+
+      export function cn(...inputs: ClassValue[]) {
+        return twMerge(clsx(inputs))
+      }
+
+      // Przykłady użycia
+
+      // 1. Warunkowe klasy
+      cn("base-class", isActive && "text-blue-500", isDisabled && "opacity-50")
+      // → "base-class text-blue-500" (jeśli active, nie disabled)
+
+      // 2. Eliminacja konfliktów (tailwind-merge)
+      cn("px-2 py-1", "px-4")
+      // → "py-1 px-4" (px-2 usunięte, px-4 wygrywa)
+
+      // 3. W komponencie z className prop
+      function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+        return (
+          <div
+            className={cn("rounded-lg border bg-card shadow-sm", className)}
+            {...props}
+          />
+        )
+      }
+      // Użytkownik może nadpisać: <Card className="border-blue-500" />
+
+  - name: "cva() — warianty komponentów"
+    desc: >
+      class-variance-authority (cva) to narzędzie do definiowania wariantów
+      komponentów w sposób typesafe. Zamiast ręcznych if/switch, deklarujesz
+      variants i defaultVariants. TypeScript generuje typy dla props automatycznie.
+    code: |
+      import { cva, type VariantProps } from "class-variance-authority"
+      import { cn } from "@/lib/utils"
+
+      // Definicja wariantów
+      const buttonVariants = cva(
+        // Base classes (zawsze obecne)
+        "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+        {
+          variants: {
+            variant: {
+              default: "bg-primary text-primary-foreground hover:bg-primary/90",
+              destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+              outline: "border border-input bg-background hover:bg-accent",
+              secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+              ghost: "hover:bg-accent hover:text-accent-foreground",
+              link: "text-primary underline-offset-4 hover:underline",
+            },
+            size: {
+              default: "h-10 px-4 py-2",
+              sm: "h-9 rounded-md px-3",
+              lg: "h-11 rounded-md px-8",
+              icon: "h-10 w-10",
+            },
+          },
+          defaultVariants: {
+            variant: "default",
+            size: "default",
+          },
+        }
+      )
+
+      // TypeScript props z wariantów
+      export interface ButtonProps
+        extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+          VariantProps<typeof buttonVariants> {}
+
+      export function Button({ className, variant, size, ...props }: ButtonProps) {
+        return (
+          <button className={cn(buttonVariants({ variant, size, className }))} {...props} />
+        )
+      }
+
+      // Użycie z pełnym TypeScript checking
+      <Button variant="destructive" size="lg">Usuń</Button>
+      // TypeScript error: variant="invalid" — nieznana wartość
+
+  - name: "Dark mode z next-themes"
+    desc: >
+      next-themes to najpopularniejsza biblioteka dark mode dla Next.js.
+      Wrappuje aplikację, przechowuje preferencję w localStorage, synchronizuje
+      z systemem OS. Shadcn używa darkMode: 'class' w tailwind.config — next-themes
+      dodaje/usuwa klasę 'dark' na html element.
+    code: |
+      // 1. Instalacja
+      // npm install next-themes
+
+      // 2. providers.tsx — wrap aplikacji
+      "use client"
+      import { ThemeProvider } from "next-themes"
+
+      export function Providers({ children }: { children: React.ReactNode }) {
+        return (
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+          </ThemeProvider>
+        )
+      }
+
+      // 3. layout.tsx
+      import { Providers } from "./providers"
+
+      export default function RootLayout({ children }: { children: React.ReactNode }) {
+        return (
+          <html lang="pl" suppressHydrationWarning>
+            <body>
+              <Providers>{children}</Providers>
+            </body>
+          </html>
+        )
+      }
+
+      // 4. Toggle button
+      "use client"
+      import { useTheme } from "next-themes"
+      import { Moon, Sun } from "lucide-react"
+
+      export function ThemeToggle() {
+        const { theme, setTheme } = useTheme()
+
+        return (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          >
+            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          </Button>
+        )
+      }
+
+  - name: Własny motyw kolorystyczny
+    desc: >
+      Zmień domyślny motyw Zinc na własne kolory przez modyfikację CSS variables
+      w globals.css. Shadcn dostarcza generator motywów na stronie. Kolory
+      w formacie HSL (bez hsl() wrappera — Tailwind dodaje go przez konfigurację).
+    code: |
+      /* globals.css — własny motyw niebieski */
+      :root {
+        /* Zamiast Zinc 900, użyj niebieskiego */
+        --primary: 221 83% 53%;         /* blue-600 */
+        --primary-foreground: 0 0% 100%;
+
+        --secondary: 214 32% 91%;
+        --secondary-foreground: 221 83% 53%;
+
+        --accent: 214 32% 91%;
+        --accent-foreground: 221 83% 53%;
+
+        /* Zmień radius */
+        --radius: 0.75rem;              /* bardziej zaokrąglony */
+      }
+
+      .dark {
+        --primary: 217 91% 60%;         /* jaśniejszy niebieski w dark */
+        --primary-foreground: 222 47% 11%;
+      }
+
+      /* Teraz bg-primary = niebieski w całej aplikacji */
+      /* Generator motywów: https://ui.shadcn.com/themes */

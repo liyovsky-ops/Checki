@@ -1,0 +1,438 @@
+title: Komendy Helm
+
+groups:
+  - name: Instalacja i konfiguracja
+    icon: "⚙️"
+    commands:
+      - cmd: brew install helm
+        desc: Zainstaluj Helm (macOS/Linux przez Homebrew)
+        detail:
+          what: Instaluje Helm CLI przez Homebrew. Na Windows użyj winget install Helm.Helm lub scoop install helm.
+          how: Helm 3 to jeden binarny plik bez tillera. Komunikuje się bezpośrednio z K8s API Server przez kubeconfig (~/.kube/config).
+          tips:
+            - 'winget install Helm.Helm — instalacja na Windows przez Winget'
+            - 'scoop install helm — alternatywa na Windows przez Scoop package manager'
+      - cmd: helm version
+        desc: Sprawdź wersję Helm
+        detail:
+          what: Wyświetla zainstalowaną wersję Helm CLI.
+          how: Helm 3 nie ma tillera — bezpośrednio komunikuje się z Kubernetes API Server przez kubeconfig. Brak zdalnego komponentu po stronie klastra.
+          tips:
+            - 'helm version --short — tylko numer wersji np. v3.14.0'
+            - 'curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash — instalacja lub upgrade przez oficjalny skrypt'
+      - cmd: helm env
+        desc: Pokaż zmienne środowiskowe Helm
+        detail:
+          what: Wyświetla wszystkie zmienne środowiskowe używane przez Helm — ścieżki do cache, data, config i aktywny namespace.
+          how: 'Domyślne ścieżki — HELM_CACHE_HOME: ~/.cache/helm, HELM_DATA_HOME: ~/.local/share/helm, HELM_CONFIG_HOME: ~/.config/helm'
+          tips:
+            - 'helm env HELM_DATA_HOME — wyświetl wartość konkretnej zmiennej środowiskowej'
+            - 'export HELM_NAMESPACE=production — ustaw domyślny namespace dla całej sesji terminala'
+      - cmd: 'helm completion bash > ~/.bash_completion'
+        desc: Generuj autocomplete dla bash/zsh/fish
+        detail:
+          what: Generuje skrypt autocomplete dla Helm i zapisuje do pliku inicjalizacyjnego powłoki.
+          how: Po załadowaniu skryptu naciśnięcie Tab po "helm " podpowiada subkomendy, flagi i nazwy release z klastra.
+          tips:
+            - 'helm completion zsh > $(brew --prefix)/share/zsh/site-functions/_helm — dla zsh'
+            - 'helm completion fish > ~/.config/fish/completions/helm.fish — dla fish shell'
+      - cmd: helm help install
+        desc: Pomoc dla konkretnej subkomendy Helm
+        detail:
+          what: Wyświetla szczegółową pomoc dla subkomendy z opisem flag, przykładami użycia i uwagami.
+          how: Każda subkomenda Helm ma własną stronę pomocy z kompletną listą dostępnych flag i ich opisami.
+          tips:
+            - 'helm install --help — szczegółowa pomoc dla install ze wszystkimi flagami'
+            - 'helm <subcommand> --help | grep "\-\-" — szybkie przejrzenie dostępnych flag przez grep'
+
+  - name: Repozytorium chartów
+    icon: "🏛️"
+    commands:
+      - cmd: helm repo add bitnami https://charts.bitnami.com/bitnami
+        desc: Dodaj repozytorium chartów pod aliasem
+        detail:
+          what: Rejestruje zdalne repozytorium chartów pod lokalnym aliasem "bitnami". Alias jest prywatny dla użytkownika.
+          how: Helm repo to serwer HTTP z plikiem index.yaml listującym dostępne charty i ich wersje. Konfiguracja w ~/.config/helm/repositories.yaml.
+          tips:
+            - 'helm repo add argo https://argoproj.github.io/argo-helm — dodaj repozytorium Argo CD'
+            - 'helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx — nginx ingress controller'
+      - cmd: helm repo list
+        desc: Lista dodanych repozytoriów z URL
+        detail:
+          what: Wyświetla wszystkie skonfigurowane repozytoria chartów z nazwami i adresami URL.
+          how: Konfiguracja repozytoriów przechowywana w ~/.config/helm/repositories.yaml jako plik YAML.
+          tips:
+            - 'helm repo list -o json — output w formacie JSON (przydatne w skryptach z jq)'
+            - 'cat ~/.config/helm/repositories.yaml — podejrzyj plik konfiguracji repo bezpośrednio'
+      - cmd: helm repo update
+        desc: Odśwież cache wszystkich repozytoriów
+        detail:
+          what: Pobiera aktualny index.yaml ze wszystkich repozytoriów i aktualizuje lokalny cache chartów.
+          how: Bez update możesz widzieć przestarzałe wersje chartów. Uruchamiaj przed helm install — szczególnie w CI/CD.
+          tips:
+            - 'helm repo update bitnami — odśwież cache tylko jednego wybranego repozytorium'
+            - 'Dodaj helm repo update do pipeline CI/CD przed każdym deploymentem dla aktualnych wersji'
+      - cmd: helm repo remove bitnami
+        desc: Usuń repozytorium z konfiguracji
+        detail:
+          what: Usuwa repozytorium chartów z lokalnej konfiguracji Helm. Nie wpływa na zainstalowane releases.
+          how: Odwraca efekt helm repo add. Lokalny cache chartów z tego repo zostaje wyczyszczony.
+          tips:
+            - 'helm repo list — sprawdź które repozytoria istnieją przed usunięciem'
+            - 'Zainstalowane releases NIE są usuwane razem z repo — tylko lokalne indeksy chartów'
+      - cmd: helm search repo nginx
+        desc: Szukaj charta w lokalnych repozytoriach
+        detail:
+          what: Przeszukuje lokalny cache wszystkich repozytoriów w poszukiwaniu chartów pasujących do frazy.
+          how: Szuka po nazwie i opisie charta. Wymaga wcześniejszego helm repo add i helm repo update.
+          tips:
+            - 'helm search repo nginx --versions — pokaż wszystkie dostępne wersje charta'
+            - 'helm search repo nginx -o yaml — wyniki w formacie YAML z pełnymi opisami chartów'
+      - cmd: helm search hub postgresql
+        desc: Szukaj charta na Artifact Hub
+        detail:
+          what: Przeszukuje Artifact Hub (artifact.hub.io) — centralny publiczny katalog z tysiącami chartów z setek repozytoriów.
+          how: Artifact Hub agreguje charty bez potrzeby wcześniejszego dodawania repo lokalnie. Zawiera oceny bezpieczeństwa.
+          tips:
+            - 'helm search hub nginx --max-col-width 80 — szersze kolumny z pełnymi opisami'
+            - 'Odwiedź artifact.hub.io dla wygodniejszego UI z ocenami bezpieczeństwa, README i historią wersji'
+
+  - name: Instalacja i upgrade
+    icon: "🚀"
+    commands:
+      - cmd: helm install myapp bitnami/nginx
+        desc: Zainstaluj chart z repozytorium
+        detail:
+          what: Tworzy nową instalację (release) charta bitnami/nginx pod nazwą "myapp" w domyślnym namespace.
+          how: Release name musi być unikalny w namespace. Helm śledzi historię wszystkich instalacji i upgradeów jako K8s Secrets.
+          tips:
+            - 'helm install myapp bitnami/nginx --version 15.0.0 — pinuj konkretną wersję charta'
+            - 'helm install myapp bitnami/nginx --wait — czekaj aż wszystkie Pody będą w stanie Ready'
+      - cmd: helm install myapp bitnami/nginx -n production --create-namespace
+        desc: Instaluj w namespace (twórz jeśli brak)
+        detail:
+          what: Instaluje chart w namespace "production". --create-namespace tworzy namespace automatycznie jeśli nie istnieje.
+          how: Bez --create-namespace instalacja do nieistniejącego namespace kończy się błędem. Bezpieczne w CI gdy namespace może nie istnieć.
+          tips:
+            - 'Pomiń --create-namespace gdy namespace już istnieje — bezpieczniejsze by uniknąć niechcianego tworzenia'
+            - 'kubectl get namespace production — sprawdź czy namespace istnieje przed instalacją'
+      - cmd: helm install myapp bitnami/nginx -f values.yaml
+        desc: Instaluj z własnym plikiem wartości
+        detail:
+          what: Nadpisuje domyślne wartości charta plikiem values.yaml. Parametry z pliku mają wyższy priorytet niż defaults charta.
+          how: values.yaml zawiera tylko te pola które chcesz zmienić — reszta pochodzi z domyślnych values.yaml charta.
+          tips:
+            - 'helm install myapp bitnami/nginx -f base.yaml -f override.yaml — łącz pliki (prawy nadpisuje lewy)'
+            - 'helm show values bitnami/nginx > my-values.yaml — eksportuj defaults jako punkt startowy'
+      - cmd: helm install myapp bitnami/nginx --set replicaCount=3 --set image.tag=1.21
+        desc: Instaluj z wartościami inline (--set)
+        detail:
+          what: Nadpisuje konkretne wartości bezpośrednio w komendzie bez tworzenia pliku values.yaml.
+          how: '--set używa notacji z kropką dla zagnieżdżonych kluczy. Można łączyć z -f values.yaml (--set ma wyższy priorytet).'
+          tips:
+            - 'helm install myapp bitnami/nginx --set-string version=1.0 — wymusza typ string zamiast number'
+            - 'Preferuj -f values.yaml nad --set dla wielu wartości — czytelniej, łatwiej w code review'
+      - cmd: helm install myapp ./mychart --dry-run --debug
+        desc: Symulacja instalacji z pełnym debugiem
+        detail:
+          what: '--dry-run nie aplikuje nic do klastra — renderuje szablony i pokazuje co by zostało zainstalowane. --debug dodaje szczegółowe logi.'
+          how: 'Różnica od helm template: --dry-run wysyła żądanie do K8s API Server dla walidacji (wymaga kubeconfig).'
+          tips:
+            - 'helm template myapp ./mychart — renderowanie czysto lokalne bez połączenia z K8s (szybsze)'
+            - 'helm install myapp ./mychart --dry-run 2>&1 | grep -A5 "Error" — filtruj tylko błędy'
+      - cmd: helm upgrade myapp bitnami/nginx -f values.yaml
+        desc: Upgrade release z nowym plikiem wartości
+        detail:
+          what: Aktualizuje istniejący release do nowszej wersji charta lub z nowymi wartościami. Tworzy nową rewizję w historii.
+          how: 'UWAGA: bez --reuse-values poprzednie wartości --set są resetowane do defaults. Używaj -f lub --reuse-values.'
+          tips:
+            - 'helm upgrade myapp bitnami/nginx --version 15.2.0 -f values.yaml — upgrade do konkretnej wersji'
+            - 'helm upgrade myapp bitnami/nginx --reuse-values — zachowaj wszystkie poprzednie wartości --set'
+      - cmd: helm upgrade --install myapp bitnami/nginx -n production --atomic
+        desc: Upgrade lub instaluj (idempotentny) z atomowym rollbackiem
+        detail:
+          what: '--upgrade --install tworzy release jeśli nie istnieje lub upgraduje istniejący. --atomic rollbackuje automatycznie przy błędzie.'
+          how: 'Standard w CI/CD — jeden idiom do install i upgrade. --atomic implikuje --wait i rollbackuje gdy Pody nie staną się Ready.'
+          tips:
+            - '--timeout 10m0s — zwiększ dla aplikacji które wolno startują (domyślny timeout --atomic to 5m)'
+            - '--cleanup-on-fail — usuwa nowe zasoby K8s jeśli upgrade się nie powiódł (zapobiega "śmieci" w klastrze)'
+      - cmd: helm upgrade myapp bitnami/nginx --wait --timeout 10m
+        desc: Upgrade z czekaniem na gotowość Podów
+        detail:
+          what: '--wait blokuje komendę do momentu gdy Pods, PVCs i Services są Ready. --timeout ustawia maksymalny czas oczekiwania.'
+          how: 'Bez --wait helm upgrade kończy się natychmiast po wysłaniu żądania do K8s API — Pody mogą jeszcze startować w tle.'
+          tips:
+            - '--wait-for-jobs — dodatkowe czekanie na zakończenie K8s Jobs (np. migracje bazy danych)'
+            - 'helm status myapp -n production — sprawdzaj status w osobnym terminalu podczas oczekiwania'
+
+  - name: Zarządzanie releases
+    icon: "📋"
+    commands:
+      - cmd: helm list -n production
+        desc: Lista releases w namespace
+        detail:
+          what: 'Wyświetla zainstalowane releases: name, namespace, revision, updated, status, chart version, app version.'
+          how: 'STATUS: deployed=aktywny, failed=błąd, superseded=zastąpiony nowszym, pending-upgrade=operacja w toku.'
+          tips:
+            - 'helm list -n production -o json — output JSON do parsowania skryptami lub jq'
+            - 'helm list -n production --failed — pokaż tylko nieudane releases'
+      - cmd: helm list -A
+        desc: Lista wszystkich releases w klastrze
+        detail:
+          what: Wyświetla releases ze wszystkich namespace w klastrze z dodatkową kolumną NAMESPACE.
+          how: Wymaga uprawnień do listowania Secrets we wszystkich namespace (Helm przechowuje stan release jako K8s Secrets).
+          tips:
+            - 'helm list -A --output table — tabelaryczny format (domyślny widok)'
+            - 'helm list -A --filter "myapp" — filtruj releases po nazwie (obsługuje wyrażenia regularne)'
+      - cmd: helm status myapp -n production
+        desc: Status zainstalowanego release
+        detail:
+          what: 'Wyświetla status release: wersja charta, stan deploymentu, notes z URL i hasłami, opis ostatniej operacji.'
+          how: Sekcja NOTES to ważna część — bitnami pokazuje tam URL aplikacji, jak wydobyć hasło z Secret i pierwsze kroki.
+          tips:
+            - 'helm status myapp --revision 2 — status konkretnej rewizji z historii release'
+            - 'helm get notes myapp -n production — wyświetl tylko sekcję notes'
+      - cmd: helm get values myapp -n production
+        desc: Pokaż wartości użyte przy instalacji
+        detail:
+          what: Wyświetla wartości --set i -f użyte przy ostatniej operacji na release (bez domyślnych values charta).
+          how: Helm przechowuje wartości w K8s Secret. Przydatne gdy nie pamiętasz jakich --set użyłeś przy instalacji.
+          tips:
+            - 'helm get values myapp -n production --all — wszystkie wartości włącznie z defaults charta'
+            - 'helm get values myapp -n production --revision 2 — wartości użyte w konkretnej rewizji'
+      - cmd: helm get manifest myapp -n production
+        desc: Pokaż wyrenderowane manifesty YAML release
+        detail:
+          what: Wyświetla finalne manifesty YAML (po renderowaniu szablonów) które Helm zaaplikował do K8s.
+          how: To samo co helm template ale dla już zainstalowanego release — pokazuje co faktycznie jest wdrożone w klastrze.
+          tips:
+            - 'helm get manifest myapp -n production | kubectl diff -f - — porównaj z aktualnym stanem klastra'
+            - 'helm get manifest myapp --revision 1 — manifesty z pierwszej instalacji do porównania z bieżącymi'
+      - cmd: helm get all myapp -n production
+        desc: Kompletny dump release (manifest + values + notes + hooks)
+        detail:
+          what: Wyświetla wszystkie informacje o release w jednym miejscu — manifesty, wartości, notes i hooki.
+          how: Agregat komend helm get values, manifest, notes i hooks. Najwygodniejsze do audytu i debugowania.
+          tips:
+            - 'helm get all myapp -n production > audit.yaml — zapisz pełny dump do pliku'
+            - 'Podzbiory: helm get values / manifest / notes / hooks — każdy dostępny osobno'
+      - cmd: helm uninstall myapp -n production
+        desc: Odinstaluj release i usuń wszystkie zasoby
+        detail:
+          what: Usuwa wszystkie zasoby K8s stworzone przez release (Pods, Services, Deployments itp.) i historię rewizji.
+          how: Domyślnie usuwa też całą historię release z K8s Secrets. UWAGA — usunięcie historii jest nieodwracalne.
+          tips:
+            - 'helm uninstall myapp -n production --keep-history — zachowaj historię (możliwy późniejszy rollback)'
+            - 'helm uninstall myapp -n production --dry-run — symulacja: pokaż co zostanie usunięte'
+
+  - name: Inspekcja i debug
+    icon: "🔍"
+    commands:
+      - cmd: helm show chart bitnami/nginx
+        desc: Metadane charta — zawartość Chart.yaml
+        detail:
+          what: Wyświetla zawartość Chart.yaml — wersja, opis, dependencje, maintainerzy, typ (application/library).
+          how: Nie wymaga instalacji charta. Działa dla zdalnych chartów z repo, lokalnych katalogów i archiwów .tgz.
+          tips:
+            - 'helm show chart bitnami/nginx --version 15.0.0 — metadane konkretnej wersji charta'
+            - 'helm show chart ./mychart — metadane lokalnego charta w katalogu (bez repo)'
+      - cmd: helm show values bitnami/nginx
+        desc: Domyślne wartości charta — pełny values.yaml
+        detail:
+          what: Wyświetla pełny values.yaml z komentarzami i domyślnymi wartościami. Punkt startowy do konfiguracji.
+          how: Zawiera wszystkie dostępne opcje konfiguracyjne z opisami w komentarzach — kompletna dokumentacja inline.
+          tips:
+            - 'helm show values bitnami/nginx > my-values.yaml — zapisz i edytuj jako bazę własnych wartości'
+            - 'helm show values bitnami/nginx | grep -A5 "ingress" — filtruj konkretne sekcje konfiguracji'
+      - cmd: helm show readme bitnami/nginx
+        desc: README charta z dokumentacją i tabelą parametrów
+        detail:
+          what: Wyświetla README.md charta z opisem, przykładami konfiguracji i pełną tabelą wszystkich parametrów.
+          how: Bitnami README są bardzo obszerne — zawierają tablę parametrów z wartościami defaults i opisami.
+          tips:
+            - 'helm show readme bitnami/nginx | less — przewijaj długi README wygodnie w terminalu'
+            - 'artifact.hub.io jest wygodniejszy do czytania README niż terminal — renderuje Markdown'
+      - cmd: helm template myapp ./mychart
+        desc: Renderuj szablony lokalnie bez K8s
+        detail:
+          what: Renderuje wszystkie szablony charta do YAML bez wysyłania do klastra. Czysto lokalna operacja offline.
+          how: 'Różnica od --dry-run: template działa bez połączenia z K8s API — szybsze i nie wymaga kubeconfig.'
+          tips:
+            - 'helm template myapp ./mychart -f values-prod.yaml — renderuj z konkretnymi values'
+            - 'helm template myapp ./mychart --show-only templates/deployment.yaml — renderuj tylko jeden szablon'
+      - cmd: helm template myapp ./mychart --debug
+        desc: Renderuj szablony z debugiem i traceback błędów
+        detail:
+          what: '--debug dodaje szczegółowe logi renderowania — pokazuje które pliki są przetwarzane i stack trace przy błędach Go template.'
+          how: Nieocenione przy debugowaniu błędów templatowania — pokazuje dokładnie które wyrażenie Go template się wysypało.
+          tips:
+            - 'helm template myapp ./mychart --debug 2>&1 | head -50 — pierwsze linie z informacjami debug'
+            - 'Szukaj "Error:" i "FAILED:" w output — stack trace wskaże plik i linię błędu'
+      - cmd: helm lint ./mychart --strict
+        desc: Sprawdź chart pod kątem błędów (strict mode)
+        detail:
+          what: Waliduje chart — sprawdza strukturę katalogów, poprawność YAML, wymagane pola Chart.yaml. --strict traktuje warnings jako errors.
+          how: 'Bez --strict: tylko errors = exit 1. Z --strict: warnings też powodują exit 1. Standard jako gate w CI/CD.'
+          tips:
+            - 'helm lint ./mychart -f values-prod.yaml — lint z wartościami produkcyjnymi (wykrywa więcej błędów)'
+            - 'helm lint ./mychart --with-subcharts — sprawdź też subcharty w katalogu charts/'
+
+  - name: Tworzenie chartów
+    icon: "🛠️"
+    commands:
+      - cmd: helm create mychart
+        desc: Scaffold nowego charta Helm
+        detail:
+          what: Tworzy szkielet nowego charta z przykładowymi szablonami — Deployment, Service, Ingress, HPA, ServiceAccount.
+          how: 'Generuje: Chart.yaml, values.yaml, templates/ z manifestami, _helpers.tpl i NOTES.txt.'
+          tips:
+            - 'Usuń szablony których nie potrzebujesz — helm create generuje za dużo boilerplate dla prostych chartów'
+            - 'helm create mychart && ls mychart/templates/ — sprawdź co zostało wygenerowane'
+      - cmd: helm package ./mychart
+        desc: Spakuj chart do archiwum .tgz
+        detail:
+          what: Tworzy archiwum mychart-X.Y.Z.tgz gotowe do publikacji w repozytorium lub OCI registry.
+          how: Wersja archiwum pochodzi z pola version w Chart.yaml. Archiwum to standardowy format dystrybucji chartów Helm.
+          tips:
+            - 'helm package ./mychart --destination ./dist — spakuj do wybranego katalogu'
+            - 'Zwiększ version w Chart.yaml przed każdym helm package (semver: MAJOR.MINOR.PATCH)'
+      - cmd: 'helm package ./mychart --sign --key "My Key" --keyring ~/.gnupg/pubring.gpg'
+        desc: Podpisz chart kryptograficznie (GPG provenance)
+        detail:
+          what: Tworzy plik .prov obok .tgz z podpisem GPG umożliwiającym weryfikację autentyczności charta przez odbiorcę.
+          how: 'helm install --verify weryfikuje podpis przed instalacją. Standard bezpieczeństwa dla enterprise chartów i publicznych chartów.'
+          tips:
+            - 'gpg --gen-key — utwórz klucz GPG jeśli jeszcze nie masz skonfigurowanego'
+            - 'helm install --verify --keyring pubkey.gpg myapp signed-chart-0.1.0.tgz — instaluj z weryfikacją'
+      - cmd: helm dependency update ./mychart
+        desc: Pobierz i zaktualizuj zależności charta
+        detail:
+          what: Pobiera wszystkie subcharty z sekcji dependencies w Chart.yaml i zapisuje do katalogu charts/.
+          how: Tworzy Chart.lock z dokładnymi pinowanymi wersjami. Uruchamiaj przed helm install gdy chart ma dependencje.
+          tips:
+            - 'helm dependency build ./mychart — pobierz zależności z Chart.lock bez aktualizacji (szybsze w CI/CD)'
+            - 'helm dependency list ./mychart — sprawdź status zależności (ok/missing/wrong version)'
+      - cmd: helm dependency list ./mychart
+        desc: Lista zależności charta ze statusem
+        detail:
+          what: 'Wyświetla wszystkie subcharty z wersjami i statusem: ok=pobrane, missing=brak, wrong version=nieaktualne.'
+          how: Zależności definiowane w Chart.yaml w sekcji dependencies, pinowane w automatycznie generowanym Chart.lock.
+          tips:
+            - 'Jeśli status = missing lub wrong version — uruchom helm dependency update aby je pobrać'
+            - 'helm show chart bitnami/postgresql | grep "^version" — sprawdź dostępne wersje subcharta'
+      - cmd: helm pull bitnami/postgresql --untar
+        desc: Pobierz i rozpakuj chart lokalnie
+        detail:
+          what: Pobiera chart z repozytorium i rozpakowuje do lokalnego katalogu. Do inspekcji zawartości, offline install lub modyfikacji.
+          how: Bez --untar pobiera archiwum .tgz. Z --untar tworzy katalog z pełną strukturą charta gotową do edycji.
+          tips:
+            - 'helm pull bitnami/postgresql --version 12.0.0 --untar — pobierz konkretną wersję charta'
+            - 'helm install myapp ./postgresql — instaluj z pobranego lokalnie charta (offline, bez repo)'
+
+  - name: OCI Registry
+    icon: "📦"
+    commands:
+      - cmd: helm registry login registry.example.com -u myuser
+        desc: Zaloguj się do OCI registry
+        detail:
+          what: Uwierzytelnia Helm CLI do OCI-kompatybilnego rejestru — Docker Hub, ECR, GCR, ACR, Harbor, GHCR.
+          how: 'OCI registry (stabilne od Helm 3.13) to alternatywa dla klasycznych repo HTTP. Charty przechowywane jako OCI artifacts.'
+          tips:
+            - 'echo $TOKEN | helm registry login ghcr.io -u user --password-stdin — bezpieczniej bez --password w CLI'
+            - 'aws ecr get-login-password | helm registry login --username AWS --password-stdin <ecr-url>'
+      - cmd: helm push mychart-0.1.0.tgz oci://registry.example.com/charts
+        desc: Push charta do OCI registry
+        detail:
+          what: Wysyła archiwum .tgz charta do OCI registry jako artefakt. Wymaga wcześniejszego helm registry login.
+          how: 'OCI URL format: oci://registry/repository. Chart dostaje tag odpowiadający version z Chart.yaml.'
+          tips:
+            - 'helm package ./mychart && helm push mychart-*.tgz oci://ghcr.io/firma/charts — pakuj i push w jednej sekwencji'
+            - 'helm push mychart-0.1.0.tgz oci://harbor.firma.pl/project/charts — push do Harbor OCI'
+      - cmd: helm pull oci://registry.example.com/charts/mychart --version 0.1.0
+        desc: Pobierz chart z OCI registry
+        detail:
+          what: Pobiera chart z OCI registry. Ekwiwalent helm pull dla klasycznych repo HTTP ale z oci:// prefix.
+          how: Wymaga pełnego URL OCI z oci:// prefix i nazwy charta. --version opcjonalne — bez niego pobiera latest.
+          tips:
+            - 'helm pull oci://ghcr.io/firma/charts/mychart --version 0.1.0 --untar — pobierz i rozpakuj'
+            - 'helm install myapp oci://registry.example.com/charts/mychart --version 0.1.0 — instaluj wprost z OCI bez pull'
+      - cmd: helm registry logout registry.example.com
+        desc: Wyloguj się z OCI registry
+        detail:
+          what: Usuwa dane uwierzytelniające dla rejestru z lokalnej konfiguracji Helm.
+          how: 'Dane uwierzytelniające przechowywane w: ~/.config/helm/registry/config.json'
+          tips:
+            - 'cat ~/.config/helm/registry/config.json — podejrzyj zapisane credentiale (base64)'
+            - 'Wyloguj się po zakończeniu pracy na współdzielonych maszynach i CI runnerach'
+
+  - name: Rollback i historia
+    icon: "⏪"
+    commands:
+      - cmd: helm history myapp -n production
+        desc: Historia wszystkich rewizji release
+        detail:
+          what: 'Wyświetla chronologiczną historię operacji: install, upgrade, rollback z wersjami chartów i statusami.'
+          how: 'Helm przechowuje historię jako K8s Secrets (helm.sh/release.v1). REVISION to numer podawany w helm rollback.'
+          tips:
+            - 'helm history myapp -n production --max 5 — ostatnie 5 rewizji zamiast pełnej historii'
+            - 'helm history myapp -n production -o json — parsuj historię przez jq lub skrypty shell'
+      - cmd: helm rollback myapp 2 -n production
+        desc: Rollback release do wybranej rewizji
+        detail:
+          what: Przywraca release do stanu z rewizji numer 2. Tworzy NOWĄ rewizję w historii — nie modyfikuje istniejących.
+          how: K8s wykonuje rolling update od bieżącej wersji z powrotem do konfiguracji z rewizji 2. Historia jest zachowana.
+          tips:
+            - 'helm history myapp -n production — sprawdź numery rewizji przed wykonaniem rollbacku'
+            - 'helm rollback myapp 0 -n production — cofnij OSTATNIĄ operację (0 = poprzednia rewizja, bez podawania numeru)'
+      - cmd: helm rollback myapp 0 -n production --wait
+        desc: Szybki rollback do poprzedniej wersji z oczekiwaniem
+        detail:
+          what: 'REVISION 0 to specjalna wartość oznaczająca "poprzednia rewizja" — nie musisz znać numeru rewizji. --wait blokuje do zakończenia.'
+          how: K8s robi rolling update z powrotem do poprzedniej wersji. --wait czeka aż stara wersja będzie w pełni Ready.
+          tips:
+            - 'Rollback tworzy NOWĄ rewizję z poprzednią konfiguracją — historia nie jest usuwana ani cofana'
+            - 'helm history myapp -n production — zweryfikuj że nowa rewizja ma status deployed po rollbacku'
+      - cmd: helm get values myapp -n production --revision 1
+        desc: Pokaż wartości z konkretnej rewizji historii
+        detail:
+          what: Wyświetla wartości --set i -f użyte przy konkretnej rewizji (nie bieżącej). Do audytu i porównania zmian.
+          how: Każda rewizja ma własne values zapisane w K8s Secret. Możesz porównać values z różnych rewizji.
+          tips:
+            - 'helm get manifest myapp --revision 1 — manifesty YAML z konkretnej historycznej rewizji'
+            - 'helm get values myapp --revision 1 --all — pełne values (z defaults) z wybranej rewizji'
+
+  - name: Plugin management
+    icon: "🔌"
+    commands:
+      - cmd: helm plugin install https://github.com/databus23/helm-diff
+        desc: Zainstaluj plugin Helm z GitHub
+        detail:
+          what: Instaluje plugin z GitHub URL lub lokalnego katalogu. Plugin rozszerza Helm CLI o nowe subkomendy.
+          how: Helm pobiera plugin, kompiluje jeśli potrzeba i instaluje w katalogu HELM_DATA_HOME/plugins.
+          tips:
+            - 'helm plugin install https://github.com/jkroepke/helm-secrets — zarządzanie sekretami (SOPS/Vault)'
+            - 'helm plugin install https://github.com/helm-unittest/helm-unittest — unit testy chartów Helm'
+      - cmd: helm plugin list
+        desc: Lista zainstalowanych pluginów
+        detail:
+          what: Wyświetla wszystkie zainstalowane pluginy z nazwami, wersjami i krótkimi opisami.
+          how: 'Pluginy przechowywane w HELM_DATA_HOME/plugins (domyślnie: ~/.local/share/helm/plugins)'
+          tips:
+            - 'helm plugin update diff — zaktualizuj konkretny plugin do najnowszej dostępnej wersji'
+            - 'ls $(helm env HELM_DATA_HOME)/plugins — podejrzyj katalog pluginów bezpośrednio w systemie plików'
+      - cmd: helm plugin update diff
+        desc: Zaktualizuj zainstalowany plugin do najnowszej wersji
+        detail:
+          what: Aktualizuje plugin do najnowszej wersji dostępnej w źródłowym repozytorium (GitHub lub inne).
+          how: Helm pobiera nową wersję z URL instalacyjnego i zastępuje starą wersję w katalogu plugins.
+          tips:
+            - 'helm plugin list — sprawdź aktualne wersje pluginów przed i po update'
+            - 'helm plugin update — bez nazwy aktualizuje WSZYSTKIE zainstalowane pluginy naraz'
+      - cmd: helm plugin uninstall diff
+        desc: Odinstaluj plugin
+        detail:
+          what: Usuwa plugin z lokalnej instalacji Helm. Subkomenda dodana przez plugin przestaje być dostępna.
+          how: Usuwa katalog pluginu z HELM_DATA_HOME/plugins. Można go ponownie zainstalować przez helm plugin install.
+          tips:
+            - 'helm plugin list — sprawdź zainstalowane pluginy przed odinstalowaniem'
+            - 'helm diff upgrade myapp ... — upewnij się że nie używasz komendy pluginu zanim go odinstalujesz'

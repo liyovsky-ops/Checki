@@ -1,0 +1,105 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Mongoose?
+  firstComponent: Pierwsze połączenie z MongoDB
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Mongoose?
+  desc: >
+    Mongoose to ODM (Object Document Mapper) dla MongoDB i Node.js. Dodaje warstwę
+    abstrakcji nad natywnym MongoDB driverem — definiujesz Schema (kształt dokumentu),
+    tworzysz Model i operujesz na typowanych obiektach. Walidacja, middleware (hooks),
+    virtual properties, populacja referencji i TypeScript support — wszystko wbudowane.
+    Mongoose to de facto standard dla MongoDB w ekosystemie Node.js.
+
+concepts:
+  - title: mongoose.connect()
+    desc: >
+      Łączy z MongoDB. Przyjmuje URI (mongodb://localhost/mydb lub Atlas URI).
+      Od wersji 6+ connect() zwraca Promise. Mongoose buforuje query — możesz
+      wysyłać query zanim połączenie się nawiąże, zostaną wykonane po połączeniu.
+    icon: "🔌"
+  - title: Schema
+    desc: >
+      Schema definiuje kształt dokumentu — pola, typy, walidacje, wartości domyślne.
+      Schema to nie kolekcja — to blueprint. Możesz mieć wiele Modeli bazujących
+      na tej samej Schema (discriminators). Schema to źródło prawdy dla struktury danych.
+    icon: "📋"
+  - title: Model
+    desc: >
+      Model to skompilowana wersja Schema — konstruktor dokumentów. mongoose.model('User', UserSchema)
+      tworzy Model powiązany z kolekcją 'users' (automatycznie pluralizowana nazwa).
+      Model udostępnia metody statyczne (find, create, updateMany) i instancyjne (save, remove).
+    icon: "🏭"
+  - title: Document vs Plain Object
+    desc: >
+      Wynik query to Mongoose Document — specjalny obiekt z metodami (save, toObject, toJSON,
+      populate). lean() zwraca plain JavaScript object — szybszy (mniej overhead), ale bez
+      metod Mongoose. Używaj lean() do read-only operacji, Document gdy potrzebujesz save().
+    icon: "📄"
+  - title: Connection Events
+    desc: >
+      mongoose.connection emituje eventy — 'connected', 'error', 'disconnected'.
+      Obsługa eventów pozwala reagować na utratę połączenia. Mongoose automatycznie
+      próbuje reconnect. Connection state sprawdzasz przez mongoose.connection.readyState.
+    icon: "📡"
+  - title: Connection Pooling
+    desc: >
+      Mongoose zarządza pulą połączeń TCP do MongoDB. Domyślnie 5 połączeń (poolSize).
+      W serverless (Lambda) każda instancja ma własną pulę — użyj cached connection
+      przez globalThis żeby unikać connection leak między wywołaniami.
+    icon: "🏊"
+
+whenToUse:
+  - MongoDB jako baza danych — Mongoose to standard
+  - Potrzebujesz walidacji i schematu na poziomie ODM (nie tylko DB)
+  - Middleware/hooks na operacjach (pre save, post find)
+  - Populacja referencji między kolekcjami (jak JOIN w SQL)
+  - TypeScript projekty z @typegoose/typegoose lub wbudowanymi typami Mongoose 6+
+  - Projekty gdzie schema może się często zmieniać (NoSQL flexibility)
+
+firstComponent: |
+  # Instalacja
+  npm install mongoose
+  npm install -D @types/mongoose  # Mongoose 6+ ma własne typy
+
+  # src/db.ts — połączenie
+  import mongoose from 'mongoose';
+
+  export async function connectDB() {
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/myapp');
+    console.log('MongoDB connected');
+  }
+
+  mongoose.connection.on('error', (err) => console.error('MongoDB error:', err));
+  mongoose.connection.on('disconnected', () => console.warn('MongoDB disconnected'));
+
+  # src/models/User.ts — Schema i Model
+  import mongoose, { Schema, Document, Model } from 'mongoose';
+
+  interface IUser extends Document {
+    name: string;
+    email: string;
+    age?: number;
+    createdAt: Date;
+  }
+
+  const UserSchema = new Schema<IUser>({
+    name:  { type: String, required: true, trim: true },
+    email: { type: String, required: true, unique: true, lowercase: true },
+    age:   { type: Number, min: 0, max: 120 },
+  }, { timestamps: true });
+
+  export const User: Model<IUser> = mongoose.model<IUser>('User', UserSchema);
+
+  # Użycie
+  import { connectDB } from './db';
+  import { User } from './models/User';
+
+  await connectDB();
+
+  const user = await User.create({ name: 'Jan Kowalski', email: 'jan@firma.pl', age: 30 });
+  console.log(user._id, user.createdAt);
+
+  const users = await User.find({ age: { $gte: 18 } }).lean();

@@ -1,0 +1,75 @@
+title: Cypress vs alternatywy testów E2E
+
+items:
+  - name: Playwright
+    icon: "🎭"
+    color: "#2ead33"
+    tagline: "Cross-browser, headless-first, mocne API — Microsoft"
+    pros:
+      - "Natywne wsparcie Chromium, Firefox i WebKit (Safari engine) — prawdziwy cross-browser"
+      - Działa na Windows, Linux, macOS — WebKit też na Linuxie
+      - "Auto-waiting wbudowane jak w Cypress — brak ręcznych sleep()"
+      - "Izolowane BrowserContext — każdy test w osobnej sesji bez wycieków stanu"
+      - "Playwright Inspector + Trace Viewer — wizualne debugowanie jak w Cypress"
+      - "Codegen — nagrywa testy klikając w przeglądarce"
+      - Wsparcie dla Python, JavaScript, TypeScript, Java, C#
+    cons:
+      - Brak interaktywnego GUI jak Cypress Test Runner (jest Playwright UI ale inny)
+      - Trudniejszy start niż Cypress — więcej konfiguracji
+      - Mniejsza społeczność i mniej zasobów edukacyjnych (choć szybko rośnie)
+      - Brak wbudowanego Component Testing (istnieje ale mniej dojrzały)
+    vs: "Playwright gdy potrzebujesz cross-browser (Safari) lub testujesz w Pythonie/Javie. Cypress gdy team jest JS-only i ceni GUI Test Runnera."
+
+  - name: Selenium
+    icon: "🕷️"
+    color: "#43b02a"
+    tagline: "Pionier testów E2E — działa z każdą przeglądarką i językiem"
+    pros:
+      - "Działa z każdą przeglądarką przez WebDriver — maksymalna kompatybilność"
+      - Wsparcie dla Java, Python, C#, Ruby, JavaScript — dowolny język
+      - Dojrzały i sprawdzony — 20 lat w branży, ogromna społeczność
+      - Selenium Grid do równoległego testowania na wielu maszynach
+      - Integracja z każdym CI/CD systemem i frameworkiem raportowania
+    cons:
+      - Wolny i niestabilny — komunikacja przez WebDriver protocol (HTTP) dodaje latency
+      - Brak automatycznego retry — musisz sam obsługiwać StaleElementReferenceException
+      - "Verbose kod — 5× więcej kodu niż Cypress dla tych samych akcji"
+      - Trudne debugowanie — brak wbudowanego screenshotowania po każdym kroku
+      - Wymaga zarządzania wersjami WebDriverów (choć Selenium Manager pomaga)
+    vs: "Selenium gdy firma wymaga konkretnego języka (Java, C#) lub testowania na IE/starych przeglądarkach. Cypress dla nowych projektów JS."
+
+  - name: "Testing Library (RTL)"
+    icon: "🐙"
+    color: "#e33d4c"
+    tagline: "Unit-level testing komponentów — filozofia dostępności"
+    pros:
+      - "Testuje komponenty w izolacji — szybki jak unit testy (ms, nie sekundy)"
+      - Selektory oparte o dostępność (getByRole, getByLabel) — wymusza a11y
+      - "Zero konfiguracji przeglądarki — jsdom lub prawdziwy browser"
+      - Idealne do TDD i testowania logiki komponentów
+      - Świetna integracja z Jest i Vitest
+    cons:
+      - "Nie testuje integracji między stronami — brak nawigacji, routing, cookies"
+      - "jsdom to nie prawdziwa przeglądarka — różnice w zachowaniu CSS i layoutu"
+      - "Brak retry-ability — testy są synchroniczne"
+      - Nie testuje prawdziwego API, sieci, WebSocket
+      - Nie zastąpi E2E — to inna warstwa testów
+    vs: "RTL + Jest/Vitest do testowania komponentów i logiki. Cypress do testów całego flow E2E. Oba w projekcie — uzupełniają się."
+
+  - name: Puppeteer
+    icon: "🤖"
+    color: "#40b5a4"
+    tagline: "Niskie API do kontroli Chromium — Google"
+    pros:
+      - "Bezpośredni dostęp do Chrome DevTools Protocol — najniższy poziom kontroli"
+      - Świetny do web scrapingu i automatyzacji (nie tylko testów)
+      - Generowanie PDF i screenshotów stron
+      - Lekki — mniejszy overhead niż pełny framework testowy
+      - "Obsługuje headless Chrome idealnie — oficjalny tool od Google"
+    cons:
+      - "Brak automatycznego retry-ability — sam musisz czekać na elementy"
+      - Brak wbudowanych asercji — musisz używać osobnej biblioteki (Jest, Chai)
+      - Brak wbudowanego test runnera — to narzędzie, nie framework testowy
+      - Tylko Chromium (i Firefox eksperymentalnie) — brak Safari
+      - "Verbose kod — 3× więcej niż Cypress dla tych samych akcji"
+    vs: "Puppeteer do scrapingu, generowania PDF i automatyzacji. Cypress do testowania aplikacji — ma retry, asercje, GUI i lepszy DX."

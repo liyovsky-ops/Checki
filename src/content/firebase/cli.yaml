@@ -1,0 +1,419 @@
+title: Komendy Firebase
+
+groups:
+  - name: Firebase CLI — instalacja i setup
+    icon: "📦"
+    commands:
+      - cmd: npm install -g firebase-tools
+        desc: Zainstaluj Firebase CLI globalnie
+        detail:
+          what: Instaluje narzędzie firebase CLI — wymagane do wszystkich operacji z terminala.
+          how: Po instalacji dostępna komenda firebase w terminalu.
+          tips:
+            - "firebase --version — sprawdź wersję CLI"
+            - "npm update -g firebase-tools — zaktualizuj CLI do najnowszej wersji"
+      - cmd: firebase login
+        desc: Zaloguj się do Firebase (otwiera przeglądarkę)
+        detail:
+          what: Autoryzuje Firebase CLI z Twoim kontem Google — wymagane przed pierwszym użyciem.
+          how: Otwiera przeglądarkę do autoryzacji OAuth. Token zapisywany lokalnie.
+          tips:
+            - "firebase login --no-localhost — dla środowisk bez przeglądarki (SSH, WSL)"
+            - "firebase logout — wyloguj się z CLI"
+      - cmd: firebase init
+        desc: Zainicjalizuj projekt Firebase w bieżącym katalogu
+        detail:
+          what: Interaktywny wizard — wybierasz usługi (Firestore, Hosting, Functions) i projekt Firebase.
+          how: Tworzy firebase.json, .firebaserc i pliki konfiguracyjne dla wybranych usług.
+          tips:
+            - "Możesz wybrać wiele usług naraz (spacja = zaznacz, Enter = potwierdź)"
+            - "firebase init hosting — inicjalizuj tylko jedną usługę"
+      - cmd: firebase projects:list
+        desc: Wylistuj projekty Firebase
+        detail:
+          what: Pokazuje wszystkie projekty Firebase powiązane z Twoim kontem Google.
+          how: Wyświetla Project ID, nazwę i numer projektu.
+          tips:
+            - "firebase use <project-id> — przełącz aktywny projekt"
+            - "firebase projects:create my-project — stwórz nowy projekt"
+      - cmd: firebase use --add
+        desc: Dodaj alias projektu (dev/prod)
+        detail:
+          what: Dodaje alias dla projektu Firebase — możesz przełączać się między dev i produkcją.
+          how: Zapisuje aliasy w pliku .firebaserc w katalogu projektu.
+          tips:
+            - "firebase use default — przełącz na domyślny projekt"
+            - "firebase use production — przełącz na projekt z aliasem 'production'"
+      - cmd: firebase open
+        desc: Otwórz konsolę Firebase w przeglądarce
+        detail:
+          what: Otwiera konsolę Firebase dla aktywnego projektu w przeglądarce.
+          how: "Opcje: firebase open firestore, firebase open hosting, firebase open auth"
+          tips:
+            - "firebase open firestore — otwórz Firestore w konsoli"
+            - "firebase open functions — otwórz logi Functions"
+
+  - name: Emulatory
+    icon: "💻"
+    commands:
+      - cmd: firebase emulators:start
+        desc: Uruchom wszystkie emulatory lokalnie
+        detail:
+          what: Uruchamia lokalne emulatory Firebase (Firestore, Auth, Storage, Functions, Hosting).
+          how: Konfiguracja emulatorów w firebase.json (sekcja emulators). Domyślne porty — Firestore 8080, Auth 9099.
+          tips:
+            - "firebase emulators:start --only firestore,auth — tylko wybrane emulatory"
+            - "Emulatory UI dostępne pod http://localhost:4000"
+      - cmd: firebase emulators:start --import=./emulator-data
+        desc: Uruchom emulatory z seed danymi
+        detail:
+          what: Uruchamia emulatory i importuje wcześniej wyeksportowane dane testowe.
+          how: Dane eksportujesz przez firebase emulators:export — przydatne do testów z realistycznymi danymi.
+          tips:
+            - "firebase emulators:export ./emulator-data — zapisz stan emulatorów"
+            - "Użyj w CI/CD żeby testy zawsze startowały z tymi samymi danymi"
+      - cmd: firebase emulators:exec "npm test"
+        desc: Uruchom testy z emulatorami (CI/CD)
+        detail:
+          what: Uruchamia emulatory, wykonuje podaną komendę i wyłącza emulatory po zakończeniu.
+          how: Idealne do CI/CD — testy integracyjne z prawdziwymi emulatorami Firebase.
+          tips:
+            - "FIRESTORE_EMULATOR_HOST=localhost:8080 — zmienne środowiskowe dla SDK"
+            - "firebase emulators:exec --only firestore \"npm test\" — tylko Firestore emulator"
+
+  - name: Deploy
+    icon: "🚀"
+    commands:
+      - cmd: firebase deploy
+        desc: Deploy całego projektu (hosting + functions + rules)
+        detail:
+          what: Publikuje hosting, Functions, reguły Firestore i Storage w jednej komendzie.
+          how: Czyta konfigurację z firebase.json i deployuje wszystkie skonfigurowane usługi.
+          tips:
+            - "Zawsze zrób build aplikacji przed deploy: npm run build && firebase deploy"
+            - "firebase deploy --except functions — deploy bez Functions"
+      - cmd: firebase deploy --only hosting
+        desc: Deploy tylko hostingu
+        detail:
+          what: Publikuje tylko pliki statyczne hostingu — szybszy niż pełny deploy.
+          how: Uploaduje zawartość katalogu public (z firebase.json) do Firebase CDN.
+          tips:
+            - "Użyj gdy zmieniłeś tylko frontend, nie zmieniałeś Functions ani reguł"
+            - "firebase deploy --only hosting -m \"fix: poprawka navbar\" — z wiadomością"
+      - cmd: firebase deploy --only functions
+        desc: Deploy tylko Cloud Functions
+        detail:
+          what: Kompiluje i publikuje tylko Cloud Functions — bez dotykania hostingu i reguł.
+          how: Wymaga wcześniejszego builda Functions (tsc lub build step).
+          tips:
+            - "firebase deploy --only functions:myFunction — deploy jednej funkcji"
+            - "Pierwsze deploy Functions trwa dłużej — zaopatrz się w cierpliwość"
+      - cmd: firebase deploy --only firestore:rules
+        desc: Deploy reguł Firestore
+        detail:
+          what: Publikuje tylko reguły bezpieczeństwa Firestore bez deployu funkcji i hostingu.
+          how: Czyta plik firestore.rules (konfigurowany w firebase.json).
+          tips:
+            - "firebase deploy --only storage:rules — deploy reguł Storage"
+            - "Przetestuj reguły przez emulator zanim opublikujesz na produkcję"
+      - cmd: firebase hosting:channel:deploy preview
+        desc: Deploy do kanału preview (nie produkcja)
+        detail:
+          what: Tworzy tymczasowy URL preview bez nadpisywania produkcyjnego hostingu.
+          how: Generuje URL w stylu my-project--preview-abc123.web.app — bezpieczny podgląd zmian.
+          tips:
+            - "firebase hosting:channel:list — lista aktywnych kanałów"
+            - "firebase hosting:channel:delete preview — usuń kanał"
+
+  - name: Firestore SDK v9+
+    icon: "🗄️"
+    commands:
+      - cmd: "const docRef = doc(db, 'users', userId);"
+        desc: Utwórz referencję do dokumentu
+        detail:
+          what: Tworzy referencję (wskaźnik) do dokumentu — nie pobiera jeszcze danych.
+          how: "doc(db, kolekcja, id) — ścieżka musi mieć parzystą liczbę segmentów (kolekcja/dokument/...)"
+          tips:
+            - "doc(db, 'users', userId, 'posts', postId) — zagnieżdżony dokument"
+            - "Referencja to obiekt — można go przekazywać i używać w batchu/transakcji"
+      - cmd: "const snap = await getDoc(doc(db, 'users', userId));"
+        desc: Pobierz dokument jednorazowo
+        detail:
+          what: Pobiera dokument z Firestore — jednorazowy odczyt (nie real-time).
+          how: "snap.exists() — sprawdź czy dokument istnieje. snap.data() — pobierz dane."
+          tips:
+            - "snap.id — ID dokumentu. snap.ref — referencja z powrotem"
+            - "Użyj getDocFromCache(ref) — tylko cache, bez sieci"
+      - cmd: "const snap = await getDocs(query(collection(db, 'users'), where('active', '==', true)));"
+        desc: Zapytanie z filtrem where
+        detail:
+          what: Pobiera dokumenty spełniające warunek — where obsługuje ==, !=, <, <=, >, >=, in, array-contains.
+          how: query() łączy referencję kolekcji z jednym lub wieloma warunkami.
+          tips:
+            - "where('tags', 'array-contains', 'admin') — dokument zawiera 'admin' w tablicy"
+            - "where('status', 'in', ['active', 'pending']) — status jest jednym z podanych"
+      - cmd: "await addDoc(collection(db, 'posts'), { title, content, createdAt: serverTimestamp() });"
+        desc: Dodaj dokument z auto-ID
+        detail:
+          what: Tworzy nowy dokument z automatycznie wygenerowanym ID — jak INSERT z auto-increment.
+          how: serverTimestamp() ustawia timestamp z serwera Firebase (nie klienta).
+          tips:
+            - "addDoc zwraca DocumentReference z .id — zapisz ID jeśli potrzebujesz"
+            - "Użyj serverTimestamp() zamiast new Date() — spójne czasy między klientami"
+      - cmd: "await setDoc(doc(db, 'users', uid), { name }, { merge: true });"
+        desc: Ustaw lub scal dokument (setDoc + merge)
+        detail:
+          what: "Z merge: true — aktualizuje tylko podane pola, reszta bez zmian. Bez merge — nadpisuje cały dokument."
+          how: Różnica od updateDoc — setDoc tworzy dokument jeśli nie istnieje, updateDoc rzuca błąd.
+          tips:
+            - "setDoc bez merge = REPLACE (ostrożnie — usuwa pola których nie podałeś)"
+            - "setDoc z merge = bezpieczna upsert operacja"
+      - cmd: "await updateDoc(doc(db, 'users', uid), { score: increment(10), updatedAt: serverTimestamp() });"
+        desc: Atomowa aktualizacja pola (increment)
+        detail:
+          what: increment() atomowo zwiększa wartość numeryczną — bezpieczne przy wielu klientach.
+          how: Firestore wykonuje increment server-side — nie ma race condition.
+          tips:
+            - "increment(-5) — zmniejsz o 5"
+            - "arrayUnion('tag') — dodaj do tablicy bez duplikatów. arrayRemove('tag') — usuń z tablicy"
+      - cmd: "const unsub = onSnapshot(collection(db, 'messages'), snap => setMessages(snap.docs.map(d => ({id: d.id, ...d.data()}))));"
+        desc: Real-time listener na kolekcję
+        detail:
+          what: Nasłuchuje zmian w kolekcji — callback wywoływany natychmiast i przy każdej zmianie.
+          how: Zwraca funkcję unsubscribe — wywołaj ją w useEffect cleanup.
+          tips:
+            - "snap.docChanges() — tablica zmian (added/modified/removed) zamiast całego snapshota"
+            - "Pamiętaj o unsubscribe przy odmontowaniu komponentu — wyciek pamięci jeśli pominiesz"
+      - cmd: "const batch = writeBatch(db); batch.set(...); batch.update(...); await batch.commit();"
+        desc: Batch — wiele operacji atomowo
+        detail:
+          what: Batch pozwala wykonać do 500 operacji w jednej atomowej transakcji — wszystkie albo żadna.
+          how: writeBatch(db) tworzy batch. Dodajesz operacje set/update/delete. commit() wykonuje wszystko.
+          tips:
+            - "Max 500 operacji per batch — podziel na mniejsze batche dla większych operacji"
+            - "Batch nie wykonuje odczytu — dla odczytu + zapisu użyj runTransaction"
+
+  - name: Authentication SDK
+    icon: "🔐"
+    commands:
+      - cmd: "await createUserWithEmailAndPassword(auth, email, password);"
+        desc: Zarejestruj użytkownika emailem
+        detail:
+          what: Tworzy nowe konto Firebase Auth z podanym emailem i hasłem.
+          how: Rzuca auth/email-already-in-use jeśli email już istnieje. Minimalna długość hasła to 6 znaków.
+          tips:
+            - "credential.user — obiekt User po pomyślnej rejestracji"
+            - "Natychmiast po rejestracji użytkownik jest zalogowany (auth.currentUser != null)"
+      - cmd: "await signInWithEmailAndPassword(auth, email, password);"
+        desc: Zaloguj użytkownika emailem
+        detail:
+          what: Loguje istniejącego użytkownika emailem i hasłem — zwraca UserCredential.
+          how: Błędy — auth/wrong-password, auth/user-not-found, auth/too-many-requests.
+          tips:
+            - "Przechwyć auth/too-many-requests — Firebase blokuje po zbyt wielu próbach"
+            - "credential.user.uid — unikalny identyfikator użytkownika"
+      - cmd: "await signInWithPopup(auth, new GoogleAuthProvider());"
+        desc: Logowanie przez Google OAuth
+        detail:
+          what: Otwiera popup Google OAuth — użytkownik wybiera konto i autoryzuje aplikację.
+          how: GoogleAuthProvider można konfigurować — addScope() dla dodatkowych uprawnień.
+          tips:
+            - "auth/popup-blocked — przeglądarka zablokowała popup (wywołaj tylko po user action)"
+            - "signInWithRedirect zamiast signInWithPopup dla lepszej obsługi mobile"
+      - cmd: "onAuthStateChanged(auth, user => setUser(user));"
+        desc: Nasłuchuj zmiany stanu logowania
+        detail:
+          what: Callback wywoływany gdy użytkownik się loguje, wylogowuje lub przy załadowaniu strony.
+          how: Wywołany asynchronicznie na starcie — poczekaj na pierwszy callback zanim renderujesz UI.
+          tips:
+            - "user === null — wylogowany. user.uid — zalogowany"
+            - "Zwraca unsubscribe — wywołaj w cleanup useEffect"
+      - cmd: "await sendPasswordResetEmail(auth, email);"
+        desc: Wyślij email reset hasła
+        detail:
+          what: Wysyła email z linkiem do zresetowania hasła na podany adres.
+          how: Firebase obsługuje cały flow — nie musisz budować własnego systemu resetowania.
+          tips:
+            - "Nie zdradza czy email istnieje (security best practice)"
+            - "Customizuj szablon emaila w Firebase Console > Authentication > Templates"
+
+  - name: Storage SDK
+    icon: "💾"
+    commands:
+      - cmd: "await uploadBytes(ref(storage, path), file);"
+        desc: Upload pliku
+        detail:
+          what: Uploaduje plik (File, Blob, ArrayBuffer) do Firebase Storage pod podaną ścieżką.
+          how: Ścieżka w Storage to jak ścieżka pliku — 'avatars/user123.jpg'.
+          tips:
+            - "Drugi argument może być File z input[type=file] lub Blob"
+            - "{ contentType: 'image/jpeg' } — ustaw MIME type w metadata (trzeci argument)"
+      - cmd: "const url = await getDownloadURL(ref(storage, path));"
+        desc: Pobierz publiczny URL pliku
+        detail:
+          what: Zwraca publiczny URL do pobrania pliku — działa przez CDN Google.
+          how: URL jest ważny dopóki plik istnieje i reguły Storage na to pozwalają.
+          tips:
+            - "URL zawiera token — można go zainwalidować przez rotację tokenu"
+            - "Zapisz URL w Firestore po uploadzie — nie generuj go za każdym razem"
+      - cmd: "const task = uploadBytesResumable(ref(storage, path), file); task.on('state_changed', ...);"
+        desc: Upload z postępem (resumable)
+        detail:
+          what: Upload z możliwością śledzenia postępu — idealny dla dużych plików.
+          how: "Eventy: state_changed (progress), error, complete. task.pause() / task.resume()."
+          tips:
+            - "snapshot.bytesTransferred / snapshot.totalBytes * 100 — procent postępu"
+            - "task.cancel() — anuluj upload"
+      - cmd: "await deleteObject(ref(storage, 'avatars/user123.jpg'));"
+        desc: Usuń plik ze Storage
+        detail:
+          what: Usuwa plik pod podaną ścieżką ze Storage — nieodwracalne.
+          how: Rzuca storage/object-not-found jeśli plik nie istnieje.
+          tips:
+            - "Sprawdź czy plik istnieje przez getMetadata() przed usunięciem"
+            - "Pamiętaj też usunąć URL zapisany w Firestore po usunięciu pliku"
+      - cmd: "const result = await listAll(ref(storage, 'uploads/userId'));"
+        desc: Listuj pliki w katalogu Storage
+        detail:
+          what: Pobiera wszystkie pliki i podkatalogi pod podaną ścieżką Storage.
+          how: "result.items — pliki. result.prefixes — podkatalogi. Rekurencja wymaga osobnych wywołań."
+          tips:
+            - "list(ref, { maxResults: 20, pageToken: token }) — stronicowanie dla dużych kolekcji"
+            - "Dla każdego item możesz wywołać getDownloadURL(item) i getMetadata(item)"
+
+  - name: Cloud Functions CLI
+    icon: "⚙️"
+    commands:
+      - cmd: firebase init functions
+        desc: Zainicjalizuj Cloud Functions w projekcie
+        detail:
+          what: Tworzy katalog functions/ z konfiguracją TypeScript/JavaScript i package.json.
+          how: Wybierz TypeScript (zalecane) lub JavaScript. Konfiguracja zapisana w firebase.json.
+          tips:
+            - "Zawsze wybieraj TypeScript — lepsze IDE support i wcześniejsze wyłapywanie błędów"
+            - "npm install w katalogu functions — zainstaluj zależności"
+      - cmd: firebase emulators:start --only functions
+        desc: Uruchom emulator Functions lokalnie
+        detail:
+          what: Uruchamia lokalny emulator Cloud Functions bez deploy na Google Cloud.
+          how: Funkcje HTTP dostępne pod http://localhost:5001/project-id/region/functionName.
+          tips:
+            - "Połącz z emulatorem Firestore dla pełnego lokalnego środowiska"
+            - "Logi funkcji pojawiają się w terminalu w czasie rzeczywistym"
+      - cmd: firebase deploy --only functions:myFunction
+        desc: Deploy jednej funkcji
+        detail:
+          what: Deployuje tylko konkretną funkcję — szybsze niż deploy wszystkich.
+          how: Nazwy funkcji eksportowane z functions/src/index.ts.
+          tips:
+            - "firebase functions:list — lista deployowanych funkcji z URL"
+            - "firebase functions:delete myFunction — usuń funkcję"
+      - cmd: firebase functions:log --only myFunction
+        desc: Sprawdź logi funkcji
+        detail:
+          what: Wyświetla logi Cloud Functions z Google Cloud Logging.
+          how: Logi z console.log() i console.error() w funkcjach pojawiają się tutaj.
+          tips:
+            - "firebase functions:log --limit 50 — ostatnie 50 wpisów"
+            - "Logi są też dostępne w Firebase Console > Functions > Logs"
+
+  - name: Firestore Rules i zarządzanie
+    icon: "🛡️"
+    commands:
+      - cmd: firebase firestore:delete --all-collections
+        desc: Usuń wszystkie dane z Firestore
+        detail:
+          what: Usuwa wszystkie kolekcje i dokumenty z Firestore — nieodwracalne.
+          how: Używaj ostrożnie — najczęściej przy resetowaniu środowiska testowego.
+          tips:
+            - "firebase firestore:delete --all-collections --project dev-project — tylko dev"
+            - "Dodaj --recursive żeby usunąć subcollections"
+      - cmd: firebase firestore:delete /users --recursive
+        desc: Usuń konkretną kolekcję
+        detail:
+          what: Usuwa kolekcję /users wraz z wszystkimi dokumentami i subcollections.
+          how: "--recursive — wymagane dla kolekcji z subcollections."
+          tips:
+            - "Przydatne do czyszczenia danych testowych wybranej kolekcji"
+            - "Nie używaj na produkcji bez backupu"
+      - cmd: firebase firestore:indexes
+        desc: Wylistuj indeksy Firestore
+        detail:
+          what: Pobiera aktualnie zdeployowane indeksy Firestore z projektu.
+          how: Synchronizuje z plikiem firestore.indexes.json — porównaj lokalne z produkcją.
+          tips:
+            - "firebase deploy --only firestore:indexes — deploy tylko indeksów"
+            - "Złożone zapytania (orderBy + where) wymagają composite index — Firebase poda link"
+      - cmd: "firebase firestore:rules:get"
+        desc: Pobierz aktualne reguły Firestore z projektu
+        detail:
+          what: Pobiera aktualnie opublikowane reguły bezpieczeństwa Firestore.
+          how: Przydatne gdy chcesz sprawdzić reguły produkcyjne lub zsynchronizować z lokalnym plikiem.
+          tips:
+            - "Porównaj z lokalnym firestore.rules przez diff"
+            - "firebase deploy --only firestore:rules — opublikuj lokalne reguły"
+
+  - name: Realtime Database CLI
+    icon: "⚡"
+    commands:
+      - cmd: firebase database:get /users
+        desc: Odczytaj dane z Realtime Database (CLI)
+        detail:
+          what: Pobiera dane z podanej ścieżki Realtime Database i wypisuje jako JSON.
+          how: Przydatne do debugowania i inspekcji danych bez wchodzenia w konsolę.
+          tips:
+            - "firebase database:get /users --pretty — czytelne formatowanie JSON"
+            - "firebase database:get / — pobierz wszystkie dane (ostrożnie na dużych bazach)"
+      - cmd: "firebase database:set /config '{\"maintenance\": false}'"
+        desc: Zapisz dane do Realtime Database (CLI)
+        detail:
+          what: Ustawia dane pod podaną ścieżką — nadpisuje istniejące dane.
+          how: Wartość musi być poprawnym JSON-em podanym jako argument.
+          tips:
+            - "firebase database:update /config '{\"key\": \"value\"}' — aktualizuj częściowo"
+            - "firebase database:push /messages '{\"text\": \"hello\"}' — dodaj z auto-ID"
+      - cmd: firebase database:rules:get
+        desc: Pobierz reguły Realtime Database
+        detail:
+          what: Wypisuje aktualne reguły bezpieczeństwa Realtime Database.
+          how: Reguły Realtime Database to JSON — inny format niż reguły Firestore.
+          tips:
+            - "firebase deploy --only database:rules — opublikuj reguły z database.rules.json"
+            - "Domyślne reguły blokują wszystkich — zmień zanim zaczniesz testować"
+
+  - name: Zarządzanie projektem
+    icon: "🔧"
+    commands:
+      - cmd: firebase apps:list
+        desc: Wylistuj aplikacje w projekcie
+        detail:
+          what: Pokazuje wszystkie aplikacje zarejestrowane w projekcie (Web, iOS, Android).
+          how: Każda aplikacja ma unikalny App ID używany w konfiguracji SDK.
+          tips:
+            - "firebase apps:create web my-web-app — zarejestruj nową aplikację web"
+            - "firebase apps:sdkconfig web -- pobierz konfigurację SDK do pliku"
+      - cmd: firebase apps:sdkconfig web > src/firebase-config.json
+        desc: Pobierz konfigurację SDK do pliku
+        detail:
+          what: Eksportuje konfigurację SDK (apiKey, projectId etc.) bezpośrednio do pliku.
+          how: Przydatne żeby nie kopiować konfiguracji ręcznie z konsoli Firebase.
+          tips:
+            - "Dodaj firebase-config.json do .gitignore jeśli zawiera wrażliwe dane"
+            - "Lepiej używać zmiennych środowiskowych (.env) niż commitować konfigurację"
+      - cmd: firebase target:apply hosting main my-project
+        desc: Przypisz cel deploy (multi-site hosting)
+        detail:
+          what: Przypisuje alias 'main' do strony 'my-project' — dla multi-site hostingu.
+          how: Multi-site pozwala deployować kilka stron z jednego projektu Firebase.
+          tips:
+            - "firebase init hosting:sites — inicjalizuj multi-site hosting"
+            - "W firebase.json możesz mieć wiele sekcji hosting z różnymi targetami"
+      - cmd: firebase ext:install firebase/firestore-send-email
+        desc: Zainstaluj rozszerzenie Firebase
+        detail:
+          what: Instaluje oficjalne rozszerzenie Firebase — w tym przypadku wysyłanie emaili z Firestore.
+          how: Rozszerzenia to gotowe integracje (Stripe, Algolia, emaile, resize images etc.).
+          tips:
+            - "firebase ext:list — lista zainstalowanych rozszerzeń"
+            - "firebase ext:update — zaktualizuj rozszerzenia"
+            - "Rozszerzenia dostępne na https://extensions.dev"

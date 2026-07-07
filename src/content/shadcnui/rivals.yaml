@@ -1,0 +1,73 @@
+title: "Shadcn/ui vs alternatywy UI"
+
+items:
+  - name: Material UI (MUI)
+    icon: "🎨"
+    color: "#007FFF"
+    tagline: "Google Material Design — kompletny, opinionated, vendor lock-in"
+    pros:
+      - "Ogromna kolekcja komponentów (50+) — wszystko gotowe out of the box"
+      - Doskonała dokumentacja z przykładami i API reference
+      - Theming system (createTheme) — centralna konfiguracja wyglądu
+      - Enterprise-ready — MUI X z DataGrid, DatePicker, Charts (płatne)
+      - Duża społeczność i ekosystem
+    cons:
+      - Vendor lock-in — silnie związany z Material Design
+      - Ciężki bundle — dodaje 50-200KB gzipped
+      - Trudne do stylowania poza Material Design — overridy są skomplikowane
+      - styled-components/emotion pod spodem — kolejna zależność
+      - Style inline generowane runtime — gorszy performance niż Tailwind
+    vs: "MUI gdy chcesz Material Design i nie masz czasu na customizację. Shadcn gdy masz Tailwind i chcesz własny styl — żadne ograniczenia designu."
+
+  - name: Ant Design
+    icon: "🐜"
+    color: "#1677FF"
+    tagline: "Alibaba enterprise framework — rozbudowany, przetestowany, chiński ekosystem"
+    pros:
+      - "Najbardziej kompletna biblioteka — 70+ komponentów"
+      - "Enterprise komponenty wbudowane: DataGrid, Tree, Upload, Transfer"
+      - Dogłębnie przetestowana na produkcji (Alibaba, Tencent)
+      - Doskonały TypeScript support
+      - Design tokens i theming przez CSS-in-JS
+    cons:
+      - Bardzo ciężki bundle (500KB+ bez tree-shaking)
+      - Styl nie pasuje do zachodniej estetyki bez znaczących overrides
+      - Tree-shaking wymaga konfiguracji babel plugin
+      - Trudne do dopasowania do własnego design systemu
+      - Wersje mają breaking changes między major wersjami
+    vs: "Ant Design dla prawdziwie enterprise aplikacji z 70+ różnymi widokami. Shadcn dla nowoczesnych SaaS gdzie estetyka i performance są ważne."
+
+  - name: Radix UI (headless)
+    icon: "◎"
+    color: "#6E56CF"
+    tagline: "Beheadless primitives — dostępność tak, style nie"
+    pros:
+      - "Zero stylów — pełna swoboda w wyglądzie"
+      - Najlepsza dostępność (WCAG AAA) — focus management, ARIA, keyboard nav
+      - Tiny bundle — ładujesz tylko używane primitives
+      - Shadcn/ui jest zbudowany na Radix — używasz go pośrednio
+      - Stabilne API — rzadkie breaking changes
+    cons:
+      - Musisz wszystko ostylować samodzielnie — bardzo dużo pracy
+      - Brak gotowych komponentów z wyglądem — to są primitives, nie UI
+      - Potrzebujesz Tailwind lub CSS-in-JS żeby cokolwiek wyglądało
+      - Złożona konfiguracja dla bardziej zaawansowanych komponentów
+    vs: "Radix UI bezpośrednio gdy budujesz własny design system od zera. Shadcn/ui gdy chcesz Radix + gotowe style Tailwind — najlepsze oba."
+
+  - name: Chakra UI
+    icon: "⚡"
+    color: "#319795"
+    tagline: "Styled components approach — piękny API, ale runtime cost"
+    pros:
+      - Doskonałe DX — intuicyjne props jak `px={4}`, `colorScheme="blue"`
+      - Wbudowany dark mode bez konfiguracji
+      - Responsywne props inline `fontSize={["sm", "md", "lg"]}`
+      - Dobra dostępność (Radix pod spodem w v3)
+      - Component composition przez `as` prop
+    cons:
+      - CSS-in-JS runtime — style generowane w JS przy każdym renderze
+      - Gorszy performance niż Tailwind (Atomic CSS)
+      - Bundle size > Tailwind + shadcn
+      - v3 prawie przepisane od zera — breaking changes
+      - Styl rozpoznawalny — ciężko mieć "własny wygląd"
+    vs: "Chakra UI dla szybkich prototypów i gdy podoba ci się API (`colorScheme`, responsive props). Shadcn + Tailwind dla produkcji gdzie performance CSS ma znaczenie."

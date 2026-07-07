@@ -1,0 +1,117 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Shadcn/ui?
+  firstComponent: Pierwsze kroki
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Shadcn/ui?
+  desc: >
+    Shadcn/ui to kolekcja pięknych, dostępnych komponentów UI zbudowanych
+    na Radix UI i Tailwind CSS. Kluczowa różnica — nie jest to biblioteka
+    którą instalujesz jako pakiet npm. Kopiujesz kod komponentów bezpośrednio
+    do swojego projektu. Masz pełną kontrolę nad każdą linią kodu. Zero
+    vendor lock-in, zero aktualizacji które psują style, zero konfiguracji
+    theme providera. Każdy komponent to plik TypeScript/TSX w twoim projekcie
+    który możesz dowolnie modyfikować.
+
+concepts:
+  - title: "Copy, don't install"
+    desc: >
+      Shadcn/ui łamie konwencję npm packages. Zamiast importować z node_modules,
+      uruchamiasz `npx shadcn add button` i dostajesz plik src/components/ui/button.tsx
+      w swoim projekcie. To twój kod — możesz go edytować, rozszerzać, usuwać.
+      Aktualizacje nie niszczą twoich customizacji.
+    icon: "📋"
+  - title: Radix UI pod spodem
+    desc: >
+      Każdy komponent używa Radix UI jako beheadless primitive — dostępność
+      (ARIA, keyboard navigation, focus management) jest wbudowana i certyfikowana.
+      Radix obsługuje logikę (otwieranie, focus trap, portale), shadcn/ui dodaje
+      style Tailwind CSS. Najlepsze z obu światów.
+    icon: "🔮"
+  - title: CSS Variables dla theming
+    desc: >
+      Shadcn/ui używa CSS custom properties (--background, --foreground, --primary itd.)
+      zamiast hardkodowanych kolorów Tailwind. Dzięki temu dark mode to zmiana
+      zestawu zmiennych, a nie dodawanie klas `dark:` wszędzie. Jedna zmiana
+      w globals.css aktualizuje cały temat.
+    icon: "🎨"
+  - title: "cn() — inteligentne łączenie klas"
+    desc: >
+      Funkcja cn() (z lib/utils.ts) łączy clsx i tailwind-merge. clsx obsługuje
+      warunkowe klasy, tailwind-merge eliminuje konflikty (np. px-2 + px-4 = px-4,
+      nie "px-2 px-4"). Używasz jej wszędzie gdzie łączysz klasy — szczególnie
+      przy wariantach komponentów.
+    icon: "🛠️"
+  - title: "cva() — warianty komponentów"
+    desc: >
+      class-variance-authority (cva) zarządza wariantami komponentu. Zamiast
+      długich if/else, definiujesz `variants` i `defaultVariants`. Button ma
+      `variant` (default/destructive/outline/ghost/link) i `size` (sm/md/lg).
+      TypeScript automatycznie typuje dozwolone kombinacje.
+    icon: "🎛️"
+  - title: components.json — konfiguracja projektu
+    desc: >
+      Plik components.json przechowuje konfigurację shadcn/ui dla projektu —
+      styl (default/new-york), TypeScript, ścieżkę komponentów, aliasy.
+      CLI używa go do wiedzenia gdzie umieszczać nowe komponenty i jakie
+      zależności instalować.
+    icon: "⚙️"
+
+whenToUse:
+  - Projekty React/Next.js potrzebujące pięknych, dostępnych komponentów
+  - Gdy chcesz pełnej kontroli nad kodem komponentów (nie czarna skrzynka)
+  - Projekty z Tailwind CSS — shadcn/ui jest na nim zbudowany
+  - Aplikacje wymagające dostępności (WCAG) — Radix UI zapewnia ją za darmo
+  - Gdy chcesz własnego design systemu zamiast narzuconych stylów MUI/Ant
+  - Szybkie prototypy i MVP — gotowe komponenty bez konfiguracji
+
+firstComponent: |
+  # 1. Inicjalizacja w projekcie Next.js / Vite
+  npx shadcn@latest init
+
+  # Pytania inicjalizacji:
+  # ✔ Which style would you like to use? › Default
+  # ✔ Which color would you like to use as base? › Zinc
+  # ✔ Do you want to use CSS variables? › yes
+
+  # 2. Wygenerowane pliki:
+  # components.json  — konfiguracja CLI
+  # src/lib/utils.ts — funkcja cn()
+  # src/app/globals.css — CSS variables (light + dark)
+  # tailwind.config.ts — rozszerzona konfiguracja
+
+  # 3. Dodaj pierwszy komponent
+  npx shadcn@latest add button
+
+  # Tworzy: src/components/ui/button.tsx
+  # Instaluje: @radix-ui/react-slot, class-variance-authority
+
+  # 4. Użyj w komponencie
+  import { Button } from "@/components/ui/button"
+
+  export default function Page() {
+    return (
+      <div className="flex gap-4">
+        <Button>Domyślny</Button>
+        <Button variant="outline">Outline</Button>
+        <Button variant="destructive">Usuń</Button>
+        <Button variant="ghost">Ghost</Button>
+        <Button size="sm">Mały</Button>
+        <Button size="lg">Duży</Button>
+      </div>
+    )
+  }
+
+  # 5. Struktura projektu po kilku komponentach
+  src/
+  ├── components/
+  │   └── ui/           ← komponenty shadcn (twój kod)
+  │       ├── button.tsx
+  │       ├── card.tsx
+  │       └── dialog.tsx
+  ├── lib/
+  │   └── utils.ts      ← cn() utility
+  └── app/
+      └── globals.css   ← CSS variables

@@ -1,0 +1,207 @@
+labels:
+  title: Repo & OCI Registry
+  subtitle: Źródła i dystrybucja chartów Helm
+
+intro:
+  title: Repozytorium i OCI Registry
+  desc: >
+    Helm chart można dystrybuować na dwa sposoby: klasyczne repozytorium HTTP z plikiem
+    index.yaml (tradycyjne, proste) lub OCI Registry (od Helm 3.8, standard od 3.13).
+    OCI to ta sama infrastruktura co Docker images — możesz trzymać charty razem z
+    obrazami w ECR, GCR, ACR, Harbor lub GHCR. Artifact Hub to katalog agregujący
+    tysiące chartów z różnych repozytoriów — idealny punkt startowy do szukania gotowych chartów.
+
+items:
+  - name: Artifact Hub — centralny katalog chartów
+    desc: >
+      Artifact Hub (artifact.hub.io) to oficjalny katalog CNCF agregujący charty z setek
+      repozytoriów. Szukaj chartów, czytaj README i sprawdzaj wersje przed dodaniem repo.
+      Zastąpił stary Helm Hub. Każdy chart ma ocenę bezpieczeństwa i link do repozytorium.
+    code: |
+      # Szukaj chartów przez Helm CLI:
+      helm search hub postgresql          # szuka na artifact.hub.io
+      helm search hub nginx --max-col-width 80
+
+      # Szukaj w lokalnych repozytoriach (po helm repo add):
+      helm search repo postgresql
+      helm search repo postgresql --versions    # wszystkie dostępne wersje
+
+      # Znajdź URL repozytorium na artifact.hub.io:
+      # 1. Otwórz artifact.hub.io
+      # 2. Znajdź chart
+      # 3. Kliknij "Install" — pokaże komendę helm repo add
+
+  - name: Bitnami — najpopularniejsze repozytorium
+    desc: >
+      Bitnami (VMware) utrzymuje setki produkcyjnych chartów: PostgreSQL, Redis, MongoDB,
+      RabbitMQ, Kafka, nginx, WordPress, Grafana i wiele innych. Charty są regularnie
+      aktualizowane i dobrze udokumentowane. Standard w większości klastrów K8s.
+    code: |
+      helm repo add bitnami https://charts.bitnami.com/bitnami
+      helm repo update
+
+      # Popularne charty bitnami:
+      helm install postgres bitnami/postgresql \
+        --set auth.postgresPassword=secret123 \
+        --set primary.persistence.size=20Gi \
+        -n production --create-namespace
+
+      helm install redis bitnami/redis \
+        --set auth.password=redis-secret \
+        --set architecture=standalone \
+        -n production
+
+      helm install kafka bitnami/kafka \
+        --set replicaCount=3 \
+        -n production
+
+      # Eksportuj domyślne values jako punkt startowy:
+      helm show values bitnami/postgresql > postgres-values.yaml
+      # Edytuj postgres-values.yaml i użyj: helm install postgres bitnami/postgresql -f postgres-values.yaml
+
+  - name: Popularne repozytoria ekosystemu K8s
+    desc: >
+      Każde duże narzędzie K8s ma własne oficjalne repozytorium Helm. Dodawaj tylko te
+      które potrzebujesz — helm repo list pokazuje co masz. Pamiętaj o helm repo update
+      przed każdą instalacją żeby mieć aktualne wersje.
+    code: |
+      # Argo CD
+      helm repo add argo https://argoproj.github.io/argo-helm
+
+      # nginx Ingress Controller (oficjalny)
+      helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+
+      # cert-manager (TLS/Let's Encrypt)
+      helm repo add jetstack https://charts.jetstack.io
+
+      # Prometheus + Grafana (kube-prometheus-stack)
+      helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+
+      # Grafana Loki + Tempo + Alloy
+      helm repo add grafana https://grafana.github.io/helm-charts
+
+      # External Secrets Operator (z Vault/AWS SSM)
+      helm repo add external-secrets https://charts.external-secrets.io
+
+      # Sealed Secrets (szyfrowane secrets w Git)
+      helm repo add sealed-secrets https://bitnami-labs.github.io/sealed-secrets
+
+      # Velero (backup K8s)
+      helm repo add vmware-tanzu https://vmware-tanzu.github.io/helm-charts
+
+      # Odśwież wszystkie naraz:
+      helm repo update
+
+  - name: OCI Registry — charty jako artefakty OCI
+    desc: >
+      OCI (Open Container Initiative) Registry pozwala przechowywać charty Helm obok
+      obrazów Docker w tej samej infrastrukturze. Obsługuje ECR (AWS), GCR (Google),
+      ACR (Azure), Harbor, GHCR (GitHub). Format OCI jest stabilny od Helm 3.13 —
+      to przyszłość dystrybucji chartów. Wymaga oci:// prefix zamiast URL repo.
+    code: |
+      # Logowanie do OCI registry:
+      helm registry login registry.example.com -u myuser -p mypassword
+
+      # GitHub Container Registry:
+      echo $GITHUB_TOKEN | helm registry login ghcr.io -u USERNAME --password-stdin
+
+      # AWS ECR:
+      aws ecr get-login-password --region eu-west-1 | \
+        helm registry login --username AWS --password-stdin \
+        123456789.dkr.ecr.eu-west-1.amazonaws.com
+
+      # Push charta do OCI:
+      helm package ./mychart                   # tworzy mychart-0.1.0.tgz
+      helm push mychart-0.1.0.tgz oci://ghcr.io/firma/charts
+
+      # Pobieranie i instalacja z OCI:
+      helm pull oci://ghcr.io/firma/charts/mychart --version 0.1.0 --untar
+      helm install myapp oci://ghcr.io/firma/charts/mychart --version 0.1.0
+
+      # Show info z OCI:
+      helm show chart oci://ghcr.io/firma/charts/mychart --version 0.1.0
+
+  - name: ChartMuseum — własne repozytorium HTTP
+    desc: >
+      ChartMuseum to lekki serwer repozytorium Helm (open-source). Możesz go zainstalować
+      w klastrze i hostować własne charty. Wspiera S3, GCS, Azure Blob jako backend storage.
+      Dobra opcja gdy nie możesz użyć OCI registry lub potrzebujesz prostego self-hosted rozwiązania.
+    code: |
+      # Instalacja ChartMuseum w K8s przez Helm:
+      helm repo add chartmuseum https://chartmuseum.github.io/charts
+      helm install chartmuseum chartmuseum/chartmuseum \
+        --set persistence.enabled=true \
+        --set persistence.size=10Gi \
+        -n helm-infrastructure --create-namespace
+
+      # Push charta do ChartMuseum (plugin helm-push lub curl):
+      # Z pluginem helm-push:
+      helm plugin install https://github.com/chartmuseum/helm-push
+      helm cm-push ./mychart http://chartmuseum.firma.pl
+
+      # Lub bezpośrednio przez curl:
+      helm package ./mychart
+      curl --data-binary "@mychart-0.1.0.tgz" http://chartmuseum.firma.pl/api/charts
+
+      # Dodaj do Helm jako repo:
+      helm repo add firma http://chartmuseum.firma.pl
+      helm repo update
+      helm install myapp firma/mychart
+
+  - name: GitHub Pages jako repozytorium chartów
+    desc: >
+      GitHub Pages to darmowy hosting dla repozytorium Helm — wystarczy repo publiczne (lub
+      prywatne z GitHub Pro). Workflow: helm package → index → commit → GitHub Pages.
+      Dobrze działa dla open-source chartów. Nie wymaga dodatkowej infrastruktury.
+    code: |
+      # Przygotuj chart i opublikuj na GitHub Pages:
+
+      # 1. Spakuj chart
+      helm package ./mychart --destination ./docs
+
+      # 2. Wygeneruj/zaktualizuj index
+      helm repo index ./docs --url https://firma.github.io/helm-charts
+
+      # 3. Commit i push
+      git add docs/
+      git commit -m "chore: release mychart-0.1.0"
+      git push
+
+      # 4. Włącz GitHub Pages z katalogu /docs (w repo settings)
+
+      # 5. Dodaj jako repo Helm:
+      helm repo add firma https://firma.github.io/helm-charts
+      helm repo update
+      helm search repo firma/
+      helm install myapp firma/mychart
+
+      # Automatyzacja z GitHub Actions (chart-releaser):
+      # https://github.com/helm/chart-releaser-action
+
+  - name: Harbor — enterprise OCI + Helm registry
+    desc: >
+      Harbor to enterprise-grade OCI registry (CNCF graduated) wspierający zarówno
+      Docker images jak i Helm charts. Wbudowane skanowanie bezpieczeństwa (Trivy),
+      RBAC, replication i quota. Standard w środowiskach enterprise bez dostępu do chmurowych registry.
+    code: |
+      # Instalacja Harbor przez Helm:
+      helm repo add harbor https://helm.goharbor.io
+      helm install harbor harbor/harbor \
+        --set expose.type=ingress \
+        --set expose.ingress.hosts.core=harbor.firma.pl \
+        --set externalURL=https://harbor.firma.pl \
+        -n harbor --create-namespace
+
+      # Logowanie do Harbor jako OCI registry:
+      helm registry login harbor.firma.pl -u admin -p Harbor12345
+
+      # Push charta:
+      helm package ./mychart
+      helm push mychart-0.1.0.tgz oci://harbor.firma.pl/project/charts
+
+      # Instalacja z Harbor OCI:
+      helm install myapp oci://harbor.firma.pl/project/charts/mychart --version 0.1.0
+
+      # Klasyczne repo HTTP (Harbor wspiera też stary format):
+      helm repo add firma https://harbor.firma.pl/chartrepo/project
+      helm repo update --username admin --password Harbor12345

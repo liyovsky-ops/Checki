@@ -1,0 +1,114 @@
+title: Podstawy Nuxt
+
+intro:
+  title: Czym jest Nuxt?
+  desc: >
+    Nuxt to meta-framework zbudowany na Vue.js, który dostarcza SSR (Server-Side Rendering),
+    SSG (Static Site Generation), plikowy routing, auto-import komponentów i composables,
+    server routes oraz wbudowane optymalizacje. Nuxt 3 używa Nitro jako silnika serwera
+    (działa na Node.js, Cloudflare Workers, Vercel, Netlify) oraz Vite do bundlowania.
+    Idealny do pełnostackowych aplikacji Vue — od bloga po kompleksowy SaaS.
+
+concepts:
+  - title: "File-based routing"
+    desc: >
+      Każdy plik w katalogu pages/ automatycznie staje się trasą. pages/index.vue → /,
+      pages/about.vue → /about, pages/blog/[slug].vue → /blog/:slug. Brak potrzeby
+      ręcznej konfiguracji Vue Router — Nuxt generuje router automatycznie.
+    icon: "📂"
+  - title: "Auto-imports"
+    desc: >
+      Nuxt automatycznie importuje komponenty z components/, composables z composables/
+      oraz utils z utils/. Nie piszesz żadnych import { ref } from 'vue' — wszystko
+      dostępne globalnie. To samo dotyczy Nuxt composables (useFetch, useState, useRoute).
+    icon: "✨"
+  - title: "SSR / SSG / SPA"
+    desc: >
+      Nuxt obsługuje trzy tryby renderowania. SSR (domyślny) — server renderuje HTML per request.
+      SSG — HTML generowany w build time (nuxi generate). SPA — tylko client-side (ssr: false).
+      Można mieszać tryby per-route za pomocą routeRules w nuxt.config.ts.
+    icon: "🖥️"
+  - title: "Server Routes"
+    desc: >
+      Pliki w server/api/ i server/routes/ stają się endpointami API. server/api/users.get.ts
+      odpowiada na GET /api/users. Nuxt używa h3 jako HTTP frameworka po stronie serwera.
+      Pełny backend w jednym projekcie — zero dodatkowej konfiguracji.
+    icon: "🔌"
+  - title: "Nitro — engine serwera"
+    desc: >
+      Nitro to silnik serwera Nuxt 3 — ultra-szybki, działa na Node.js, Cloudflare Workers,
+      Deno, Bun, Vercel, Netlify Edge. Automatyczne code splitting, tree-shaking, server routes
+      z cache wbudowanym. Jeden codebase → deploy na dowolny host.
+    icon: "⚡"
+  - title: "Layouts"
+    desc: >
+      Layouts definiują wspólny wrapper stron (np. navbar + footer). layouts/default.vue
+      otacza wszystkie strony. layouts/admin.vue dla sekcji admin. Strona wybiera layout
+      przez definePageMeta({ layout: 'admin' }) lub komponent <NuxtLayout name="admin">.
+    icon: "🏗️"
+  - title: "Plugins"
+    desc: >
+      Pliki w plugins/ są ładowane przy starcie aplikacji — idealnie do rejestrowania
+      globalnych komponentów, inicjowania bibliotek (axios, i18n), rozszerzania $nuxt.
+      Sufiks .client.ts — tylko po stronie przeglądarki. .server.ts — tylko na serwerze.
+    icon: "🔧"
+  - title: "Middleware"
+    desc: >
+      Middleware to funkcje wykonywane przed nawigacją do strony. middleware/auth.ts
+      sprawdza czy użytkownik jest zalogowany. Globalne middleware (rejestracja w nuxt.config)
+      lub lokalne (definePageMeta({ middleware: 'auth' })). Mogą blokować lub przekierowywać.
+    icon: "🛡️"
+
+whenToUse:
+  - "Full-stack Vue.js — backend + frontend w jednym projekcie"
+  - "SEO-heavy aplikacje gdzie SSR lub SSG jest wymagane"
+  - "Blogi, landing pages, e-commerce — SSG + hydration"
+  - "SaaS z autentykacją — server routes + middleware"
+  - "Zespoły pracujące w Vue — Nuxt to naturalny następny krok"
+  - "Rapid prototyping — auto-imports + plikowy routing eliminują boilerplate"
+
+firstComponent: |
+  # Instalacja Nuxt
+  npx nuxi@latest init my-app
+  cd my-app && npm install && npm run dev
+
+  # app.vue — root komponent
+  <template>
+    <div>
+      <NuxtRouteAnnouncer />
+      <NuxtPage />
+    </div>
+  </template>
+
+  # pages/index.vue — strona główna (/)
+  <script setup lang="ts">
+  const { data: posts } = await useFetch('/api/posts')
+
+  useHead({
+    title: 'Strona główna',
+    meta: [{ name: 'description', content: 'Moja aplikacja Nuxt' }]
+  })
+  </script>
+
+  <template>
+    <div>
+      <h1>Witaj w Nuxt!</h1>
+      <ul>
+        <li v-for="post in posts" :key="post.id">
+          <NuxtLink :to="`/blog/${post.slug}`">{{ post.title }}</NuxtLink>
+        </li>
+      </ul>
+    </div>
+  </template>
+
+  # server/api/posts.get.ts — endpoint GET /api/posts
+  export default defineEventHandler(async (event) => {
+    return [
+      { id: 1, title: 'Hello Nuxt', slug: 'hello-nuxt' },
+      { id: 2, title: 'SSR w praktyce', slug: 'ssr-praktyka' },
+    ]
+  })
+
+  # Uruchomienie dev
+  npm run dev
+  # http://localhost:3000

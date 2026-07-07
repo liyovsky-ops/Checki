@@ -1,0 +1,21 @@
+title: Ekosystem Turborepo — narzędzia i integracje
+
+items:
+  - name: create-turbo
+    desc: Oficjalny kreator nowych monorepo — npx create-turbo@latest. Tworzy gotową strukturę apps/ i packages/ z konfiguracją pnpm/npm/yarn. Dostępne przykłady — with-tailwind, with-docker, with-prisma, with-storybook. Najszybszy sposób na start.
+    icon: "🚀"
+  - name: turbo-ignore
+    desc: Skrypt do pomijania zbędnych buildów w CI (Vercel, Netlify). Wykrywa czy cokolwiek się zmieniło w danym workspace od ostatniego deployu. Jeśli nie — wychodzi z kodem 0 i platforma pomija build. Oficjalnie wspierany przez Vercel. Użycie w Ignore Command — npx turbo-ignore.
+    icon: "⏭️"
+  - name: Vercel Remote Cache
+    desc: Oficjalny Remote Cache dla Turborepo od Vercel. Darmowy dla projektów open source (publiczne repo), płatny dla prywatnych. Konfiguracja lokalna — turbo login + turbo link. W CI — zmienne środowiskowe TURBO_TOKEN i TURBO_TEAM. Zero kodu — Turborepo automatycznie używa cache po skonfigurowaniu.
+    icon: "☁️"
+  - name: Turborepo + pnpm workspaces
+    desc: Najpopularniejsze połączenie narzędzi monorepo. pnpm zarządza zależnościami (szybsza instalacja dzięki hard links i content-addressable store), Turborepo zarządza zadaniami (cache, pipeline, Remote Cache). pnpm-workspace.yaml definiuje workspace, turbo.json definiuje zadania. Minimalna konfiguracja, maksymalna wydajność.
+    icon: "📦"
+  - name: Changesets
+    desc: Narzędzie do wersjonowania i publishowania paczek w monorepo — changelog, bump wersji semver, publish na npm. Idealne połączenie z Turborepo gdy monorepo zawiera biblioteki publishowane na npm. Workflow — developer dodaje changeset (plik w .changeset/), CI automatycznie bumupuje wersje i publikuje.
+    icon: "📝"
+  - name: turbo gen (Plop.js)
+    desc: Generator kodu wbudowany w Turborepo (turbo gen). Tworzy nowy workspace według szablonu istniejącego workspace lub pliku konfiguracyjnego. Bazuje na Plop.js — możesz pisać własne generatory (turbo.generators/config.ts) dla komponentów, route, modułów, serwisów. Eliminuje ręczne kopiowanie struktury plików.
+    icon: "⚙️"

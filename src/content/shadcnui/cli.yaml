@@ -1,0 +1,586 @@
+title: Komendy i snippety Shadcn/ui
+
+groups:
+  - name: Instalacja & Init
+    icon: "📦"
+    commands:
+      - cmd: npx shadcn@latest init
+        desc: Inicjalizuj shadcn/ui w projekcie
+        detail:
+          what: Tworzy components.json, lib/utils.ts, aktualizuje globals.css i tailwind.config.
+          how: "Pytania: styl (Default/New York), kolor bazowy (Zinc/Slate/Stone...), CSS variables."
+          tips:
+            - "npx shadcn@latest init --defaults — pomiń pytania, użyj defaults"
+      - cmd: npx shadcn@latest add button
+        desc: Dodaj komponent Button
+        detail:
+          what: Kopiuje src/components/ui/button.tsx i instaluje zależności (cva, radix-slot).
+          how: Komponent ląduje w twoim projekcie — możesz go edytować.
+          tips:
+            - "npx shadcn@latest add button card dialog — kilka naraz"
+      - cmd: npx shadcn@latest add --all
+        desc: Dodaj wszystkie dostępne komponenty
+        detail:
+          what: Instaluje cały katalog komponentów shadcn/ui naraz.
+          how: Przydatne na starcie projektu — masz wszystko pod ręką.
+          tips:
+            - "Łatwiej usunąć nieużywane niż szukać potrzebnych po jednym"
+      - cmd: npx shadcn@latest diff
+        desc: Sprawdź różnice względem upstream
+        detail:
+          what: Pokazuje co się zmieniło w oryginalnych komponentach shadcn od ostatniej instalacji.
+          how: Pozwala ręcznie zaaplikować ulepszenia nie psując własnych zmian.
+          tips:
+            - "npx shadcn@latest diff button — diff dla konkretnego komponentu"
+      - cmd: npm install class-variance-authority clsx tailwind-merge
+        desc: Instaluj zależności ręcznie
+        detail:
+          what: "cva = warianty, clsx = warunkowe klasy, tailwind-merge = eliminacja konfliktów klas."
+          how: "shadcn init instaluje je automatycznie, ale warto znać co i po co."
+          tips:
+            - "tailwind-merge rozwiązuje problem: px-2 + px-4 = px-4 (nie obie)"
+
+  - name: "Button & Badge & Avatar"
+    icon: "🔘"
+    commands:
+      - cmd: "<Button variant=\"destructive\">Usuń</Button>"
+        desc: Czerwony przycisk akcji destrukcyjnej
+        detail:
+          what: Wariant destructive = czerwone tło. Używaj do nieodwracalnych akcji.
+          how: Zawsze dodaj potwierdzenie (Dialog/AlertDialog) przed faktyczną akcją.
+          tips:
+            - "variant: default | destructive | outline | secondary | ghost | link"
+      - cmd: "<Button variant=\"outline\" size=\"sm\">Anuluj</Button>"
+        desc: Mały outline button — secondary action
+        detail:
+          what: "outline = border bez fill, sm = h-9 px-3. Standardowy Cancel button."
+          how: Używaj obok primary action button.
+          tips:
+            - "size: sm | default | lg | icon"
+      - cmd: "<Button asChild><Link href=\"/\">Home</Link></Button>"
+        desc: Button renderowany jako Next.js Link
+        detail:
+          what: "asChild przekazuje style i props do child elementu zamiast renderować <button>."
+          how: Idealne gdy potrzebujesz button wyglądającego jak button ale działającego jak link.
+          tips:
+            - "asChild działa z każdym elementem — a, Link, RouterLink"
+      - cmd: "<Badge variant=\"secondary\">Beta</Badge>"
+        desc: Badge z wariantem secondary
+        detail:
+          what: "secondary = szare tło. Używaj dla tagów, statusów, kategorii."
+          how: Inline element — wstawiaj obok tekstu lub w CardTitle.
+          tips:
+            - "variant: default | secondary | destructive | outline"
+      - cmd: "<Avatar><AvatarImage src={url} /><AvatarFallback>JK</AvatarFallback></Avatar>"
+        desc: Avatar z fallback inicjałami
+        detail:
+          what: AvatarImage ładuje zdjęcie, AvatarFallback pokazuje się gdy brak lub błąd.
+          how: Fallback = inicjały użytkownika (2 litery). Radix obsługuje onLoadingStatusChange.
+          tips:
+            - "Dodaj className=\"h-8 w-8\" dla rozmiaru (domyślnie h-10 w-10)"
+
+  - name: "Dialog & Sheet & Drawer"
+    icon: "🪟"
+    commands:
+      - cmd: npx shadcn@latest add dialog
+        desc: Dodaj komponent Dialog (modal)
+        detail:
+          what: "Dialog = modal overlay. DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription."
+          how: "DialogContent automatycznie zarządza focus trap, Escape key, aria-modal."
+          tips:
+            - "AlertDialog — specjalny dialog do potwierdzenia akcji (z Cancel i Confirm)"
+      - cmd: |
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button>Otwórz</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Tytuł</DialogTitle>
+                <DialogDescription>Opis dialogu.</DialogDescription>
+              </DialogHeader>
+              <p>Treść dialogu</p>
+            </DialogContent>
+          </Dialog>
+        desc: Kompletny Dialog z triggerem
+        detail:
+          what: Minimalny dialog — trigger button + content z header.
+          how: "DialogContent renderuje się w portalu (poza drzewem DOM rodzica)."
+          tips:
+            - "DialogFooter — footer z Cancel/Confirm buttons"
+      - cmd: npx shadcn@latest add sheet
+        desc: Dodaj Sheet (slide-in panel)
+        detail:
+          what: "Sheet = Dialog który wysuwa się z boku (side panel / drawer dla desktop)."
+          how: "SheetContent side='right' | 'left' | 'top' | 'bottom'."
+          tips:
+            - "Idealny do filtrów, nawigacji mobilnej, detail panels"
+      - cmd: npx shadcn@latest add drawer
+        desc: Dodaj Drawer (slide-up mobile)
+        detail:
+          what: "Drawer = vaul library — animowany panel z dołu z drag-to-close. Mobile-first."
+          how: Snap points, drag handle, smooth spring animation.
+          tips:
+            - "Użyj Drawer na mobile, Dialog/Sheet na desktop — responsywnie"
+      - cmd: npx shadcn@latest add alert-dialog
+        desc: Dodaj AlertDialog — potwierdzenie akcji
+        detail:
+          what: Specjalny dialog z Cancel i Action buttons. Semantycznie poprawny dla destrukcyjnych akcji.
+          how: "AlertDialogAction + AlertDialogCancel zamiast zwykłych Button."
+          tips:
+            - "Zawsze używaj AlertDialog przed usunięciem, wylogowaniem, resetowaniem"
+
+  - name: "Popover & Tooltip"
+    icon: "💬"
+    commands:
+      - cmd: npx shadcn@latest add popover
+        desc: Dodaj Popover (floating content)
+        detail:
+          what: "Radix Popover — floating panel przy kliknięciu. PopoverTrigger + PopoverContent."
+          how: "Używany jako baza dla Combobox, DatePicker, ColorPicker."
+          tips:
+            - "align='start' | 'center' | 'end' — wyrównanie do triggera"
+      - cmd: npx shadcn@latest add tooltip
+        desc: Dodaj Tooltip (hover info)
+        detail:
+          what: "Tooltip pojawia się na hover/focus. TooltipProvider (root) + Tooltip + TooltipTrigger + TooltipContent."
+          how: "TooltipProvider musi owijać całą aplikację lub sekcję."
+          tips:
+            - "delayDuration={0} na TooltipProvider — natychmiastowe pojawienie"
+      - cmd: |
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <Info className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Więcej informacji</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        desc: Kompletny Tooltip z ikoną
+        detail:
+          what: Tooltip na icon button — asChild przekazuje trigger do Button.
+          how: "TooltipContent side='top' | 'right' | 'bottom' | 'left' — pozycja."
+          tips:
+            - "Zawsze dodaj aria-label do icon buttonów — Tooltip nie zastępuje dostępności"
+
+  - name: Input OTP
+    icon: "🔢"
+    commands:
+      - cmd: npx shadcn@latest add input-otp
+        desc: Dodaj Input OTP (kod jednorazowy)
+        detail:
+          what: "Input dla kodów OTP (SMS, email). InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator."
+          how: "maxLength={6} = 6 cyfr. pattern='digits' ogranicza do cyfr."
+          tips:
+            - "Integruje się z react-hook-form tak samo jak zwykły Input"
+
+  - name: "Select & Combobox & Command"
+    icon: "🔽"
+    commands:
+      - cmd: npx shadcn@latest add select
+        desc: Dodaj Select (lista rozwijana)
+        detail:
+          what: "Radix Select — dostępny, stylowany dropdown. SelectTrigger, SelectContent, SelectItem."
+          how: "onValueChange={field.onChange} do integracji z react-hook-form."
+          tips:
+            - "SelectGroup + SelectLabel do grupowania opcji"
+      - cmd: npx shadcn@latest add combobox
+        desc: Dodaj Combobox (select z wyszukiwaniem)
+        detail:
+          what: "Combobox = Popover + Command + CommandInput. Umożliwia wyszukiwanie opcji przez wpisanie."
+          how: "Nie jest osobnym komponentem — to pattern złożony z Popover i Command."
+          tips:
+            - "Dokumentacja shadcn pokazuje gotowy przykład Combobox do skopiowania"
+      - cmd: npx shadcn@latest add command
+        desc: Dodaj Command (command palette)
+        detail:
+          what: "Command palette z cmdk. CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem."
+          how: "Fuzzy search wbudowany. Używaj w command+K shortcut lub standalone search."
+          tips:
+            - "useCommandState() — dostęp do wewnętrznego stanu (search value, selected)"
+      - cmd: |
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" role="combobox">
+                {value ? frameworks.find(f => f.value === value)?.label : "Wybierz..."}
+                <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[200px] p-0">
+              <Command>
+                <CommandInput placeholder="Szukaj..." />
+                <CommandEmpty>Nie znaleziono.</CommandEmpty>
+                <CommandGroup>
+                  {frameworks.map((framework) => (
+                    <CommandItem key={framework.value}
+                      onSelect={() => { setValue(framework.value); setOpen(false) }}>
+                      <Check className={cn("mr-2 h-4 w-4", value === framework.value ? "opacity-100" : "opacity-0")} />
+                      {framework.label}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        desc: Combobox — kompletny przykład z wyszukiwaniem
+        detail:
+          what: Pattern Combobox z Popover + Command. Wyszukiwanie, zaznaczony element, clear.
+          how: useState dla open (popover) i value (zaznaczona opcja).
+          tips:
+            - "CommandEmpty renderuje się gdy brak wyników w CommandInput"
+
+  - name: DropdownMenu
+    icon: "📋"
+    commands:
+      - cmd: npx shadcn@latest add dropdown-menu
+        desc: Dodaj DropdownMenu
+        detail:
+          what: "Radix DropdownMenu — kontekstowe menu przy kliknięciu. DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem."
+          how: "DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem, DropdownMenuRadioGroup."
+          tips:
+            - "DropdownMenuShortcut — wyświetl skrót klawiszowy (tylko wizualnie, logikę musisz dodać)"
+      - cmd: |
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Akcje</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>Edytuj</DropdownMenuItem>
+              <DropdownMenuItem>Duplikuj</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-red-600">Usuń</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        desc: DropdownMenu z trzema kroplkami (actions menu)
+        detail:
+          what: Standardowy pattern actions menu — ikona 3 kropki, menu z akcjami.
+          how: "align='end' — menu wyrównane do prawej krawędzi triggera."
+          tips:
+            - "Dodaj inset do DropdownMenuLabel dla wyrównania z ikonami"
+      - cmd: |
+          <DropdownMenuCheckboxItem
+            checked={showStatusBar}
+            onCheckedChange={setShowStatusBar}
+          >
+            Pasek statusu
+          </DropdownMenuCheckboxItem>
+        desc: DropdownMenuCheckboxItem — toggle opcji
+        detail:
+          what: Checkbox wbudowany w menu item. Persystuje stan między otwarciami menu.
+          how: checked + onCheckedChange jak zwykły Checkbox.
+          tips:
+            - "DropdownMenuRadioGroup + DropdownMenuRadioItem dla mutually exclusive opcji"
+
+  - name: "Toast & Sonner"
+    icon: "🔔"
+    commands:
+      - cmd: npx shadcn@latest add sonner
+        desc: Dodaj Sonner (nowoczesne toasty)
+        detail:
+          what: Sonner = następca react-hot-toast. Piękne animacje, stack, promise toast.
+          how: "Dodaj <Toaster /> do layout, potem wywołuj toast() z dowolnego miejsca."
+          tips:
+            - "Shadcn integruje Sonner z własnym stylem pasującym do design system"
+      - cmd: |
+          import { toast } from "sonner"
+
+          toast("Zapisano!")
+          toast.success("Operacja zakończona pomyślnie")
+          toast.error("Wystąpił błąd")
+          toast.warning("Uwaga: mało miejsca")
+          toast.info("Wersja 2.0 dostępna")
+        desc: Wszystkie typy toastów Sonner
+        detail:
+          what: "toast() = neutralny, toast.success/error/warning/info = semantyczne z ikoną."
+          how: Import toast z sonner, nie z komponentu shadcn.
+          tips:
+            - "toast.dismiss() — zamknij konkretny lub wszystkie toasty"
+      - cmd: |
+          toast.promise(saveData(), {
+            loading: "Zapisuję...",
+            success: "Zapisano!",
+            error: "Błąd zapisu",
+          })
+        desc: Promise toast — automatyczny loading/success/error
+        detail:
+          what: Przyjmuje Promise, automatycznie zmienia stan loading→success lub loading→error.
+          how: Idealne do async operacji API, upload, form submit.
+          tips:
+            - "success: (data) => `Zapisano ${data.name}` — dynamiczny tekst z wyniku"
+      - cmd: |
+          toast("Plik usunięty", {
+            action: {
+              label: "Cofnij",
+              onClick: () => restoreFile(),
+            },
+          })
+        desc: Toast z przyciskiem akcji (undo)
+        detail:
+          what: Toast z action button — idealny do undo po destrukcyjnej akcji.
+          how: "action.onClick = callback do cofnięcia akcji. Auto-dismiss po timeout."
+          tips:
+            - "duration: 5000 — czas wyświetlania w ms (domyślnie 4000)"
+
+  - name: Nawigacja
+    icon: "🧭"
+    commands:
+      - cmd: npx shadcn@latest add navigation-menu
+        desc: Dodaj NavigationMenu (mega menu)
+        detail:
+          what: "Radix NavigationMenu — hover/click dropdown, keyboard navigation, ARIA menu."
+          how: "NavigationMenuList, NavigationMenuItem, NavigationMenuTrigger, NavigationMenuContent."
+          tips:
+            - "Idealny do głównej nawigacji z submenu/megamenu"
+      - cmd: npx shadcn@latest add breadcrumb
+        desc: Dodaj Breadcrumb
+        detail:
+          what: "Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbSeparator, BreadcrumbEllipsis."
+          how: "BreadcrumbPage dla aktualnej strony (bez linku). Automatyczny aria-current."
+          tips:
+            - "BreadcrumbSeparator można customizować — własna ikona zamiast /"
+      - cmd: npx shadcn@latest add tabs
+        desc: Dodaj Tabs
+        detail:
+          what: "Radix Tabs — Tabs, TabsList, TabsTrigger, TabsContent. Keyboard navigation wbudowana."
+          how: "defaultValue lub value + onValueChange dla controlled. Radix zarządza focus."
+          tips:
+            - "TabsContent jest niewidoczny nie aktywny — nie unmountuje (można zmienić)"
+      - cmd: |
+          <Tabs defaultValue="account">
+            <TabsList>
+              <TabsTrigger value="account">Konto</TabsTrigger>
+              <TabsTrigger value="password">Hasło</TabsTrigger>
+            </TabsList>
+            <TabsContent value="account">Ustawienia konta</TabsContent>
+            <TabsContent value="password">Zmień hasło</TabsContent>
+          </Tabs>
+        desc: Kompletne Tabs — minimalny przykład
+        detail:
+          what: Tabs z dwoma panelami. TabsList = kontener przycisków, TabsContent = panele.
+          how: value w TabsTrigger i TabsContent musi się zgadzać.
+          tips:
+            - "Dodaj className do TabsList dla custom stylowania (grid, flex)"
+      - cmd: npx shadcn@latest add pagination
+        desc: Dodaj Pagination
+        detail:
+          what: "Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious."
+          how: Statyczny komponent UI — logikę paginacji musisz zaimplementować sam (lub TanStack Table).
+          tips:
+            - "PaginationEllipsis — wielokropek gdy za dużo stron"
+
+  - name: "Skeleton & Loading"
+    icon: "⏳"
+    commands:
+      - cmd: "<Skeleton className=\"h-4 w-[250px]\" />"
+        desc: Skeleton jednej linii tekstu
+        detail:
+          what: Placeholder dla ładującego się tekstu. h-4 = wysokość linii, w-[250px] = szerokość.
+          how: Animacja animate-pulse (Tailwind) daje efekt pulsowania.
+          tips:
+            - "Dopasuj wymiary do rzeczywistego contentu który zastępujesz"
+      - cmd: "<Skeleton className=\"h-12 w-12 rounded-full\" />"
+        desc: Skeleton okrągłego avatara
+        detail:
+          what: Okrągły placeholder dla avatara użytkownika.
+          how: "rounded-full = pełne zaokrąglenie. h/w muszą być równe dla koła."
+          tips:
+            - "Użyj obok tekstowych skeletonów dla realnego layoutu"
+      - cmd: |
+          {isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+            </div>
+          ) : (
+            <p>{content}</p>
+          )}
+        desc: "Skeleton vs content — conditional rendering"
+        detail:
+          what: Pokazuj szkielety podczas ładowania, treść gdy gotowe.
+          how: "isLoading z useState lub z React Query (query.isLoading)."
+          tips:
+            - "Różne szerokości (full, 3/4, 1/2) wyglądają bardziej naturalnie"
+      - cmd: npx shadcn@latest add progress
+        desc: Dodaj Progress bar
+        detail:
+          what: "Progress — wizualizacja postępu 0-100. Radix Progress z ARIA."
+          how: "<Progress value={uploadPercent} className=\"w-full\" />"
+          tips:
+            - "Animuj przez transition-all duration-700 i zmianę value po montowaniu"
+
+  - name: "Calendar & DatePicker"
+    icon: "📅"
+    commands:
+      - cmd: "npm install react-day-picker date-fns"
+        desc: Instaluj zależności Calendar
+        detail:
+          what: "Calendar shadcn używa react-day-picker v8. date-fns do formatowania dat."
+          how: "npx shadcn@latest add calendar — instaluje komponent i te zależności."
+          tips:
+            - "react-day-picker v9 ma breaking changes — sprawdź wersję"
+      - cmd: npx shadcn@latest add calendar
+        desc: Dodaj komponent Calendar
+        detail:
+          what: Interaktywny kalendarz z nawigacją między miesiącami, zaznaczaniem dni.
+          how: "mode='single' | 'multiple' | 'range'. selected + onSelect do kontrolowania."
+          tips:
+            - "disabled prop przyjmuje Date, DateRange, Matcher[] — blokuj daty"
+      - cmd: npx shadcn@latest add date-picker
+        desc: Dodaj DatePicker (Popover + Calendar)
+        detail:
+          what: DatePicker to pattern — Popover z Calendar w środku + Button trigger.
+          how: "Nie jest osobnym komponentem — shadcn docs pokazuje gotowy przykład."
+          tips:
+            - "format(date, 'dd.MM.yyyy', { locale: pl }) z date-fns dla polskiego formatu"
+      - cmd: |
+          const [date, setDate] = useState<Date>()
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !date && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date ? format(date, "dd.MM.yyyy") : <span>Wybierz datę</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
+            </PopoverContent>
+          </Popover>
+        desc: Kompletny DatePicker
+        detail:
+          what: Button trigger wyświetlający wybraną datę, Popover z Calendar.
+          how: cn() do warunkowego stylu (szary tekst gdy brak daty).
+          tips:
+            - "initialFocus — kalendarz skupia się automatycznie po otwarciu"
+
+  - name: "Charts (Recharts)"
+    icon: "📊"
+    commands:
+      - cmd: npx shadcn@latest add chart
+        desc: Dodaj Charts z Recharts
+        detail:
+          what: Shadcn Charts = wrapper na recharts z CSS variables design tokens.
+          how: "ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend — shadcn komponenty."
+          tips:
+            - "chartConfig definiuje colory i etykiety dla każdej serii danych"
+      - cmd: |
+          const chartConfig = {
+            desktop: { label: "Desktop", color: "hsl(var(--chart-1))" },
+            mobile: { label: "Mobile", color: "hsl(var(--chart-2))" },
+          } satisfies ChartConfig
+
+          <ChartContainer config={chartConfig}>
+            <BarChart data={data}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="month" tickLine={false} axisLine={false} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Bar dataKey="desktop" fill="var(--color-desktop)" radius={4} />
+              <Bar dataKey="mobile" fill="var(--color-mobile)" radius={4} />
+            </BarChart>
+          </ChartContainer>
+        desc: BarChart z ChartContainer i Tooltip
+        detail:
+          what: Grupowany BarChart z customowym Tooltip i XAxis. CSS variables dla kolorów.
+          how: "ChartContainer opakowuje recharts komponent i dostarcza config przez context."
+          tips:
+            - "var(--color-desktop) pochodzi z chartConfig przez CSS variables"
+      - cmd: |
+          <ChartContainer config={chartConfig}>
+            <AreaChart data={data}>
+              <defs>
+                <linearGradient id="colorDesktop" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-desktop)" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="var(--color-desktop)" stopOpacity={0.1} />
+                </linearGradient>
+              </defs>
+              <Area type="monotone" dataKey="desktop" fill="url(#colorDesktop)" stroke="var(--color-desktop)" />
+              <ChartTooltip content={<ChartTooltipContent />} />
+            </AreaChart>
+          </ChartContainer>
+        desc: AreaChart z gradientem
+        detail:
+          what: Area chart z gradientem SVG linearGradient — efekt zanikania w dół.
+          how: "defs + linearGradient w SVG, fill='url(#id)' w Area."
+          tips:
+            - "type='monotone' = wygładzone krzywe, 'linear' = kanciate linie"
+      - cmd: |
+          <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[250px]">
+            <PieChart>
+              <Pie data={data} dataKey="value" nameKey="browser"
+                cx="50%" cy="50%" outerRadius={80} label>
+                {data.map((entry, index) => (
+                  <Cell key={index} fill={`var(--color-${entry.browser})`} />
+                ))}
+              </Pie>
+              <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+              <ChartLegend content={<ChartLegendContent nameKey="browser" />} />
+            </PieChart>
+          </ChartContainer>
+        desc: PieChart z legendą
+        detail:
+          what: Kołowy wykres z automatyczną legendą i Tooltip. Cell = kolor per sektor.
+          how: "aspect-square max-h-[250px] dla proporcjonalnego rozmiaru."
+          tips:
+            - "innerRadius={60} na Pie = donut chart (wykres pierścieniowy)"
+      - cmd: |
+          <ChartContainer config={chartConfig}>
+            <LineChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="month" />
+              <YAxis />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Line type="monotone" dataKey="revenue" stroke="var(--color-revenue)"
+                strokeWidth={2} dot={false} />
+            </LineChart>
+          </ChartContainer>
+        desc: LineChart — trend przychodów
+        detail:
+          what: Liniowy wykres trendu. dot=false = brak punktów na linii (czystszy wygląd).
+          how: "strokeWidth={2} = grubsza linia. type='monotone' = wygładzona."
+          tips:
+            - "activeDot={{ r: 6 }} — większy punkt przy hover na Tooltip"
+      - cmd: |
+          <ChartContainer config={chartConfig}>
+            <RadarChart data={data}>
+              <PolarGrid />
+              <PolarAngleAxis dataKey="subject" />
+              <Radar dataKey="A" stroke="var(--color-a)"
+                fill="var(--color-a)" fillOpacity={0.6} />
+              <ChartLegend content={<ChartLegendContent />} />
+            </RadarChart>
+          </ChartContainer>
+        desc: RadarChart — porównanie wielowymiarowe
+        detail:
+          what: Pajęczyna — porównaj wiele metryk naraz. Idealny do skill radar, porównania produktów.
+          how: "fillOpacity={0.6} — półprzezroczysty fill. PolarGrid = siatka."
+          tips:
+            - "Kilka Radar na jednym RadarChart — porównaj 2 produkty/osoby"
+      - cmd: |
+          const chartConfig = {
+            views: {
+              label: "Odsłony",
+            },
+            desktop: {
+              label: "Desktop",
+              color: "hsl(var(--chart-1))",
+            },
+            mobile: {
+              label: "Mobile",
+              color: "hsl(var(--chart-2))",
+            },
+          } satisfies ChartConfig
+        desc: chartConfig — konfiguracja serii danych
+        detail:
+          what: Obiekt konfiguracji shadcn Charts — etykiety i kolory per seria.
+          how: "satisfies ChartConfig — TypeScript sprawdza poprawność. hsl(var(--chart-N)) = design token."
+          tips:
+            - "--chart-1 do --chart-5 zdefiniowane w globals.css (można zmienić)"

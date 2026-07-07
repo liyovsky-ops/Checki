@@ -1,0 +1,258 @@
+title: Ekosystem Deno
+
+items:
+  - name: Fresh — Deno web framework
+    desc: >
+      Fresh to oficjalny full-stack framework od Deno team. Islands architecture —
+      domyślnie zero JavaScript po stronie klienta, hydration tylko dla interaktywnych
+      komponentów. Routowanie przez system plików (jak Next.js Pages Router), Preact pod spodem.
+      Działa natywnie na Deno Deploy.
+    icon: "🍋"
+    code: |
+      # Tworzenie projektu Fresh
+      deno run -A -r https://fresh.deno.dev my-project
+      cd my-project && deno task start
+
+      // routes/index.tsx — strona główna
+      import { PageProps } from "$fresh/server.ts";
+
+      export default function Home({ data }: PageProps) {
+        return (
+          <div>
+            <h1>Witaj z Fresh! 🍋</h1>
+            <p>Zero JS po stronie klienta domyślnie.</p>
+          </div>
+        );
+      }
+
+      // islands/Counter.tsx — interaktywna wyspa (ma JavaScript!)
+      import { useSignal } from "@preact/signals";
+
+      export default function Counter() {
+        const count = useSignal(0);
+        return (
+          <button onClick={() => count.value++}>
+            Kliknięcia: {count}
+          </button>
+        );
+      }
+
+      // routes/api/hello.ts — API route
+      import { Handlers } from "$fresh/server.ts";
+
+      export const handler: Handlers = {
+        async GET(req) {
+          return Response.json({ message: "Cześć z Fresh API!" });
+        },
+      };
+
+  - name: Hono on Deno
+    desc: >
+      Hono to ultraszybki, lekki framework webowy działający na Deno, Bun, Cloudflare Workers
+      i Node.js. Idealny gdy potrzebujesz przenośnego kodu. Pełne wsparcie TypeScript,
+      middleware, walidacja z Zod. Na Deno używa jsr:@hono/hono.
+    icon: "🔥"
+    code: |
+      // deno.json
+      // {
+      //   "imports": { "hono": "jsr:@hono/hono" }
+      // }
+
+      import { Hono } from "hono";
+      import { cors } from "hono/cors";
+      import { logger } from "hono/logger";
+      import { zValidator } from "hono/zod-validator";
+      import { z } from "npm:zod";
+
+      const app = new Hono();
+
+      // Middleware globalny
+      app.use("*", logger());
+      app.use("/api/*", cors());
+
+      // Routing
+      app.get("/", (c) => c.text("Witaj z Hono na Deno! 🦕"));
+
+      app.get("/users/:id", (c) => {
+        const id = c.req.param("id");
+        return c.json({ id, imie: "Łukasz" });
+      });
+
+      // Walidacja z Zod
+      app.post(
+        "/users",
+        zValidator("json", z.object({
+          imie: z.string().min(2),
+          email: z.string().email(),
+        })),
+        (c) => {
+          const body = c.req.valid("json");
+          return c.json({ stworzono: true, ...body }, 201);
+        }
+      );
+
+      // Deno.serve integracja
+      Deno.serve({ port: 3000 }, app.fetch);
+
+  - name: Deno Deploy
+    desc: >
+      Deno Deploy to globalny edge hosting od twórców Deno. Kod wykonuje się w V8 Isolates
+      w 35+ regionach świata. Zero cold start, wbudowane Deno KV globalnie rozproszone,
+      cron jobs, webhooks. GitHub integration — push = automatyczny deployment.
+    icon: "🚀"
+    code: |
+      # Instalacja Deno Deploy CLI
+      deno install -A jsr:@deno/deployctl
+
+      # Deploy z pliku lokalnego
+      deployctl deploy --project=moj-projekt main.ts
+
+      # Deploy z URL (bezpośrednio z GitHub)
+      # → w dashboardzie deploy.deno.com połącz repo GitHub
+
+      // main.ts — gotowy do deploy na Deno Deploy
+      Deno.serve((req) => {
+        const url = new URL(req.url);
+
+        if (url.pathname === "/") {
+          return new Response("Działa globalnie na Deno Deploy! 🌍");
+        }
+
+        return new Response("Not Found", { status: 404 });
+      });
+
+      // Deno KV na Deploy — globalnie rozproszone
+      const kv = await Deno.openKv(); // Na Deploy: distributed global KV
+      await kv.set(["visits"], ((await kv.get<number>(["visits"])).value ?? 0) + 1);
+
+      // deno.json — definicja projektu
+      // {
+      //   "name": "moj-projekt",
+      //   "tasks": {
+      //     "deploy": "deployctl deploy --project=moj-projekt main.ts"
+      //   }
+      // }
+
+  - name: Oak — Koa-inspired framework
+    desc: >
+      Oak to jeden z najpopularniejszych frameworków Deno — zainspirowany Koa (Node.js).
+      Middleware-based routing, Context object, obsługa statycznych plików i WebSocket.
+      Dostępny przez jsr:@oak/oak. Dobry dla developerów znających Koa.
+    icon: "🌳"
+    code: |
+      // deno.json imports
+      // { "imports": { "@oak/oak": "jsr:@oak/oak" } }
+
+      import { Application, Router } from "@oak/oak";
+
+      const router = new Router();
+
+      // Definiowanie tras
+      router
+        .get("/", (ctx) => {
+          ctx.response.body = "Witaj z Oak! 🌳";
+        })
+        .get("/users/:id", async (ctx) => {
+          const id = ctx.params.id;
+          ctx.response.body = { id, imie: "Łukasz" };
+          ctx.response.type = "json";
+        })
+        .post("/users", async (ctx) => {
+          const body = ctx.request.body;
+          const dane = await body.json();
+          ctx.response.status = 201;
+          ctx.response.body = { stworzono: true, dane };
+        });
+
+      const app = new Application();
+
+      // Middleware — obsługa błędów
+      app.use(async (ctx, next) => {
+        try {
+          await next();
+        } catch (err) {
+          ctx.response.status = 500;
+          ctx.response.body = { blad: String(err) };
+        }
+      });
+
+      app.use(router.routes());
+      app.use(router.allowedMethods());
+
+      console.log("Oak działa na http://localhost:8000");
+      await app.listen({ port: 8000 });
+
+  - name: JSR — JavaScript Registry
+    desc: >
+      JSR (jsr.io) to nowy rejestr paczek od Deno team — następca deno.land/x.
+      TypeScript-first: publikujesz TypeScript, JSR generuje .d.ts i docs automatycznie.
+      Działa z Deno, Node.js, Bun i Cloudflare Workers przez jsr: prefix lub npm package.
+    icon: "📦"
+    code: |
+      # Używanie paczek z JSR w Deno
+      deno add jsr:@std/assert        # instaluje do deno.json
+      deno add jsr:@hono/hono
+      deno add jsr:@oak/oak
+
+      # Import bezpośredni (bez instalacji)
+      import { assertEquals } from "jsr:@std/assert";
+      import { Hono } from "jsr:@hono/hono";
+
+      # Popularne paczki na JSR:
+      # jsr:@std/*        — Deno Standard Library (assert, fmt, path, http...)
+      # jsr:@hono/hono    — framework webowy
+      # jsr:@oak/oak      — framework webowy (Koa-inspired)
+      # jsr:@deno/kv-utils — narzędzia dla Deno KV
+
+      # Publikowanie własnej paczki na JSR
+      # deno.json:
+      # {
+      #   "name": "@twoj-scope/paczka",
+      #   "version": "1.0.0",
+      #   "exports": "./mod.ts"
+      # }
+      # deno publish  ← publikuje na jsr.io
+
+      # JSR vs npm dla paczek Deno:
+      # JSR — TypeScript first, docs auto-generated, strictniejsze standardy
+      # npm:  — prefix dla kompatybilności z istniejącymi paczkami Node.js
+    lang: bash
+
+  - name: Deno Standard Library (@std)
+    desc: >
+      Standardowa biblioteka Deno dostępna przez jsr:@std/*. Zawiera utility do operacji
+      na plikach, sieciach, testowania, formatowania dat, obsługi CSV/YAML/TOML i wiele więcej.
+      Każdy moduł jest niezależny — importujesz tylko to, czego potrzebujesz.
+    icon: "📚"
+    code: |
+      # Instalacja wybranych modułów std
+      deno add jsr:@std/path jsr:@std/fs jsr:@std/assert
+
+      // Manipulacja ścieżkami (@std/path)
+      import { join, dirname, extname } from "jsr:@std/path";
+      const sciezka = join("/home/lukasz", "projekty", "deno-app");
+      console.log(extname("index.ts")); // ".ts"
+
+      // Operacje na plikach (@std/fs)
+      import { ensureDir, exists, copy, move } from "jsr:@std/fs";
+      await ensureDir("./output/logs"); // tworzy katalog jeśli nie istnieje
+      const czyIstnieje = await exists("./config.json");
+      await copy("./src", "./backup", { overwrite: true });
+
+      // Asercje w testach (@std/assert)
+      import { assertEquals, assertThrows, assertMatch } from "jsr:@std/assert";
+      assertEquals({ a: 1 }, { a: 1 }); // deep equality
+      assertMatch("hello world", /hello/); // regex
+
+      // Parsowanie argumentów CLI (@std/cli)
+      import { parseArgs } from "jsr:@std/cli/parse-args";
+      const args = parseArgs(Deno.args, {
+        string: ["port", "host"],
+        boolean: ["verbose"],
+        default: { port: "3000" },
+      });
+      console.log(args.port, args.verbose);
+
+      // Formatowanie daty (@std/datetime)
+      import { format } from "jsr:@std/datetime";
+      console.log(format(new Date(), "dd-MM-yyyy HH:mm")); // "27-06-2026 14:30"

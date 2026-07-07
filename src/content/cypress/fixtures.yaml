@@ -1,0 +1,238 @@
+title: Fixtures & Custom Commands
+
+items:
+  - name: "cy.fixture() — dane testowe z plików"
+    desc: >
+      Ładuje dane z pliku w katalogu cypress/fixtures/. Obsługuje JSON, JS, HTML, CSV.
+      Zwraca Promise (then()) lub może być użyty z .as() żeby być dostępny jako alias.
+      Dane fixture mogą być używane w intercept(), jako dane formularzy lub do weryfikacji.
+    code: |
+      // cypress/fixtures/user.json
+      // { "name": "Jan Kowalski", "email": "jan@test.com", "role": "admin" }
+
+      // Załaduj w teście
+      cy.fixture('user').then((user) => {
+        cy.get('[data-cy="email"]').type(user.email)
+        cy.get('[data-cy="name"]').type(user.name)
+      })
+
+      // Alias — dostęp przez this.user (wymaga function(), nie arrow)
+      cy.fixture('user').as('userData')
+      cy.get('@userData').then((user) => {
+        cy.log(user.email)
+      })
+
+      // Fixture w beforeEach z aliasem
+      beforeEach(() => {
+        cy.fixture('products').as('products')
+      })
+
+  - name: "Struktura fixtures — pliki i zagnieżdżenie"
+    desc: >
+      Fixture mogą być w podkatalogach. Cypress obsługuje JSON automatycznie
+      (parse do objektu). Inne formaty (HTML, CSV) ładowane jako string.
+      Możesz też używać import bezpośrednio w pliku testu dla statycznych danych.
+    code: |
+      // Struktura katalogów
+      // cypress/fixtures/
+      //   users.json
+      //   products.json
+      //   api/
+      //     login-success.json
+      //     login-error.json
+
+      // Ładuj z podkatalogu
+      cy.fixture('api/login-success').then((response) => {
+        cy.intercept('POST', '/api/login', response)
+      })
+
+      // Fixture jako HTML
+      cy.fixture('template.html').then((html) => {
+        cy.document().then((doc) => {
+          doc.body.innerHTML = html
+        })
+      })
+
+      // Bezpośredni import (TypeScript)
+      import users from '../fixtures/users.json'
+
+  - name: "Cypress.Commands.add() — własne komendy"
+    desc: >
+      Pozwala tworzyć własne komendy cy.* wielokrotnego użytku. Definiuje się
+      je w cypress/support/commands.ts. Enkapsulują powtarzalne sekwencje akcji.
+      Mogą przyjmować parametry i zwracać Cypress chain. Best practice: tworzyć
+      komendy dla login, seedowania danych, często używanych interakcji.
+    code: |
+      // cypress/support/commands.ts
+
+      // Komenda cy.login()
+      Cypress.Commands.add('login', (email: string, password: string) => {
+        cy.visit('/login')
+        cy.get('[data-cy="email"]').type(email)
+        cy.get('[data-cy="password"]').type(password)
+        cy.get('[data-cy="submit"]').click()
+        cy.url().should('include', '/dashboard')
+      })
+
+      // Komenda przez API (szybciej niż przez UI)
+      Cypress.Commands.add('loginByApi', (email: string, password: string) => {
+        cy.request('POST', '/api/auth/login', { email, password })
+          .then((response) => {
+            window.localStorage.setItem('token', response.body.token)
+          })
+      })
+
+      // Komenda z łańcuchowaniem
+      Cypress.Commands.add('selectUser', (name: string) => {
+        cy.get('[data-cy="user-list"]').contains(name).click()
+      })
+
+  - name: "TypeScript typowanie Custom Commands"
+    desc: >
+      Aby TypeScript znał Twoje custom commands, musisz rozszerzyć namespace Cypress.Chainable.
+      Deklaracja typów w cypress/support/index.d.ts lub cypress.d.ts. Bez tego
+      TypeScript będzie zgłaszał błąd przy używaniu cy.login() itp.
+    code: |
+      // cypress/support/index.d.ts
+      declare namespace Cypress {
+        interface Chainable {
+          login(email: string, password: string): Chainable<void>
+          loginByApi(email: string, password: string): Chainable<void>
+          selectUser(name: string): Chainable<void>
+          seedDatabase(fixture: string): Chainable<void>
+        }
+      }
+
+      // Użycie w teście — pełne autouzupełnianie
+      cy.login('admin@test.com', 'secret')
+      cy.loginByApi('user@test.com', 'pass')
+      cy.selectUser('Jan Kowalski')
+
+  - name: "cy.task() — Node.js po stronie serwera"
+    desc: >
+      cy.task() wywołuje kod Node.js w procesie Cypress (nie przeglądarce). Przydatne
+      do operacji niemożliwych w przeglądarce: zapis plików, operacje na bazie danych,
+      uruchamianie skryptów, odczyt plików konfiguracyjnych. Zdefiniowane w cypress.config.ts.
+    code: |
+      // cypress.config.ts
+      import { defineConfig } from 'cypress'
+      import { db } from './src/database'
+
+      export default defineConfig({
+        e2e: {
+          setupNodeEvents(on) {
+            on('task', {
+              // Resetuj bazę danych
+              'db:seed': async () => {
+                await db.migrate.rollback()
+                await db.migrate.latest()
+                await db.seed.run()
+                return null
+              },
+
+              // Odczytaj plik
+              'readFileMaybe': (filename: string) => {
+                if (fs.existsSync(filename)) {
+                  return fs.readFileSync(filename, 'utf8')
+                }
+                return null
+              },
+
+              // Wyślij email przez nodemailer
+              'sendEmail': (options) => {
+                return mailer.sendMail(options)
+              }
+            })
+          }
+        }
+      })
+
+      // W teście
+      cy.task('db:seed')
+      cy.task('readFileMaybe', '/tmp/token.txt')
+
+  - name: "Cypress.env() — zmienne środowiskowe"
+    desc: >
+      Cypress.env() daje dostęp do zmiennych środowiskowych w testach. Możesz je
+      ustawić w cypress.config.ts (env: {}), pliku cypress.env.json (nie commituj!),
+      z CLI (--env key=value) lub z OS env (CYPRESS_*). Przydatne dla URL-i,
+      poświadczeń testowych i flag feature'ów.
+    code: |
+      // cypress.config.ts
+      export default defineConfig({
+        e2e: {
+          env: {
+            apiUrl: 'http://localhost:3000',
+            testUserEmail: 'test@example.com',
+          }
+        }
+      })
+
+      // cypress.env.json (nie commituj — dodaj do .gitignore)
+      // { "testUserPassword": "secret123", "adminToken": "abc..." }
+
+      // Z CLI
+      // npx cypress run --env apiUrl=https://staging.app.com
+
+      // Z OS env (CYPRESS_ prefix)
+      // export CYPRESS_testUserPassword=secret123
+
+      // W teście
+      const apiUrl = Cypress.env('apiUrl')
+      const email = Cypress.env('testUserEmail')
+      cy.request(`${apiUrl}/api/users`)
+
+  - name: "beforeEach / afterEach / before / after"
+    desc: >
+      Hooki cyklu życia do setup i teardown. before() i after() uruchamiają się
+      raz dla całego describe bloku. beforeEach() i afterEach() — przed i po każdym
+      teście. Najczęstsze użycie: cy.visit() w beforeEach(), reset stanu w after(),
+      załadowanie fixture i intercept setup.
+    code: |
+      describe('Panel administratora', () => {
+        before(() => {
+          // Raz dla całego suite
+          cy.task('db:seed')
+        })
+
+        beforeEach(() => {
+          // Przed każdym testem
+          cy.loginByApi('admin@test.com', 'secret')
+          cy.visit('/admin')
+          cy.intercept('GET', '/api/users').as('getUsers')
+        })
+
+        afterEach(() => {
+          // Po każdym teście
+          cy.clearLocalStorage()
+          cy.clearCookies()
+        })
+
+        after(() => {
+          // Raz po całym suite
+          cy.task('db:cleanup')
+        })
+
+        it('powinien wyświetlić listę użytkowników', () => {
+          cy.wait('@getUsers')
+          cy.get('[data-cy="user-list"]').should('exist')
+        })
+      })
+
+  - name: "Komendy overwrite — nadpisywanie wbudowanych"
+    desc: >
+      Cypress.Commands.overwrite() pozwala nadpisać istniejącą komendę Cypress
+      zachowując oryginalne zachowanie. Przydatne do dodania logowania, screenshotów
+      przy każdym cy.visit() lub automatycznego retry dla niestabilnych akcji.
+    code: |
+      // Dodaj log do każdego cy.visit()
+      Cypress.Commands.overwrite('visit', (originalFn, url, options) => {
+        console.log(`Odwiedzam: ${url}`)
+        return originalFn(url, options)
+      })
+
+      // Automatyczny screenshot przy każdym click
+      Cypress.Commands.overwrite('click', (originalFn, element, options) => {
+        cy.screenshot(`before-click-${Date.now()}`)
+        return originalFn(element, options)
+      })

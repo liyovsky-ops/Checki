@@ -1,0 +1,321 @@
+title: Routes i HTTP
+
+items:
+  - name: Shorthand methods — GET, POST, PUT, DELETE
+    desc: >
+      Fastify udostępnia shorthand methods dla wszystkich metod HTTP. Każda trasa może przyjąć
+      opcje (schema, preHandler, config) jako drugi argument. Handler zwraca wartość
+      lub używa reply.send() — oba podejścia działają.
+    code: |
+      import Fastify from 'fastify'
+
+      const fastify = Fastify({ logger: true })
+
+      // GET — pobieranie listy
+      fastify.get('/users', async (request, reply) => {
+        return { users: [] }
+      })
+
+      // GET z parametrem URL
+      fastify.get('/users/:id', async (request, reply) => {
+        const { id } = request.params as { id: string }
+        return { id, name: 'Jan Kowalski' }
+      })
+
+      // POST — tworzenie
+      fastify.post('/users', async (request, reply) => {
+        const body = request.body as { name: string; email: string }
+        reply.code(201)
+        return { id: Date.now(), ...body }
+      })
+
+      // PUT — pełna aktualizacja
+      fastify.put('/users/:id', async (request, reply) => {
+        const { id } = request.params as { id: string }
+        const body = request.body as Record<string, unknown>
+        return { id, ...body, updatedAt: new Date().toISOString() }
+      })
+
+      // PATCH — częściowa aktualizacja
+      fastify.patch('/users/:id', async (request, reply) => {
+        const { id } = request.params as { id: string }
+        return { id, updated: true }
+      })
+
+      // DELETE — usunięcie
+      fastify.delete('/users/:id', async (request, reply) => {
+        reply.code(204)
+        return null
+      })
+
+  - name: Route Options — schema, preHandler, config
+    desc: >
+      Każda trasa przyjmuje obiekt opcji jako drugi argument (przed handlerem).
+      Opcje pozwalają ustawić schemat walidacji, pre-handler middleware, ograniczenia
+      (rate limit, host) i własną konfigurację dostępną przez request.routeOptions.
+    code: |
+      import Fastify from 'fastify'
+
+      const fastify = Fastify()
+
+      fastify.post('/api/orders', {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['productId', 'quantity'],
+            properties: {
+              productId: { type: 'string' },
+              quantity: { type: 'integer', minimum: 1 }
+            }
+          },
+          response: {
+            201: {
+              type: 'object',
+              properties: {
+                orderId: { type: 'string' },
+                status: { type: 'string' }
+              }
+            }
+          }
+        },
+        preHandler: async (request, reply) => {
+          // np. sprawdzenie autentykacji
+          if (!request.headers.authorization) {
+            reply.code(401).send({ error: 'Unauthorized' })
+          }
+        },
+        config: {
+          rateLimit: { max: 10, timeWindow: '1 minute' }
+        }
+      }, async (request, reply) => {
+        const { productId, quantity } = request.body as {
+          productId: string
+          quantity: number
+        }
+        reply.code(201)
+        return { orderId: crypto.randomUUID(), status: 'pending' }
+      })
+
+  - name: Query String i parametry URL
+    desc: >
+      request.params zawiera parametry URL (:id), request.query zawiera query string (?page=1).
+      Oba mogą być walidowane przez JSON Schema. Bez schematu TypeScript wymaga type assertion.
+    code: |
+      import Fastify from 'fastify'
+
+      const fastify = Fastify()
+
+      // Query string z walidacją
+      fastify.get('/search', {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: {
+              q: { type: 'string', minLength: 1 },
+              limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+              page: { type: 'integer', minimum: 1, default: 1 },
+              sort: { type: 'string', enum: ['asc', 'desc'], default: 'asc' }
+            }
+          }
+        }
+      }, async (request, reply) => {
+        const { q, limit, page, sort } = request.query as {
+          q: string
+          limit: number
+          page: number
+          sort: string
+        }
+        return { q, limit, page, sort, results: [] }
+      })
+
+      // Wiele parametrów URL
+      fastify.get('/orgs/:orgId/repos/:repoId', async (request, reply) => {
+        const { orgId, repoId } = request.params as {
+          orgId: string
+          repoId: string
+        }
+        return { orgId, repoId }
+      })
+
+      // Wildcard — catch-all
+      fastify.get('/docs/*', async (request, reply) => {
+        const { '*': path } = request.params as { '*': string }
+        return { path }
+      })
+
+  - name: reply.send() i reply.code()
+    desc: >
+      reply.send(data) wysyła odpowiedź — JSON jeśli object, string jeśli tekst.
+      reply.code(statusCode) ustawia status kod. reply.header() dodaje nagłówek.
+      Można też zwrócić wartość bezpośrednio z async handlera — Fastify serialize automatycznie.
+    code: |
+      import Fastify from 'fastify'
+
+      const fastify = Fastify()
+
+      // Zwracanie wartości — najczystszy styl
+      fastify.get('/data', async (request, reply) => {
+        return { data: [1, 2, 3] }
+      })
+
+      // reply.send() — jawne wysłanie
+      fastify.get('/text', async (request, reply) => {
+        reply.send('Hello Fastify!')
+      })
+
+      // reply.code() + reply.send()
+      fastify.post('/resource', async (request, reply) => {
+        const resource = { id: 1, name: 'test' }
+        reply
+          .code(201)
+          .header('Location', `/resource/${resource.id}`)
+          .header('X-Custom', 'header-value')
+          .send(resource)
+      })
+
+      // Przekierowanie
+      fastify.get('/old-path', async (request, reply) => {
+        reply.redirect('/new-path', 301)
+      })
+
+      // 204 No Content
+      fastify.delete('/resource/:id', async (request, reply) => {
+        reply.code(204).send()
+      })
+
+      // Streaming — Buffer lub stream
+      fastify.get('/stream', async (request, reply) => {
+        reply.type('text/plain').send('streamed response')
+      })
+
+  - name: Prefixing i grupowanie tras
+    desc: >
+      fastify.register() z opcją prefix grupuje trasy pod wspólnym prefiksem.
+      To podstawowy sposób organizacji API — każdy moduł/zasób ma własny plugin
+      z prefiksem /api/users, /api/products itp.
+    code: |
+      import Fastify from 'fastify'
+
+      const fastify = Fastify()
+
+      // Plugin z prefiksem
+      async function usersPlugin(fastify: any, opts: any) {
+        fastify.get('/', async () => ({ users: [] }))
+        fastify.get('/:id', async (req: any) => ({ id: req.params.id }))
+        fastify.post('/', async (req: any, reply: any) => {
+          reply.code(201)
+          return { created: true, ...req.body }
+        })
+      }
+
+      async function postsPlugin(fastify: any, opts: any) {
+        fastify.get('/', async () => ({ posts: [] }))
+        fastify.get('/:id', async (req: any) => ({ id: req.params.id }))
+      }
+
+      // Rejestracja z prefiksem
+      fastify.register(usersPlugin, { prefix: '/api/users' })
+      fastify.register(postsPlugin, { prefix: '/api/posts' })
+
+      // Wynikowe trasy:
+      // GET /api/users
+      // GET /api/users/:id
+      // POST /api/users
+      // GET /api/posts
+      // GET /api/posts/:id
+
+      await fastify.listen({ port: 3000 })
+
+  - name: Obsługa błędów — setErrorHandler i notFoundHandler
+    desc: >
+      fastify.setErrorHandler() rejestruje globalny handler błędów. fastify.setNotFoundHandler()
+      obsługuje trasy których nie znaleziono. Oba mogą być ustawione per-plugin dla
+      różnych zachowań w różnych częściach aplikacji.
+    code: |
+      import Fastify, { FastifyError } from 'fastify'
+
+      const fastify = Fastify()
+
+      // Globalny handler błędów
+      fastify.setErrorHandler(async (error: FastifyError, request, reply) => {
+        fastify.log.error({
+          err: error,
+          request: { method: request.method, url: request.url }
+        })
+
+        // Błędy walidacji Fastify
+        if (error.validation) {
+          return reply.code(400).send({
+            error: 'Validation Error',
+            details: error.validation
+          })
+        }
+
+        // Custom kody HTTP
+        if (error.statusCode) {
+          return reply.code(error.statusCode).send({
+            error: error.message
+          })
+        }
+
+        return reply.code(500).send({ error: 'Internal Server Error' })
+      })
+
+      // Handler dla nieznanych tras
+      fastify.setNotFoundHandler(async (request, reply) => {
+        return reply.code(404).send({
+          error: 'Route Not Found',
+          path: request.url,
+          method: request.method
+        })
+      })
+
+      fastify.get('/crash', async () => {
+        throw new Error('Intentional error')
+      })
+
+  - name: TypeScript — typowane Request i Reply
+    desc: >
+      FastifyRequest<{Body, Params, Querystring, Headers}> i FastifyReply<RouteGeneric>
+      dają pełną type safety. Generic pozwala TypeScript'owi znać kształt danych
+      bez type assertion. TypeBox lub JSON Schema generuje typy automatycznie.
+    code: |
+      import Fastify, { FastifyRequest, FastifyReply } from 'fastify'
+
+      const fastify = Fastify()
+
+      // Typy dla request
+      interface CreateUserBody {
+        name: string
+        email: string
+        age: number
+      }
+
+      interface UserParams {
+        id: string
+      }
+
+      interface SearchQuery {
+        q: string
+        limit?: number
+      }
+
+      // Typowany handler
+      fastify.post<{
+        Body: CreateUserBody
+        Reply: { id: number; name: string; email: string }
+      }>('/users', async (request, reply) => {
+        const { name, email, age } = request.body  // TypeScript: typed!
+        reply.code(201)
+        return { id: Date.now(), name, email }
+      })
+
+      // Typowany GET z params
+      fastify.get<{
+        Params: UserParams
+        Querystring: SearchQuery
+      }>('/users/:id', async (request, reply) => {
+        const { id } = request.params    // string
+        const { q, limit } = request.query  // typed
+        return { id, q, limit }
+      })

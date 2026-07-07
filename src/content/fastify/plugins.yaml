@@ -1,0 +1,292 @@
+title: Plugin System i Dekoratory
+
+items:
+  - name: Plugin System — encapsulation
+    desc: >
+      Każdy plugin to async funkcja (fastify, opts) => {}. Fastify enkapsuluje każdy
+      plugin — dekoratory, hooki i trasy zdefiniowane w pluginie nie wyciekają na zewnątrz.
+      To izolacja: każda gałąź drzewa pluginów ma swój własny kontekst.
+    code: |
+      import Fastify from 'fastify'
+
+      const fastify = Fastify()
+
+      // Plugin A — ma własny dekorator 'serviceA'
+      async function pluginA(fastify: any, opts: any) {
+        fastify.decorate('serviceA', { getData: () => 'from A' })
+
+        fastify.get('/a', async (req: any) => {
+          return fastify.serviceA.getData()  // OK — w zasięgu pluginu A
+        })
+      }
+
+      // Plugin B — NIE widzi 'serviceA' (enkapsulacja)
+      async function pluginB(fastify: any, opts: any) {
+        fastify.get('/b', async (req: any) => {
+          // fastify.serviceA  — undefined! nie ma dostępu
+          return { b: true }
+        })
+      }
+
+      fastify.register(pluginA)
+      fastify.register(pluginB)
+
+      // fastify.serviceA — też undefined tu (poza pluginem)
+
+      await fastify.listen({ port: 3000 })
+
+  - name: fastify-plugin (fp) — zniesienie enkapsulacji
+    desc: >
+      Owijając plugin w fp() (fastify-plugin), dekoratory i hooki definiowane w nim
+      są widoczne dla rodzica i rodzeństwa. Używaj fp() dla współdzielonych serwisów
+      (połączenie DB, JWT, config) — nie dla business logic.
+    code: |
+      import Fastify from 'fastify'
+      import fp from 'fastify-plugin'
+
+      const fastify = Fastify()
+
+      // Plugin z fp — eksponuje dekorator globalnie
+      const dbPlugin = fp(async (fastify: any) => {
+        // Symulacja połączenia z DB
+        const db = {
+          query: async (sql: string) => ({ rows: [] }),
+          close: async () => {}
+        }
+
+        fastify.decorate('db', db)
+
+        // Zamknij połączenie przy shutdown
+        fastify.addHook('onClose', async () => {
+          await db.close()
+        })
+      }, {
+        name: 'db-plugin',
+        fastify: '>=4.0.0'
+      })
+
+      // Plugin JWT z fp — dostępny wszędzie
+      const jwtPlugin = fp(async (fastify: any) => {
+        fastify.decorate('authenticate', async (req: any, reply: any) => {
+          const token = req.headers.authorization?.slice(7)
+          if (!token) {
+            reply.code(401).send({ error: 'No token' })
+          }
+          req.user = { id: '1' }  // z JWT decode
+        })
+      })
+
+      fastify.register(dbPlugin)
+      fastify.register(jwtPlugin)
+
+      // Teraz fastify.db i fastify.authenticate są dostępne wszędzie
+      fastify.get('/users', {
+        preHandler: [fastify.authenticate]
+      } as any, async (req: any) => {
+        const result = await fastify.db.query('SELECT * FROM users')
+        return result.rows
+      })
+
+      await fastify.listen({ port: 3000 })
+
+  - name: fastify.decorate() — rozszerzanie instancji
+    desc: >
+      decorate() dodaje właściwość lub metodę do instancji Fastify. Dostępna we
+      wszystkich handlerach i hookach jako fastify.myProp lub przez this (nie
+      zalecane w async). Idealne dla klientów DB, zewnętrznych serwisów, helperów.
+    code: |
+      import Fastify from 'fastify'
+      import fp from 'fastify-plugin'
+
+      const fastify = Fastify()
+
+      // Dekoruj serwer wartością
+      fastify.decorate('config', {
+        appName: 'My API',
+        version: '1.0.0',
+        environment: process.env.NODE_ENV ?? 'development'
+      })
+
+      // Dekoruj serwer funkcją
+      fastify.decorate('generateId', () => crypto.randomUUID())
+
+      // Dekoruj serwer obiektem serwisu
+      fastify.decorate('emailService', {
+        send: async (to: string, subject: string, body: string) => {
+          // Wysyłka emaila...
+          console.log(`Email to ${to}: ${subject}`)
+          return { sent: true }
+        }
+      })
+
+      // Użycie w routach
+      fastify.post('/users', async (request, reply) => {
+        const userId = (fastify as any).generateId()
+        const body = request.body as { email: string; name: string }
+
+        await (fastify as any).emailService.send(
+          body.email,
+          'Welcome!',
+          `Hi ${body.name}`
+        )
+
+        reply.code(201)
+        return { id: userId, name: body.name, email: body.email }
+      })
+
+      fastify.get('/version', async () => {
+        return (fastify as any).config
+      })
+
+      await fastify.listen({ port: 3000 })
+
+  - name: decorateRequest() i decorateReply()
+    desc: >
+      decorateRequest() / decorateReply() rozszerzają obiekty request i reply
+      o własne właściwości. Ważne — musisz zadeklarować z wartością domyślną null
+      zanim pluginy ustawią rzeczywistą wartość. To Fastify best practice dla
+      właściwości dodawanych do request (np. request.user).
+    code: |
+      import Fastify from 'fastify'
+      import fp from 'fastify-plugin'
+
+      const fastify = Fastify()
+
+      // Deklaruj PRZED użyciem — null jako placeholder
+      fastify.decorateRequest('user', null)
+      fastify.decorateRequest('requestId', null)
+      fastify.decorateReply('startTime', null)
+
+      // Hook ustawia wartości
+      fastify.addHook('onRequest', async (request, reply) => {
+        (request as any).requestId = crypto.randomUUID();
+        (reply as any).startTime = Date.now()
+      })
+
+      // Auth hook ustawia user
+      fastify.addHook('preHandler', async (request, reply) => {
+        const token = request.headers.authorization?.slice(7)
+        if (token) {
+          // Decode JWT...
+          (request as any).user = { id: '1', name: 'Jan', role: 'user' }
+        }
+      })
+
+      // Handler używa rozszerzonych właściwości
+      fastify.get('/profile', async (request, reply) => {
+        const user = (request as any).user
+        const reqId = (request as any).requestId
+        const elapsed = Date.now() - (reply as any).startTime
+
+        if (!user) {
+          return reply.code(401).send({ error: 'Unauthorized' })
+        }
+
+        reply.header('X-Request-Id', reqId)
+        reply.header('X-Response-Time', `${elapsed}ms`)
+        return { user, requestId: reqId }
+      })
+
+      await fastify.listen({ port: 3000 })
+
+  - name: Awaited plugins i dependency injection
+    desc: >
+      fastify.register() jest async — pluginy ładują się sekwencyjnie gdy używasz await.
+      Bez await kolejność ładowania nie jest gwarantowana. Przy TypeScript
+      dekoratory wymagają declaration merging lub type assertion.
+    code: |
+      import Fastify from 'fastify'
+      import fp from 'fastify-plugin'
+
+      // TypeScript declaration merging dla dekoratorów
+      declare module 'fastify' {
+        interface FastifyInstance {
+          db: { query: (sql: string, params?: any[]) => Promise<any> }
+          config: { jwtSecret: string; dbUrl: string }
+        }
+        interface FastifyRequest {
+          user: { id: string; role: string } | null
+        }
+      }
+
+      const fastify = Fastify()
+
+      // Config plugin — musi być załadowany PIERWSZY
+      const configPlugin = fp(async (fastify) => {
+        fastify.decorate('config', {
+          jwtSecret: process.env.JWT_SECRET ?? 'dev-secret',
+          dbUrl: process.env.DATABASE_URL ?? 'postgres://localhost/mydb'
+        })
+      })
+
+      // DB plugin — zależy od config
+      const dbPlugin = fp(async (fastify) => {
+        // Teraz fastify.config jest dostępne (załadowane przez configPlugin)
+        const dbUrl = fastify.config.dbUrl
+        fastify.decorate('db', {
+          query: async (sql: string, params?: any[]) => {
+            // Użyj dbUrl do połączenia...
+            return { rows: [] }
+          }
+        })
+      })
+
+      // Ładuj sekwencyjnie — await gwarantuje kolejność
+      await fastify.register(configPlugin)
+      await fastify.register(dbPlugin)
+
+      // Teraz oba są gotowe
+      fastify.get('/users', async (request) => {
+        const result = await fastify.db.query('SELECT * FROM users')
+        return result.rows
+      })
+
+      await fastify.listen({ port: 3000 })
+
+  - name: Autoload pluginów z @fastify/autoload
+    desc: >
+      "@fastify/autoload automatycznie ładuje pluginy z katalogu. Każdy plik w /plugins
+      jest traktowany jako plugin. Pliki w /routes definiują trasy. Eliminuje ręczne
+      register() dla każdego pliku."
+    code: |
+      // Struktura projektu:
+      // src/
+      //   app.ts          — główna aplikacja
+      //   plugins/
+      //     db.ts         — plugin bazy danych
+      //     auth.ts       — plugin autentykacji
+      //     sensible.ts   — @fastify/sensible
+      //   routes/
+      //     users/
+      //       index.ts    — GET /users, POST /users
+      //       _id/
+      //         index.ts  — GET /users/:id (folder _id = :id)
+      //     posts/
+      //       index.ts    — GET /posts
+
+      // src/app.ts
+      import Fastify from 'fastify'
+      import autoload from '@fastify/autoload'
+      import { join } from 'path'
+
+      const fastify = Fastify({ logger: true })
+
+      // Załaduj wszystkie pluginy z src/plugins/
+      fastify.register(autoload, {
+        dir: join(__dirname, 'plugins'),
+        options: { /* opcje przekazane do każdego pluginu */ }
+      })
+
+      // Załaduj wszystkie trasy z src/routes/
+      fastify.register(autoload, {
+        dir: join(__dirname, 'routes'),
+        options: { prefix: '/api' }
+      })
+
+      // src/routes/users/index.ts
+      // export default async function usersRoutes(fastify, opts) {
+      //   fastify.get('/', async () => ({ users: [] }))
+      //   fastify.post('/', async (req) => req.body)
+      // }
+
+      export default fastify

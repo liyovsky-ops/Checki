@@ -1,0 +1,377 @@
+title: Walidacja i Serializacja
+
+items:
+  - name: JSON Schema — podstawy walidacji
+    desc: >
+      Fastify używa Ajv (Another JSON Validator) do walidacji requestów i serializacji
+      responseów. Schemat definiujesz w opcjach trasy. Walidacja requestu jest automatyczna
+      i rzuca błąd 400. Serializacja response jest 2x szybsza niż JSON.stringify.
+    code: |
+      import Fastify from 'fastify'
+
+      const fastify = Fastify()
+
+      fastify.post('/products', {
+        schema: {
+          // Walidacja body
+          body: {
+            type: 'object',
+            required: ['name', 'price', 'category'],
+            properties: {
+              name: {
+                type: 'string',
+                minLength: 2,
+                maxLength: 100
+              },
+              price: {
+                type: 'number',
+                minimum: 0,
+                exclusiveMinimum: true
+              },
+              category: {
+                type: 'string',
+                enum: ['electronics', 'clothing', 'food']
+              },
+              description: {
+                type: 'string',
+                maxLength: 500
+              },
+              tags: {
+                type: 'array',
+                items: { type: 'string' },
+                maxItems: 10
+              }
+            },
+            additionalProperties: false  // odrzuć nieznane pola
+          },
+          // Serializacja response (szybka!)
+          response: {
+            201: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                name: { type: 'string' },
+                price: { type: 'number' },
+                category: { type: 'string' },
+                createdAt: { type: 'string' }
+              }
+            }
+          }
+        }
+      }, async (request, reply) => {
+        const product = request.body as {
+          name: string
+          price: number
+          category: string
+        }
+        reply.code(201)
+        return {
+          id: crypto.randomUUID(),
+          ...product,
+          createdAt: new Date().toISOString()
+        }
+      })
+
+  - name: Walidacja params, querystring i headers
+    desc: >
+      Schemat może walidować nie tylko body ale też parametry URL (params),
+      query string (querystring) i nagłówki (headers). Każdy ma osobną sekcję
+      w obiekcie schema. Fastify automatycznie konwertuje stringi z URL na number/boolean.
+    code: |
+      import Fastify from 'fastify'
+
+      const fastify = Fastify()
+
+      fastify.get('/products/:id', {
+        schema: {
+          // Walidacja parametrów URL
+          params: {
+            type: 'object',
+            properties: {
+              id: { type: 'integer' }  // Fastify konwertuje string na integer!
+            },
+            required: ['id']
+          },
+          // Walidacja query string
+          querystring: {
+            type: 'object',
+            properties: {
+              lang: {
+                type: 'string',
+                enum: ['pl', 'en', 'de'],
+                default: 'pl'
+              },
+              include: {
+                type: 'string',
+                enum: ['reviews', 'variants', 'all']
+              }
+            }
+          },
+          // Walidacja nagłówków
+          headers: {
+            type: 'object',
+            required: ['x-api-version'],
+            properties: {
+              'x-api-version': {
+                type: 'string',
+                enum: ['v1', 'v2']
+              },
+              'accept-language': { type: 'string' }
+            }
+          }
+        }
+      }, async (request, reply) => {
+        const { id } = request.params as { id: number }      // number, nie string!
+        const { lang, include } = request.query as { lang: string; include?: string }
+
+        return { id, lang, include }
+      })
+
+  - name: TypeBox — JSON Schema z TypeScript types
+    desc: >
+      TypeBox (@sinclair/typebox) generuje JSON Schema i TypeScript typy jednocześnie.
+      Type.Object() = JSON Schema + TypeScript interface. Eliminuje duplikowanie
+      definicji. Jest preferowanym sposobem walidacji w projektach TypeScript z Fastify.
+    code: |
+      import Fastify from 'fastify'
+      import { Type, Static } from '@sinclair/typebox'
+      import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
+
+      // TypeBox schema = JSON Schema + TypeScript types w jednym
+      const UserSchema = Type.Object({
+        name: Type.String({ minLength: 2, maxLength: 50 }),
+        email: Type.String({ format: 'email' }),
+        age: Type.Integer({ minimum: 18, maximum: 120 }),
+        role: Type.Union([
+          Type.Literal('user'),
+          Type.Literal('admin')
+        ]),
+        tags: Type.Optional(Type.Array(Type.String()))
+      })
+
+      // Static<typeof UserSchema> = TypeScript interface automatycznie
+      type User = Static<typeof UserSchema>
+
+      const ResponseSchema = Type.Object({
+        id: Type.String({ format: 'uuid' }),
+        name: Type.String(),
+        email: Type.String(),
+        role: Type.String(),
+        createdAt: Type.String()
+      })
+
+      // Fastify z TypeBox provider
+      const fastify = Fastify().withTypeProvider<TypeBoxTypeProvider>()
+
+      fastify.post('/users', {
+        schema: {
+          body: UserSchema,
+          response: { 201: ResponseSchema }
+        }
+      }, async (request, reply) => {
+        // request.body jest w pełni typowany jako User!
+        const { name, email, age, role } = request.body
+
+        reply.code(201)
+        return {
+          id: crypto.randomUUID(),
+          name,
+          email,
+          role,
+          createdAt: new Date().toISOString()
+        }
+      })
+
+      await fastify.listen({ port: 3000 })
+
+  - name: Serializacja response — szybkość i bezpieczeństwo
+    desc: >
+      Schema response nie tylko dokumentuje API — aktywnie serializuje dane
+      i POMIJA pola których nie ma w schemacie (ukrywa wrażliwe dane jak
+      hasła, tokeny). To ważna funkcja bezpieczeństwa Fastify.
+    code: |
+      import Fastify from 'fastify'
+
+      const fastify = Fastify()
+
+      // Obiekt z wrażliwymi danymi z bazy
+      const usersFromDB = [
+        { id: 1, name: 'Jan', email: 'jan@test.com', passwordHash: 'bcrypt...', secretToken: 'xxx' },
+        { id: 2, name: 'Anna', email: 'anna@test.com', passwordHash: 'bcrypt...', secretToken: 'yyy' }
+      ]
+
+      fastify.get('/users', {
+        schema: {
+          response: {
+            200: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'integer' },
+                  name: { type: 'string' },
+                  email: { type: 'string' }
+                  // passwordHash i secretToken NIE ma tutaj
+                }
+              }
+            }
+          }
+        }
+      }, async () => {
+        // Fastify automatycznie POMINIE passwordHash i secretToken
+        return usersFromDB
+        // Response: [{ id: 1, name: 'Jan', email: 'jan@...' }, ...]
+        // passwordHash i secretToken NIGDY nie trafi do klienta!
+      })
+
+      // Wiele statusów response
+      fastify.get('/users/:id', {
+        schema: {
+          response: {
+            200: {
+              type: 'object',
+              properties: {
+                id: { type: 'integer' },
+                name: { type: 'string' }
+              }
+            },
+            404: {
+              type: 'object',
+              properties: {
+                error: { type: 'string' }
+              }
+            }
+          }
+        }
+      }, async (request, reply) => {
+        const { id } = request.params as { id: string }
+        const user = usersFromDB.find(u => u.id === Number(id))
+
+        if (!user) {
+          return reply.code(404).send({ error: 'User not found' })
+        }
+        return user
+      })
+
+  - name: Zod z Fastify — @fastify/zod-to-json-schema
+    desc: >
+      Fastify natywnie używa JSON Schema (Ajv), ale można integrować Zod przez
+      konwersję schematów. Pakiet zod-to-json-schema konwertuje Zod schema do
+      JSON Schema kompatybilnego z Fastify. Wymaga TypeProvider.
+    code: |
+      import Fastify from 'fastify'
+      import { z } from 'zod'
+      import { zodToJsonSchema } from 'zod-to-json-schema'
+      import {
+        ZodTypeProvider,
+        serializerCompiler,
+        validatorCompiler
+      } from 'fastify-type-provider-zod'
+
+      // npm install fastify-type-provider-zod zod
+
+      const fastify = Fastify()
+
+      // Ustaw kompilatory Zod
+      fastify.setValidatorCompiler(validatorCompiler)
+      fastify.setSerializerCompiler(serializerCompiler)
+
+      const fastifyWithZod = fastify.withTypeProvider<ZodTypeProvider>()
+
+      // Definicja schematów Zod
+      const CreateUserSchema = z.object({
+        name: z.string().min(2).max(50),
+        email: z.string().email(),
+        role: z.enum(['user', 'admin']).default('user')
+      })
+
+      const UserResponseSchema = z.object({
+        id: z.string().uuid(),
+        name: z.string(),
+        email: z.string(),
+        role: z.string(),
+        createdAt: z.string()
+      })
+
+      fastifyWithZod.post('/users', {
+        schema: {
+          body: CreateUserSchema,
+          response: { 201: UserResponseSchema }
+        }
+      }, async (request, reply) => {
+        // request.body w pełni typowany z Zod schema
+        const { name, email, role } = request.body
+
+        reply.code(201)
+        return {
+          id: crypto.randomUUID(),
+          name,
+          email,
+          role,
+          createdAt: new Date().toISOString()
+        }
+      })
+
+      await fastify.listen({ port: 3000 })
+
+  - name: Ajv — konfiguracja i własne formaty
+    desc: >
+      Fastify używa Ajv pod spodem. Możesz go skonfigurować przez opcje Fastify
+      lub dodać własne formaty (np. waluta, PESEL, NIP). ajv-formats dodaje
+      standardowe formaty jak email, date, uri, uuid.
+    code: |
+      import Fastify from 'fastify'
+      import Ajv from 'ajv'
+      import addFormats from 'ajv-formats'
+
+      // npm install ajv-formats
+
+      // Fastify z customowym Ajv
+      const fastify = Fastify({
+        ajv: {
+          customOptions: {
+            coerceTypes: 'array',    // koercja typów
+            useDefaults: true,       // wypełniaj default z schema
+            removeAdditional: true,  // usuń dodatkowe pola
+            allErrors: true          // zbierz WSZYSTKIE błędy naraz
+          },
+          plugins: [
+            // Dodaj standardowe formaty (email, uri, uuid, date-time itp.)
+            addFormats
+          ]
+        }
+      })
+
+      // Własny format walidacji
+      fastify.get('/', async () => 'ok')
+
+      // Rejestracja własnego formatu przez setValidatorCompiler
+      fastify.setValidatorCompiler(({ schema, method, url, httpPart }) => {
+        const ajv = new Ajv({ coerceTypes: true, useDefaults: true })
+        addFormats(ajv)
+
+        // Dodaj własny format PESEL
+        ajv.addFormat('pesel', {
+          type: 'string',
+          validate: (v: string) => /^\d{11}$/.test(v)
+        })
+
+        return ajv.compile(schema)
+      })
+
+      fastify.post('/persons', {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['pesel'],
+            properties: {
+              pesel: { type: 'string', format: 'pesel' },
+              birthDate: { type: 'string', format: 'date' }  // z ajv-formats
+            }
+          }
+        }
+      }, async (request) => {
+        return { valid: true, ...request.body as object }
+      })
+
+      await fastify.listen({ port: 3000 })

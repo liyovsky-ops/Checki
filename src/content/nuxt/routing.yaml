@@ -1,0 +1,313 @@
+title: Routing & Pages w Nuxt
+
+items:
+  - name: "Struktura pages/ — file-based routing"
+    desc: >
+      Każdy plik .vue w katalogu pages/ staje się trasą. Struktura katalogów odpowiada
+      ścieżkom URL. Nuxt automatycznie generuje konfigurację Vue Router na podstawie
+      plików — zero ręcznej konfiguracji. Pliki index.vue mapują na katalog nadrzędny.
+    code: |
+      pages/
+        index.vue           → /
+        about.vue           → /about
+        contact.vue         → /contact
+        blog/
+          index.vue         → /blog
+          [slug].vue        → /blog/:slug
+          [slug]/
+            index.vue       → /blog/:slug
+            comments.vue    → /blog/:slug/comments
+        users/
+          index.vue         → /users
+          [id].vue          → /users/:id
+          [id]/
+            edit.vue        → /users/:id/edit
+        [...slug].vue       → /* (catch-all — 404)
+        [[optional]].vue    → / lub /:optional (opcjonalny parametr)
+
+  - name: "Dynamiczne trasy — [id].vue"
+    desc: >
+      Nawiasy kwadratowe w nazwie pliku tworzą dynamiczny parametr trasy. Odczytaj
+      przez useRoute().params. Podwójne nawiasy [[id]].vue — parametr opcjonalny.
+      Wielokropek [...slug].vue — catch-all (pasuje do wielu segmentów URL).
+    code: |
+      // pages/posts/[id].vue
+      <script setup lang="ts">
+      const route = useRoute()
+      const postId = route.params.id  // string lub string[]
+
+      // Pobierz post na podstawie parametru
+      const { data: post } = await useFetch(`/api/posts/${route.params.id}`)
+
+      // SEO dynamiczne
+      useSeoMeta({
+        title: () => post.value?.title,
+        description: () => post.value?.excerpt,
+      })
+      </script>
+
+      <template>
+        <article v-if="post">
+          <h1>{{ post.title }}</h1>
+          <div v-html="post.content" />
+        </article>
+      </template>
+
+      // pages/[...slug].vue — catch-all (np. dla CMS)
+      <script setup lang="ts">
+      const route = useRoute()
+      const slug = route.params.slug  // tablica segmentów ["a", "b", "c"]
+      </script>
+
+  - name: "definePageMeta — meta strony"
+    desc: >
+      definePageMeta ustawia metadane strony — layout, middleware, tytuł, custom meta.
+      Compiler macro — nie wymaga importu, działa w bloku setup. Dane dostępne
+      przez route.meta we wszystkich middleware i layoutach.
+    code: |
+      // pages/dashboard.vue
+      <script setup lang="ts">
+      definePageMeta({
+        layout: 'dashboard',           // użyj layouts/dashboard.vue
+        middleware: ['auth', 'admin'],  // middleware sekwencyjnie
+        title: 'Panel administratora',
+        keepalive: true,               // zachowaj stan komponentu
+        pageTransition: {
+          name: 'slide',
+          mode: 'out-in'
+        },
+        // Custom meta — dostępne w middleware
+        requiresAuth: true,
+        roles: ['admin', 'manager'],
+      })
+      </script>
+
+      // middleware/auth.ts — odczyt route.meta
+      export default defineNuxtRouteMiddleware((to, from) => {
+        if (to.meta.requiresAuth) {
+          const { loggedIn } = useAuth()
+          if (!loggedIn.value) {
+            return navigateTo('/login')
+          }
+        }
+      })
+
+  - name: "Layouts — layouts/"
+    desc: >
+      Layouts to wrappery stron z wspólnym UI (navbar, footer, sidebar). Domyślny
+      layout to layouts/default.vue. Zmiana layoutu przez definePageMeta lub
+      <NuxtLayout name="admin">. Slot default renderuje zawartość strony.
+    code: |
+      // layouts/default.vue — layout dla większości stron
+      <template>
+        <div class="layout-default">
+          <AppNavbar />
+          <main class="container">
+            <slot />
+          </main>
+          <AppFooter />
+        </div>
+      </template>
+
+      // layouts/dashboard.vue — layout dla panelu
+      <template>
+        <div class="layout-dashboard">
+          <DashboardSidebar />
+          <div class="dashboard-content">
+            <DashboardHeader />
+            <main>
+              <slot />
+            </main>
+          </div>
+        </div>
+      </template>
+
+      // layouts/blank.vue — dla stron auth
+      <template>
+        <div class="layout-blank min-h-screen">
+          <slot />
+        </div>
+      </template>
+
+      // Dynamiczna zmiana layoutu
+      <script setup lang="ts">
+      const { isAdmin } = useAuth()
+      </script>
+
+      <template>
+        <NuxtLayout :name="isAdmin ? 'admin' : 'default'">
+          <NuxtPage />
+        </NuxtLayout>
+      </template>
+
+  - name: "Middleware — ochrona tras"
+    desc: >
+      Middleware to funkcje wykonywane przed nawigacją. Mogą blokować dostęp
+      (zwróć navigateTo) lub przepuścić request (brak return lub return undefined).
+      Globalne middleware — umieść w middleware/ bez prefiksu. Lokalne — zdefiniuj
+      w definePageMeta lub inline.
+    code: |
+      // middleware/auth.ts — lokalne (używane przez definePageMeta)
+      export default defineNuxtRouteMiddleware((to, from) => {
+        const token = useCookie('auth-token')
+
+        if (!token.value) {
+          // Przekieruj do logowania
+          return navigateTo('/login', { replace: true })
+        }
+      })
+
+      // middleware/admin.global.ts — GLOBALNE (sufiks .global)
+      // Wykonuje się dla każdej nawigacji
+      export default defineNuxtRouteMiddleware((to) => {
+        // Sprawdź role tylko dla tras wymagających admina
+        if (to.meta.requiresAdmin) {
+          const { user } = useAuth()
+          if (user.value?.role !== 'admin') {
+            throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
+          }
+        }
+      })
+
+      // Inline middleware w definePageMeta
+      definePageMeta({
+        middleware: [
+          function(to, from) {
+            if (to.query.preview !== 'true') {
+              return navigateTo('/')
+            }
+          }
+        ]
+      })
+
+  - name: "Server Routes — server/api/"
+    desc: >
+      Pliki w server/api/ stają się endpointami API Nuxt. Konwencja nazewnictwa:
+      [name].[method].ts lub [name].ts (obsługuje wszystkie metody). Nuxt używa h3
+      jako frameworka HTTP. Dostępne narzędzia: readBody, getQuery, getCookie,
+      defineEventHandler, createError.
+    code: |
+      // server/api/posts.get.ts → GET /api/posts
+      export default defineEventHandler(async (event) => {
+        const query = getQuery(event)
+        const page = Number(query.page) || 1
+        const limit = Number(query.limit) || 10
+
+        // Zwróć dane (Nitro auto-serializuje do JSON)
+        return {
+          data: await db.posts.findMany({
+            skip: (page - 1) * limit,
+            take: limit,
+          }),
+          total: await db.posts.count(),
+          page,
+        }
+      })
+
+      // server/api/posts.post.ts → POST /api/posts
+      export default defineEventHandler(async (event) => {
+        const body = await readBody(event)
+
+        // Walidacja
+        if (!body.title) {
+          throw createError({ statusCode: 400, statusMessage: 'Title required' })
+        }
+
+        const post = await db.posts.create({ data: body })
+        return post
+      })
+
+      // server/api/posts/[id].delete.ts → DELETE /api/posts/:id
+      export default defineEventHandler(async (event) => {
+        const id = getRouterParam(event, 'id')
+        await db.posts.delete({ where: { id: Number(id) } })
+        return { success: true }
+      })
+
+      // server/middleware/auth.ts — middleware serwera (globalne)
+      export default defineEventHandler(async (event) => {
+        const token = getCookie(event, 'auth-token')
+        if (event.path.startsWith('/api/protected')) {
+          if (!token) {
+            throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+          }
+          event.context.user = await verifyToken(token)
+        }
+      })
+
+  - name: "navigateTo i abortNavigation"
+    desc: >
+      navigateTo to Nuxt helper do programowej nawigacji — działa zarówno po stronie
+      klienta jak i serwera (w middleware, server routes). abortNavigation anuluje
+      bieżącą nawigację z opcjonalnym błędem.
+    code: |
+      <script setup lang="ts">
+      const router = useRouter()
+
+      // Nawigacja kliencka
+      async function saveAndRedirect() {
+        await $fetch('/api/posts', { method: 'POST', body: form.value })
+        await navigateTo('/posts')  // lub router.push('/posts')
+      }
+
+      // Z opcjami
+      await navigateTo('/login', {
+        replace: true,          // zamień historię
+        redirectCode: 301,      // dla SSR redirect (SEO)
+      })
+
+      // Zewnętrzny URL
+      await navigateTo('https://example.com', { external: true })
+      </script>
+
+      // W middleware — blokada + redirect
+      export default defineNuxtRouteMiddleware((to, from) => {
+        const { isAuthenticated } = useAuth()
+
+        if (!isAuthenticated.value) {
+          return navigateTo({
+            path: '/login',
+            query: { redirect: to.fullPath },  // zapisz gdzie chciał iść
+          })
+        }
+
+        // abortNavigation — anuluj nawigację
+        if (isMaintenanceMode) {
+          return abortNavigation(
+            createError({ statusCode: 503, statusMessage: 'Service Unavailable' })
+          )
+        }
+      })
+
+  - name: "routeRules — per-route rendering w nuxt.config"
+    desc: >
+      routeRules pozwala na mieszanie trybów renderowania w jednej aplikacji.
+      Niektóre trasy SSR, inne statyczne (prerender), inne SPA-only (ssr: false).
+      Można też ustawiać cache headers, redirecty, nagłówki per-route.
+    code: |
+      // nuxt.config.ts
+      export default defineNuxtConfig({
+        routeRules: {
+          // Strona główna — SSG (statyczna, fast)
+          '/': { prerender: true },
+
+          // Blog — ISR (revalidate co 60s)
+          '/blog/**': { isr: 60 },
+
+          // Dashboard — SPA (tylko klienckie)
+          '/dashboard/**': { ssr: false },
+
+          // API — cache na CDN przez 5 minut
+          '/api/**': { cache: { maxAge: 300 } },
+
+          // Stary URL — redirect 301
+          '/old-blog/**': { redirect: '/blog/**' },
+
+          // Dodaj nagłówki
+          '/public/**': {
+            headers: {
+              'Cache-Control': 'public, max-age=31536000'
+            }
+          }
+        }
+      })

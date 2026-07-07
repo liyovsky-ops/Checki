@@ -1,0 +1,133 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać SvelteKit?
+  firstComponent: Przykładowa aplikacja SvelteKit
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest SvelteKit?
+  desc: >
+    SvelteKit to oficjalny full-stack framework zbudowany na Svelte.
+    To odpowiednik Next.js (dla React) czy Nuxt (dla Vue), ale dla Svelte.
+    Oferuje file-based routing, SSR (Server-Side Rendering), SSG (Static Site Generation),
+    load functions do pobierania danych, form actions do obsługi formularzy,
+    hooks do middleware, i adaptery do deploymentu na dowolną platformę.
+    W przeciwieństwie do samego Svelte (biblioteka UI), SvelteKit to kompletne
+    rozwiązanie od frontend do backend — możesz pisać API routes, połączyć się
+    z bazą danych i obsługiwać auth — wszystko w jednym projekcie TypeScript.
+
+concepts:
+  - title: File-based routing z + prefixem
+    desc: >
+      Pliki w src/routes/ tworzą ścieżki URL. Ale nie każdy plik — tylko te
+      z + prefixem są plikami specjalnymi SvelteKit. +page.svelte = strona,
+      +layout.svelte = layout, +server.ts = API endpoint, +page.server.ts = server load/actions.
+      Katalog [slug] = dynamiczny parametr. (group) = grupowanie bez wpływu na URL.
+      To eliminuje konflikty między plikami routingu a komponentami pomocniczymi.
+    icon: "🗂️"
+
+  - title: SSR, SSG i CSR — jeden framework
+    desc: >
+      SvelteKit obsługuje wszystkie tryby renderowania. SSR (Server-Side Rendering) —
+      każdy request generuje HTML na serwerze, świeże dane, dobry SEO.
+      SSG (Static Site Generation) — prerenderowanie przy buildzie, export prerender = true.
+      CSR (Client-Side Rendering) — SPA bez serwera, export ssr = false.
+      Możesz mieszać — niektóre strony SSR, inne prerendered, inne CSR.
+      Jeden projekt, maksymalna elastyczność.
+    icon: "⚡"
+
+  - title: Load Functions — dane przed renderowaniem
+    desc: >
+      +page.server.ts i +page.ts eksportują load() — funkcję która pobiera dane
+      ZANIM strona się wyrenderuje. Odpowiednik getServerSideProps z Next.js.
+      +page.server.ts działa tylko na serwerze (dostęp do DB, sekretów).
+      +page.ts działa na serwerze (SSR) i kliencie (nawigacja SPA).
+      Dane z load() trafiają do komponentu przez export let data.
+    icon: "📡"
+
+  - title: Form Actions — formularze bez JS
+    desc: >
+      +page.server.ts eksportuje actions — funkcje obsługujące POST requests z formularzy.
+      Progressive enhancement — formularz działa bez JavaScript (native HTML form),
+      ale działa lepiej z JS (use:enhance, brak pełnego page reload, loading state).
+      fail() zwraca błędy walidacji, redirect() przekierowuje po sukcesie.
+      Bezpieczne — logika serwerowa nigdy nie trafia do klienta.
+    icon: "📬"
+
+  - title: Hooks — middleware dla każdego requestu
+    desc: >
+      src/hooks.server.ts eksportuje handle() — uruchamia się przy każdym request.
+      Idealne do: auth (sprawdź cookie → ustaw locals.user), logging, security headers,
+      rate limiting, CORS. sequence() komponuje wiele handle functions.
+      event.locals = dane przekazane przez hook do load functions i actions.
+      handleError = obsługa nieobsłużonych błędów z logowaniem.
+    icon: "🪝"
+
+  - title: Adaptery — deploy anywhere
+    desc: >
+      SvelteKit adaptery transformują output builda do formatu konkretnej platformy.
+      adapter-node → Node.js server (VPS, Docker, Railway, Render).
+      adapter-static → statyczne HTML/JS/CSS (GitHub Pages, Netlify, S3, CDN).
+      adapter-vercel → Serverless Functions + Edge Runtime + ISR.
+      adapter-cloudflare → Cloudflare Workers z dostępem do KV, D1, R2.
+      Zmiana platformy = zmiana jednej linii w svelte.config.js.
+    icon: "🚢"
+
+whenToUse:
+  - Full-stack aplikacja z jednym repozytorium (frontend + backend + DB)
+  - SEO-critical strony wymagające SSR (blog, e-commerce, landing pages)
+  - Strony statyczne (dokumentacja, portfolio) — export prerender = true
+  - Formularze wymagające progressive enhancement (działają bez JS)
+  - Projekt gdzie wydajność i mały bundle są priorytetem
+  - Svelte jako baza + potrzeba SSR, routingu i API routes
+  - Alternatywa dla Next.js gdy wolisz Svelte od React
+
+firstComponent: |
+  // npm create svelte@latest my-app
+  // cd my-app && npm install && npm run dev
+
+  // src/routes/+page.server.ts — dane z "bazy danych"
+  import type { PageServerLoad, Actions } from './$types';
+  import { fail } from '@sveltejs/kit';
+
+  let tasks = ['Nauczyć się SvelteKit', 'Zbudować aplikację'];
+
+  export const load: PageServerLoad = async () => {
+    return { tasks };
+  };
+
+  export const actions: Actions = {
+    addTask: async ({ request }) => {
+      const data = await request.formData();
+      const task = data.get('task') as string;
+
+      if (!task?.trim()) {
+        return fail(400, { error: 'Zadanie nie może być puste' });
+      }
+
+      tasks = [...tasks, task.trim()];
+      return { success: true };
+    }
+  };
+
+  // src/routes/+page.svelte — komponent z formularzem
+  // <script lang="ts">
+  //   import { enhance } from '$app/forms';
+  //   import type { PageData, ActionData } from './$types';
+  //   export let data: PageData;
+  //   export let form: ActionData;
+  // </script>
+  //
+  // <h1>Moje zadania ({data.tasks.length})</h1>
+  //
+  // <ul>
+  //   {#each data.tasks as task}
+  //     <li>{task}</li>
+  //   {/each}
+  // </ul>
+  //
+  // <form method="POST" action="?/addTask" use:enhance>
+  //   <input name="task" placeholder="Nowe zadanie" />
+  //   {#if form?.error}<p class="error">{form.error}</p>{/if}
+  //   <button type="submit">Dodaj</button>
+  // </form>

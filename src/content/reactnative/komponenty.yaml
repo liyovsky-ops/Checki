@@ -1,0 +1,367 @@
+title: Komponenty bazowe React Native
+
+items:
+  - name: View
+    desc: >
+      Podstawowy kontener — odpowiednik div w HTML. Obsługuje Flexbox layout,
+      style, touch events i accessibility. Każdy widok na ekranie to View.
+      Renderuje się do UIView (iOS) lub android.view.View (Android).
+    code: |
+      import { View, StyleSheet } from 'react-native';
+
+      function Card({ children }: { children: React.ReactNode }) {
+        return (
+          <View style={styles.card}>
+            {children}
+          </View>
+        );
+      }
+
+      const styles = StyleSheet.create({
+        card: {
+          backgroundColor: '#fff',
+          borderRadius: 12,
+          padding: 16,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3, // Android shadow
+        },
+      });
+
+  - name: Text
+    desc: >
+      Jedyny komponent do wyświetlania tekstu — bez niego React Native rzuci błąd
+      jeśli spróbujesz wstawiać string bezpośrednio do View. Obsługuje zagnieżdżanie
+      (dziedziczenie stylów), onPress i numberOfLines do obcinania.
+    code: |
+      import { Text, StyleSheet } from 'react-native';
+
+      function TextExamples() {
+        return (
+          <Text style={styles.title}>
+            Tytuł{' '}
+            <Text style={styles.bold}>pogrubiony</Text>
+            {' '}koniec
+          </Text>
+        );
+      }
+
+      const styles = StyleSheet.create({
+        title: { fontSize: 18, color: '#333' },
+        bold: { fontWeight: 'bold', color: '#000' },
+      });
+
+  - name: TextInput
+    desc: >
+      Pole do wpisywania tekstu. Obsługuje keyboardType (numeric, email-address,
+      phone-pad), secureTextEntry (hasło), multiline, autoCapitalize i autoCorrect.
+      Pamiętaj o KeyboardAvoidingView żeby klawiatura nie zasłaniała pola.
+    code: |
+      import { TextInput, StyleSheet, useState } from 'react';
+      import { View } from 'react-native';
+
+      function LoginForm() {
+        const [email, setEmail] = useState('');
+        const [pass, setPass] = useState('');
+
+        return (
+          <View>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={email}
+              onChangeText={setEmail}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Hasło"
+              secureTextEntry
+              value={pass}
+              onChangeText={setPass}
+            />
+          </View>
+        );
+      }
+
+      const styles = StyleSheet.create({
+        input: {
+          borderWidth: 1,
+          borderColor: '#ddd',
+          borderRadius: 8,
+          padding: 12,
+          marginBottom: 12,
+        },
+      });
+
+  - name: ScrollView
+    desc: >
+      Kontener z przewijaniem — ładuje WSZYSTKIE dzieci jednocześnie do pamięci.
+      Dobry do krótkich list (poniżej ~50 elementów). Dla długich list używaj
+      FlatList. Obsługuje horizontal, onScroll, refreshControl i pagingEnabled.
+    code: |
+      import { ScrollView, Text, StyleSheet } from 'react-native';
+
+      function ArticleView({ content }: { content: string[] }) {
+        return (
+          <ScrollView
+            style={styles.scroll}
+            showsVerticalScrollIndicator={false}
+          >
+            {content.map((paragraph, i) => (
+              <Text key={i} style={styles.paragraph}>
+                {paragraph}
+              </Text>
+            ))}
+          </ScrollView>
+        );
+      }
+
+      const styles = StyleSheet.create({
+        scroll: { flex: 1, padding: 16 },
+        paragraph: { fontSize: 16, lineHeight: 24, marginBottom: 16 },
+      });
+
+  - name: FlatList
+    desc: >
+      Wirtualizowana lista — renderuje tylko widoczne elementy, reszta jest poza DOM.
+      Idealny do długich list danych. Wymaga data i renderItem. Wbudowany pull-to-refresh
+      przez onRefresh + refreshing, infinite scroll przez onEndReached.
+    code: |
+      import { FlatList, Text, View, StyleSheet } from 'react-native';
+
+      type Item = { id: string; title: string; subtitle: string };
+
+      function ItemList({ items }: { items: Item[] }) {
+        return (
+          <FlatList
+            data={items}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View style={styles.row}>
+                <Text style={styles.title}>{item.title}</Text>
+                <Text style={styles.sub}>{item.subtitle}</Text>
+              </View>
+            )}
+            ItemSeparatorComponent={() => <View style={styles.sep} />}
+            ListEmptyComponent={<Text>Brak elementów</Text>}
+          />
+        );
+      }
+
+      const styles = StyleSheet.create({
+        row: { padding: 16, backgroundColor: '#fff' },
+        title: { fontSize: 16, fontWeight: '600' },
+        sub: { fontSize: 14, color: '#666', marginTop: 4 },
+        sep: { height: 1, backgroundColor: '#eee' },
+      });
+
+  - name: SectionList
+    desc: >
+      Jak FlatList, ale z sekcjami i nagłówkami grup. Dane w formacie
+      [{title, data: [...]}]. Wirtualizowana — wydajna dla wielu sekcji.
+      Obsługuje sticky section headers (domyślnie na iOS).
+    code: |
+      import { SectionList, Text, View, StyleSheet } from 'react-native';
+
+      const sections = [
+        { title: 'Owoce', data: ['Jabłko', 'Banan', 'Gruszka'] },
+        { title: 'Warzywa', data: ['Marchew', 'Brokuł', 'Szpinak'] },
+      ];
+
+      function GroupedList() {
+        return (
+          <SectionList
+            sections={sections}
+            keyExtractor={(item, index) => item + index}
+            renderItem={({ item }) => (
+              <Text style={styles.item}>{item}</Text>
+            )}
+            renderSectionHeader={({ section }) => (
+              <Text style={styles.header}>{section.title}</Text>
+            )}
+          />
+        );
+      }
+
+      const styles = StyleSheet.create({
+        header: { fontSize: 14, fontWeight: 'bold', backgroundColor: '#f5f5f5', padding: 8 },
+        item: { fontSize: 16, padding: 12 },
+      });
+
+  - name: Image
+    desc: >
+      Wyświetla obrazy lokalne (require) lub zdalne (uri). Zawsze podaj width i height —
+      zdalne obrazy nie mają wymiarów z góry. resizeMode kontroluje jak obraz wypełnia
+      kontener (cover, contain, stretch). Użyj FastImage dla lepszego cachowania.
+    code: |
+      import { Image, StyleSheet } from 'react-native';
+
+      function AvatarImage({ uri }: { uri: string }) {
+        return (
+          <Image
+            source={{ uri }}
+            style={styles.avatar}
+            resizeMode="cover"
+          />
+        );
+      }
+
+      // Lokalny obraz
+      function LocalImage() {
+        return (
+          <Image
+            source={require('./assets/logo.png')}
+            style={styles.logo}
+          />
+        );
+      }
+
+      const styles = StyleSheet.create({
+        avatar: { width: 64, height: 64, borderRadius: 32 },
+        logo: { width: 120, height: 40 },
+      });
+
+  - name: Pressable
+    desc: >
+      Nowoczesny komponent do obsługi dotknięć (zalecany zamiast TouchableOpacity).
+      Obsługuje pressed state przez children jako funkcję, hitSlop (powiększenie
+      obszaru dotyku), onLongPress i delay. Działa poprawnie z nową architekturą.
+    code: |
+      import { Pressable, Text, StyleSheet } from 'react-native';
+
+      function ActionButton({
+        label,
+        onPress,
+      }: {
+        label: string;
+        onPress: () => void;
+      }) {
+        return (
+          <Pressable
+            style={({ pressed }) => [
+              styles.button,
+              pressed && styles.pressed,
+            ]}
+            onPress={onPress}
+            hitSlop={8}
+          >
+            {({ pressed }) => (
+              <Text style={[styles.label, pressed && styles.pressedLabel]}>
+                {label}
+              </Text>
+            )}
+          </Pressable>
+        );
+      }
+
+      const styles = StyleSheet.create({
+        button: { backgroundColor: '#61dafb', padding: 14, borderRadius: 8 },
+        pressed: { opacity: 0.75, transform: [{ scale: 0.97 }] },
+        label: { fontSize: 16, fontWeight: '600', textAlign: 'center' },
+        pressedLabel: { color: '#fff' },
+      });
+
+  - name: Modal
+    desc: >
+      Nakładka modalna wyświetlana nad aktualnym widokiem. visible kontroluje
+      widoczność, animationType ustawia animację (slide, fade, none).
+      onRequestClose jest wymagane na Androidzie (przycisk back). Używaj
+      dla dialogów, bottom sheet lub fullscreen overlay.
+    code: |
+      import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
+      import { useState } from 'react';
+
+      function ConfirmModal() {
+        const [visible, setVisible] = useState(false);
+
+        return (
+          <>
+            <Pressable onPress={() => setVisible(true)}>
+              <Text>Otwórz modal</Text>
+            </Pressable>
+            <Modal
+              visible={visible}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setVisible(false)}
+            >
+              <View style={styles.backdrop}>
+                <View style={styles.box}>
+                  <Text style={styles.title}>Potwierdź akcję</Text>
+                  <Pressable onPress={() => setVisible(false)}>
+                    <Text>Zamknij</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </Modal>
+          </>
+        );
+      }
+
+      const styles = StyleSheet.create({
+        backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+        box: { backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '80%' },
+        title: { fontSize: 18, fontWeight: '600', marginBottom: 16 },
+      });
+
+  - name: ActivityIndicator
+    desc: >
+      Wbudowany spinner ładowania — natywny wygląd na każdej platformie.
+      size przyjmuje 'small' lub 'large'. color ustawia kolor (domyślnie szary).
+      Użyj razem z warunkiem loading do pokazania stanu ładowania.
+    code: |
+      import { ActivityIndicator, View, Text, StyleSheet } from 'react-native';
+
+      function LoadingState({ loading }: { loading: boolean }) {
+        if (!loading) return null;
+        return (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color="#61dafb" />
+            <Text style={styles.text}>Ładowanie...</Text>
+          </View>
+        );
+      }
+
+      const styles = StyleSheet.create({
+        center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+        text: { marginTop: 12, color: '#666' },
+      });
+
+  - name: KeyboardAvoidingView
+    desc: >
+      Automatycznie przesuwa widok gdy pojawia się klawiatura — zapobiega
+      zasłanianiu pól TextInput. behavior różni się między platformami:
+      'padding' dla iOS, 'height' lub 'position' dla Android.
+      Zawsze opakuj formularze w KeyboardAvoidingView.
+    code: |
+      import {
+        KeyboardAvoidingView,
+        ScrollView,
+        TextInput,
+        Platform,
+        StyleSheet,
+      } from 'react-native';
+
+      function FormScreen() {
+        return (
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <ScrollView contentContainerStyle={styles.form}>
+              <TextInput style={styles.input} placeholder="Imię" />
+              <TextInput style={styles.input} placeholder="Email" />
+              <TextInput style={styles.input} placeholder="Wiadomość" multiline />
+            </ScrollView>
+          </KeyboardAvoidingView>
+        );
+      }
+
+      const styles = StyleSheet.create({
+        form: { padding: 16 },
+        input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, marginBottom: 12 },
+      });

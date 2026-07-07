@@ -1,0 +1,66 @@
+title: Nuxt vs alternatywy full-stack
+
+items:
+  - name: Next.js
+    icon: "▲"
+    color: "#000000"
+    tagline: "React meta-framework — SSR, SSG, App Router, Server Actions"
+    pros:
+      - Największa społeczność i ekosystem — najwięcej zasobów, tutoriali, pracy
+      - App Router z React Server Components — zero JavaScript dla statycznych komponentów
+      - Server Actions — mutacje bezpośrednio z komponentów bez osobnego API route
+      - Vercel integration — zero-config deploy, Edge Functions, Image Optimization
+    cons:
+      - React — więcej boilerplate niż Vue (JSX, hooks rules, no two-way binding)
+      - App Router vs Pages Router — podział ekosystemu, starsza dokumentacja myli
+      - React Server Components learning curve — nowy mental model, wiele rzeczy nie działa
+      - Vendor lock z Vercel — optymalne tylko na ich infrastrukturze
+    vs: Next.js gdy pracujesz z React lub Twoim zespołem jest React. Nuxt gdy preferujesz Vue — prostszy mental model, lepszy DX dla wielu deweloperów.
+
+  - name: SvelteKit
+    icon: "🔥"
+    color: "#ff3e00"
+    tagline: "Svelte full-stack — kompilowany do vanilla JS, zero runtime"
+    pros:
+      - Najmniejszy bundle — Svelte kompiluje do czystego JS, zero Virtual DOM
+      - Najlepsza wydajność runtime — brak overhead frameworka
+      - Prostsze API niż Vue/React — mniej kodu dla tej samej funkcji
+      - Wbudowane form actions — mutacje bez JavaScript (jak PHP, ale nowocześnie)
+    cons:
+      - Mniejsza społeczność i ekosystem niż Vue/React
+      - Mniej bibliotek UI (Svelte nie ma ekwiwalentu Vuetify, shadcn-vue)
+      - Mniej ofert pracy — niszowy na rynku
+      - Svelte 4 vs 5 (Runes) — duża zmiana API, ekosystem w przejściu
+    vs: SvelteKit gdy zależy Ci na minimalnym bundle i wydajności. Nuxt gdy potrzebujesz bogatego ekosystemu Vue i więcej dostępnych deweloperów na rynku.
+
+  - name: Remix
+    icon: "💿"
+    color: "#121212"
+    tagline: "React full-stack z naciskiem na web standards i progressive enhancement"
+    pros:
+      - Nested routes z nested data loading — każdy segment URL ładuje własne dane równolegle
+      - Form actions wbudowane — POST bez JavaScript (progressive enhancement)
+      - Web standards first — Request/Response, FormData, URL — natywne API
+      - Error boundaries per-route — błąd w jednej sekcji nie psuje całej strony
+    cons:
+      - React ecosystem — te same wady co Next.js (JSX, hooks)
+      - Mniejsza społeczność niż Next.js
+      - Nested routes mogą być skomplikowane przy głębokich strukturach
+      - Mniej popularny na rynku pracy — rzadziej wymagany w ogłoszeniach
+    vs: Remix gdy budujesz aplikację intensywnie korzystającą z formularzy i mutacji. Nuxt gdy preferujesz Vue i prostszy model danych.
+
+  - name: Astro
+    icon: "🚀"
+    color: "#ff5d01"
+    tagline: "Static-first — minimalne JavaScript, Multi-framework, Content-focused"
+    pros:
+      - Zero JavaScript domyślnie — HTML + CSS only, JS tylko gdy potrzebne (islands)
+      - Multi-framework — komponenty Vue, React, Svelte, Lit w jednym projekcie
+      - Content Collections — type-safe markdown/MDX dla blogów i dokumentacji
+      - Najlepsze Core Web Vitals — minimalne JS = najszybsze ładowanie
+    cons:
+      - Nie nadaje się do interaktywnych aplikacji (dashboard, SaaS)
+      - Brak wbudowanego state managementu — islands są izolowane
+      - Brak server routes w stylu Nuxt — limited server-side logic
+      - Dynamiczne strony (auth, personalizacja) wymagają obejść
+    vs: Astro dla statycznych stron, blogów, dokumentacji — gdzie treść ważniejsza od interaktywności. Nuxt dla pełnych aplikacji z autentykacją, dashboardami i złożonym UI.

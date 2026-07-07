@@ -1,0 +1,303 @@
+labels:
+  main: Konfiguracja turbo.json — pipeline i taski
+  mainLang: json
+
+intro:
+  title: turbo.json — definiujesz graf zadań
+  desc: >
+    turbo.json to serce konfiguracji Turborepo. Definiujesz w nim "tasks"
+    (Turborepo v2+, dawniej "pipeline") — mapę zadań i ich zależności. Turbo czyta
+    ten plik, buduje graf zależności między zadaniami we wszystkich workspace i na
+    tej podstawie decyduje co uruchomić równolegle, co musi czekać, co cache'ować
+    i jakie pliki wpływają na wynik. Jeden plik turbo.json w root — zarządza
+    wszystkimi workspace w monorepo.
+
+items:
+  - title: Podstawowa konfiguracja tasks
+    desc: >
+      turbo.json z podstawowymi zadaniami. Od Turborepo v2 używamy klucza "tasks"
+      zamiast "pipeline". Każde zadanie jest kluczem. Wartości opisują zależności,
+      cache i wyjścia. Turborepo automatycznie odkrywa zadania we wszystkich workspace.
+    code: |
+      {
+        "$schema": "https://turbo.build/schema.json",
+        "tasks": {
+          "build": {
+            "dependsOn": ["^build"],
+            "outputs": ["dist/**", ".next/**"]
+          },
+          "test": {
+            "dependsOn": ["build"],
+            "outputs": ["coverage/**"]
+          },
+          "lint": {
+            "outputs": []
+          },
+          "dev": {
+            "cache": false,
+            "persistent": true
+          }
+        }
+      }
+    lang: json
+
+  - title: dependsOn — zależności między zadaniami
+    desc: >
+      dependsOn definiuje co musi być gotowe przed uruchomieniem zadania.
+      Prefix "^" oznacza zależność od tego samego zadania w pakietach upstream
+      (zależnościach workspace). Bez "^" — zależność w tym samym workspace.
+      Pusta tablica — brak zależności, uruchamiane zawsze maksymalnie równolegle.
+    code: |
+      {
+        "tasks": {
+          "build": {
+            // "^build" = najpierw uruchom "build" we wszystkich
+            // zależnościach tego workspace (topologicznie)
+            "dependsOn": ["^build"]
+          },
+          "test": {
+            // Bez "^" = najpierw uruchom "build" w TYM SAMYM workspace
+            "dependsOn": ["build"]
+          },
+          "deploy": {
+            // Możesz mieszać — najpierw build zależności, potem test lokalny
+            "dependsOn": ["^build", "test"]
+          },
+          "lint": {
+            // Pusta tablica = brak zależności → zawsze równolegle
+            "dependsOn": []
+          },
+          "type-check": {
+            // Zależy od build zależności (typy muszą być wygenerowane)
+            "dependsOn": ["^build"]
+          }
+        }
+      }
+    lang: json
+
+  - title: cache — kontrola cachowania
+    desc: >
+      cache true (domyślnie) — Turborepo zapisuje wyniki zadania w cache.
+      Przy kolejnym uruchomieniu z tymi samymi wejściami odtwarza z cache.
+      cache false — zawsze wykonuj od nowa. Używaj dla deploy, notify, czyszczenia.
+    code: |
+      {
+        "tasks": {
+          "build": {
+            "dependsOn": ["^build"],
+            "cache": true,           // domyślnie true, można pominąć
+            "outputs": ["dist/**"]
+          },
+          "test": {
+            "cache": true,
+            "outputs": ["coverage/**"]
+          },
+          "deploy": {
+            // Deploy NIE powinien być cache'owany
+            "cache": false,
+            "dependsOn": ["build", "test"]
+          },
+          "notify-slack": {
+            // Powiadomienia nie mają sensu z cache
+            "cache": false
+          },
+          "dev": {
+            // Serwer deweloperski — bez cache, persistent
+            "cache": false,
+            "persistent": true
+          }
+        }
+      }
+    lang: json
+
+  - title: inputs — co triggeruje rebuild
+    desc: >
+      inputs definiuje które pliki wpływają na hash cache zadania. Domyślnie
+      Turborepo bierze wszystkie git-tracked pliki workspace. Zawężenie inputs
+      pozwala uniknąć zbędnych rebuilds — testy odpalaą się tylko gdy zmienią
+      się pliki .ts, nie gdy zmienisz README.md lub komentarz w dokumentacji.
+    code: |
+      {
+        "tasks": {
+          "test": {
+            "dependsOn": ["^build"],
+            "inputs": [
+              "src/**/*.ts",
+              "src/**/*.tsx",
+              "test/**/*.ts",
+              "jest.config.js",
+              "tsconfig.json"
+            ],
+            "outputs": ["coverage/**"]
+          },
+          "lint": {
+            // Lint triggeruje się tylko gdy zmienią się pliki TS/TSX lub config ESLint
+            "inputs": [
+              "src/**/*.{ts,tsx}",
+              ".eslintrc.*",
+              "eslint.config.*"
+            ],
+            "outputs": []
+          },
+          "build": {
+            "dependsOn": ["^build"],
+            "inputs": [
+              "src/**",
+              "public/**",
+              "package.json",
+              "tsconfig.json",
+              "next.config.*"
+            ],
+            "outputs": [".next/**", "!.next/cache/**"]
+          }
+        }
+      }
+    lang: json
+
+  - title: outputs — co jest cachowane
+    desc: >
+      outputs to lista plików i katalogów które Turborepo zapisuje w cache
+      po wykonaniu zadania. Przy cache hit — te pliki są odtwarzane z cache
+      zamiast wykonywać zadanie od nowa. Używaj glob patterns. Prefix "!" wyklucza
+      pliki z cache (np. wewnętrzny cache Next.js jest zbyt duży).
+    code: |
+      {
+        "tasks": {
+          "build": {
+            "dependsOn": ["^build"],
+            "outputs": [
+              "dist/**",           // skompilowane pliki biblioteki
+              ".next/**",          // build Next.js
+              "!.next/cache/**"    // wyklucz wewnętrzny cache Next.js
+            ]
+          },
+          "test": {
+            "outputs": [
+              "coverage/**",       // raport pokrycia kodu
+              "test-results/**"    // wyniki testów (JUnit XML)
+            ]
+          },
+          "compile-types": {
+            "outputs": [
+              "*.d.ts",
+              "dist/**/*.d.ts"
+            ]
+          },
+          "lint": {
+            // Lint nie produkuje plików — pusta lista
+            "outputs": []
+          }
+        }
+      }
+    lang: json
+
+  - title: env — zmienne środowiskowe w kluczu cache
+    desc: >
+      env definiuje które zmienne środowiskowe wpływają na hash cache zadania.
+      Jeśli wartość zmiennej się zmieni — cache miss, rebuild. Krytyczne gdy
+      budujesz dla różnych środowisk (dev/staging/prod) — NEXT_PUBLIC_API_URL
+      różne dla każdego środowiska musi dawać różne cache entries.
+    code: |
+      {
+        "tasks": {
+          "build": {
+            "dependsOn": ["^build"],
+            "env": [
+              "NODE_ENV",
+              "NEXT_PUBLIC_API_URL",
+              "NEXT_PUBLIC_ANALYTICS_ID",
+              "NEXT_PUBLIC_FEATURE_FLAGS"
+            ],
+            "outputs": [".next/**", "!.next/cache/**"]
+          },
+          "test": {
+            "env": ["NODE_ENV", "TEST_DATABASE_URL"],
+            "outputs": ["coverage/**"]
+          }
+        },
+        // Globalne env dla WSZYSTKICH tasków — nie trzeba powtarzać
+        "globalEnv": [
+          "CI",
+          "NODE_VERSION"
+        ],
+        // Globalne zależności — zmiana tych plików invaliduje CAŁY cache
+        "globalDependencies": [
+          ".env",
+          "turbo.json"
+        ]
+      }
+    lang: json
+
+  - title: persistent — long-running tasks (dev servers)
+    desc: >
+      persistent true oznacza że zadanie nigdy nie kończy się samo — dev server,
+      file watcher. Turborepo nie czeka na jego zakończenie i nie blokuje innych
+      zadań. Zadania persistentne nie mogą być zależnościami innych zadań
+      (nie możesz: "build" dependsOn ["dev"]).
+    code: |
+      {
+        "tasks": {
+          "dev": {
+            "cache": false,
+            "persistent": true
+            // Turborepo uruchamia to w tle i nie czeka na zakończenie
+          },
+          "storybook": {
+            "cache": false,
+            "persistent": true
+          },
+          "watch": {
+            "cache": false,
+            "persistent": true
+          }
+        }
+      }
+
+      // Uruchomienie persistent tasków:
+      // turbo dev                 → dev we wszystkich workspace równolegle
+      // turbo dev --filter=web    → tylko w workspace "web"
+      // turbo dev --filter={apps/*} → tylko aplikacje
+    lang: json
+
+  - title: Kompletna konfiguracja — przykład produkcyjny
+    desc: >
+      Kompletny turbo.json dla monorepo z aplikacją Next.js, bibliotekami UI
+      i paczkami z typami. Pokazuje kombinację wszystkich opcji w jednym pliku.
+    code: |
+      {
+        "$schema": "https://turbo.build/schema.json",
+        "globalEnv": ["NODE_ENV", "CI"],
+        "globalDependencies": [".env", "turbo.json"],
+        "tasks": {
+          "build": {
+            "dependsOn": ["^build"],
+            "env": ["NEXT_PUBLIC_API_URL", "NEXT_PUBLIC_APP_ENV"],
+            "inputs": ["src/**", "public/**", "package.json", "tsconfig.json"],
+            "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+          },
+          "test": {
+            "dependsOn": ["^build"],
+            "env": ["NODE_ENV", "TEST_DATABASE_URL"],
+            "inputs": ["src/**", "test/**", "jest.config.*"],
+            "outputs": ["coverage/**"]
+          },
+          "lint": {
+            "dependsOn": [],
+            "inputs": ["src/**/*.{ts,tsx}", "eslint.config.*", ".eslintrc.*"],
+            "outputs": []
+          },
+          "type-check": {
+            "dependsOn": ["^build"],
+            "inputs": ["src/**/*.{ts,tsx}", "tsconfig*.json"],
+            "outputs": []
+          },
+          "dev": {
+            "cache": false,
+            "persistent": true
+          },
+          "clean": {
+            "cache": false
+          }
+        }
+      }
+    lang: json

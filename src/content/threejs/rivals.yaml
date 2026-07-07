@@ -1,0 +1,67 @@
+title: Three.js vs inne biblioteki 3D
+
+items:
+  - name: Babylon.js
+    icon: "🏺"
+    color: "#BB464B"
+    tagline: Pełny silnik 3D/gier od Microsoftu — baterie w zestawie
+    pros:
+      - Pełny silnik z wbudowaną fizyką, kolizjami, GUI, audio, animacjami
+      - Oficjalne wsparcie Microsoftu — długoterminowo stabilne
+      - TypeScript first — świetne typy od początku
+      - Babylon Playground — testuj kod online w sekundę
+      - Lepszy performance na złożonych scenach gier
+    cons:
+      - Większy bundle niż Three.js
+      - Mniejsza społeczność i mniej tutoriali
+      - Bardziej opinionated — trudniej wyjść poza standardowy workflow
+      - Mniej zasobów (assets, shaderów) dostosowanych do niego
+    vs: Babylon.js jest lepszy gdy budujesz grę (wbudowana fizyka, kolizje, AI). Three.js wygrywa gdy budujesz wizualizację lub chcesz pełną kontrolę. Three.js ma 5× większą społeczność i ekosystem.
+
+  - name: PlayCanvas
+    icon: "🎮"
+    color: "#F60"
+    tagline: Silnik gier 3D z chmurowym edytorem wizualnym
+    pros:
+      - Wbudowany edytor w przeglądarce — praca zespołowa w chmurze
+      - Doskonały do gier mobilnych i reklam interaktywnych
+      - Wbudowany asset pipeline, fizyka (Ammo.js), audio, UI
+      - WebXR (VR/AR) support out of the box
+    cons:
+      - Wymaga edytora PlayCanvas lub płatny plan dla pełnych ficzerów
+      - Open-source ale model biznesowy chmurowy = vendor lock-in
+      - Mniejsza społeczność od Three.js
+      - API bardziej skomplikowane niż Three.js dla prostych projektów
+    vs: PlayCanvas świeci gdy masz team i budujesz grę z edytorem. Three.js jest prostszy dla deweloperów-programistów i wizualizacji. Do hobby i nauki — Three.js bezkonkurencyjny.
+
+  - name: A-Frame
+    icon: "🥽"
+    color: "#EF2D5E"
+    tagline: HTML-based WebXR framework — 3D bez JavaScript
+    pros:
+      - Deklaratywny HTML — <a-box color="red"> zamiast kodu JS
+      - Zbudowany na Three.js — pełna kompatybilność
+      - WebVR/WebXR first — najłatwiejszy start z VR
+      - Dostępny dla niedewelopera (HTML skills wystarczą)
+    cons:
+      - Ograniczona kontrola dla zaawansowanych zastosowań
+      - Słaba wydajność przy złożonych scenach
+      - Mała kontrola nad pętlą renderowania i optymalizacją
+      - Entity-Component system trudny do debugowania
+    vs: A-Frame = Three.js dla niedewelopera. Jeśli znasz JS — pomiń A-Frame i ucz Three.js bezpośrednio. A-Frame dobre do szybkich prototypów VR i edukacji, nie do produkcji.
+
+  - name: WebGPU / WGPU (raw)
+    icon: "⚡"
+    color: "#005A9C"
+    tagline: Niskopoziomowe API GPU nowej generacji w przeglądarce
+    pros:
+      - Najlepsza możliwa wydajność — bezpośredni dostęp do GPU
+      - Nowoczesne API (compute shaders, ray tracing w przyszłości)
+      - Pełna kontrola nad pipeline renderowania
+      - Three.js i Babylon.js dodają WebGPU backend — możesz korzystać przez nie
+    cons:
+      - Wsparcie przeglądarek wciąż ograniczone (Chrome 113+, Firefox eksperymentalnie)
+      - Ogromna krzywa uczenia — WGSL shader language, pipeline setup
+      - Dużo kodu boilerplate nawet dla trójkąta
+      - Mała liczba tutoriali i zasobów
+    vs: WebGPU raw to jak pisanie OpenGL bez biblioteki — możliwe ale brutal. Używaj Three.js r163+ z WebGPU backend dla przyszłościowości bez bólu głowy. Do nauki GPU programming — WebGPU Samples.

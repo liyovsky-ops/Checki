@@ -1,0 +1,99 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Firebase?
+  firstComponent: Konfiguracja Firebase SDK
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Firebase?
+  desc: >
+    Firebase to platforma BaaS (Backend as a Service) od Google, która dostarcza gotowe
+    backendowe usługi: bazę danych (Firestore, Realtime Database), uwierzytelnianie (Auth),
+    przechowywanie plików (Storage), serverless funkcje (Cloud Functions) i hosting.
+    Dzięki modularowemu SDK v9+ importujesz tylko to czego używasz — tree-shakeable,
+    mniejszy bundle. Idealne dla aplikacji MVP, startupów i projektów gdzie chcesz
+    skupić się na frontendzie bez zarządzania infrastrukturą.
+
+concepts:
+  - title: Projekt Firebase
+    desc: >
+      Wszystko zaczyna się od projektu Firebase w konsoli (console.firebase.google.com).
+      Projekt grupuje wszystkie usługi (Firestore, Auth, Storage) i zawiera konfigurację
+      SDK (apiKey, projectId, storageBucket itp.). Jeden projekt może obsługiwać wiele
+      platform (web, iOS, Android).
+    icon: "🏗️"
+  - title: Modularny SDK v9+
+    desc: >
+      Firebase v9+ (modular API) używa tree-shakeable importów — importujesz tylko
+      używane funkcje. Zamiast firebase.firestore().collection() piszesz collection(db, 'users').
+      Drastycznie zmniejsza rozmiar bundle. Stary SDK (compat) jest dostępny dla migracji
+      ale nowe projekty zawsze powinny używać modular API.
+    icon: "📦"
+  - title: Firestore
+    desc: >
+      Cloud Firestore to NoSQL baza dokumentów (document-oriented). Dane są pogrupowane
+      w kolekcje (collections) i dokumenty (documents). Każdy dokument to JSON-like
+      obiekt z polami. Wsparcie dla subcollections, real-time listeners, transakcji
+      i zaawansowanych zapytań (filtrowanie, sortowanie, stronicowanie).
+    icon: "🗄️"
+  - title: Firebase Auth
+    desc: >
+      Gotowy system uwierzytelniania z obsługą email/hasło, Google, GitHub, Facebook,
+      Apple, SMS i custom tokens. onAuthStateChanged nasłuchuje zmiany stanu logowania.
+      Integruje się z Firestore Rules — możesz ograniczać dostęp do dokumentów
+      do zalogowanego użytkownika (request.auth.uid).
+    icon: "🔐"
+  - title: Emulatory lokalne
+    desc: >
+      Firebase Local Emulator Suite pozwala rozwijać aplikację lokalnie bez kosztów
+      i połączenia z produkcją. Emulatory Firestore, Auth, Storage, Functions działają
+      na localhost. Idealne do testowania reguł bezpieczeństwa i Cloud Functions.
+    icon: "💻"
+  - title: Reguły bezpieczeństwa
+    desc: >
+      Firebase Security Rules kontrolują kto może czytać/pisać dane w Firestore i Storage.
+      Reguły działają server-side — nie można ich obejść z klienta. Przykład:
+      allow read, write: if request.auth != null — tylko zalogowani użytkownicy mają dostęp.
+    icon: "🛡️"
+
+whenToUse:
+  - MVP i startupy — szybki start bez zarządzania infrastrukturą
+  - Aplikacje real-time — czat, dashboard, live updates przez onSnapshot
+  - Mobile-first projekty — Firebase jest standardem w React Native i Flutter
+  - Małe i średnie projekty gdzie koszty Firestore są akceptowalne
+  - Prototypy i hackathony — gotowe Auth, DB, Storage w godzinę
+  - Aplikacje z Social Login (Google, GitHub, Apple)
+
+firstComponent: |
+  // 1. Instalacja
+  npm install firebase
+
+  // 2. Konfiguracja (src/firebase.ts)
+  import { initializeApp } from 'firebase/app';
+  import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+  import { getAuth, connectAuthEmulator } from 'firebase/auth';
+  import { getStorage, connectStorageEmulator } from 'firebase/storage';
+
+  const firebaseConfig = {
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: "my-project.firebaseapp.com",
+    projectId: "my-project",
+    storageBucket: "my-project.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abc123"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  export const db = getFirestore(app);
+  export const auth = getAuth(app);
+  export const storage = getStorage(app);
+
+  // 3. Emulatory (tylko w development)
+  if (import.meta.env.DEV) {
+    connectFirestoreEmulator(db, 'localhost', 8080);
+    connectAuthEmulator(auth, 'http://localhost:9099');
+    connectStorageEmulator(storage, 'localhost', 9199);
+  }
+
+  // 4. Uruchom emulatory
+  // firebase emulators:start

@@ -1,0 +1,280 @@
+title: Modele Pydantic — wzorce i architektura
+
+labels:
+  items: Wzorce modeli
+
+intro: >
+  BaseModel to fundament Pydantic — klasa bazowa dla wszystkich modeli.
+  Pydantic v2 oferuje dziedziczenie, modele generyczne, discriminated unions,
+  computed fields i bogatą konfigurację przez model_config. Każdy model
+  generuje JSON Schema dostępne przez Model.model_json_schema().
+
+items:
+  - name: Dziedziczenie modeli
+    desc: >
+      Modele Pydantic dziedziczą pola i walidatory z klas bazowych.
+      Możesz nadpisać pole w podklasie — nowy typ musi być zgodny z Liskov.
+      Idealne do tworzenia hierarchii: BaseEntity → User, Product, Order.
+    code: |
+      from pydantic import BaseModel
+      from datetime import datetime
+
+      class BaseEntity(BaseModel):
+          id: int
+          created_at: datetime
+          updated_at: datetime
+
+      class User(BaseEntity):
+          name: str
+          email: str
+          is_active: bool = True
+
+      class AdminUser(User):
+          permissions: list[str] = []
+          admin_level: int = 1
+
+      admin = AdminUser(
+          id=1, name="Łukasz",
+          email="l@example.com",
+          created_at=datetime.now(),
+          updated_at=datetime.now(),
+          permissions=["read", "write", "delete"],
+      )
+      print(admin.model_fields.keys())  # wszystkie pola z całej hierarchii
+
+  - name: Opcjonalne pola vs None
+    desc: >
+      Optional[X] = X | None — pole może być None. Default = None.
+      Bez Optional — pole jest wymagane i nie może być None.
+      X | None bez default — pole wymagane ale dopuszcza None.
+      Różnica ważna: Optional[str] = None to inne niż str | None (wymagane).
+    code: |
+      from pydantic import BaseModel
+      from typing import Optional
+
+      class Profile(BaseModel):
+          name: str                        # wymagane, nie może być None
+          bio: Optional[str] = None        # opcjonalne, domyślnie None
+          avatar_url: str | None = None    # to samo co wyżej (Python 3.10+)
+          nickname: str | None             # WYMAGANE ale może być None
+
+      # Poprawne
+      p1 = Profile(name="Łukasz", nickname=None)
+      p2 = Profile(name="Łukasz", bio="Dev", nickname="Luke")
+
+      # Błąd — nickname jest wymagane
+      # p3 = Profile(name="Łukasz")  → ValidationError
+
+  - name: Union types i discriminated unions
+    desc: >
+      Union[A, B] lub A | B waliduje pierwsze pasujące. Discriminated union
+      używa jednego pola (discriminator) do wyboru modelu — szybsze i czytelniejsze.
+      Pydantic v2 obsługuje Literal jako discriminator.
+    code: |
+      from pydantic import BaseModel, Field
+      from typing import Union, Literal
+
+      class Cat(BaseModel):
+          type: Literal["cat"]
+          indoor: bool
+
+      class Dog(BaseModel):
+          type: Literal["dog"]
+          breed: str
+
+      class Bird(BaseModel):
+          type: Literal["bird"]
+          can_talk: bool
+
+      # Discriminated union — Pydantic sprawdza tylko "type" żeby wybrać model
+      class Pet(BaseModel):
+          pet: Union[Cat, Dog, Bird] = Field(discriminator="type")
+
+      p = Pet(pet={"type": "dog", "breed": "Labrador"})
+      print(type(p.pet))  # <class 'Dog'>
+      print(p.pet.breed)  # Labrador
+
+  - name: Generic models — Generic[T]
+    desc: >
+      Modele generyczne pozwalają tworzyć szablony — np. Paginated[User],
+      ApiResponse[List[Product]]. Dziedzicz po BaseModel i Generic[T].
+      TypeVar definiuje parametr typowy.
+    code: |
+      from pydantic import BaseModel
+      from typing import Generic, TypeVar, Optional
+
+      T = TypeVar("T")
+
+      class ApiResponse(BaseModel, Generic[T]):
+          data: T
+          total: int
+          page: int
+          per_page: int
+          next_page: Optional[int] = None
+
+      class User(BaseModel):
+          id: int
+          name: str
+
+      class Product(BaseModel):
+          id: int
+          title: str
+          price: float
+
+      # Konkretne instancje generycznego modelu
+      users_response = ApiResponse[list[User]](
+          data=[User(id=1, name="Łukasz")],
+          total=1, page=1, per_page=20
+      )
+
+      products_response = ApiResponse[list[Product]](
+          data=[Product(id=1, title="Kurs", price=99.0)],
+          total=1, page=1, per_page=20
+      )
+
+  - name: model_config — konfiguracja modelu
+    desc: >
+      model_config = ConfigDict(...) zastępuje class Config z v1.
+      Kluczowe opcje: from_attributes (ORM), extra ("forbid"/"ignore"/"allow"),
+      frozen (immutable), populate_by_name (obsługa alias i nazwy jednocześnie).
+    code: |
+      from pydantic import BaseModel, ConfigDict
+
+      class UserORM(BaseModel):
+          model_config = ConfigDict(
+              from_attributes=True,   # SQLAlchemy ORM objects → Pydantic
+              extra="forbid",         # błąd gdy nieznane pole
+              frozen=True,            # immutable — nie można zmieniać atrybutów
+              populate_by_name=True,  # alias I oryginalna nazwa działają
+          )
+
+          id: int
+          name: str
+
+      # from_attributes — konwersja z ORM
+      class FakeSQLUser:
+          id = 1
+          name = "Łukasz"
+
+      user = UserORM.model_validate(FakeSQLUser(), from_attributes=True)
+      print(user.id)    # 1
+
+      # frozen=True — błąd przy próbie zmiany
+      # user.name = "Jan"  → ValidationError: Instance is frozen
+
+  - name: Computed fields — @computed_field
+    desc: >
+      @computed_field dekorator tworzy pole obliczane na podstawie innych pól.
+      Uwzględniane w model_dump() i JSON Schema. Nie przyjmuje wartości przy inicjalizacji.
+      Zastępuje @property gdy chcesz żeby pole było w serializacji.
+    code: |
+      from pydantic import BaseModel, computed_field
+
+      class Rectangle(BaseModel):
+          width: float
+          height: float
+
+          @computed_field
+          @property
+          def area(self) -> float:
+              return self.width * self.height
+
+          @computed_field
+          @property
+          def perimeter(self) -> float:
+              return 2 * (self.width + self.height)
+
+      r = Rectangle(width=4.0, height=3.0)
+      print(r.area)       # 12.0
+      print(r.perimeter)  # 14.0
+      print(r.model_dump())
+      # {'width': 4.0, 'height': 3.0, 'area': 12.0, 'perimeter': 14.0}
+
+  - name: Zagnieżdżone modele i listy
+    desc: >
+      Pola mogą być innymi modelami Pydantic — walidacja kaskadowa.
+      list[SubModel], dict[str, SubModel] — Pydantic waliduje każdy element.
+      Zagnieżdżone modele można tworzyć z dict lub z instancji.
+    code: |
+      from pydantic import BaseModel
+      from typing import Optional
+
+      class Address(BaseModel):
+          street: str
+          city: str
+          country: str = "PL"
+
+      class Order(BaseModel):
+          product_id: int
+          quantity: int
+          price: float
+
+      class Customer(BaseModel):
+          id: int
+          name: str
+          address: Address
+          orders: list[Order] = []
+          metadata: dict[str, str] = {}
+
+      customer = Customer(
+          id=1,
+          name="Łukasz",
+          address={"street": "Krakowska 1", "city": "Kraków"},  # dict → Address
+          orders=[
+              {"product_id": 10, "quantity": 2, "price": 49.99},
+          ],
+      )
+      print(customer.address.city)         # Kraków
+      print(customer.orders[0].price)      # 49.99
+
+  - name: model_rebuild i forward references
+    desc: >
+      Gdy modele odwołują się do siebie (rekurencja) lub są definiowane w złej kolejności
+      — użyj model_rebuild() po zdefiniowaniu wszystkich klas. Annotations jako string
+      ('ClassName') pozwalają na forward references.
+    code: |
+      from __future__ import annotations
+      from pydantic import BaseModel
+      from typing import Optional
+
+      class TreeNode(BaseModel):
+          value: int
+          left: Optional[TreeNode] = None   # forward reference — działa dzięki annotations
+          right: Optional[TreeNode] = None
+
+      # Potrzebne gdy używasz from __future__ import annotations
+      TreeNode.model_rebuild()
+
+      tree = TreeNode(
+          value=1,
+          left=TreeNode(value=2, left=TreeNode(value=4)),
+          right=TreeNode(value=3),
+      )
+      print(tree.left.left.value)   # 4
+
+  - name: model_copy — modyfikacja immutable modeli
+    desc: >
+      model_copy(update={...}) tworzy kopię z podmienionymi polami.
+      Niezbędne gdy model jest frozen=True. Shallow copy — zagnieżdżone obiekty
+      są współdzielone. model_copy(deep=True) robi deep copy.
+    code: |
+      from pydantic import BaseModel, ConfigDict
+
+      class Config(BaseModel):
+          model_config = ConfigDict(frozen=True)
+
+          host: str
+          port: int
+          debug: bool = False
+
+      prod = Config(host="prod.example.com", port=5432)
+
+      # Kopia z podmienionymi polami
+      dev = prod.model_copy(update={"host": "localhost", "debug": True})
+
+      print(prod.host)  # prod.example.com
+      print(dev.host)   # localhost
+      print(dev.debug)  # True
+
+      # prod nadal niezmieniony
+      # prod.host = "x"  → ValidationError: Instance is frozen

@@ -1,0 +1,304 @@
+title: Middleware w Hono
+
+items:
+  - name: Jak działa middleware w Hono
+    desc: >
+      Middleware w Hono to async (c, next) => {}. await next() wywołuje następny
+      middleware lub handler. Kod przed next() = faza "before", kod po = faza "after".
+      Wzorzec cebuli — każdy middleware owija poprzedni.
+    code: |
+      import { Hono } from 'hono'
+
+      const app = new Hono()
+
+      // Middleware globalny — na każdy request
+      app.use('*', async (c, next) => {
+        const start = Date.now()
+        console.log(`→ ${c.req.method} ${c.req.url}`)
+
+        await next()  // wywołaj następny middleware/handler
+
+        // Kod po next() — po odpowiedzi
+        const ms = Date.now() - start
+        console.log(`← ${c.res.status} ${ms}ms`)
+      })
+
+      app.get('/', (c) => c.text('Hello!'))
+      export default app
+    lang: typescript
+
+  - name: cors() — Cross-Origin Resource Sharing
+    desc: >
+      Wbudowany middleware CORS z hono/cors. Konfiguracja origins, methods, headers,
+      credentials, max age. Bez konfiguracji = allow all (tylko dev!).
+    code: |
+      import { Hono } from 'hono'
+      import { cors } from 'hono/cors'
+
+      const app = new Hono()
+
+      // Allow all origins — tylko development!
+      app.use('*', cors())
+
+      // Produkcja — konkretne origins
+      app.use('/api/*', cors({
+        origin: ['https://myapp.com', 'https://admin.myapp.com'],
+        allowMethods: ['GET', 'POST', 'PUT', 'DELETE'],
+        allowHeaders: ['Content-Type', 'Authorization'],
+        credentials: true,
+        maxAge: 600,
+      }))
+
+      app.get('/api/data', (c) => c.json({ data: 'ok' }))
+      export default app
+    lang: typescript
+
+  - name: logger() — HTTP request logger
+    desc: >
+      Wbudowany logger z hono/logger. Loguje metodę, URL, status i czas odpowiedzi.
+      Kolorowy output w terminalu. Można podać własną funkcję logującą.
+    code: |
+      import { Hono } from 'hono'
+      import { logger } from 'hono/logger'
+
+      const app = new Hono()
+
+      // Domyślny logger — kolorowy output
+      app.use('*', logger())
+
+      // Custom logger function
+      app.use('*', logger((str, ...rest) => {
+        // Wyślij do własnego systemu logowania
+        console.log('[HONO]', str, ...rest)
+      }))
+
+      app.get('/', (c) => c.text('Hello!'))
+      export default app
+    lang: typescript
+
+  - name: jwt() — JWT Authentication
+    desc: >
+      Middleware JWT z hono/jwt. Weryfikuje token z Authorization header.
+      Payload dostępny przez c.get('jwtPayload'). Nie wymaga zewnętrznej biblioteki.
+    code: |
+      import { Hono } from 'hono'
+      import { jwt } from 'hono/jwt'
+      import { sign } from 'hono/jwt'
+
+      const app = new Hono()
+
+      const JWT_SECRET = 'super-secret-key'
+
+      // Chronione endpointy
+      app.use('/api/*', jwt({ secret: JWT_SECRET }))
+
+      app.get('/api/profile', (c) => {
+        const payload = c.get('jwtPayload')
+        return c.json({ user: payload })
+      })
+
+      // Login endpoint — generuje token
+      app.post('/login', async (c) => {
+        const { email } = await c.req.json()
+        const token = await sign(
+          { sub: email, exp: Math.floor(Date.now() / 1000) + 3600 },
+          JWT_SECRET
+        )
+        return c.json({ token })
+      })
+
+      export default app
+    lang: typescript
+
+  - name: basicAuth() — Basic Authentication
+    desc: >
+      Middleware Basic Auth z hono/basic-auth. Username + password w header.
+      Przydatne do szybkiej ochrony endpointów na staging.
+    code: |
+      import { Hono } from 'hono'
+      import { basicAuth } from 'hono/basic-auth'
+
+      const app = new Hono()
+
+      // Statyczne credentials
+      app.use('/admin/*', basicAuth({
+        username: 'admin',
+        password: 'secret',
+      }))
+
+      // Dynamiczne credentials (baza danych)
+      app.use('/private/*', basicAuth({
+        verifyUser: async (username, password, c) => {
+          // Sprawdź w bazie danych
+          return username === 'user' && password === 'pass'
+        },
+      }))
+
+      app.get('/admin/dashboard', (c) => c.text('Admin panel'))
+      export default app
+    lang: typescript
+
+  - name: cache() — HTTP Caching
+    desc: >
+      Middleware cache z hono/cache. Ustawia Cache-Control i ETag.
+      Działa z Cloudflare Cache API na Workers. Można definiować
+      różny cache per route.
+    code: |
+      import { Hono } from 'hono'
+      import { cache } from 'hono/cache'
+
+      const app = new Hono()
+
+      // Cache na 5 minut — dla statycznych danych
+      app.use('/api/config', cache({
+        cacheName: 'config-cache',
+        cacheControl: 'max-age=300, s-maxage=300',
+      }))
+
+      // Cache na godzinę — dla danych publicznych
+      app.use('/api/products/*', cache({
+        cacheName: 'products',
+        cacheControl: 'public, max-age=3600',
+      }))
+
+      // Brak cache — dla prywatnych danych
+      app.use('/api/user/*', cache({
+        cacheName: 'private',
+        cacheControl: 'no-store',
+      }))
+
+      app.get('/api/config', (c) => c.json({ version: '1.0' }))
+      export default app
+    lang: typescript
+
+  - name: compress() — Kompresja gzip/brotli
+    desc: >
+      Middleware kompresji z hono/compress. Automatycznie kompresuje odpowiedzi
+      gzip lub deflate na podstawie Accept-Encoding header klienta.
+      Działa na Node.js i Bun.
+    code: |
+      import { Hono } from 'hono'
+      import { compress } from 'hono/compress'
+
+      const app = new Hono()
+
+      // Kompresja wszystkich odpowiedzi
+      app.use('*', compress())
+
+      // Tylko gzip (bez deflate/brotli)
+      app.use('*', compress({ encoding: 'gzip' }))
+
+      app.get('/big-data', (c) => {
+        const data = Array.from({ length: 10000 }, (_, i) => ({
+          id: i,
+          value: `item-${i}`,
+        }))
+        return c.json(data)  // automatycznie skompresowane
+      })
+
+      export default app
+    lang: typescript
+
+  - name: csrf() + etag() — Bezpieczeństwo i cache
+    desc: >
+      csrf() chroni przed Cross-Site Request Forgery przez weryfikację Origin/Referer.
+      etag() generuje ETag nagłówek dla conditional caching — 304 Not Modified
+      gdy zawartość się nie zmieniła.
+    code: |
+      import { Hono } from 'hono'
+      import { csrf } from 'hono/csrf'
+      import { etag } from 'hono/etag'
+
+      const app = new Hono()
+
+      // CSRF protection — tylko na mutujące metody
+      app.use('*', csrf({
+        origin: 'https://myapp.com',
+      }))
+
+      // ETag — conditional GET caching
+      app.use('*', etag())
+
+      app.get('/resource', (c) => {
+        return c.json({ data: 'unchanged content' })
+        // Klient dostanie 304 jeśli ETag się zgadza
+      })
+
+      export default app
+    lang: typescript
+
+  - name: c.set() i c.get() — shared state middleware
+    desc: >
+      Middleware może ustawiać dane na kontekście przez c.set('key', value).
+      Handler (i kolejne middleware) czytają przez c.get('key').
+      Typuj Variables w generics Hono dla type safety.
+    code: |
+      import { Hono } from 'hono'
+      import { jwt } from 'hono/jwt'
+
+      // Typowanie zmiennych kontekstu
+      type Variables = {
+        userId: string
+        role: 'admin' | 'user'
+      }
+
+      const app = new Hono<{ Variables: Variables }>()
+
+      // Auth middleware — ustawia userId i role
+      app.use('/api/*', async (c, next) => {
+        const payload = c.get('jwtPayload')
+        c.set('userId', payload.sub)
+        c.set('role', payload.role ?? 'user')
+        await next()
+      })
+
+      app.get('/api/profile', (c) => {
+        const userId = c.get('userId')  // TypeScript wie że to string
+        const role = c.get('role')      // 'admin' | 'user'
+        return c.json({ userId, role })
+      })
+
+      export default app
+    lang: typescript
+
+  - name: Custom middleware — przed i po routach
+    desc: >
+      Własny middleware do logowania, auth, rate limiting, request ID.
+      Kod przed await next() = przed handlerern. Kod po = po odpowiedzi.
+      Można przerywać chain przez return c.json(error, 401).
+    code: |
+      import { Hono } from 'hono'
+
+      const app = new Hono()
+
+      // Request ID middleware
+      app.use('*', async (c, next) => {
+        const requestId = crypto.randomUUID()
+        c.res.headers.set('X-Request-ID', requestId)
+        await next()
+      })
+
+      // Rate limiter (prosty in-memory)
+      const requestCounts = new Map<string, number>()
+
+      app.use('/api/*', async (c, next) => {
+        const ip = c.req.header('CF-Connecting-IP') ?? 'unknown'
+        const count = (requestCounts.get(ip) ?? 0) + 1
+        requestCounts.set(ip, count)
+
+        if (count > 100) {
+          return c.json({ error: 'Too many requests' }, 429)
+        }
+        await next()
+      })
+
+      // Timing middleware
+      app.use('*', async (c, next) => {
+        const t = performance.now()
+        await next()
+        c.res.headers.set('X-Response-Time', `${(performance.now() - t).toFixed(2)}ms`)
+      })
+
+      app.get('/api/data', (c) => c.json({ ok: true }))
+      export default app
+    lang: typescript

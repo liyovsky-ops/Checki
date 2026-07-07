@@ -1,0 +1,514 @@
+title: Komendy MySQL / mysql CLI
+
+groups:
+  - name: Instalacja i uruchamianie
+    icon: "📦"
+    commands:
+      - cmd: sudo apt install mysql-server mysql-client
+        desc: Zainstaluj MySQL (Ubuntu/Debian)
+        detail:
+          what: Instaluje serwer MySQL i klienta na Ubuntu/Debian/WSL.
+          how: Domyślnie tworzy użytkownika root. Po instalacji uruchom mysql_secure_installation.
+          tips:
+            - "sudo systemctl start mysql — uruchom serwer po instalacji"
+            - "sudo mysql_secure_installation — ustaw hasło root, usuń testowe bazy"
+      - cmd: sudo systemctl start mysql && sudo systemctl status mysql
+        desc: "Uruchom / zatrzymaj / sprawdź status (systemd)"
+        detail:
+          what: Uruchamia serwer MySQL i sprawdza czy działa poprawnie.
+          how: systemctl zarządza usługami systemowymi. status pokazuje czy Active (running).
+          tips:
+            - "sudo systemctl enable mysql — uruchamiaj automatycznie po restarcie"
+            - "sudo systemctl restart mysql — restart po zmianie konfiguracji w my.cnf"
+      - cmd: "docker run -d --name mysql -e MYSQL_ROOT_PASSWORD=secret -e MYSQL_DATABASE=myapp -p 3306:3306 mysql:8.0"
+        desc: Zainstaluj MySQL przez Docker
+        detail:
+          what: Uruchamia MySQL 8.0 w kontenerze z hasłem roota, bazą i portowaniem na localhost:3306.
+          how: MYSQL_ROOT_PASSWORD — wymagane. MYSQL_DATABASE — baza tworzona automatycznie.
+          tips:
+            - "Dodaj -v mysql_data:/var/lib/mysql — dane przetrwają restart kontenera"
+            - "docker exec -it mysql mysql -u root -p — wejdź do CLI w kontenerze"
+      - cmd: docker compose up -d mysql
+        desc: Uruchom MySQL z Docker Compose
+        detail:
+          what: Uruchamia serwis mysql z docker-compose.yml w tle.
+          how: Wymaga zdefiniowanego serwisu mysql w docker-compose.yml.
+          tips:
+            - "docker compose logs mysql — sprawdź logi jeśli nie startuje"
+            - "docker compose exec mysql mysql -u root -p — wejdź do CLI"
+      - cmd: mysql --version
+        desc: Sprawdź wersję MySQL
+        detail:
+          what: Wypisuje wersję zainstalowanego klienta mysql.
+          how: Wersja klienta powinna być zgodna z wersją serwera.
+          tips:
+            - "SELECT VERSION(); — wersja serwera (po połączeniu przez mysql CLI)"
+            - "SHOW VARIABLES LIKE 'version%'; — szczegóły wersji serwera"
+
+  - name: "Połączenie z bazą (mysql CLI)"
+    icon: "🔌"
+    commands:
+      - cmd: mysql -u root -p myapp
+        desc: Połącz się z lokalną bazą
+        detail:
+          what: Łączy się z bazą myapp jako użytkownik root na localhost:3306.
+          how: "-p bez wartości = pytaj o hasło interaktywnie. Po połączeniu wchodzisz w interaktywny shell."
+          tips:
+            - "sudo mysql — na Ubuntu często nie wymaga hasła (auth_socket)"
+            - "exit lub \\q lub Ctrl+D — wyjdź z mysql CLI"
+      - cmd: "mysql -h db.example.com -u root -p myapp"
+        desc: Połącz z zdalnym hostem
+        detail:
+          what: Łączy się z MySQL na zdalnym serwerze.
+          how: "-h = host. Domyślny port 3306 możesz zmienić przez -P 3307."
+          tips:
+            - "-P 3307 — niestandardowy port"
+            - "Upewnij się że firewall zezwala na połączenia do portu 3306"
+      - cmd: "mysql -u root -p myapp -e \"SELECT COUNT(*) FROM users\""
+        desc: Wykonaj jedno polecenie i wyjdź
+        detail:
+          what: Wykonuje jedno zapytanie SQL i wraca do shellu bez wchodzenia w tryb interaktywny.
+          how: "-e = execute. Przydatne w skryptach bash i CI/CD."
+          tips:
+            - "-e \"...\" -s — silent mode (tylko wyniki, bez nagłówków)"
+            - "MYSQL_PWD=secret mysql -u root ... — hasło przez zmienną środowiskową (niezalecane)"
+      - cmd: mysql -u root -p myapp < schema.sql
+        desc: Wykonaj plik SQL
+        detail:
+          what: Uruchamia wszystkie zapytania SQL z pliku schema.sql w bazie myapp.
+          how: "Każde zapytanie wykonywane kolejno. Błąd nie zatrzymuje wykonania (domyślnie)."
+          tips:
+            - "mysql -u root -p myapp < schema.sql --force — kontynuuj mimo błędów"
+            - "Używaj do migracji, seedowania danych, tworzenia schematu"
+      - cmd: docker exec -it mysql mysql -u root -p myapp
+        desc: Połącz przez Docker
+        detail:
+          what: Otwiera sesję mysql CLI wewnątrz kontenera Docker.
+          how: "docker exec -it = interactive terminal. Nazwa kontenera (mysql) musi się zgadzać."
+          tips:
+            - "docker exec mysql mysql -u root -p -e \"SHOW DATABASES;\" — bez interaktywnego trybu"
+            - "Użyj MYSQL_ROOT_PASSWORD w docker-compose.yml dla automatycznego logowania"
+
+  - name: mysql CLI — meta-komendy
+    icon: "💻"
+    commands:
+      - cmd: SHOW DATABASES;
+        desc: Lista wszystkich baz danych
+        detail:
+          what: Wyświetla wszystkie bazy danych dostępne dla zalogowanego użytkownika.
+          how: Odpowiednik psql \l. Widoczne tylko bazy do których masz uprawnienia.
+          tips:
+            - "SHOW DATABASES LIKE 'my%'; — filtruj po nazwie"
+            - "SELECT schema_name FROM information_schema.schemata; — przez SQL"
+      - cmd: USE myapp;
+        desc: Przełącz na bazę danych
+        detail:
+          what: Ustawia myapp jako aktywną bazę dla wszystkich kolejnych zapytań.
+          how: Odpowiednik psql \\c. Wymagane po połączeniu bez podania bazy.
+          tips:
+            - "SELECT DATABASE(); — pokaż aktualnie wybraną bazę"
+            - "Możesz też podać bazę przy połączeniu: mysql -u root -p myapp"
+      - cmd: SHOW TABLES;
+        desc: Lista tabel w aktywnej bazie
+        detail:
+          what: Wyświetla wszystkie tabele w aktualnie wybranej bazie danych.
+          how: Wymaga wcześniejszego USE myapp; lub wybrania bazy przy połączeniu.
+          tips:
+            - "SHOW TABLES FROM myapp; — tabele z innej bazy bez przełączania"
+            - "SHOW FULL TABLES; — pokazuje typ (BASE TABLE lub VIEW)"
+      - cmd: DESCRIBE users;
+        desc: "Opisz tabelę (kolumny, typy, NULL, default)"
+        detail:
+          what: Pokazuje strukturę tabeli — kolumny, typy, nullable, klucze, wartości domyślne.
+          how: "Skrót: DESC users; Odpowiednik psql \\d users."
+          tips:
+            - "SHOW CREATE TABLE users; — pełna definicja CREATE TABLE z constraintami"
+            - "SHOW COLUMNS FROM users; — to samo co DESCRIBE, bardziej verbose"
+      - cmd: SHOW INDEX FROM users;
+        desc: Lista indeksów tabeli
+        detail:
+          what: Wyświetla wszystkie indeksy tabeli users z typami, kolumnami i unikalności.
+          how: "Kolumny: Key_name, Column_name, Non_unique, Index_type (BTREE/FULLTEXT/HASH)."
+          tips:
+            - "SHOW INDEX FROM users WHERE Key_name != 'PRIMARY'; — pomiń klucz główny"
+            - "SELECT * FROM information_schema.STATISTICS WHERE TABLE_NAME='users'; — przez SQL"
+      - cmd: SHOW PROCESSLIST;
+        desc: Aktywne połączenia i zapytania
+        detail:
+          what: Wyświetla wszystkie aktywne połączenia z sesją, stanem i aktualnym zapytaniem.
+          how: "Kolumny: Id, User, Host, db, Command, Time, State, Info (zapytanie)."
+          tips:
+            - "SHOW FULL PROCESSLIST; — pełne zapytania (nie obcięte do 100 znaków)"
+            - "KILL 12345; — przerwij zapytanie lub połączenie o podanym Id"
+      - cmd: SHOW VARIABLES LIKE 'character%';
+        desc: Sprawdź ustawienia charset
+        detail:
+          what: Wyświetla zmienne konfiguracyjne związane z character set i collation.
+          how: "% działa jak wildcard. Sprawdź czy character_set_server = utf8mb4."
+          tips:
+            - "SHOW VARIABLES LIKE 'innodb_buffer_pool_size'; — sprawdź rozmiar buffora"
+            - "SHOW GLOBAL STATUS LIKE 'Com_%'; — statystyki wykonanych zapytań"
+      - cmd: STATUS;
+        desc: "Informacje o połączeniu, serwerze i charset"
+        detail:
+          what: Wyświetla informacje o aktualnym połączeniu — user, baza, charset, wersja serwera.
+          how: "Skrót: \\s Przydatne do weryfikacji że połączyłeś się z właściwą bazą i charsetem."
+          tips:
+            - "Zawsze sprawdź charset przed pracą z polskimi znakami — powinno być utf8mb4"
+            - "\\h — pomoc z listą meta-komend mysql CLI"
+
+  - name: Zarządzanie bazami
+    icon: "🗄️"
+    commands:
+      - cmd: "CREATE DATABASE myapp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+        desc: Utwórz bazę z utf8mb4
+        detail:
+          what: Tworzy nową bazę danych z poprawnym kodowaniem dla polskich znaków i emoji.
+          how: utf8mb4 = pełny Unicode. utf8mb4_unicode_ci = case-insensitive, poprawne sortowanie.
+          tips:
+            - "Zawsze twórz bazy z utf8mb4 — domyślne latin1 nie obsługuje polskich znaków"
+            - "SHOW CREATE DATABASE myapp; — sprawdź jak baza została utworzona"
+      - cmd: DROP DATABASE IF EXISTS myapp;
+        desc: Usuń bazę danych
+        detail:
+          what: Usuwa całą bazę danych z wszystkimi tabelami i danymi — nieodwracalne.
+          how: "IF EXISTS — nie zgłaszaj błędu jeśli baza nie istnieje. Wymaga uprawnień DROP."
+          tips:
+            - "Nie ma potwierdzenia — baza znika natychmiast. Zrób backup przed!"
+            - "Sprawdź: SELECT DATABASE(); żeby upewnić się że nie usuwasz aktywnej bazy"
+      - cmd: "SELECT table_name, ROUND((data_length + index_length) / 1024 / 1024, 2) AS size_mb FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY size_mb DESC;"
+        desc: "Rozmiary tabel w bazie"
+        detail:
+          what: Wyświetla wszystkie tabele z ich rozmiarem (dane + indeksy) w MB.
+          how: "information_schema.tables — metadane tabel. data_length + index_length = całkowity rozmiar."
+          tips:
+            - "WHERE table_schema = 'myapp' — konkretna baza zamiast aktywnej"
+            - "Monitoruj regularnie — duże tabele to kandydaci do optymalizacji i partycjonowania"
+      - cmd: "SELECT table_name, table_rows FROM information_schema.tables WHERE table_schema = DATABASE();"
+        desc: Liczba rekordów w tabelach (szacunkowa)
+        detail:
+          what: Wyświetla szacunkową liczbę rekordów w każdej tabeli (InnoDB = przybliżone).
+          how: table_rows w InnoDB to oszacowanie z statystyk — może się różnić od COUNT(*).
+          tips:
+            - "SELECT COUNT(*) FROM users; — dokładna liczba (ale wolniejsze)"
+            - "ANALYZE TABLE users; — zaktualizuj statystyki tabeli"
+
+  - name: "DDL — CREATE / ALTER / DROP"
+    icon: "🏗️"
+    commands:
+      - cmd: "CREATE TABLE users (id INT NOT NULL AUTO_INCREMENT, email VARCHAR(255) NOT NULL UNIQUE, name VARCHAR(100) NOT NULL, PRIMARY KEY (id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+        desc: "Utwórz tabelę"
+        detail:
+          what: Tworzy tabelę users z kluczem głównym, AUTO_INCREMENT i constraintami.
+          how: "ENGINE=InnoDB — wymagany dla transakcji i kluczy obcych. DEFAULT CHARSET=utf8mb4 — kodowanie."
+          tips:
+            - "SHOW CREATE TABLE users; — sprawdź jak tabela została utworzona"
+            - "Zawsze dodawaj ENGINE=InnoDB i DEFAULT CHARSET=utf8mb4 dla nowych tabel"
+      - cmd: ALTER TABLE users ADD COLUMN phone VARCHAR(20) AFTER email;
+        desc: Dodaj kolumnę do tabeli
+        detail:
+          what: Dodaje kolumnę phone po kolumnie email w tabeli users.
+          how: "AFTER email — pozycja kolumny. FIRST — na początku. Bez AFTER — na końcu."
+          tips:
+            - "MySQL 8.0 INSTANT ADD COLUMN — działa bez przebudowy tabeli (szybkie!)"
+            - "ALTER na dużych tabelach może zablokować tabelę — użyj pt-online-schema-change"
+      - cmd: ALTER TABLE users DROP COLUMN phone;
+        desc: Usuń kolumnę
+        detail:
+          what: Usuwa kolumnę phone z tabeli users — operacja nieodwracalna.
+          how: "MySQL odbuduje tabelę bez tej kolumny. Na dużych tabelach może trwać długo."
+          tips:
+            - "Zawsze zrób backup lub sprawdź EXPLAIN przed DROP COLUMN w produkcji"
+            - "pt-online-schema-change — Percona tool do ALTER bez blokad"
+      - cmd: "ALTER TABLE users MODIFY COLUMN name VARCHAR(200) NOT NULL DEFAULT '';"
+        desc: "Zmień typ / definicję kolumny"
+        detail:
+          what: Zmienia typ i definicję kolumny name — długość, nullable, wartość domyślna.
+          how: "MODIFY COLUMN zmienia definicję zachowując nazwę. CHANGE COLUMN zmienia też nazwę."
+          tips:
+            - "CHANGE COLUMN old_name new_name VARCHAR(200) NOT NULL; — zmień nazwę i typ"
+            - "Sprawdź czy dane mieszczą się w nowym typie przed zmianą"
+      - cmd: TRUNCATE TABLE logs;
+        desc: Wyczyść tabelę (szybkie)
+        detail:
+          what: Usuwa wszystkie rekordy z tabeli, resetuje AUTO_INCREMENT — szybsze niż DELETE.
+          how: TRUNCATE to DDL (nie DML) — nie można cofnąć przez ROLLBACK.
+          tips:
+            - "DELETE FROM logs; — wolniejszy ale można cofnąć (DML w transakcji)"
+            - "TRUNCATE resetuje AUTO_INCREMENT do 1 — DELETE tego nie robi"
+
+  - name: "DML — SELECT / INSERT / UPDATE / DELETE"
+    icon: "📝"
+    commands:
+      - cmd: "SELECT * FROM users WHERE email LIKE '%@gmail.com' ORDER BY created_at DESC LIMIT 10;"
+        desc: "SELECT z filtrem, sortowaniem i limitem"
+        detail:
+          what: Pobiera rekordy z filtrami, sortowaniem i ograniczeniem liczby wyników.
+          how: "LIKE '%...' — wildcard na końcu. ORDER BY DESC — od najnowszych. LIMIT — paginacja."
+          tips:
+            - "Unikaj SELECT * w produkcji — pobierz tylko potrzebne kolumny"
+            - "EXPLAIN SELECT... — sprawdź czy zapytanie używa indeksów"
+      - cmd: "INSERT INTO users (email, name) VALUES ('jan@example.com', 'Jan') ON DUPLICATE KEY UPDATE name = VALUES(name);"
+        desc: "INSERT lub UPDATE przy duplikacie klucza"
+        detail:
+          what: Wstawia rekord lub aktualizuje go jeśli narusza UNIQUE constraint — upsert.
+          how: "ON DUPLICATE KEY UPDATE — obsługuje konflikt UNIQUE/PRIMARY KEY. VALUES(name) = nowa wartość."
+          tips:
+            - "INSERT IGNORE — ignoruj błąd duplikatu (nic nie aktualizuje)"
+            - "REPLACE INTO — usuń stary + wstaw nowy (zmienia AUTO_INCREMENT!)"
+      - cmd: "UPDATE orders SET status = 'shipped', shipped_at = NOW() WHERE id = 42;"
+        desc: UPDATE rekordu
+        detail:
+          what: Aktualizuje status i czas wysyłki dla zamówienia o id=42.
+          how: "Zawsze używaj WHERE — bez WHERE aktualizujesz całą tabelę!"
+          tips:
+            - "SET SQL_SAFE_UPDATES = 1; — blokuj UPDATE/DELETE bez WHERE lub klucza"
+            - "UPDATE ... LIMIT 1000 — bezpieczne przy masowych aktualizacjach"
+      - cmd: DELETE FROM sessions WHERE expires_at < NOW();
+        desc: "DELETE — usuń wygasłe sesje"
+        detail:
+          what: Usuwa wszystkie rekordy gdzie expires_at jest w przeszłości.
+          how: Zawsze używaj WHERE — bez WHERE usuwasz całą tabelę!
+          tips:
+            - "DELETE ... LIMIT 10000 — bezpieczniejsze przy masowych usunięciach"
+            - "TRUNCATE zamiast DELETE jeśli chcesz usunąć wszystkie rekordy"
+
+  - name: "Joins — przykłady"
+    icon: "🔗"
+    commands:
+      - cmd: "SELECT u.name, COUNT(o.id) AS orders FROM users u LEFT JOIN orders o ON o.user_id = u.id GROUP BY u.id, u.name ORDER BY orders DESC;"
+        desc: "LEFT JOIN — użytkownicy z liczbą zamówień"
+        detail:
+          what: Pobiera wszystkich użytkowników z liczbą ich zamówień — nawet tych bez zamówień (0).
+          how: "LEFT JOIN = wszyscy z lewej tabeli. COUNT(o.id) = NULL zamówień liczy jako 0."
+          tips:
+            - "COUNT(*) liczyłoby NULL — użyj COUNT(o.id) dla prawidłowych wyników"
+            - "HAVING orders > 0 — filtruj po agregacji (nie WHERE)"
+      - cmd: "SELECT u.name, o.id, o.total FROM users u JOIN orders o ON o.user_id = u.id WHERE o.status = 'paid' ORDER BY o.created_at DESC LIMIT 20;"
+        desc: "INNER JOIN — zamówienia z danymi usera"
+        detail:
+          what: Pobiera zapłacone zamówienia z nazwą klienta — tylko gdy obie strony JOINu mają dopasowanie.
+          how: "JOIN = INNER JOIN = tylko pasujące rekordy z obu tabel."
+          tips:
+            - "Dodaj indeksy na kolumnach JOIN: CREATE INDEX idx_orders_user_id ON orders(user_id);"
+            - "EXPLAIN pokaże czy JOIN używa indeksu — Rows duże = brakuje indeksu"
+
+  - name: Agregacja i analityka
+    icon: "📊"
+    commands:
+      - cmd: "SELECT role, COUNT(*) AS count, MIN(created_at) AS first FROM users GROUP BY role ORDER BY count DESC;"
+        desc: "GROUP BY z COUNT i MIN"
+        detail:
+          what: Grupuje użytkowników po roli, zlicza i pokazuje datę pierwszego w każdej grupie.
+          how: "GROUP BY — podziel wiersze na grupy. Funkcje agregujące (COUNT, SUM...) działają per grupa."
+          tips:
+            - "HAVING COUNT(*) > 5 — filtruj grupy po agregacji (nie WHERE)"
+            - "GROUP_CONCAT(email) — połącz wartości grupy w jeden string"
+      - cmd: "SELECT YEAR(created_at) AS rok, MONTH(created_at) AS mies, SUM(total) AS przychod FROM orders WHERE status='paid' GROUP BY rok, mies ORDER BY rok DESC, mies DESC;"
+        desc: "Przychody per miesiąc"
+        detail:
+          what: Oblicza miesięczne przychody z zapłaconych zamówień, posortowane od najnowszych.
+          how: "YEAR() i MONTH() ekstrahują składowe daty. GROUP BY obie kolumny = grupuj per miesiąc."
+          tips:
+            - "DATE_FORMAT(created_at, '%Y-%m') AS okres — alternatywny sposób grupowania"
+            - "Dodaj indeks na created_at i status dla szybszego zapytania"
+      - cmd: "SELECT user_id, SUM(total) AS spent FROM orders GROUP BY user_id HAVING spent > 1000 ORDER BY spent DESC LIMIT 10;"
+        desc: "Top 10 klientów po wydatkach"
+        detail:
+          what: Znajduje 10 klientów z największymi łącznymi wydatkami powyżej 1000.
+          how: "HAVING — filtrowanie po agregacji. Kolejność: WHERE → GROUP BY → HAVING → ORDER BY → LIMIT."
+          tips:
+            - "Dołącz JOIN users u ON u.id = user_id żeby pokazać imię zamiast ID"
+            - "Dodaj WHERE status='paid' przed GROUP BY jeśli liczysz tylko zapłacone"
+
+  - name: Indeksy
+    icon: "⚡"
+    commands:
+      - cmd: "CREATE INDEX idx_orders_user_status ON orders(user_id, status);"
+        desc: Utwórz indeks złożony
+        detail:
+          what: Tworzy indeks B-tree na dwóch kolumnach — przyspiesza zapytania z WHERE user_id AND status.
+          how: "Kolejność kolumn ważna: indeks używany gdy WHERE ma user_id (lub user_id + status)."
+          tips:
+            - "Pierwsza kolumna = najbardziej selektywna (dużo unikalnych wartości)"
+            - "EXPLAIN pokaże czy indeks jest używany — key = nazwa indeksu, NULL = brak"
+      - cmd: "CREATE FULLTEXT INDEX idx_articles ON articles(title, content);"
+        desc: "Utwórz FULLTEXT INDEX"
+        detail:
+          what: Tworzy indeks do pełnotekstowego wyszukiwania w kolumnach title i content.
+          how: "Wymaga MyISAM lub InnoDB (InnoDB od MySQL 5.6). Używaj z MATCH ... AGAINST."
+          tips:
+            - "SELECT * FROM articles WHERE MATCH(title,content) AGAINST('MySQL indeksy' IN BOOLEAN MODE);"
+            - "IN BOOLEAN MODE — obsługuje +słowo -wyklucz \"fraza dokładna\""
+      - cmd: EXPLAIN SELECT * FROM orders WHERE user_id = 1 AND status = 'paid';
+        desc: "Sprawdź plan zapytania (EXPLAIN)"
+        detail:
+          what: Pokazuje jak MySQL wykona zapytanie — czy używa indeksu, ile wierszy skanuje.
+          how: "type: const/ref = dobry (indeks). ALL = zły (full scan). rows = im mniej tym lepiej."
+          tips:
+            - "Extra: 'Using index' = covering index (super!). 'Using filesort' = brak indeksu dla ORDER BY"
+            - "EXPLAIN FORMAT=JSON ... — bardziej szczegółowe info (MySQL 8.0)"
+      - cmd: ANALYZE TABLE users;
+        desc: Zaktualizuj statystyki tabeli
+        detail:
+          what: Odświeża statystyki tabeli — MySQL używa ich do wyboru optymalnego planu zapytania.
+          how: "InnoDB robi to automatycznie, ale po dużych INSERT/DELETE warto uruchomić ręcznie."
+          tips:
+            - "OPTIMIZE TABLE users; — defragmentuj tabelę i indeksy (rebuild)"
+            - "OPTIMIZE TABLE może zablokować tabelę — używaj ostrożnie w produkcji"
+
+  - name: "Transakcje"
+    icon: "🔄"
+    commands:
+      - cmd: "START TRANSACTION; UPDATE accounts SET balance = balance - 100 WHERE id = 1; UPDATE accounts SET balance = balance + 100 WHERE id = 2; COMMIT;"
+        desc: "Transakcja — transfer środków"
+        detail:
+          what: Przenosi 100 z konta 1 na konto 2 atomowo — albo oba UPDATE albo żaden.
+          how: "START TRANSACTION lub BEGIN. COMMIT — zatwierdź. ROLLBACK — cofnij całość."
+          tips:
+            - "BEGIN; — krótszy alias dla START TRANSACTION;"
+            - "InnoDB domyślnie w trybie autocommit=1 — każde zapytanie = własna transakcja"
+      - cmd: ROLLBACK;
+        desc: Cofnij transakcję
+        detail:
+          what: Cofa wszystkie zmiany od ostatniego START TRANSACTION / BEGIN.
+          how: Używaj w bloku try/catch — przy błędzie ROLLBACK przywraca stan sprzed transakcji.
+          tips:
+            - "ROLLBACK TO SAVEPOINT sp1; — cofnij tylko do punktu zapisu"
+            - "SAVEPOINT sp1; — utwórz punkt zapisu wewnątrz transakcji"
+      - cmd: "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;"
+        desc: Ustaw poziom izolacji transakcji
+        detail:
+          what: "Ustawia poziom izolacji: READ UNCOMMITTED / READ COMMITTED / REPEATABLE READ / SERIALIZABLE."
+          how: "Domyślny MySQL: REPEATABLE READ (InnoDB). READ COMMITTED — mniej phantom reads, popularny."
+          tips:
+            - "SHOW VARIABLES LIKE 'transaction_isolation'; — sprawdź aktualny poziom"
+            - "Niższy poziom = lepsza wydajność, wyższy = więcej blokad i spójności"
+
+  - name: "Użytkownicy i uprawnienia"
+    icon: "👤"
+    commands:
+      - cmd: "CREATE USER 'appuser'@'localhost' IDENTIFIED BY 'strong_password';"
+        desc: Utwórz użytkownika
+        detail:
+          what: Tworzy nowego użytkownika MySQL dostępnego tylko z localhost.
+          how: "'user'@'host' — host określa skąd użytkownik może się połączyć. '%' = z dowolnego hosta."
+          tips:
+            - "'appuser'@'%' — pozwól na połączenia z dowolnego hosta (sieciowe)"
+            - "Użyj silnego hasła — generuj: openssl rand -base64 32"
+      - cmd: "GRANT SELECT, INSERT, UPDATE, DELETE ON myapp.* TO 'appuser'@'localhost';"
+        desc: Nadaj uprawnienia do bazy
+        detail:
+          what: Nadaje uprawnienia CRUD do wszystkich tabel w bazie myapp dla użytkownika appuser.
+          how: "myapp.* = wszystkie tabele w bazie myapp. myapp.users = konkretna tabela."
+          tips:
+            - "FLUSH PRIVILEGES; — wymuś załadowanie nowych uprawnień (rzadko potrzebne)"
+            - "GRANT ALL PRIVILEGES ON myapp.* TO ... — wszystkie uprawnienia (nie superuser)"
+      - cmd: SHOW GRANTS FOR 'appuser'@'localhost';
+        desc: Sprawdź uprawnienia użytkownika
+        detail:
+          what: Wyświetla listę uprawnień nadanych użytkownikowi appuser.
+          how: "Pokazuje GRANT statements które można użyć do replikacji uprawnień."
+          tips:
+            - "SHOW GRANTS; — uprawnienia aktualnie zalogowanego użytkownika"
+            - "SELECT * FROM information_schema.USER_PRIVILEGES; — wszystkich użytkowników"
+      - cmd: "REVOKE DELETE ON myapp.* FROM 'appuser'@'localhost';"
+        desc: Cofnij uprawnienie
+        detail:
+          what: Usuwa uprawnienie DELETE dla appuser — pozostałe uprawnienia zostają.
+          how: "REVOKE ma tę samą składnię co GRANT ale odwrotny efekt."
+          tips:
+            - "DROP USER 'appuser'@'localhost'; — usuń użytkownika całkowicie"
+            - "ALTER USER 'appuser'@'localhost' IDENTIFIED BY 'new_pass'; — zmień hasło"
+
+  - name: mysqldump i import
+    icon: "💾"
+    commands:
+      - cmd: "mysqldump -u root -p myapp > backup_$(date +%Y%m%d).sql"
+        desc: Backup bazy do pliku SQL
+        detail:
+          what: Tworzy backup bazy myapp jako plik SQL z datą w nazwie.
+          how: "Wynikowy plik zawiera CREATE TABLE i INSERT. Przywróć: mysql -u root -p myapp < backup.sql"
+          tips:
+            - "mysqldump -u root -p myapp | gzip > backup.sql.gz — kompresuj od razu"
+            - "Cron: 0 3 * * * mysqldump -u root -p'pass' myapp > /backup/$(date +\\%Y\\%m\\%d).sql"
+      - cmd: mysqldump -u root -p --no-data myapp > schema.sql
+        desc: "Backup tylko struktury (bez danych)"
+        detail:
+          what: Eksportuje tylko strukturę tabel (CREATE TABLE, indeksy, FK) bez danych.
+          how: "--no-data = tylko DDL. Odwrotnie: --no-create-info = tylko dane (INSERT)."
+          tips:
+            - "mysqldump --tables users orders — backup tylko wybranych tabel"
+            - "Przydatne do dokumentacji schematu i porównania środowisk"
+      - cmd: mysql -u root -p myapp < backup.sql
+        desc: Restore z pliku SQL
+        detail:
+          what: Przywraca bazę z pliku SQL — wykonuje wszystkie zawarte komendy.
+          how: "Baza musi istnieć przed restore. Stwórz: CREATE DATABASE myapp;"
+          tips:
+            - "pv backup.sql | mysql -u root -p myapp — z paskiem postępu (pv = pipe viewer)"
+            - "mysql -u root -p --force myapp < backup.sql — kontynuuj mimo błędów"
+      - cmd: mysqldump -u root -p --all-databases > all.sql
+        desc: Backup wszystkich baz
+        detail:
+          what: Tworzy backup wszystkich baz danych i konfiguracji użytkowników.
+          how: "--all-databases obejmuje mysql (użytkownicy), information_schema itp."
+          tips:
+            - "Przywróć: mysql -u root -p < all.sql (wymaga pustego serwera)"
+            - "Duże pliki — zawsze kompresuj: mysqldump ... | gzip > all.sql.gz"
+
+  - name: "JSON w MySQL"
+    icon: "📦"
+    commands:
+      - cmd: "SELECT JSON_EXTRACT(meta, '$.city') AS miasto FROM users WHERE JSON_EXTRACT(meta, '$.score') > 80;"
+        desc: "Odczyt i filtrowanie pól JSON"
+        detail:
+          what: Ekstrahuje pole city z kolumny JSON i filtruje po polu score.
+          how: "JSON_EXTRACT(col, '$.field') lub skrót col->'$.field'. ->> zwraca TEXT (bez cudzysłowów)."
+          tips:
+            - "meta->>'$.city' — skrót dla JSON_UNQUOTE(JSON_EXTRACT(meta, '$.city'))"
+            - "meta->'$.tags[0]' — pierwszy element tablicy JSON"
+      - cmd: "UPDATE users SET meta = JSON_SET(meta, '$.score', 100, '$.verified', true) WHERE id = 1;"
+        desc: Aktualizuj pola JSON
+        detail:
+          what: Ustawia pola score i verified w kolumnie JSON bez nadpisywania całego obiektu.
+          how: "JSON_SET — ustaw (nadpisz). JSON_INSERT — wstaw tylko jeśli nie istnieje. JSON_REPLACE — tylko istniejące."
+          tips:
+            - "JSON_REMOVE(meta, '$.old_field') — usuń pole z JSON"
+            - "SET meta = JSON_MERGE_PATCH(meta, '{\"city\":\"Warszawa\"}') — merguj obiekty"
+      - cmd: "SELECT * FROM users WHERE JSON_CONTAINS(meta->'$.tags', '\"vip\"');"
+        desc: "Szukaj w tablicy JSON"
+        detail:
+          what: Znajdź użytkowników których meta.tags zawiera wartość 'vip'.
+          how: "JSON_CONTAINS sprawdza czy JSON zawiera podaną wartość. Cudzysłowy w stringach JSON."
+          tips:
+            - "JSON_CONTAINS_PATH(meta, 'one', '$.address.city') — czy ścieżka istnieje"
+            - "JSON_OVERLAPS(meta->'$.tags', '[\"vip\",\"admin\"]') — MySQL 8.0 — czy mają wspólne elementy"
+
+  - name: Window Functions (MySQL 8.0+)
+    icon: "📈"
+    commands:
+      - cmd: "SELECT name, salary, RANK() OVER (PARTITION BY department ORDER BY salary DESC) AS rank_in_dept FROM employees;"
+        desc: "RANK() — ranking w grupie"
+        detail:
+          what: Przypisuje ranking wynagrodzenia w ramach każdego działu.
+          how: "PARTITION BY = podział na grupy. ORDER BY = kolejność wewnątrz grupy. RANK = 1,2,2,4 (luki)."
+          tips:
+            - "DENSE_RANK() — ranking bez luk (1,2,2,3). ROW_NUMBER() — unikalny numer (1,2,3,4)"
+            - "NTILE(4) OVER (...) — podział na kwartyle"
+      - cmd: "SELECT month, revenue, LAG(revenue, 1) OVER (ORDER BY month) AS prev, revenue - LAG(revenue,1) OVER (ORDER BY month) AS growth FROM monthly_sales;"
+        desc: "LAG() — porównanie z poprzednim wierszem"
+        detail:
+          what: Pokazuje przychody z poprzedniego miesiąca i wzrost miesiąc do miesiąca.
+          how: "LAG(col, n) = wartość n wierszy wcześniej. LEAD(col, n) = n wierszy do przodu."
+          tips:
+            - "LAG(revenue, 1, 0) — trzeci argument = wartość domyślna gdy brak poprzedniego wiersza"
+            - "LEAD() dla porównania z następnym wierszem"
+      - cmd: "SELECT *, SUM(total) OVER (PARTITION BY user_id ORDER BY created_at ROWS UNBOUNDED PRECEDING) AS cumulative FROM orders;"
+        desc: Kumulatywna suma per użytkownik
+        detail:
+          what: Oblicza narastającą sumę zamówień dla każdego użytkownika chronologicznie.
+          how: "ROWS UNBOUNDED PRECEDING = od początku partycji do bieżącego wiersza."
+          tips:
+            - "ROWS BETWEEN 6 PRECEDING AND CURRENT ROW — suma ostatnich 7 wierszy (rolling window)"
+            - "AVG(total) OVER (...) — zamiast SUM dla rolling average"

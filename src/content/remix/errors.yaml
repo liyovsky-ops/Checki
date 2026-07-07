@@ -1,0 +1,272 @@
+title: Error Handling i Meta
+
+groups:
+  - name: Error Handling
+    commands:
+      - code: |
+          // ErrorBoundary — obsługa błędów w trasie
+          import { useRouteError, isRouteErrorResponse, Link } from "@remix-run/react";
+
+          export function ErrorBoundary() {
+            const error = useRouteError();
+
+            // Response rzucony przez throw new Response() lub json()
+            if (isRouteErrorResponse(error)) {
+              return (
+                <div className="error-page">
+                  <h1>{error.status} {error.statusText}</h1>
+                  {error.status === 404 && (
+                    <div>
+                      <p>Strona nie istnieje.</p>
+                      <Link to="/">Wróć na stronę główną</Link>
+                    </div>
+                  )}
+                  {error.status === 403 && (
+                    <div>
+                      <p>Brak uprawnień do tej strony.</p>
+                      <Link to="/login">Zaloguj się</Link>
+                    </div>
+                  )}
+                  {error.status === 500 && (
+                    <p>Błąd serwera. Spróbuj ponownie za chwilę.</p>
+                  )}
+                </div>
+              );
+            }
+
+            // Nieoczekiwany JavaScript Error
+            const message =
+              error instanceof Error ? error.message : "Nieznany błąd";
+
+            return (
+              <div className="error-page">
+                <h1>Coś poszło nie tak</h1>
+                <p>{message}</p>
+                <Link to="/">Wróć na stronę główną</Link>
+              </div>
+            );
+          }
+        desc: ErrorBoundary — obsługa 404, 403, 500 i JS errors
+        detail:
+          what: ErrorBoundary w pliku trasy przechwytuje błędy z loader(), action() i renderowania. isRouteErrorResponse() rozróżnia HTTP errors od JS errors.
+          how: Każda trasa może mieć własny ErrorBoundary — granularna obsługa błędów. Root ErrorBoundary to fallback dla całej aplikacji.
+          tips:
+            - 'ErrorBoundary w trasie nie przerywa parent layout — tylko ten segment się psuje'
+            - 'isRouteErrorResponse() — true gdy rzucono Response lub json() z statusem 4xx/5xx'
+
+      - code: |
+          // Rzucanie błędów z loader i action
+          import { json } from "@remix-run/node";
+          import type { LoaderFunctionArgs } from "@remix-run/node";
+
+          export async function loader({ params, request }: LoaderFunctionArgs) {
+            const session = await getSession(request.headers.get("Cookie"));
+
+            // 401 — brak autoryzacji
+            if (!session.get("userId")) {
+              throw new Response("Unauthorized", { status: 401 });
+            }
+
+            const item = await db.items.findUnique({ where: { id: params.id } });
+
+            // 404 — nie znaleziono
+            if (!item) {
+              throw new Response(null, { status: 404 });
+            }
+
+            // 403 — brak uprawnień
+            if (item.ownerId !== session.get("userId")) {
+              throw new Response("Forbidden", {
+                status: 403,
+                statusText: "Nie masz dostępu do tego zasobu",
+              });
+            }
+
+            // json z error status — obsługiwany przez ErrorBoundary
+            if (!item.active) {
+              throw json(
+                { message: "Ten zasób jest niedostępny", code: "INACTIVE" },
+                { status: 410 }
+              );
+            }
+
+            return json({ item });
+          }
+        desc: Rzucanie Response — 401, 403, 404 z loader
+        detail:
+          what: throw new Response() lub throw json() w loader/action uruchamia ErrorBoundary tej trasy. Status kontroluje co wyświetla ErrorBoundary.
+          how: throw new Response() — body jako string. throw json() — body jako obiekt (dostępny przez error.data w ErrorBoundary).
+          tips:
+            - 'error.data w ErrorBoundary — gdy rzucono throw json(data, { status })'
+            - 'Rzucaj Response, nie Error — daje kontrolę nad HTTP status i UX'
+
+      - code: |
+          // useRouteError — pełne API
+          import { useRouteError, isRouteErrorResponse } from "@remix-run/react";
+
+          export function ErrorBoundary() {
+            const error = useRouteError();
+
+            // Typ 1: HTTP Response (throw new Response lub throw json)
+            if (isRouteErrorResponse(error)) {
+              // error.status — HTTP status code
+              // error.statusText — HTTP status text
+              // error.data — body (string lub obiekt z throw json())
+              return (
+                <div>
+                  <h1>HTTP {error.status}</h1>
+                  <p>{error.statusText || JSON.stringify(error.data)}</p>
+                </div>
+              );
+            }
+
+            // Typ 2: JavaScript Error (throw new Error lub runtime exception)
+            if (error instanceof Error) {
+              return (
+                <div>
+                  <h1>Błąd JavaScript</h1>
+                  <p>{error.message}</p>
+                  {/* Stack trace tylko w development */}
+                  {process.env.NODE_ENV === "development" && (
+                    <pre>{error.stack}</pre>
+                  )}
+                </div>
+              );
+            }
+
+            // Typ 3: Nieznany — string lub inny typ
+            return <div>Nieznany błąd: {String(error)}</div>;
+          }
+        desc: useRouteError — pełne API obsługi błędów
+        detail:
+          what: useRouteError() zwraca różne typy w zależności od źródła błędu. isRouteErrorResponse() sprawdza czy to HTTP Response.
+          how: Zawsze obsłuż wszystkie 3 przypadki — RouteErrorResponse, Error, i unknown.
+          tips:
+            - 'W production ukryj stack trace — może zawierać sekrety serwera'
+            - 'error.data dostępne tylko gdy rzucono throw json() (isRouteErrorResponse)'
+
+  - name: Meta i Links
+    commands:
+      - code: |
+          // meta() — tytuły, description, og tags
+          import type { MetaFunction, LoaderFunctionArgs } from "@remix-run/node";
+          import { json } from "@remix-run/node";
+
+          export async function loader({ params }: LoaderFunctionArgs) {
+            const post = await getPost(params.slug!);
+            return json({ post });
+          }
+
+          export const meta: MetaFunction<typeof loader> = ({ data, matches }) => {
+            if (!data?.post) {
+              return [{ title: "Post nie znaleziony" }];
+            }
+
+            const { post } = data;
+
+            return [
+              // <title>
+              { title: `${post.title} | Blog` },
+              // <meta name="description">
+              { name: "description", content: post.excerpt },
+              // Open Graph
+              { property: "og:title", content: post.title },
+              { property: "og:description", content: post.excerpt },
+              { property: "og:image", content: post.coverImage },
+              { property: "og:type", content: "article" },
+              // Twitter Card
+              { name: "twitter:card", content: "summary_large_image" },
+              { name: "twitter:title", content: post.title },
+              // Canonical URL
+              { tagName: "link", rel: "canonical", href: `https://example.com/blog/${post.slug}` },
+            ];
+          };
+        desc: meta() — title, description, og tags, twitter card
+        detail:
+          what: meta() zwraca tablicę obiektów opisujących <meta> tagi. MetaFunction<typeof loader> daje typy dla data z loadera.
+          how: Meta z zagnieżdżonych tras są mergowane. Późniejsza trasa nadpisuje wcześniejsze meta o tej samej nazwie.
+          tips:
+            - 'MetaFunction<typeof loader> — dostęp do data z loadera z typami'
+            - 'matches — dostęp do meta z parent tras'
+
+      - code: |
+          // links() — CSS, preload, favicon
+          import type { LinksFunction } from "@remix-run/node";
+          import stylesheetUrl from "~/styles/blog.css";
+
+          export const links: LinksFunction = () => [
+            // Importowany CSS moduł
+            { rel: "stylesheet", href: stylesheetUrl },
+
+            // Zewnętrzny CSS
+            {
+              rel: "stylesheet",
+              href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap",
+            },
+
+            // Preload czcionki
+            {
+              rel: "preload",
+              href: "/fonts/inter.woff2",
+              as: "font",
+              type: "font/woff2",
+              crossOrigin: "anonymous",
+            },
+
+            // Preload obrazu (powyżej foldu)
+            {
+              rel: "preload",
+              href: "/images/hero.webp",
+              as: "image",
+              type: "image/webp",
+            },
+
+            // Favicon
+            { rel: "icon", href: "/favicon.ico" },
+            { rel: "icon", type: "image/png", href: "/favicon.png" },
+          ];
+        desc: links() — CSS, preload fonts/images, favicon
+        detail:
+          what: links() zwraca tablicę obiektów <link>. Remix wstrzykuje je do <head> tylko gdy trasa jest aktywna — automatyczny cleanup przy wyjściu z trasy.
+          how: LinksFunction na poziomie trasy. Root links() to globalne linki (zawsze aktywne). Trasy dodają swoje CSS tylko gdy są aktywne.
+          tips:
+            - 'CSS per-trasa — brak globalnego CSS blokującego render, ładowany on-demand'
+            - 'preload czcionek w root links() — priorytetowe ładowanie'
+
+      - code: |
+          // headers() — HTTP response headers
+          import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
+          import { json } from "@remix-run/node";
+
+          export async function loader({ params }: LoaderFunctionArgs) {
+            const article = await getArticle(params.id!);
+            return json(
+              { article },
+              {
+                headers: {
+                  // Cache w przeglądarce 5 min, na CDN 1h
+                  "Cache-Control": "public, max-age=300, s-maxage=3600",
+                },
+              }
+            );
+          }
+
+          // headers() uruchamia się po loader — może modyfikować headers
+          export const headers: HeadersFunction = ({ loaderHeaders, parentHeaders }) => {
+            return {
+              // Przekaż Cache-Control z loadera
+              "Cache-Control": loaderHeaders.get("Cache-Control") ?? "no-cache",
+              // Security headers
+              "X-Frame-Options": "DENY",
+              "X-Content-Type-Options": "nosniff",
+              // CORS
+              "Access-Control-Allow-Origin": "*",
+            };
+          };
+        desc: headers() — Cache-Control, security headers na trasie
+        detail:
+          what: headers() definiuje HTTP response headers dla trasy. loaderHeaders to headers z loader(), parentHeaders z parent route.
+          how: Headers per-trasa — granularna kontrola cache'owania. Wyrafinowany system propagacji headers.
+          tips:
+            - 'loaderHeaders.get("Cache-Control") — propaguj cache z loader do response'
+            - 'Security headers w root headers() — globalne dla całej aplikacji'

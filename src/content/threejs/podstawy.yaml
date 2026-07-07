@@ -1,0 +1,97 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Three.js?
+  firstComponent: Twój pierwszy sześcian
+  firstComponentLang: javascript
+
+intro:
+  title: Czym jest Three.js?
+  desc: >
+    Three.js to najpopularniejsza biblioteka JavaScript do tworzenia grafiki 3D w przeglądarce.
+    Abstrahuje nad niskopoziomowym WebGL — zamiast pisać setki linii kodu GLSL i GL calls,
+    pracujesz z intuicyjnymi obiektami: Scene, Camera, Mesh, Light.
+    Używana przez NASA, Google, Apple, tysiące gier przeglądarkowych i wizualizacji danych.
+
+concepts:
+  - title: Scene Graph
+    desc: >
+      Scena to drzewo obiektów 3D — jak DOM dla przeglądarki.
+      Każdy Object3D może mieć dzieci (children), które dziedziczą transformacje rodzica.
+      scene.add(mesh) dodaje obiekt do renderowania; obiekty bez rodzica są niewidoczne.
+    icon: "🌳"
+  - title: WebGL Abstrakcja
+    desc: >
+      Three.js ukrywa WebGL — niskopoziomowe API graficzne przeglądarki.
+      Zamiast pisać shader programs, vertex buffers i gl.drawElements(),
+      tworzysz Mesh(geometry, material) i Three.js generuje cały WebGL kod za Ciebie.
+    icon: "🎛️"
+  - title: Mesh = Geometry + Material
+    desc: >
+      Podstawowa jednostka renderowania to Mesh — para geometrii (kształt: wierzchołki, trójkąty)
+      i materiału (jak wygląda: kolor, tekstura, odbicia). Jeden material możesz przypisać
+      do wielu geometrii; jedna geometria + różne materiały = różne wyglądy.
+    icon: "🧱"
+  - title: Render Loop
+    desc: >
+      Three.js nie renderuje automatycznie — musisz wywołać renderer.render(scene, camera)
+      w każdej klatce animacji. Standardowo używasz requestAnimationFrame() do ciągłej pętli.
+      Daje to pełną kontrolę: możesz renderować tylko gdy coś się zmieni (on-demand).
+    icon: "🔄"
+  - title: Camera Types
+    desc: >
+      PerspectiveCamera (fov, aspect, near, far) — naturalna perspektywa jak ludzkie oko.
+      OrthographicCamera (left, right, top, bottom, near, far) — brak perspektywy, każdy obiekt
+      tej samej wielkości bez względu na odległość. Używana w izometrycznych grach i CAD.
+    icon: "📷"
+  - title: Coordinate System (Y-up)
+    desc: >
+      Three.js używa prawoskrętnego układu współrzędnych z Y skierowanym w górę.
+      X idzie w prawo, Y w górę, Z w kierunku kamery (ku nam).
+      Modele z Blendera używają Z-up — musisz obrócić o -90° wokół X przy ładowaniu.
+    icon: "📐"
+
+whenToUse:
+  - Interaktywne wizualizacje 3D na stronach WWW
+  - Gry przeglądarkowe (first-person, izometryczne, casual)
+  - Konfiguratory produktów 3D (sklepy, motoryzacja)
+  - Wizualizacje naukowe i danych (mapy, wykresy 3D)
+  - Prezentacje architektoniczne i VR/AR (WebXR)
+  - Efekty tła i animacje na stronach portfolio
+
+firstComponent: |
+  import * as THREE from 'three';
+
+  // Trzy fundamenty: scena, kamera, renderer
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(
+    75,                                    // FOV w stopniach
+    window.innerWidth / window.innerHeight, // proporcje
+    0.1,                                   // near plane
+    1000                                   // far plane
+  );
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  // Mesh = geometria + material
+  const geometry = new THREE.BoxGeometry(1, 1, 1);
+  const material = new THREE.MeshStandardMaterial({ color: 0x049ef4 });
+  const cube = new THREE.Mesh(geometry, material);
+  scene.add(cube);
+
+  // Oświetlenie (MeshStandardMaterial wymaga światła)
+  const light = new THREE.DirectionalLight(0xffffff, 1);
+  light.position.set(5, 5, 5);
+  scene.add(light);
+  scene.add(new THREE.AmbientLight(0x404040, 0.5));
+
+  camera.position.z = 3;
+
+  // Pętla animacji
+  function animate() {
+    requestAnimationFrame(animate);
+    cube.rotation.x += 0.01;
+    cube.rotation.y += 0.01;
+    renderer.render(scene, camera);
+  }
+  animate();

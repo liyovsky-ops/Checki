@@ -1,0 +1,194 @@
+title: Asercje i Czekanie
+
+items:
+  - name: ".should() — główna asercja"
+    desc: >
+      Podstawowy sposób asercji w Cypress. Przyjmuje stringi Chai matchers i jest
+      wbudowany w retry-ability — Cypress będzie ponawiał asercję dopóki nie przejdzie
+      lub nie upłynie timeout. Możesz łączyć wielokrotne asercje na jednym elemencie.
+      should() z callbackiem pozwala na złożone asercje niestandardowe.
+    code: |
+      // Widoczność i istnienie
+      cy.get('[data-cy="alert"]').should('be.visible')
+      cy.get('[data-cy="loader"]').should('not.exist')
+      cy.get('[data-cy="menu"]').should('be.hidden')
+
+      // Tekst i zawartość
+      cy.get('[data-cy="title"]').should('have.text', 'Witaj!')
+      cy.get('[data-cy="desc"]').should('contain.text', 'fragment')
+
+      // Klasy CSS
+      cy.get('[data-cy="btn"]').should('have.class', 'active')
+      cy.get('[data-cy="btn"]').should('not.have.class', 'disabled')
+
+      // Atrybuty
+      cy.get('a').should('have.attr', 'href', '/home')
+      cy.get('input').should('have.attr', 'placeholder', 'Wpisz email...')
+
+  - name: ".and() — łańcuchowanie asercji"
+    desc: >
+      and() to alias dla should() — pozwala łączyć wiele asercji na tym samym elemencie
+      w czytelny sposób. Działa identycznie jak kolejne should() — obie formy są poprawne
+      i tożsame funkcjonalnie. Poprawia czytelność gdy sprawdzasz wiele warunków naraz.
+    code: |
+      cy.get('[data-cy="success-msg"]')
+        .should('be.visible')
+        .and('have.class', 'green')
+        .and('contain', 'Zapisano')
+
+      cy.get('[data-cy="email-input"]')
+        .should('have.attr', 'type', 'email')
+        .and('not.be.disabled')
+        .and('have.value', 'user@example.com')
+
+      // Asercje na wartości numerycznej
+      cy.get('[data-cy="items-count"]')
+        .invoke('text')
+        .then(parseInt)
+        .should('be.greaterThan', 0)
+
+  - name: "Chai matchers — kompletna lista"
+    desc: >
+      Cypress używa biblioteki Chai do asercji. Oto najważniejsze matchery
+      pogrupowane według kategorii: egzystencja, widoczność, tekst, DOM, wartości.
+      Każdy matcher można zanegować przez .not.
+    code: |
+      // Egzystencja w DOM
+      .should('exist')
+      .should('not.exist')
+
+      // Widoczność
+      .should('be.visible')
+      .should('be.hidden')
+
+      // Stan
+      .should('be.enabled')
+      .should('be.disabled')
+      .should('be.checked')
+      .should('be.empty')          // puste pole lub brak dzieci
+
+      // Tekst
+      .should('have.text', 'dokładny tekst')
+      .should('contain.text', 'fragment')
+      .should('include.text', 'fragment')   // alias
+
+      // Klasy i atrybuty
+      .should('have.class', 'active')
+      .should('have.attr', 'href', '/path')
+      .should('have.css', 'color', 'rgb(255, 0, 0)')
+
+      // Liczba elementów
+      .should('have.length', 5)
+      .should('have.length.greaterThan', 3)
+      .should('have.length.lessThan', 10)
+
+      // Wartości
+      .should('have.value', 'tekst w inpucie')
+
+  - name: ".should() z callbackiem"
+    desc: >
+      should() przyjmuje funkcję callback — pozwala na złożone asercje z pełną
+      swobodą. Callback otrzymuje natywny element jQuery. Wewnątrz callbacku
+      możesz używać expect() (Chai) lub assert (Node.js assert). Cały callback
+      jest powtarzany przy retry.
+    code: |
+      cy.get('[data-cy="user-list"]').should(($list) => {
+        expect($list).to.have.length(3)
+        expect($list.first()).to.contain('Jan')
+        expect($list.last()).to.contain('Piotr')
+      })
+
+      cy.get('[data-cy="price"]').should(($el) => {
+        const price = parseFloat($el.text().replace(',', '.'))
+        expect(price).to.be.within(10, 100)
+      })
+
+  - name: "expect() i assert — bezpośrednie asercje"
+    desc: >
+      expect() to styl BDD (Chai), assert to styl TDD. Używaj ich wewnątrz then()
+      lub should() callbacków gdy potrzebujesz asercji na zwykłych wartościach
+      JavaScript (nie elementach DOM). Nie mają retry-ability — są jednorazowe.
+    code: |
+      // expect() — BDD styl
+      cy.url().then((url) => {
+        expect(url).to.include('/dashboard')
+        expect(url).not.to.include('/login')
+      })
+
+      cy.get('[data-cy="items"]').then(($els) => {
+        expect($els).to.have.length.greaterThan(0)
+      })
+
+      // assert — TDD styl
+      cy.title().then((title) => {
+        assert.include(title, 'Moja Aplikacja')
+      })
+
+      // Chai chain — czytelny BDD
+      expect(true).to.be.true
+      expect([1, 2, 3]).to.have.length(3)
+      expect('hello').to.match(/ell/)
+
+  - name: "cy.wait() — czekanie na czas i aliasy"
+    desc: >
+      cy.wait(ms) czeka przez określony czas — unikaj gdy możliwe, wolisz retry-ability.
+      cy.wait('@alias') czeka na konkretny request sieciowy (z cy.intercept().as()).
+      To bezpieczne czekanie — Cypress wie kiedy request skończył się i może asertować
+      na szczegółach odpowiedzi.
+    code: |
+      // Czekaj na request (preferowane)
+      cy.intercept('POST', '/api/login').as('loginRequest')
+      cy.get('[data-cy="submit"]').click()
+      cy.wait('@loginRequest').then((interception) => {
+        expect(interception.response.statusCode).to.eq(200)
+        expect(interception.response.body).to.have.property('token')
+      })
+
+      // Czekaj na wiele requestów
+      cy.intercept('GET', '/api/users').as('getUsers')
+      cy.intercept('GET', '/api/roles').as('getRoles')
+      cy.wait(['@getUsers', '@getRoles'])
+
+      // cy.wait(ms) — tylko gdy naprawdę potrzebujesz
+      cy.wait(1000)   // Unikaj! Wolisz should() z retry
+
+  - name: "Timeout — konfiguracja czekania"
+    desc: >
+      Domyślny timeout Cypress to 4000ms. Możesz go zmieniać globalnie
+      w cypress.config.ts lub per-komenda. Dłuższy timeout dla wolnych operacji
+      (animacje, API calls), krótszy dla szybkich asercji negatywnych.
+    code: |
+      // Per-komenda
+      cy.get('[data-cy="loader"]', { timeout: 10000 }).should('not.exist')
+      cy.get('[data-cy="result"]', { timeout: 15000 }).should('be.visible')
+
+      // W cypress.config.ts — globalnie
+      // defaultCommandTimeout: 4000
+      // pageLoadTimeout: 60000
+      // requestTimeout: 5000
+      // responseTimeout: 30000
+
+      // Per-asercja
+      cy.get('[data-cy="async-content"]')
+        .should('be.visible', { timeout: 8000 })
+
+  - name: "cy.waitUntil() — warunkowe czekanie"
+    desc: >
+      Nie wbudowany w Cypress — wymaga pluginu cypress-wait-until. Czeka
+      aż callback zwróci truthy. Przydatne dla niestandardowych warunków
+      (np. czekaj aż element osiągnie określoną wartość lub stan aplikacji
+      będzie gotowy). Alternatywa dla should() gdy warunek jest złożony.
+    code: |
+      // Wymaga: npm i -D cypress-wait-until
+      // W cypress/support/commands.ts: import 'cypress-wait-until'
+
+      // Czekaj aż element ma tekst
+      cy.waitUntil(() => cy.get('[data-cy="status"]').then(
+        ($el) => $el.text() === 'Gotowy'
+      ))
+
+      // Czekaj aż zniknie spinner
+      cy.waitUntil(() =>
+        cy.get('[data-cy="spinner"]').then(($el) => $el.length === 0),
+        { timeout: 10000, interval: 500 }
+      )

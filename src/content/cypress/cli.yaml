@@ -1,0 +1,422 @@
+title: Komendy Cypress
+
+groups:
+  - name: Instalacja & Setup
+    icon: "📦"
+    commands:
+      - cmd: npm install --save-dev cypress
+        desc: Zainstaluj Cypress jako dev dependency
+        detail:
+          what: Instaluje Cypress z pełną przeglądarką Chromium w node_modules.
+          how: Przy pierwszym otwarciu Cypress pobiera binaria przeglądarki (~200MB).
+          tips:
+            - 'yarn add --dev cypress — Yarn'
+            - 'pnpm add -D cypress — pnpm'
+      - cmd: npx cypress open
+        desc: Otwórz Cypress Test Runner (GUI)
+        detail:
+          what: Uruchamia interaktywny GUI Test Runner z podglądem testów i przeglądarką.
+          how: Pierwsze uruchomienie pokazuje wizard konfiguracji i tworzy cypress/ katalog.
+          tips:
+            - 'Wybierz E2E Testing lub Component Testing przy pierwszym uruchomieniu'
+            - 'cypress open --e2e — skip wyboru i otwórz E2E od razu'
+      - cmd: npx cypress run
+        desc: Uruchom wszystkie testy headlessly (CI)
+        detail:
+          what: Uruchamia wszystkie testy E2E w tle bez GUI. Domyślnie Chromium, headless.
+          how: Wynik w terminalu + screenshoty/wideo w cypress/screenshots i cypress/videos.
+          tips:
+            - 'npx cypress run --headless — jawnie headless (domyślne)'
+            - 'npx cypress run --headed — pokaż okno przeglądarki'
+      - cmd: npx cypress open --e2e
+        desc: Otwórz Test Runner tylko dla E2E
+        detail:
+          what: Pomija dialog wyboru trybu i otwiera E2E Testing bezpośrednio.
+          how: Przydatne gdy masz już skonfigurowany projekt.
+          tips:
+            - 'npx cypress open --component — otwórz Component Testing'
+      - cmd: npx cypress open --component
+        desc: Otwórz Test Runner dla Component Testing
+        detail:
+          what: Otwiera Cypress w trybie Component Testing (React, Vue, Angular, Svelte).
+          how: Wymaga konfiguracji devServer w cypress.config.ts.
+          tips:
+            - 'Działa z Vite, Webpack, Next.js, Create React App'
+
+  - name: Uruchamianie testów
+    icon: "🚀"
+    commands:
+      - cmd: npx cypress run --spec "cypress/e2e/login.cy.ts"
+        desc: Uruchom konkretny plik spec
+        detail:
+          what: Uruchamia tylko wskazany plik z testami zamiast wszystkich.
+          how: Ścieżka relatywna lub glob pattern.
+          tips:
+            - '"cypress/e2e/**/*.cy.ts" — glob dla wszystkich plików'
+            - 'npx cypress run --spec "cypress/e2e/auth/**" — katalog'
+      - cmd: npx cypress run --browser chrome
+        desc: Uruchom testy na Chrome
+        detail:
+          what: Wybiera zainstalowaną przeglądarkę Chrome zamiast Chromium wbudowanego.
+          how: Cypress wykrywa zainstalowane przeglądarki automatycznie.
+          flags:
+            - flag: "--browser chrome"
+              desc: Google Chrome (zainstalowany)
+            - flag: "--browser firefox"
+              desc: Mozilla Firefox
+            - flag: "--browser edge"
+              desc: Microsoft Edge
+            - flag: "--browser electron"
+              desc: Wbudowany Electron (headless, bez instalacji)
+          tips:
+            - 'npx cypress run --browser firefox — Firefox'
+      - cmd: npx cypress run --browser firefox
+        desc: Uruchom testy na Firefox
+        detail:
+          what: Używa zainstalowanego Firefox do uruchomienia testów.
+          how: Firefox musi być zainstalowany na maszynie.
+          tips:
+            - 'Cypress nie obsługuje Safari — użyj Playwright dla WebKit'
+      - cmd: npx cypress run --headed
+        desc: Uruchom testy z widoczną przeglądarką
+        detail:
+          what: Otwiera okno przeglądarki i uruchamia testy w trybie headed.
+          how: Wolniejsze niż headless — widoczne kliknięcia i wpisywanie.
+          tips:
+            - 'Przydatne do debugowania na lokalnym środowisku'
+            - 'npx cypress run --headed --no-exit — nie zamykaj po testach'
+      - cmd: npx cypress run --record
+        desc: Nagraj wyniki do Cypress Cloud
+        detail:
+          what: Uploaduje wyniki, screenshoty i wideo do Cypress Cloud (dash.cypress.io).
+          how: Wymaga CYPRESS_RECORD_KEY lub --key <key>.
+          tips:
+            - 'npx cypress run --record --key <twój-klucz>'
+            - 'Cypress Cloud — historia wyników, flaky test detection, parallelizacja'
+      - cmd: "npx cypress run --env apiUrl=http://localhost:3000"
+        desc: Przekaż zmienne środowiskowe do testów
+        detail:
+          what: Ustawia Cypress.env('apiUrl') dostępne w testach.
+          how: Wiele zmiennych oddzielone przecinkiem.
+          tips:
+            - '"--env key1=val1,key2=val2" — wiele zmiennych'
+            - 'CYPRESS_apiUrl=http://... npx cypress run — z OS env'
+      - cmd: npx cypress run --config baseUrl=http://localhost:8080
+        desc: Override konfiguracji z CLI
+        detail:
+          what: Nadpisuje wartość z cypress.config.ts przez CLI.
+          how: Przydatne do testowania różnych środowisk (staging, prod).
+          tips:
+            - '"--config baseUrl=https://staging.app.com,viewportWidth=1280"'
+      - cmd: npx cypress run --reporter mochawesome
+        desc: Generuj HTML raport z wynikami
+        detail:
+          what: Używa reportera mochawesome zamiast domyślnego spec.
+          how: Wymaga npm i -D mochawesome cypress-mochawesome-reporter.
+          tips:
+            - 'Raport w cypress/reports/ jako HTML z screenshotami'
+
+  - name: Nawigacja
+    icon: "🧭"
+    commands:
+      - code: "cy.visit('/login')"
+        desc: Odwiedź URL (relatywny do baseUrl)
+        detail:
+          what: Nawiguje przeglądarkę do podanego URL. Czeka na załadowanie strony.
+          how: Relatywny URL łączony z baseUrl z cypress.config.ts.
+          tips:
+            - "cy.visit('https://example.com') — pełny URL"
+            - 'cy.visit("/path", { timeout: 10000 }) — custom timeout'
+      - code: cy.url()
+        desc: Pobierz aktualny URL strony
+        detail:
+          what: Zwraca aktualny URL jako string. Używaj .should() do asercji.
+          how: cy.url().should('include', '/dashboard')
+          tips:
+            - "cy.url().should('eq', 'http://localhost:3000/home')"
+      - code: cy.go('back')
+        desc: Cofnij przeglądarkę (historia)
+        detail:
+          what: Symuluje kliknięcie przycisku wstecz przeglądarki.
+          how: "'back' lub -1. cy.go('forward') lub 1 — naprzód."
+          tips:
+            - 'cy.go(-2) — cofnij o 2 kroki'
+      - code: cy.reload()
+        desc: Odśwież stronę
+        detail:
+          what: Odświeża aktualną stronę jak F5.
+          how: cy.reload(true) — hard reload (ignoruj cache).
+          tips:
+            - 'cy.reload(true) — force reload bez cache'
+      - code: cy.title()
+        desc: Pobierz tytuł strony
+        detail:
+          what: Zwraca wartość <title> dokumentu HTML.
+          how: "cy.title().should('eq', 'Strona główna — Moja Aplikacja')"
+          tips:
+            - 'cy.title().should(''contain'', ''Moja Aplikacja'')'
+
+  - name: Selektory DOM
+    icon: "🎯"
+    commands:
+      - code: "cy.get('[data-cy=\"submit\"]')"
+        desc: Pobierz element po selektorze CSS
+        detail:
+          what: Pobiera element(y) z DOM. Automatycznie czeka na pojawienie się.
+          how: Preferuj atrybuty data-cy — odporne na zmiany CSS i struktury HTML.
+          tips:
+            - "cy.get('.class') — po klasie"
+            - "cy.get('#id') — po ID"
+            - 'cy.get("input[type=email]") — po atrybucie'
+      - code: cy.contains('Zaloguj się')
+        desc: Pobierz element po tekście
+        detail:
+          what: Szuka elementu zawierającego podany tekst.
+          how: cy.contains('button', 'Wyślij') — element + tekst.
+          tips:
+            - 'cy.contains(/zaloguj/i) — regex case-insensitive'
+      - code: "cy.get('ul').find('li')"
+        desc: Szukaj elementu wewnątrz innego
+        detail:
+          what: find() zawęża wyszukiwanie do potomków elementu.
+          how: Odpowiednik querySelectorAll na konkretnym elemencie.
+          tips:
+            - 'cy.get("table").find("tr").should("have.length", 5)'
+      - code: cy.get('[data-cy="item"]').first()
+        desc: Pierwszy element z listy
+        detail:
+          what: Pobiera pierwszy element z kolekcji.
+          how: .last() — ostatni. .eq(2) — po indeksie (0-based).
+          tips:
+            - '.last() — ostatni element'
+            - '.eq(3) — czwarty element (index 3)'
+      - code: "cy.get('[data-cy=\"row\"]').each(($el) => { cy.wrap($el).click() })"
+        desc: Iteruj po elementach
+        detail:
+          what: each() iteruje po każdym elemencie z kolekcji.
+          how: cy.wrap($el) opakowuje natywny element do Cypress chain.
+          tips:
+            - 'cy.get("li").its("length").should("be.gt", 0)'
+
+  - name: Interakcje
+    icon: "🖱️"
+    commands:
+      - code: cy.get('[data-cy="btn"]').click()
+        desc: Kliknij element
+        detail:
+          what: Symuluje kliknięcie myszką. Czeka aż element będzie widoczny i klikalny.
+          how: Automatycznie scrolluje do elementu przed kliknięciem.
+          tips:
+            - '.click({ force: true }) — klik na ukrytym elemencie'
+            - '.dblclick() — podwójne kliknięcie'
+      - code: cy.get('input').type('tekst{enter}')
+        desc: Wpisz tekst do pola
+        detail:
+          what: Symuluje realne naciśnięcia klawiszy. Trigguje keydown/keypress/input/keyup.
+          how: Specjalne klawisze w nawiasach klamrowych.
+          tips:
+            - '"{backspace}" — usuń znak'
+            - '"{selectall}" — zaznacz wszystko'
+            - '"{ctrl}a" — Ctrl+A'
+      - code: cy.get('input').clear()
+        desc: Wyczyść pole tekstowe
+        detail:
+          what: Usuwa zawartość pola input lub textarea.
+          how: Odpowiednik Ctrl+A + Delete.
+          tips:
+            - '.clear().type("nowy tekst") — wyczyść i wpisz'
+      - code: cy.get('select').select('Opcja A')
+        desc: Wybierz opcję w select
+        detail:
+          what: Wybiera opcję po tekście etykiety lub wartości value.
+          how: "cy.get('select').select('PL') — po value lub 'Polska' — po tekście."
+          tips:
+            - ".select(['val1', 'val2']) — multi-select"
+      - code: cy.get('[type="checkbox"]').check()
+        desc: Zaznacz checkbox
+        detail:
+          what: Zaznacza checkbox lub radio button.
+          how: .uncheck() — odznacza. .check(['val1', 'val2']) — wiele checkboxów.
+          tips:
+            - '.uncheck() — odznacz'
+            - '.should("be.checked") — asertuj zaznaczenie'
+
+  - name: Asercje
+    icon: "✅"
+    commands:
+      - code: ".should('be.visible')"
+        desc: Element jest widoczny
+        detail:
+          what: Asertuje że element jest renderowany i widoczny (nie hidden, nie opacity 0).
+          how: Cypress automatycznie ponawia asercję do timeout.
+          tips:
+            - ".should('not.exist') — element nie istnieje w DOM"
+            - ".should('be.hidden') — element istnieje ale jest ukryty"
+      - code: ".should('have.text', 'Witaj!')"
+        desc: Element ma dokładny tekst
+        detail:
+          what: Asertuje dokładną zawartość tekstową elementu.
+          how: "contain.text — częściowe dopasowanie. have.text — dokładne."
+          tips:
+            - ".should('contain.text', 'fragment') — częściowe"
+            - ".invoke('text').should('match', /regex/)"
+      - code: ".should('have.length', 5)"
+        desc: Kolekcja ma dokładną liczbę elementów
+        detail:
+          what: Asertuje liczbę elementów w kolekcji zwróconej przez cy.get().
+          how: cy.get('li').should('have.length', 5)
+          tips:
+            - ".should('have.length.greaterThan', 0) — więcej niż 0"
+            - ".should('have.length.lessThan', 10)"
+      - code: ".should('have.class', 'active')"
+        desc: Element ma klasę CSS
+        detail:
+          what: Asertuje że element posiada daną klasę CSS.
+          how: Sprawdza classList — element może mieć inne klasy obok.
+          tips:
+            - ".should('not.have.class', 'disabled')"
+      - code: ".should('have.attr', 'href', '/home')"
+        desc: Element ma atrybut HTML
+        detail:
+          what: Asertuje wartość atrybutu HTML elementu.
+          how: Dwa argumenty — nazwa i oczekiwana wartość. Jeden argument — atrybut istnieje.
+          tips:
+            - ".should('have.attr', 'disabled') — atrybut istnieje"
+            - ".invoke('attr', 'href').should('include', 'example.com')"
+
+  - name: Network & Intercepting
+    icon: "🌐"
+    commands:
+      - code: "cy.intercept('GET', '/api/users').as('getUsers')"
+        desc: Przechwytuj request i nadaj alias
+        detail:
+          what: Przechwytuje request GET do /api/users i nadaje mu alias getUsers.
+          how: Musi być wywołane PRZED akcją która triggeruje request.
+          tips:
+            - "cy.intercept('POST', '/api/**').as('anyPost') — wildcard"
+      - code: "cy.intercept('GET', '/api/data', { fixture: 'data.json' })"
+        desc: Stub request z fixtures
+        detail:
+          what: Zwraca zawartość pliku fixture zamiast prawdziwej odpowiedzi API.
+          how: Plik z cypress/fixtures/data.json.
+          tips:
+            - "{ statusCode: 500 } — symuluj błąd"
+            - "{ delay: 2000 } — symuluj wolne API"
+      - code: "cy.wait('@getUsers')"
+        desc: Czekaj na request z aliasem
+        detail:
+          what: Zatrzymuje test do momentu zakończenia requestu z danym aliasem.
+          how: Zwraca obiekt interception z request i response detalami.
+          tips:
+            - "cy.wait('@getUsers').its('response.statusCode').should('eq', 200)"
+            - "cy.wait(['@req1', '@req2']) — czekaj na wiele"
+      - code: "cy.request('POST', '/api/login', { email: 'a@b.com', password: 'x' })"
+        desc: Wyślij HTTP request bez UI
+        detail:
+          what: Bezpośredni HTTP request z Cypress — do seedowania danych i logowania przez API.
+          how: Poza przeglądarką — szybkie i niezawodne setup/teardown.
+          tips:
+            - ".then((res) => { expect(res.status).to.eq(200) })"
+      - code: "cy.intercept('POST', '/api/login', { forceNetworkError: true })"
+        desc: Symuluj błąd sieci
+        detail:
+          what: Powoduje że request kończy się błędem sieciowym zamiast odpowiedzią HTTP.
+          how: Przydatne do testowania obsługi braku połączenia i error states.
+          tips:
+            - "{ statusCode: 503 } — błąd serwera zamiast network error"
+      - code: "cy.intercept('GET', '/api/**', (req) => { req.reply((res) => { res.delay = 3000 }) })"
+        desc: Dodaj opóźnienie do odpowiedzi API
+        detail:
+          what: Modyfikuje odpowiedź z serwera — dodaje delay symulując wolne połączenie.
+          how: Użyj routeHandler z req.reply() do modyfikacji odpowiedzi w locie.
+          tips:
+            - "{ delay: 3000 } w stubbie — prostszy sposób na delay"
+
+  - name: Debugowanie
+    icon: "🐛"
+    commands:
+      - code: cy.pause()
+        desc: Zatrzymaj test i otwórz debugger
+        detail:
+          what: Pauzuje wykonanie testu w tym miejscu. W Test Runner możesz klikać Step Over.
+          how: Usuń przed commitem — tylko do debugowania.
+          tips:
+            - 'Otwórz DevTools w Cypress Test Runner (F12) przed pauzą'
+      - code: cy.debug()
+        desc: Dodaj breakpoint do konsoli
+        detail:
+          what: Loguje aktualny obiekt do konsoli i pauzuje wykonanie gdy DevTools otwarte.
+          how: Działa jak debugger; w JavaScript.
+          tips:
+            - 'cy.get("input").debug() — debuguj konkretny element'
+      - code: "cy.log('Informacja debugowa')"
+        desc: Loguj do Cypress Command Log
+        detail:
+          what: Wyświetla wiadomość w Command Log po lewej stronie Test Runnera.
+          how: Widoczne tylko w GUI — nie w headless output.
+          tips:
+            - 'cy.log(`URL: ${Cypress.config("baseUrl")}`) — log z wartością'
+      - code: npx cypress run --headed --no-exit
+        desc: Headed i nie zamykaj po testach
+        detail:
+          what: Uruchamia testy z przeglądarką i nie zamyka jej po skończeniu.
+          how: Możesz inspect DOM po zakończeniu testu.
+          tips:
+            - 'Przydatne do debugowania stanu po failurze'
+      - code: "CYPRESS_DEBUG=true npx cypress run"
+        desc: Verbose debug output Cypress
+        detail:
+          what: Wyświetla szczegółowe logi Cypress internals w terminalu.
+          how: Pomaga diagnozować problemy z konfiguracją i timeoutami.
+          tips:
+            - 'DEBUG=cypress:* npx cypress run — pełny debug wszystkich modułów'
+
+  - name: Konfiguracja
+    icon: "⚙️"
+    commands:
+      - code: "cy.viewport(1280, 720)"
+        desc: Ustaw rozmiar okna przeglądarki
+        detail:
+          what: Zmienia viewport na podany rozmiar w pikselach.
+          how: Możesz też użyć predefiniowanych nazw urządzeń.
+          tips:
+            - "cy.viewport('iphone-14') — predefiniowany viewport"
+            - "cy.viewport('macbook-15') — laptop"
+      - code: "cy.setCookie('session', 'abc123')"
+        desc: Ustaw cookie
+        detail:
+          what: Ustawia cookie w aktualnej sesji przeglądarki.
+          how: Przydatne do ręcznego ustawiania sesji bez przechodzenia przez login.
+          tips:
+            - "cy.getCookie('session').should('have.property', 'value', 'abc123')"
+            - 'cy.clearCookies() — wyczyść wszystkie cookies'
+      - code: "cy.clearLocalStorage()"
+        desc: Wyczyść localStorage
+        detail:
+          what: Usuwa wszystkie klucze z localStorage przeglądarki.
+          how: Przydatne w afterEach do resetu stanu między testami.
+          tips:
+            - "cy.window().then((win) => win.localStorage.setItem('key', 'val'))"
+      - code: Cypress.config('baseUrl')
+        desc: Odczytaj wartość konfiguracji
+        detail:
+          what: Zwraca wartość z cypress.config.ts lub ustawioną przez CLI.
+          how: Cypress.config('baseUrl', 'http://new-url') — ustaw w runtime.
+          tips:
+            - 'Cypress.env("apiKey") — odczytaj zmienną środowiskową'
+      - code: "cy.screenshot('nazwa-screenshota')"
+        desc: Zrób screenshot strony lub elementu
+        detail:
+          what: Zapisuje screenshot do cypress/screenshots/. Automatycznie przy failurach.
+          how: "cy.get('[data-cy=\"modal\"]').screenshot() — screenshot konkretnego elementu."
+          tips:
+            - 'Domyślnie screenshots włączone przy failach w cypress run'
+            - "cypress run --screenshot — wymuś screenshot każdego testu"
+      - code: "cy.scrollTo('bottom')"
+        desc: Przewiń stronę do pozycji
+        detail:
+          what: Przewija okno lub element do podanej pozycji lub koordynatów.
+          how: "Wartości: 'top', 'bottom', 'center', 'left', 'right' lub {x, y}."
+          tips:
+            - "cy.get('[data-cy=\"list\"]').scrollTo('bottom') — przewiń wewnątrz elementu"
+            - "cy.scrollTo(0, 500) — przewiń o 500px w dół"

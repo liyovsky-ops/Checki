@@ -1,0 +1,255 @@
+labels:
+  main: System uprawnień Deno
+  mainLang: typescript
+
+intro:
+  title: Deno — security by default
+  desc: >
+    Deno działa w piaskownicy — domyślnie skrypt ma zero dostępu do sieci, plików, zmiennych
+    środowiskowych, procesów ani sprzętu. Każdy dostęp musi być jawnie przyznany flagą --allow-*.
+    Możesz zawężać uprawnienia do konkretnych hostów, ścieżek lub zmiennych dla minimalnego
+    zakresu uprawnień (principle of least privilege). Deno 2.x dodał --deny-* dla explicit deny
+    i programowe API do zapytań o uprawnienia w runtime.
+
+items:
+  - title: --allow-read / --allow-write
+    desc: >
+      Kontroluje dostęp do systemu plików. Bez tych flag, każda próba odczytu lub zapisu
+      pliku rzuci PermissionDeniedError. Możesz ograniczyć dostęp do konkretnych ścieżek.
+    code: |
+      # Pełny dostęp do odczytu
+      deno run --allow-read script.ts
+
+      # Dostęp tylko do katalogu ./data i pliku config.json
+      deno run --allow-read=./data,./config.json script.ts
+
+      # Pełny dostęp do zapisu
+      deno run --allow-write script.ts
+
+      # Zapis tylko do katalogu ./output
+      deno run --allow-write=./output script.ts
+
+      # Odczyt I zapis jednocześnie
+      deno run --allow-read=./data --allow-write=./output script.ts
+
+      # Skrót: -R i -W (Deno 2.x)
+      deno run -R -W script.ts
+    lang: bash
+
+  - title: --allow-net / --deny-net
+    desc: >
+      Kontroluje dostęp do sieci (TCP, UDP, HTTP). Możesz ograniczyć do konkretnych hostów
+      i portów. --deny-net pozwala na explicit deny wybranych hostów przy ogólnym --allow-net.
+    code: |
+      # Pełny dostęp do sieci
+      deno run --allow-net script.ts
+
+      # Dostęp tylko do wybranych hostów (z portem lub bez)
+      deno run --allow-net=api.example.com,localhost:8080 script.ts
+
+      # Deny konkretnego hosta (przy ogólnym allow-net)
+      deno run --allow-net --deny-net=evil.example.com script.ts
+
+      # Przykład w kodzie — bez uprawnienia:
+      # PermissionDeniedError: Requires net access to "example.com:443"
+      const resp = await fetch("https://example.com/api");
+      // Powyższe wymaga: --allow-net=example.com
+
+      # Skrót: -N
+      deno run -N script.ts
+    lang: bash
+
+  - title: --allow-env
+    desc: >
+      Kontroluje dostęp do zmiennych środowiskowych przez Deno.env. Możesz ograniczyć
+      do konkretnych nazw zmiennych dla minimalnych uprawnień.
+    code: |
+      # Dostęp do wszystkich zmiennych środowiskowych
+      deno run --allow-env script.ts
+
+      # Dostęp tylko do wybranych zmiennych
+      deno run --allow-env=PORT,DATABASE_URL,SECRET_KEY script.ts
+
+      # W kodzie — sprawdzenie konkretnej zmiennej
+      const port = Deno.env.get("PORT"); // wymaga --allow-env lub --allow-env=PORT
+      const db = Deno.env.get("DATABASE_URL");
+
+      // Bez uprawnienia:
+      // PermissionDeniedError: Requires env access to "PORT"
+
+      # Ładowanie .env przez flagę (Deno 1.38+)
+      deno run --allow-env --env-file=.env main.ts
+
+      # Skrót: -E
+      deno run -E script.ts
+    lang: bash
+
+  - title: --allow-run
+    desc: >
+      Kontroluje uruchamianie procesów zewnętrznych przez Deno.Command. Możesz ograniczyć
+      do wybranych poleceń. Bez tej flagi Deno.Command rzuci PermissionDeniedError.
+    code: |
+      # Pełne uprawnienie do uruchamiania procesów
+      deno run --allow-run script.ts
+
+      # Tylko wybrane polecenia
+      deno run --allow-run=git,ls,grep script.ts
+
+      # Przykład w kodzie
+      const cmd = new Deno.Command("git", {
+        args: ["status"],
+        stdout: "piped",
+      });
+      const { stdout } = await cmd.output(); // wymaga --allow-run=git
+
+      // Bez uprawnienia:
+      // PermissionDeniedError: Requires run access to "git"
+
+      # Uwaga: --allow-run daje duże uprawnienia — używaj z listą konkretnych komend
+      # deno run --allow-run=git,npm script.ts  ← lepsze niż --allow-run
+    lang: bash
+
+  - title: --allow-ffi / --allow-hrtime
+    desc: >
+      --allow-ffi umożliwia ładowanie bibliotek natywnych (C, Rust) przez Deno.dlopen.
+      --allow-hrtime zezwala na high-resolution timing (może być używane do side-channel attacks).
+      Oba wymagają świadomej decyzji bezpieczeństwa.
+    code: |
+      # Załaduj bibliotekę natywną (.so/.dll/.dylib)
+      deno run --allow-ffi script.ts
+
+      # Przykład Deno FFI (Foreign Function Interface)
+      // native.ts — wymaga --allow-ffi
+      const libSuffix = Deno.build.os === "windows" ? "dll"
+        : Deno.build.os === "darwin" ? "dylib" : "so";
+
+      const lib = Deno.dlopen(`./mylib.${libSuffix}`, {
+        add: { parameters: ["i32", "i32"], result: "i32" },
+        greet: { parameters: ["buffer"], result: "void" },
+      });
+
+      console.log(lib.symbols.add(5, 3)); // 8 — wykonano native code
+
+      lib.close();
+
+      # High-resolution timer (domyślnie zaokrąglony dla bezpieczeństwa)
+      deno run --allow-hrtime benchmark.ts
+      # performance.now() zwraca precyzyjny czas zamiast zaokrąglonego
+    lang: bash
+
+  - title: Deno.permissions — runtime API
+    desc: >
+      Programowe sprawdzanie, żądanie i cofanie uprawnień w runtime. Pozwala na
+      dynamiczne sprawdzanie co jest dozwolone i prośbę o dodatkowe uprawnienia.
+    code: |
+      // Sprawdzenie stanu uprawnienia (query)
+      const statusNet = await Deno.permissions.query({
+        name: "net",
+        host: "example.com",
+      });
+      console.log(statusNet.state); // "granted" | "denied" | "prompt"
+
+      // Sprawdzenie uprawnienia do pliku
+      const statusRead = await Deno.permissions.query({
+        name: "read",
+        path: "/etc/passwd",
+      });
+      console.log(statusRead.state);
+
+      // Żądanie uprawnienia (pokazuje prompt użytkownikowi)
+      const prosba = await Deno.permissions.request({
+        name: "net",
+        host: "api.example.com",
+      });
+
+      if (prosba.state === "granted") {
+        const resp = await fetch("https://api.example.com/data");
+        console.log(await resp.json());
+      } else {
+        console.log("Użytkownik odrzucił dostęp do sieci");
+      }
+
+      // Cofnięcie uprawnienia
+      await Deno.permissions.revoke({ name: "net" });
+    lang: typescript
+
+  - title: --unstable-* flagi
+    desc: >
+      Niektóre API Deno są dostępne za flagami --unstable-*. To mechanizm stopniowego
+      dojrzewania API — korzystasz z nowych funkcji, ale akceptujesz możliwość zmian.
+      Każda funkcja ma własną flagę zamiast globalnego --unstable.
+    code: |
+      # Dostępne flagi --unstable-* w Deno 2.x:
+      --unstable-kv          # Deno KV (wbudowana baza danych)
+      --unstable-cron        # Deno.cron (zaplanowane zadania)
+      --unstable-temporal    # Temporal API (nowoczesne daty)
+      --unstable-broadcast-channel  # BroadcastChannel
+      --unstable-ffi         # Foreign Function Interface
+      --unstable-net         # Dodatkowe net APIs (UDP, Unix sockets)
+      --unstable-worker-options  # Opcje Web Workers
+
+      # Przykład użycia:
+      deno run --allow-read --allow-write --unstable-kv kv-app.ts
+      deno run --allow-net --unstable-cron scheduler.ts
+
+      # Sprawdzenie w deno.json (zamiast flag CLI):
+      # {
+      #   "unstable": ["kv", "cron", "temporal"]
+      # }
+      # Wtedy wystarczy: deno run --allow-net --allow-read main.ts
+    lang: bash
+
+  - title: Flaga -A i tryb produkcyjny
+    desc: >
+      -A (--allow-all) przyznaje wszystkie uprawnienia — odpowiednik sudo dla Deno.
+      Wygodne w developmencie, ale nigdy nie powinno być używane w produkcji.
+      W produkcji zawsze definiuj minimalne wymagane uprawnienia.
+    code: |
+      # Development — wygoda (TYLKO lokalnie)
+      deno run -A --watch main.ts
+
+      # Produkcja — minimalne uprawnienia (BEZPIECZNE)
+      deno run \
+        --allow-net=api.external.com,0.0.0.0:8080 \
+        --allow-read=./static,./config.json \
+        --allow-env=PORT,DATABASE_URL,JWT_SECRET \
+        --allow-write=./logs \
+        main.ts
+
+      # W deno.json — zdefiniuj uprawnienia dla zadań (tasks):
+      # {
+      #   "tasks": {
+      #     "start": "deno run --allow-net=:8080 --allow-env=PORT main.ts",
+      #     "dev": "deno run -A --watch main.ts"
+      #   }
+      # }
+
+      # deno task start  ← produkcja
+      # deno task dev    ← development
+    lang: bash
+
+  - title: Permission prompts interaktywne
+    desc: >
+      Gdy skrypt próbuje wykonać operację bez uprawnienia, Deno pyta użytkownika
+      interaktywnie (jeśli terminal jest dostępny). To model podobny do przeglądarki —
+      użytkownik decyduje w runtime. W CI/CD promptu nie ma — operacja jest odrzucana.
+    code: |
+      // main.ts — uruchom BEZ flag uprawnień
+      // deno run main.ts
+
+      // Gdy kod spróbuje:
+      const data = await Deno.readTextFile("./secret.txt");
+      // Deno wyświetli prompt:
+      // ┌ ⚠️  Deno requests read access to "./secret.txt".
+      // ├ Requested by `Deno.readTextFile()` API.
+      // ├ Run again with --allow-read to bypass this prompt.
+      // └ Allow? [y/n/A] (y = yes, allow; n = no, deny; A = allow all read)
+
+      // Odpowiedź y  → operacja dozwolona jednorazowo
+      // Odpowiedź A  → --allow-read dla całego procesu
+      // Odpowiedź n  → PermissionDeniedError
+
+      # W skryptach nieinteraktywnych (CI/CD):
+      # Brak terminala → automatyczne odrzucenie bez pytania
+      # PermissionDeniedError: Requires read access to "./secret.txt"
+    lang: typescript

@@ -1,0 +1,206 @@
+title: Selektory i Interakcje
+
+items:
+  - name: "cy.get() — podstawowy selektor"
+    desc: >
+      Główna komenda do pobierania elementów. Przyjmuje selektor CSS, atrybut data-cy
+      lub alias (@alias). Automatycznie czeka na pojawienie się elementu w DOM
+      (domyślny timeout 4000ms). Zwraca Cypress wrapper, nie natywny element DOM.
+    code: |
+      // Selektor CSS
+      cy.get('button')
+      cy.get('.submit-btn')
+      cy.get('#email')
+      cy.get('input[type="email"]')
+
+      // Rekomendowane: atrybut data-cy (nie zmienia się przy refactoringu)
+      cy.get('[data-cy="submit-btn"]')
+      cy.get('[data-cy="email-input"]')
+
+      // Alias (wcześniej cy.get(...).as('myEl'))
+      cy.get('@myEl')
+
+  - name: "cy.contains() — selektor po tekście"
+    desc: >
+      Pobiera element zawierający podany tekst. Przydatne gdy nie masz data-cy,
+      ale element ma unikalny tekst. Obsługuje string i regex. Możesz podać
+      selektor jako pierwszy argument — zawęża szukanie do elementów pasujących do CSS.
+    code: |
+      // Znajdź element z tekstem
+      cy.contains('Zaloguj się')
+      cy.contains('button', 'Wyślij')
+      cy.contains('td', 'Jan Kowalski')
+
+      // Regex
+      cy.contains(/zaloguj/i)
+
+      // Zagnieżdżone wyszukiwanie
+      cy.get('[data-cy="user-list"]')
+        .contains('Jan Kowalski')
+        .click()
+
+  - name: "cy.find() — szukaj w kontekście"
+    desc: >
+      Szuka elementów wewnątrz wcześniej pobranego elementu. Używany po cy.get()
+      do zawężania wyszukiwania. Odpowiednik querySelector na konkretnym elemencie,
+      nie całym dokumencie.
+    code: |
+      cy.get('[data-cy="product-card"]')
+        .find('[data-cy="add-to-cart"]')
+        .click()
+
+      cy.get('table')
+        .find('tr')
+        .should('have.length', 5)
+
+      cy.get('form')
+        .find('input[required]')
+        .each(($el) => {
+          cy.wrap($el).should('be.visible')
+        })
+
+  - name: "cy.closest() — znajdź rodzica"
+    desc: >
+      Przechodzi w górę drzewa DOM i zwraca najbliższego rodzica pasującego do selektora.
+      Przydatne gdy masz referencję do dziecka i chcesz operować na rodzicu
+      (np. znalazłeś link, chcesz kliknąć cały wiersz tabeli).
+    code: |
+      cy.contains('Usuń').closest('tr').should('have.class', 'active')
+
+      cy.get('[data-cy="delete-btn"]')
+        .closest('[data-cy="user-row"]')
+        .find('[data-cy="username"]')
+        .should('contain', 'admin')
+
+  - name: "Atrybut data-cy — best practice"
+    desc: >
+      Cypress rekomenduje używanie atrybutów data-cy (lub data-testid) jako selektorów.
+      Są odporne na zmiany CSS i refactoring HTML. Nie wpływają na style ani zachowanie.
+      Dodawaj je do elementów w kodzie aplikacji, nie w testach.
+    code: |
+      // W komponencie React/Vue/HTML
+      <button data-cy="submit-btn">Wyślij</button>
+      <input data-cy="email-input" type="email" />
+      <div data-cy="user-card" data-user-id={user.id}>...</div>
+
+      // W teście
+      cy.get('[data-cy="submit-btn"]').click()
+      cy.get('[data-cy="email-input"]').type('test@example.com')
+
+      // Możesz użyć wartości dynamicznej
+      cy.get(`[data-cy="user-card"][data-user-id="${userId}"]`)
+
+  - name: ".click() — kliknięcie"
+    desc: >
+      Symuluje kliknięcie myszką. Automatycznie czeka aż element będzie widoczny
+      i nie będzie przykryty innym elementem. Obsługuje opcje: position (top/center/bottom),
+      multiple i force (klik na ukrytym elemencie — ostrożnie).
+    code: |
+      cy.get('[data-cy="submit-btn"]').click()
+
+      // Opcje pozycji
+      cy.get('.map').click('topLeft')
+      cy.get('.map').click(100, 200)   // koordynaty x, y
+
+      // Klikaj każdy element
+      cy.get('[data-cy="checkbox"]').click({ multiple: true })
+
+      // Wymuś klik (nawet gdy ukryty) — używaj ostrożnie
+      cy.get('[data-cy="hidden-btn"]').click({ force: true })
+
+  - name: ".type() — wpisywanie tekstu"
+    desc: >
+      Wpisuje tekst do pola input lub textarea. Symuluje realne naciśnięcia klawiszy —
+      każdy znak wywołuje keydown, keypress, input, keyup. Obsługuje specjalne klawisze
+      w nawiasach klamrowych. Automatycznie focusuje element przed pisaniem.
+    code: |
+      cy.get('[data-cy="email-input"]').type('user@example.com')
+      cy.get('[data-cy="message"]').type('Wiadomość testowa')
+
+      // Specjalne klawisze
+      cy.get('input').type('{enter}')
+      cy.get('input').type('{backspace}')
+      cy.get('input').type('{selectall}nowy tekst')
+      cy.get('input').type('{ctrl}a{del}')
+
+      // Opóźnienie między znakami (ms)
+      cy.get('input').type('wolny tekst', { delay: 100 })
+
+  - name: ".clear() i .focus() / .blur()"
+    desc: >
+      clear() czyści zawartość pola tekstowego. focus() przenosi fokus na element
+      bez klikania. blur() zdejmuje fokus — przydatne do triggerowania walidacji
+      onBlur. Często używane razem w sekwencji czyszczenia i przepisywania.
+    code: |
+      // Wyczyść i wpisz nową wartość
+      cy.get('[data-cy="search-input"]')
+        .clear()
+        .type('nowe zapytanie')
+
+      // Focus i blur do testowania walidacji
+      cy.get('[data-cy="email-input"]')
+        .focus()
+        .blur()
+      cy.get('[data-cy="email-error"]').should('be.visible')
+
+  - name: ".check() i .select()"
+    desc: >
+      check() zaznacza checkbox lub radio button. uncheck() odznacza. select() wybiera
+      opcję w elemencie select — możesz podać wartość (value) lub etykietę (label).
+      Obsługuje multi-select przez przekazanie tablicy wartości.
+    code: |
+      // Checkbox
+      cy.get('[data-cy="accept-terms"]').check()
+      cy.get('[data-cy="notifications"]').uncheck()
+
+      // Radio
+      cy.get('[data-cy="gender-male"]').check()
+
+      // Select — po wartości lub tekście
+      cy.get('[data-cy="country-select"]').select('PL')
+      cy.get('[data-cy="country-select"]').select('Polska')
+
+      // Multi-select
+      cy.get('[data-cy="tags-select"]').select(['react', 'typescript'])
+
+  - name: ".trigger() i .scrollIntoView()"
+    desc: >
+      trigger() wywołuje zdarzenie DOM (mouseenter, mouseover, dragstart, itp.).
+      Przydatne dla customowych event handlerów i testowania hover effects.
+      scrollIntoView() przewija stronę do elementu — niezbędne przed interakcją
+      z elementami poza ekranem.
+    code: |
+      // Symuluj hover
+      cy.get('[data-cy="dropdown"]').trigger('mouseenter')
+      cy.get('[data-cy="tooltip-trigger"]').trigger('mouseover')
+
+      // Drag and drop
+      cy.get('[data-cy="draggable"]')
+        .trigger('dragstart')
+      cy.get('[data-cy="dropzone"]')
+        .trigger('drop')
+
+      // Przewiń do elementu i kliknij
+      cy.get('[data-cy="lazy-button"]')
+        .scrollIntoView()
+        .click()
+
+  - name: ".submit() i .invoke()"
+    desc: >
+      submit() triggeruje zdarzenie submit na formularzu — alternatywa dla klikania
+      przycisku submit. invoke() wywołuje metodę na elemencie jQuery lub ustawia
+      właściwości — przydatne do usuwania atrybutów readonly, disabled.
+    code: |
+      // Submit formularza
+      cy.get('[data-cy="login-form"]').submit()
+
+      // Wywołaj metodę jQuery
+      cy.get('[data-cy="input"]').invoke('val', 'nowa wartość')
+
+      // Usuń atrybut disabled
+      cy.get('[data-cy="btn"]').invoke('removeAttr', 'disabled').click()
+
+      // Sprawdź wartość właściwości
+      cy.get('[data-cy="input"]')
+        .invoke('val')
+        .should('eq', 'oczekiwana wartość')

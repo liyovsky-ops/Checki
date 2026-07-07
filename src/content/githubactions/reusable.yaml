@@ -1,0 +1,168 @@
+title: Reusable Workflows
+
+items:
+  - name: "workflow_call — definicja reusable workflow"
+    desc: >
+      Reusable workflow to workflow_call jako trigger. Można zdefiniować inputs
+      (parametry), outputs (zwracane wartości) i secrets (sekrety przekazywane
+      przez wywołującego). Eliminuje duplikację między workflow w organizacji.
+    code: |
+      # .github/workflows/reusable-ci.yml
+      name: Reusable CI
+
+      on:
+        workflow_call:
+          inputs:
+            node-version:
+              description: Wersja Node.js
+              type: string
+              required: false
+              default: '20'
+            run-e2e:
+              description: Czy uruchamiać testy e2e
+              type: boolean
+              default: false
+
+          outputs:
+            coverage:
+              description: Pokrycie kodu testami
+              value: ${{ jobs.test.outputs.coverage }}
+
+          secrets:
+            NPM_TOKEN:
+              required: false
+
+      jobs:
+        test:
+          runs-on: ubuntu-latest
+          outputs:
+            coverage: ${{ steps.coverage.outputs.result }}
+
+          steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                node-version: ${{ inputs.node-version }}
+
+            - run: npm ci
+              env:
+                NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+            - run: npm test -- --coverage
+
+            - name: Wyciągnij coverage
+              id: coverage
+              run: |
+                COV=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
+                echo "result=$COV" >> $GITHUB_OUTPUT
+
+  - name: "Wywołanie reusable workflow — lokalnie i zewnętrznie"
+    desc: >
+      uses: w jobie (nie w step!) wskazuje na reusable workflow.
+      Format: owner/repo/.github/workflows/plik.yml@ref dla zewnętrznych.
+      ./.github/workflows/plik.yml dla lokalnych (w tym samym repo).
+    code: |
+      # Wywołanie lokalnego workflow
+      jobs:
+        ci:
+          uses: ./.github/workflows/reusable-ci.yml
+          with:
+            node-version: '22'
+            run-e2e: true
+          secrets:
+            NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Wywołanie workflow z innego repo organizacji
+        deploy:
+          needs: ci
+          uses: myorg/shared-workflows/.github/workflows/deploy.yml@v2
+          with:
+            environment: production
+          secrets: inherit
+
+      # Odczyt outputu z reusable workflow
+        report:
+          needs: ci
+          runs-on: ubuntu-latest
+          steps:
+            - run: echo "Coverage ${{ needs.ci.outputs.coverage }}%"
+
+  - name: "Composite action — action.yml z wieloma krokami"
+    desc: >
+      Composite action to alternatywa dla reusable workflow — działa na poziomie
+      steps (nie jobs). Definiujesz w .github/actions/name/action.yml.
+      Może być używana lokalnie lub opublikowana na Marketplace.
+    code: |
+      # .github/actions/docker-build-push/action.yml
+      name: Docker Build and Push
+      description: Buduj i pushuj obraz Docker do rejestru
+
+      inputs:
+        image-name:
+          description: Nazwa obrazu
+          required: true
+        tag:
+          description: Tag obrazu
+          default: latest
+        registry:
+          description: Rejestr Docker
+          default: ghcr.io
+
+      outputs:
+        image-url:
+          description: Pełny URL obrazu
+          value: ${{ steps.meta.outputs.tags }}
+
+      runs:
+        using: composite
+        steps:
+          - name: Login do rejestru
+            uses: docker/login-action@v3
+            with:
+              registry: ${{ inputs.registry }}
+              username: ${{ github.actor }}
+              password: ${{ github.token }}
+
+          - name: Docker meta
+            id: meta
+            uses: docker/metadata-action@v5
+            with:
+              images: ${{ inputs.registry }}/${{ inputs.image-name }}
+
+          - name: Build i push
+            uses: docker/build-push-action@v5
+            with:
+              push: true
+              tags: ${{ steps.meta.outputs.tags }}
+
+      # Użycie w workflow:
+      # - uses: ./.github/actions/docker-build-push
+      #   with:
+      #     image-name: myapp
+      #     tag: ${{ github.sha }}
+
+  - name: "Wersjonowanie — @tag, @sha, @branch"
+    desc: >
+      Actions i reusable workflows są wersjonowane przez git ref.
+      @v4 to tag semantyczny, @main to branch (niestabilny!),
+      @sha to pełny hash (najbezpieczniejszy — niezmienny).
+      Dependabot automatycznie aktualizuje wersje actions.
+    code: |
+      steps:
+        # Stabilna wersja — zalecane
+        - uses: actions/checkout@v4
+
+        # Dokładna wersja (semver)
+        - uses: actions/setup-node@v4.0.2
+
+        # SHA hash — najbezpieczniejszy (supply chain security)
+        - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+        # Branch — niestabilny, zmienny (unikać na prod)
+        - uses: actions/checkout@main
+
+      # Reusable workflow z tagiem
+      jobs:
+        build:
+          uses: myorg/workflows/.github/workflows/build.yml@v3

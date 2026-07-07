@@ -1,0 +1,94 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Pydantic?
+  firstComponent: Pierwszy model
+  firstComponentLang: python
+
+intro:
+  title: Czym jest Pydantic?
+  desc: >
+    Pydantic to biblioteka do walidacji danych w Pythonie oparta na type hints.
+    Definiujesz model jako klasę dziedziczącą po BaseModel — Pydantic automatycznie
+    waliduje dane przy inicjalizacji i rzuca ValidationError gdy coś się nie zgadza.
+    Wersja v2 (2023) przepisana w Rust (pydantic-core) — 5-50x szybsza od v1.
+    Używana w FastAPI, Pydantic AI, SQLModel i dziesiątkach innych frameworków.
+    Kluczowe API v2: model_dump() zamiast .dict(), model_validate() zamiast .parse_obj(),
+    model_dump_json() zamiast .json().
+
+concepts:
+  - title: Type hints → walidacja
+    desc: >
+      Pydantic czyta type hints pól i waliduje każdą wartość przy tworzeniu instancji.
+      int przyjmie "42" i skonwertuje na 42. str nie przyjmie None jeśli pole nie jest Optional.
+      Pydantic stara się koercji przed rzuceniem błędu — "123" → int 123, ale "abc" → błąd.
+    icon: "📝"
+  - title: ValidationError
+    desc: >
+      Gdy dane nie przejdą walidacji, Pydantic rzuca pydantic.ValidationError (nie ValueError).
+      ValidationError zawiera listę wszystkich błędów naraz — nie tylko pierwszy.
+      error.errors() zwraca listę dict z polami loc (ścieżka), msg, type, input.
+    icon: "❌"
+  - title: Field() — metadane pola
+    desc: >
+      Field() pozwala dodać ograniczenia (gt, lt, min_length, max_length, pattern),
+      wartość domyślną, alias, tytuł i opis do każdego pola. Używany też do dokumentacji
+      JSON Schema generowanego przez Pydantic (np. w FastAPI).
+    icon: "🔧"
+  - title: Pydantic v2 vs v1
+    desc: >
+      v2 (2023): model_dump() zamiast .dict(), model_validate() zamiast .parse_obj(),
+      model_dump_json() zamiast .json(), @field_validator zamiast @validator,
+      @model_validator zamiast @root_validator, model_config zamiast class Config.
+      v1 API częściowo dostępne przez pydantic.v1 dla migracji.
+    icon: "🔄"
+  - title: pydantic-core (Rust)
+    desc: >
+      Pydantic v2 używa pydantic-core — silnika walidacji napisanego w Rust przez
+      Samuel Colvin. Walidacja jest 5-50x szybsza niż v1 i zużywa mniej pamięci.
+      Dzięki temu Pydantic nadaje się do high-throughput API (FastAPI + Pydantic = szybsze niż Flask).
+    icon: "⚡"
+  - title: Annotated types
+    desc: >
+      Annotated[typ, metadane] pozwala definiować ograniczenia bez Field() w ciele klasy.
+      Używany z AfterValidator, BeforeValidator, Gt, Lt, MinLen — komponowalny i reużywalny.
+      PositiveInt = Annotated[int, Gt(0)] — można używać wielokrotnie bez powtarzania Field().
+    icon: "🏷️"
+
+whenToUse:
+  - Walidacja danych wejściowych w API (FastAPI używa Pydantic natywnie)
+  - Parsowanie JSON/dict do typowanych obiektów Pythona
+  - Konfiguracja aplikacji z env vars (BaseSettings)
+  - Serializacja danych do JSON z kontrolą formatu
+  - Gdy potrzebujesz runtime type checking bez pisania własnej walidacji
+  - Modele AI z typowanym output (Pydantic AI, Instructor)
+
+firstComponent: |
+  # pip install pydantic
+
+  from pydantic import BaseModel, Field, ValidationError
+  from typing import Optional
+  from datetime import datetime
+
+  class User(BaseModel):
+      id: int
+      name: str
+      email: str
+      age: Optional[int] = None
+      created_at: datetime = Field(default_factory=datetime.now)
+
+  # Walidacja przy tworzeniu — automatyczna koercja typów
+  user = User(id="1", name="Łukasz", email="l@example.com", age=30)
+  # id="1" → int 1 (koercja stringa)
+
+  print(user.id)          # 1 (int, nie "1")
+  print(user.model_dump()) # {'id': 1, 'name': 'Łukasz', ...}
+
+  # ValidationError — zbiera WSZYSTKIE błędy naraz
+  try:
+      bad = User(id="abc", name=None, email="l@example.com")
+  except ValidationError as e:
+      print(e.errors())
+      # [
+      #   {'loc': ('id',), 'msg': 'Input should be a valid integer', ...},
+      #   {'loc': ('name',), 'msg': 'Input should be a valid string', ...}
+      # ]

@@ -1,0 +1,256 @@
+title: Formularze
+
+items:
+  - name: "Podstawowy formularz z react-hook-form + zod"
+    desc: >
+      Shadcn/ui integruje się ze standardem branżowym — react-hook-form do
+      zarządzania stanem formularza i zod do walidacji schematu. Komponenty
+      Form/FormField/FormItem/FormLabel/FormControl/FormMessage tworzą
+      spójny, dostępny formularz z automatyczną obsługą błędów i ARIA.
+    code: |
+      import { useForm } from "react-hook-form"
+      import { zodResolver } from "@hookform/resolvers/zod"
+      import { z } from "zod"
+      import { Button } from "@/components/ui/button"
+      import { Input } from "@/components/ui/input"
+      import {
+        Form, FormControl, FormDescription,
+        FormField, FormItem, FormLabel, FormMessage
+      } from "@/components/ui/form"
+
+      const formSchema = z.object({
+        username: z.string().min(2, "Minimum 2 znaki").max(50),
+        email: z.string().email("Niepoprawny email"),
+      })
+
+      export function ProfileForm() {
+        const form = useForm<z.infer<typeof formSchema>>({
+          resolver: zodResolver(formSchema),
+          defaultValues: { username: "", email: "" },
+        })
+
+        function onSubmit(values: z.infer<typeof formSchema>) {
+          console.log(values)
+        }
+
+        return (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nazwa użytkownika</FormLabel>
+                    <FormControl>
+                      <Input placeholder="jan_kowalski" {...field} />
+                    </FormControl>
+                    <FormDescription>Publiczna nazwa wyświetlana innym.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="jan@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit">Zapisz zmiany</Button>
+            </form>
+          </Form>
+        )
+      }
+
+  - name: "Select — lista rozwijana"
+    desc: >
+      Select oparty na Radix UI Select primitive — dostępny, stylowany.
+      SelectTrigger (przycisk), SelectContent (lista), SelectItem (opcja).
+      Pełna integracja z react-hook-form przez FormControl.
+    code: |
+      import {
+        Select, SelectContent, SelectItem,
+        SelectTrigger, SelectValue
+      } from "@/components/ui/select"
+
+      // Samodzielny
+      <Select>
+        <SelectTrigger className="w-[180px]">
+          <SelectValue placeholder="Wybierz framework" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="react">React</SelectItem>
+          <SelectItem value="vue">Vue</SelectItem>
+          <SelectItem value="svelte">Svelte</SelectItem>
+        </SelectContent>
+      </Select>
+
+      // W formularzu z react-hook-form
+      <FormField
+        control={form.control}
+        name="role"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Rola</FormLabel>
+            <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder="Wybierz rolę" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value="admin">Administrator</SelectItem>
+                <SelectItem value="user">Użytkownik</SelectItem>
+                <SelectItem value="viewer">Obserwator</SelectItem>
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+  - name: "Checkbox i Switch"
+    desc: >
+      Checkbox do zaznaczania opcji, Switch do włączania/wyłączania ustawień.
+      Oba oparte na Radix UI — pełna dostępność (keyboard, ARIA).
+      Switch wygląda jak toggle z iOS/Android — wizualnie sugeruje stan.
+    code: |
+      import { Checkbox } from "@/components/ui/checkbox"
+      import { Switch } from "@/components/ui/switch"
+
+      // Checkbox z etykietą
+      <div className="flex items-center space-x-2">
+        <Checkbox id="terms" />
+        <label htmlFor="terms" className="text-sm font-medium">
+          Akceptuję regulamin
+        </label>
+      </div>
+
+      // Checkbox w formularzu (controlled)
+      <FormField
+        control={form.control}
+        name="acceptTerms"
+        render={({ field }) => (
+          <FormItem className="flex items-start space-x-3 space-y-0">
+            <FormControl>
+              <Checkbox
+                checked={field.value}
+                onCheckedChange={field.onChange}
+              />
+            </FormControl>
+            <FormLabel className="font-normal">
+              Akceptuję regulamin i politykę prywatności
+            </FormLabel>
+          </FormItem>
+        )}
+      />
+
+      // Switch z opisem
+      <div className="flex items-center justify-between rounded-lg border p-4">
+        <div>
+          <p className="font-medium">Powiadomienia email</p>
+          <p className="text-sm text-muted-foreground">
+            Otrzymuj powiadomienia o nowych wiadomościach
+          </p>
+        </div>
+        <Switch
+          checked={emailNotifications}
+          onCheckedChange={setEmailNotifications}
+        />
+      </div>
+
+  - name: Textarea i Input
+    desc: >
+      Input i Textarea to podstawowe kontrolki z pełnym Tailwind stylowaniem.
+      Obsługują wszystkie HTML atrybuty + focus ring z shadcn design tokens.
+      Dodaj cn() dla warunkowych klas (error state, disabled).
+    code: |
+      import { Input } from "@/components/ui/input"
+      import { Textarea } from "@/components/ui/textarea"
+      import { Label } from "@/components/ui/label"
+
+      // Input z etykietą
+      <div className="grid w-full gap-1.5">
+        <Label htmlFor="email">Email</Label>
+        <Input type="email" id="email" placeholder="jan@example.com" />
+      </div>
+
+      // Input z ikoną (własny wrapper)
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input className="pl-9" placeholder="Szukaj..." />
+      </div>
+
+      // Input file
+      <div className="grid w-full gap-1.5">
+        <Label htmlFor="picture">Zdjęcie profilowe</Label>
+        <Input id="picture" type="file" accept="image/*" />
+      </div>
+
+      // Textarea
+      <div className="grid w-full gap-1.5">
+        <Label htmlFor="bio">Bio</Label>
+        <Textarea
+          id="bio"
+          placeholder="Napisz coś o sobie..."
+          className="resize-none"
+          rows={4}
+        />
+        <p className="text-sm text-muted-foreground">Maksymalnie 200 znaków.</p>
+      </div>
+
+  - name: RadioGroup
+    desc: >
+      RadioGroup do wyboru jednej opcji z grupy. Radix UI zapewnia poprawne
+      zachowanie klawiatury (strzałki przełączają opcje), ARIA roledescription.
+      Często używany w wizardach, konfiguracji planu, wyborze motywu.
+    code: |
+      import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+      import { Label } from "@/components/ui/label"
+
+      // Podstawowy
+      <RadioGroup defaultValue="option-one">
+        <div className="flex items-center space-x-2">
+          <RadioGroupItem value="option-one" id="option-one" />
+          <Label htmlFor="option-one">Opcja pierwsza</Label>
+        </div>
+        <div className="flex items-center space-x-2">
+          <RadioGroupItem value="option-two" id="option-two" />
+          <Label htmlFor="option-two">Opcja druga</Label>
+        </div>
+      </RadioGroup>
+
+      // W formularzu — wybór planu
+      <FormField
+        control={form.control}
+        name="plan"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Plan subskrypcji</FormLabel>
+            <FormControl>
+              <RadioGroup
+                onValueChange={field.onChange}
+                defaultValue={field.value}
+                className="flex flex-col space-y-1"
+              >
+                {["free", "pro", "enterprise"].map((plan) => (
+                  <FormItem key={plan} className="flex items-center space-x-3 space-y-0">
+                    <FormControl>
+                      <RadioGroupItem value={plan} />
+                    </FormControl>
+                    <FormLabel className="font-normal capitalize">{plan}</FormLabel>
+                  </FormItem>
+                ))}
+              </RadioGroup>
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />

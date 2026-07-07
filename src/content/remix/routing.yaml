@@ -1,0 +1,257 @@
+title: Routing i Nawigacja
+
+groups:
+  - name: File-based Routing (Remix v2)
+    commands:
+      - code: |
+          app/routes/
+            _index.tsx                  # /
+            about.tsx                   # /about
+            blog.tsx                    # /blog (layout dla /blog/*)
+            blog._index.tsx             # /blog
+            blog.$slug.tsx              # /blog/:slug
+            blog.$slug.edit.tsx         # /blog/:slug/edit
+            users.$id.tsx               # /users/:id
+            users.$id.posts.tsx         # /users/:id/posts
+            dashboard.tsx               # layout dashboard
+            dashboard._index.tsx        # /dashboard
+            dashboard.settings.tsx      # /dashboard/settings
+            _auth.tsx                   # layout (bez URL prefix)
+            _auth.login.tsx             # /login
+            _auth.register.tsx          # /register
+            $.tsx                       # /* (catch-all 404)
+            api.users.tsx               # /api/users (resource route)
+        desc: Flat routes — konwencja nazw Remix v2
+        detail:
+          what: Remix v2 używa flat routes — jeden plik zamiast katalogów. Dots (.) = separator segmentów URL. $ = dynamic param. _ = layout bez URL prefix.
+          how: blog.tsx + blog.$slug.tsx = layout + nested route. Outlet w blog.tsx renderuje $slug content.
+          tips:
+            - 'Prefiks _ (np. _auth.tsx) tworzy layout bez dodawania segmentu do URL'
+            - '$.tsx obsługuje wszystkie niezdefiniowane trasy (404 page)'
+
+      - code: |
+          // Flat routes — nawigacja między poziomami
+          // app/routes/blog.tsx — layout z Outlet
+          import { Outlet, NavLink } from "@remix-run/react";
+          import { json } from "@remix-run/node";
+          import { useLoaderData } from "@remix-run/react";
+
+          export async function loader() {
+            const categories = await getCategories();
+            return json({ categories });
+          }
+
+          export default function BlogLayout() {
+            const { categories } = useLoaderData<typeof loader>();
+            return (
+              <div className="blog-layout">
+                <aside>
+                  {categories.map((cat) => (
+                    <NavLink key={cat.id} to={`/blog/category/${cat.slug}`}>
+                      {cat.name}
+                    </NavLink>
+                  ))}
+                </aside>
+                <main>
+                  <Outlet />
+                </main>
+              </div>
+            );
+          }
+
+          // app/routes/blog.$slug.tsx — child route
+          import { useLoaderData } from "@remix-run/react";
+          import type { LoaderFunctionArgs } from "@remix-run/node";
+
+          export async function loader({ params }: LoaderFunctionArgs) {
+            return json({ post: await getPost(params.slug!) });
+          }
+
+          export default function BlogPost() {
+            const { post } = useLoaderData<typeof loader>();
+            return <article><h1>{post.title}</h1></article>;
+          }
+        desc: Layout route + nested route z Outlet
+        detail:
+          what: blog.tsx definiuje layout z Outlet. blog.$slug.tsx jest child route renderowanym w Outlet. Oba loadery uruchamiają się równolegle.
+          how: Dane z parent loader są dostępne przez useRouteLoaderData() w child. Nie przekazuje się ich automatycznie przez props.
+          tips:
+            - 'Oba loadery (layout + child) uruchamiają się równolegle — bez waterfallu'
+            - 'useRouteLoaderData("routes/blog") — pobierz dane z parent route'
+
+      - code: |
+          // Dynamic params — $param
+          // app/routes/users.$id.posts.$postId.tsx
+          import { json } from "@remix-run/node";
+          import type { LoaderFunctionArgs } from "@remix-run/node";
+
+          export async function loader({ params }: LoaderFunctionArgs) {
+            // Wiele dynamic params
+            const { id, postId } = params;
+            // params.id, params.postId — zawsze string | undefined
+
+            const [user, post] = await Promise.all([
+              getUser(id!),
+              getPost(postId!),
+            ]);
+
+            return json({ user, post });
+          }
+
+          // Splat route — catch-all
+          // app/routes/$.tsx — obsługa /anything/here
+          export async function loader({ params }: LoaderFunctionArgs) {
+            // params["*"] — reszta URL po /
+            const path = params["*"];
+            console.log("Nieznana trasa:", path);
+            throw new Response("Nie znaleziono", { status: 404 });
+          }
+        desc: Dynamic params i splat route — $param i $.tsx
+        detail:
+          what: $param w nazwie pliku tworzy dynamic segment. $.tsx (splat) łapie wszystko co nie pasuje do innych tras — idealne dla 404.
+          how: params["*"] w splat route zawiera całą resztę URL-a. Zawsze string.
+          tips:
+            - 'params zawsze string — konwertuj Number(params.id) gdy potrzebujesz liczby'
+            - '$.tsx na końcu jako fallback 404 zamiast Remix domyślnej strony błędu'
+
+      - code: |
+          // Route Module API — pełne API modułu trasy
+          import type {
+            LoaderFunctionArgs,
+            ActionFunctionArgs,
+            LinksFunction,
+            MetaFunction,
+            HeadersFunction,
+            ShouldRevalidateFunction,
+          } from "@remix-run/node";
+
+          // Eksporty które Remix rozumie
+          export const meta: MetaFunction = () => [];        // <head> meta tagi
+          export const links: LinksFunction = () => [];      // <link> CSS, preload
+          export const headers: HeadersFunction = () => ({}); // HTTP response headers
+          export const shouldRevalidate: ShouldRevalidateFunction = () => true; // revalidacja
+
+          export async function loader(args: LoaderFunctionArgs) {}    // GET data
+          export async function action(args: ActionFunctionArgs) {}    // POST/PUT/DELETE
+
+          export default function Component() {}  // React component
+          export function ErrorBoundary() {}      // error boundary
+          export function HydrateFallback() {}    // fallback podczas hydration
+        desc: Route Module API — wszystkie eksporty trasy
+        detail:
+          what: Plik trasy Remix może eksportować wiele specjalnych funkcji. Remix używa każdej dla konkretnego celu — meta, links, headers, loader, action, component.
+          how: Eksportujesz tylko to czego potrzebujesz. Brak default export = resource route (brak HTML).
+          tips:
+            - 'Kolejność eksportów bez znaczenia — Remix zbiera je po nazwach'
+            - 'Jeden plik = jedna trasa = wszystkie jej potrzeby w jednym miejscu'
+
+      - code: |
+          // shouldRevalidate — kontrola odświeżania loaderów
+          import type { ShouldRevalidateFunction } from "@remix-run/node";
+
+          // Domyślnie loader odświeża się po każdej akcji/nawigacji
+          // shouldRevalidate pozwala to kontrolować
+          export const shouldRevalidate: ShouldRevalidateFunction = ({
+            currentUrl,
+            nextUrl,
+            defaultShouldRevalidate,
+            actionResult,
+            formAction,
+            formMethod,
+          }) => {
+            // Nie odświeżaj gdy zmienił się tylko hash
+            if (currentUrl.pathname === nextUrl.pathname &&
+                currentUrl.search === nextUrl.search) {
+              return false;
+            }
+
+            // Zawsze odświeżaj po delete
+            if (formAction?.includes("delete")) {
+              return true;
+            }
+
+            return defaultShouldRevalidate;
+          };
+        desc: shouldRevalidate — optymalizacja odświeżania danych
+        detail:
+          what: shouldRevalidate kontroluje czy loader trasy powinien re-uruchomić się po nawigacji lub akcji. Optymalizacja wydajności.
+          how: Domyślnie Remix odświeża wszystkie aktywne loadery po każdej akcji. shouldRevalidate pozwala to ograniczyć.
+          tips:
+            - 'return false dla statycznych danych które nie zmieniają się po akcjach'
+            - 'defaultShouldRevalidate — fallback do domyślnego zachowania Remix'
+
+  - name: Nawigacja programatyczna
+    commands:
+      - code: |
+          // useNavigate — programatyczna nawigacja
+          import { useNavigate } from "@remix-run/react";
+
+          export function ConfirmDialog({
+            onConfirm,
+            redirectTo,
+          }: {
+            onConfirm: () => Promise<void>;
+            redirectTo: string;
+          }) {
+            const navigate = useNavigate();
+
+            async function handleConfirm() {
+              await onConfirm();
+              navigate(redirectTo, { replace: true });
+            }
+
+            function handleCancel() {
+              navigate(-1); // wróć wstecz
+            }
+
+            return (
+              <dialog open>
+                <p>Czy na pewno chcesz kontynuować?</p>
+                <button onClick={handleConfirm}>Potwierdź</button>
+                <button onClick={handleCancel}>Anuluj</button>
+              </dialog>
+            );
+          }
+        desc: useNavigate — nawigacja w event handlerach
+        detail:
+          what: useNavigate() zwraca funkcję do nawigacji w event handlerach (onClick, po async operacji). Nie używaj w useEffect — użyj redirect() w loader/action.
+          how: "navigate(path) lub navigate(-1) dla wstecz. navigate(path, { replace: true }) — nie dodaje do history."
+          tips:
+            - 'Preferuj redirect() w loader/action nad useNavigate() w efektach'
+            - 'navigate(-1) — wróć wstecz (jak przycisk back)'
+
+      - code: |
+          // Obsługa pending state — optimistic UI
+          import { useFetcher, useNavigation } from "@remix-run/react";
+
+          // Optimistic list item
+          export function TodoList({ todos }: { todos: Todo[] }) {
+            const navigation = useNavigation();
+
+            // Czy trwa dodawanie nowego?
+            const isAdding =
+              navigation.state === "submitting" &&
+              navigation.formAction === "/todos";
+
+            return (
+              <ul>
+                {todos.map((todo) => (
+                  <TodoItem key={todo.id} todo={todo} />
+                ))}
+                {/* Optimistic nowy element */}
+                {isAdding && (
+                  <li style={{ opacity: 0.5 }}>
+                    {navigation.formData?.get("title") as string}
+                    <span> (zapisywanie...)</span>
+                  </li>
+                )}
+              </ul>
+            );
+          }
+        desc: Optimistic UI z navigation.formData
+        detail:
+          what: navigation.formData zawiera dane formularza podczas submitting. Użyj do wyświetlenia optimistic update — pokaż wynik zanim serwer potwierdzi.
+          how: navigation.state === "submitting" + navigation.formAction === "/todos" identyfikuje konkretną akcję.
+          tips:
+            - 'Optimistic UI = pokaż wynik natychmiast, wycofaj przy błędzie'
+            - 'navigation.formData.get("title") — odczytaj dane formularza w trakcie submit'

@@ -1,0 +1,284 @@
+title: "Tabele & Data"
+
+items:
+  - name: "Podstawowa tabela HTML"
+    desc: >
+      Shadcn/ui dostarcza ostylowane wrapperów na HTML table — Table, TableHeader,
+      TableBody, TableFooter, TableRow, TableHead, TableCell, TableCaption.
+      Idealna do prostych, statycznych danych gdzie nie potrzebujesz sortowania
+      ani paginacji.
+    code: |
+      import {
+        Table, TableBody, TableCaption, TableCell,
+        TableFooter, TableHead, TableHeader, TableRow
+      } from "@/components/ui/table"
+
+      const invoices = [
+        { id: "INV001", status: "Paid", method: "Credit Card", amount: "250.00" },
+        { id: "INV002", status: "Pending", method: "PayPal", amount: "150.00" },
+        { id: "INV003", status: "Unpaid", method: "Bank Transfer", amount: "350.00" },
+      ]
+
+      <Table>
+        <TableCaption>Lista ostatnich faktur</TableCaption>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[100px]">Faktura</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Metoda</TableHead>
+            <TableHead className="text-right">Kwota</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {invoices.map((invoice) => (
+            <TableRow key={invoice.id}>
+              <TableCell className="font-medium">{invoice.id}</TableCell>
+              <TableCell>{invoice.status}</TableCell>
+              <TableCell>{invoice.method}</TableCell>
+              <TableCell className="text-right">{invoice.amount} zł</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+        <TableFooter>
+          <TableRow>
+            <TableCell colSpan={3}>Razem</TableCell>
+            <TableCell className="text-right">750.00 zł</TableCell>
+          </TableRow>
+        </TableFooter>
+      </Table>
+
+  - name: "DataTable z TanStack Table — definicja kolumn"
+    desc: >
+      DataTable to zaawansowana tabela zbudowana na TanStack Table (React Table v8).
+      Zaczynasz od zdefiniowania ColumnDef<T> — każda kolumna opisuje jak pobrać
+      i wyrenderować dane. accessorKey to klucz z obiektu danych, cell to custom renderer.
+    code: |
+      // columns.tsx
+      import { ColumnDef } from "@tanstack/react-table"
+      import { Badge } from "@/components/ui/badge"
+      import { Button } from "@/components/ui/button"
+      import { MoreHorizontal, ArrowUpDown } from "lucide-react"
+
+      export type Payment = {
+        id: string
+        amount: number
+        status: "pending" | "processing" | "success" | "failed"
+        email: string
+      }
+
+      export const columns: ColumnDef<Payment>[] = [
+        // Kolumna z checkbox (row selection)
+        {
+          id: "select",
+          header: ({ table }) => (
+            <Checkbox
+              checked={table.getIsAllPageRowsSelected()}
+              onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            />
+          ),
+          cell: ({ row }) => (
+            <Checkbox
+              checked={row.getIsSelected()}
+              onCheckedChange={(value) => row.toggleSelected(!!value)}
+            />
+          ),
+        },
+        // Kolumna z sortowaniem
+        {
+          accessorKey: "email",
+          header: ({ column }) => (
+            <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+              Email
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          ),
+        },
+        // Kolumna z custom renderem
+        {
+          accessorKey: "status",
+          header: "Status",
+          cell: ({ row }) => {
+            const status = row.getValue<string>("status")
+            return <Badge variant={status === "success" ? "default" : "secondary"}>{status}</Badge>
+          },
+        },
+        {
+          accessorKey: "amount",
+          header: () => <div className="text-right">Kwota</div>,
+          cell: ({ row }) => {
+            const amount = parseFloat(row.getValue("amount"))
+            return <div className="text-right font-medium">{amount.toFixed(2)} zł</div>
+          },
+        },
+        // Kolumna z actions menu
+        {
+          id: "actions",
+          cell: ({ row }) => {
+            const payment = row.original
+            return (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="h-8 w-8 p-0">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => navigator.clipboard.writeText(payment.id)}>
+                    Kopiuj ID
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem>Edytuj</DropdownMenuItem>
+                  <DropdownMenuItem className="text-red-600">Usuń</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )
+          },
+        },
+      ]
+
+  - name: "DataTable — useReactTable hook"
+    desc: >
+      useReactTable() inicjalizuje tabelę z danymi i kolumnami. Definiujesz
+      jakie features aktywować — sorting, filtering, pagination, row selection.
+      getCoreRowModel() jest wymagany, pozostałe są opcjonalne.
+    code: |
+      // data-table.tsx
+      import {
+        useReactTable, getCoreRowModel, getPaginationRowModel,
+        getSortedRowModel, getFilteredRowModel,
+        flexRender, SortingState, ColumnFiltersState, VisibilityState
+      } from "@tanstack/react-table"
+      import { useState } from "react"
+
+      interface DataTableProps<TData, TValue> {
+        columns: ColumnDef<TData, TValue>[]
+        data: TData[]
+      }
+
+      export function DataTable<TData, TValue>({ columns, data }: DataTableProps<TData, TValue>) {
+        const [sorting, setSorting] = useState<SortingState>([])
+        const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+        const [rowSelection, setRowSelection] = useState({})
+
+        const table = useReactTable({
+          data,
+          columns,
+          getCoreRowModel: getCoreRowModel(),
+          getPaginationRowModel: getPaginationRowModel(),
+          getSortedRowModel: getSortedRowModel(),
+          getFilteredRowModel: getFilteredRowModel(),
+          onSortingChange: setSorting,
+          onColumnFiltersChange: setColumnFilters,
+          onRowSelectionChange: setRowSelection,
+          state: { sorting, columnFilters, rowSelection },
+        })
+
+        return (
+          <div>
+            {/* Toolbar z filtrem */}
+            <div className="flex items-center py-4">
+              <Input
+                placeholder="Filtruj email..."
+                value={(table.getColumn("email")?.getFilterValue() as string) ?? ""}
+                onChange={(e) => table.getColumn("email")?.setFilterValue(e.target.value)}
+                className="max-w-sm"
+              />
+            </div>
+
+            {/* Tabela */}
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <TableRow key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => (
+                        <TableHead key={header.id}>
+                          {header.isPlaceholder ? null
+                            : flexRender(header.column.columnDef.header, header.getContext())}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableHeader>
+                <TableBody>
+                  {table.getRowModel().rows?.length ? (
+                    table.getRowModel().rows.map((row) => (
+                      <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell key={cell.id}>
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={columns.length} className="h-24 text-center">
+                        Brak wyników.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Paginacja */}
+            <div className="flex items-center justify-between py-4">
+              <div className="text-sm text-muted-foreground">
+                {table.getFilteredSelectedRowModel().rows.length} z{" "}
+                {table.getFilteredRowModel().rows.length} wierszy zaznaczonych.
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm"
+                  onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+                  Poprzednia
+                </Button>
+                <Button variant="outline" size="sm"
+                  onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+                  Następna
+                </Button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+  - name: "Widoczność kolumn — column visibility"
+    desc: >
+      TanStack Table umożliwia toggle widoczności kolumn przez użytkownika.
+      DropdownMenu z listą kolumn i Checkbox per kolumna. Shadcn DropdownMenu
+      + table.getAllColumns() + column.toggleVisibility().
+    code: |
+      import { DropdownMenu, DropdownMenuCheckboxItem,
+        DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+
+      // Dodaj do toolbar DataTable
+      const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+
+      // W useReactTable dodaj:
+      // onColumnVisibilityChange: setColumnVisibility,
+      // state: { ..., columnVisibility }
+
+      // Toggle button
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" className="ml-auto">
+            Kolumny <ChevronDown className="ml-2 h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {table
+            .getAllColumns()
+            .filter((column) => column.getCanHide())
+            .map((column) => (
+              <DropdownMenuCheckboxItem
+                key={column.id}
+                className="capitalize"
+                checked={column.getIsVisible()}
+                onCheckedChange={(value) => column.toggleVisibility(!!value)}
+              >
+                {column.id}
+              </DropdownMenuCheckboxItem>
+            ))}
+        </DropdownMenuContent>
+      </DropdownMenu>

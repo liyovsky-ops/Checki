@@ -1,0 +1,297 @@
+title: Walidacja i RPC w Hono
+
+items:
+  - name: Walidacja z @hono/zod-validator
+    desc: >
+      zValidator() to middleware integrujące Zod z Hono. Waliduje body, query,
+      params, headers. Błędy walidacji automatycznie zwracają 400.
+      Zwalidowane dane są w pełni typowane w handlerze.
+    code: |
+      import { Hono } from 'hono'
+      import { zValidator } from '@hono/zod-validator'
+      import { z } from 'zod'
+
+      const app = new Hono()
+
+      const userSchema = z.object({
+        name: z.string().min(2).max(50),
+        email: z.string().email(),
+        age: z.number().int().min(18).max(120),
+      })
+
+      app.post(
+        '/users',
+        zValidator('json', userSchema),
+        (c) => {
+          const { name, email, age } = c.req.valid('json')
+          // Pełne TypeScript types — name: string, email: string, age: number
+          return c.json({ created: { name, email, age } }, 201)
+        }
+      )
+
+      export default app
+    lang: typescript
+
+  - name: Walidacja query params i path params
+    desc: >
+      zValidator działa dla 'query', 'param', 'header', 'json', 'form', 'cookie'.
+      c.req.valid('query') zwraca zwalidowane i typowane dane.
+    code: |
+      import { Hono } from 'hono'
+      import { zValidator } from '@hono/zod-validator'
+      import { z } from 'zod'
+
+      const app = new Hono()
+
+      // Walidacja query params
+      const searchSchema = z.object({
+        q: z.string().min(1).max(100),
+        limit: z.coerce.number().int().min(1).max(100).default(20),
+        page: z.coerce.number().int().min(1).default(1),
+      })
+
+      app.get(
+        '/search',
+        zValidator('query', searchSchema),
+        (c) => {
+          const { q, limit, page } = c.req.valid('query')
+          return c.json({ q, limit, page })
+        }
+      )
+
+      // Walidacja path params
+      const paramSchema = z.object({
+        id: z.coerce.number().int().positive(),
+      })
+
+      app.get(
+        '/users/:id',
+        zValidator('param', paramSchema),
+        (c) => {
+          const { id } = c.req.valid('param')
+          return c.json({ id })  // id jest number, nie string
+        }
+      )
+
+      export default app
+    lang: typescript
+
+  - name: Custom error handler walidacji
+    desc: >
+      Domyślnie zValidator zwraca 400 z ZodError. Możesz podać własny handler
+      jako trzeci argument — pełna kontrola nad formatem błędów.
+    code: |
+      import { Hono } from 'hono'
+      import { zValidator } from '@hono/zod-validator'
+      import { z } from 'zod'
+
+      const app = new Hono()
+
+      const schema = z.object({
+        email: z.string().email(),
+        password: z.string().min(8),
+      })
+
+      app.post(
+        '/auth/register',
+        zValidator('json', schema, (result, c) => {
+          if (!result.success) {
+            // Formatuj błędy po swojemu
+            const errors = result.error.issues.map((issue) => ({
+              field: issue.path.join('.'),
+              message: issue.message,
+            }))
+            return c.json({ success: false, errors }, 422)
+          }
+        }),
+        (c) => {
+          const { email, password } = c.req.valid('json')
+          return c.json({ success: true, email }, 201)
+        }
+      )
+
+      export default app
+    lang: typescript
+
+  - name: Hono RPC — typowany serwer
+    desc: >
+      Hono RPC = end-to-end type safety bez schema generatora. Zdefiniuj trasy
+      z .get()/.post() i zwróć typ AppType przez as const. Frontend używa
+      tego typu przez hc<AppType>().
+    code: |
+      import { Hono } from 'hono'
+      import { zValidator } from '@hono/zod-validator'
+      import { z } from 'zod'
+
+      const app = new Hono()
+
+      const routes = app
+        .get('/users', (c) => {
+          return c.json({ users: [{ id: 1, name: 'Jan' }] })
+        })
+        .post(
+          '/users',
+          zValidator('json', z.object({
+            name: z.string(),
+            email: z.string().email(),
+          })),
+          async (c) => {
+            const data = c.req.valid('json')
+            return c.json({ created: data }, 201)
+          }
+        )
+        .get('/users/:id', (c) => {
+          return c.json({ id: c.req.param('id'), name: 'Jan' })
+        })
+
+      export type AppType = typeof routes
+      export default app
+    lang: typescript
+
+  - name: Hono Client — hc() po stronie frontendu
+    desc: >
+      hc<AppType>(baseUrl) tworzy typowanego klienta HTTP. Wywołania mają
+      autocomplete, sprawdzanie typów parametrów i odpowiedzi. Działa z Fetch API.
+      Idealny do monorepo React + Hono.
+    code: |
+      // frontend/api.ts
+      import { hc } from 'hono/client'
+      import type { AppType } from '../server/index'
+
+      // Klient z pełnymi typami
+      const client = hc<AppType>('http://localhost:3000')
+
+      // GET /users — TypeScript wie co zwraca
+      const getUsers = async () => {
+        const res = await client.users.$get()
+        const data = await res.json()
+        // data.users jest typowane jako Array<{id: number, name: string}>
+        return data.users
+      }
+
+      // POST /users — TypeScript sprawdza body
+      const createUser = async (name: string, email: string) => {
+        const res = await client.users.$post({
+          json: { name, email },
+        })
+        return res.json()
+      }
+
+      // GET /users/:id — parametr musi być podany
+      const getUser = async (id: string) => {
+        const res = await client.users[':id'].$get({
+          param: { id },
+        })
+        return res.json()
+      }
+    lang: typescript
+
+  - name: RPC z headers i cookies
+    desc: >
+      Hono Client obsługuje przekazywanie headers (Authorization, cookies) przy
+      każdym wywołaniu. Można też ustawić globalny init dla wszystkich requestów.
+    code: |
+      import { hc } from 'hono/client'
+      import type { AppType } from '../server'
+
+      const client = hc<AppType>('https://api.myapp.com', {
+        // Domyślne headers dla wszystkich requestów
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // Custom fetch — np. z auth interceptorem
+        fetch: async (url, init) => {
+          const token = localStorage.getItem('token')
+          return fetch(url, {
+            ...init,
+            headers: {
+              ...init?.headers,
+              Authorization: `Bearer ${token}`,
+            },
+          })
+        },
+      })
+
+      // Wszystkie requesty automatycznie mają Authorization header
+      const profile = await client.api.profile.$get()
+      const data = await profile.json()
+    lang: typescript
+
+  - name: Wiele walidatorów na jednym route
+    desc: >
+      Można stackować wiele zValidator() na jednym route — np. param + body.
+      Każdy waliduje inny 'target'. c.req.valid() jest typowane per target.
+    code: |
+      import { Hono } from 'hono'
+      import { zValidator } from '@hono/zod-validator'
+      import { z } from 'zod'
+
+      const app = new Hono()
+
+      app.put(
+        '/users/:id',
+        // Waliduj param
+        zValidator('param', z.object({
+          id: z.coerce.number().int().positive(),
+        })),
+        // Waliduj body
+        zValidator('json', z.object({
+          name: z.string().min(2).optional(),
+          email: z.string().email().optional(),
+        })),
+        (c) => {
+          const { id } = c.req.valid('param')    // number
+          const updates = c.req.valid('json')     // { name?, email? }
+          return c.json({ id, ...updates })
+        }
+      )
+
+      export default app
+    lang: typescript
+
+  - name: Swagger UI z @hono/swagger-ui
+    desc: >
+      @hono/swagger-ui generuje interaktywną dokumentację API z OpenAPI spec.
+      Kombinacja z @hono/zod-openapi pozwala automatycznie generować OpenAPI
+      z Zod schematów — dokumentacja zawsze aktualna.
+    code: |
+      import { Hono } from 'hono'
+      import { swaggerUI } from '@hono/swagger-ui'
+
+      const app = new Hono()
+
+      // Serwuj Swagger UI pod /docs
+      app.get('/docs', swaggerUI({ url: '/openapi.json' }))
+
+      // OpenAPI spec — możesz generować automatycznie z @hono/zod-openapi
+      app.get('/openapi.json', (c) => {
+        return c.json({
+          openapi: '3.0.0',
+          info: { title: 'My API', version: '1.0.0' },
+          paths: {
+            '/users': {
+              get: {
+                summary: 'List users',
+                responses: {
+                  '200': {
+                    description: 'Success',
+                    content: {
+                      'application/json': {
+                        schema: {
+                          type: 'object',
+                          properties: {
+                            users: { type: 'array' },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        })
+      })
+
+      export default app
+    lang: typescript

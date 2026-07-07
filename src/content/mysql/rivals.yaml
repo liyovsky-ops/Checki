@@ -1,0 +1,67 @@
+title: MySQL vs inne bazy danych
+
+items:
+  - name: PostgreSQL
+    icon: "🐘"
+    color: "#336791"
+    tagline: "Zaawansowana open-source baza — JSONB, window functions, rozszerzenia"
+    pros:
+      - "Bogatszy zestaw typów: JSONB, ARRAY, UUID, HSTORE, range types"
+      - "Prawdziwy JSONB z indeksowaniem GIN — szybszy niż MySQL JSON przy złożonych zapytaniach"
+      - "Silniejsze wsparcie dla window functions, lateral joins, recursive CTE"
+      - "Rozszerzenia: PostGIS (geo), TimescaleDB (time-series), pg_trgm (fuzzy search)"
+      - "Pełna zgodność ze standardem SQL i lepsze wsparcie dla zaawansowanych constraintów"
+      - "MVCC bez blokad na poziomie tabeli — lepsza współbieżność przy mieszanym obciążeniu"
+    cons:
+      - "Mniej popularny w hostingach współdzielonych i środowiskach CMS"
+      - "Nieco bardziej złożona konfiguracja i administracja dla początkujących"
+      - "MySQL bywa szybszy dla prostego CRUD z dużym ruchem read-only"
+    vs: "MySQL dla prostego CRUD, CMS (WordPress), LAMP/LEMP stack i gdy liczy się popularność hostingów. PostgreSQL gdy potrzebujesz zaawansowanych typów danych, złożonych zapytań analitycznych, JSONB lub PostGIS. Dla nowych projektów bez ograniczeń warto wybrać PostgreSQL."
+
+  - name: SQLite
+    icon: "📁"
+    color: "#0f7ec0"
+    tagline: "Serverless baza w jednym pliku — zero konfiguracji, wbudowana w Python"
+    pros:
+      - "Zero konfiguracji — jeden plik .db, gotowe do działania natychmiast"
+      - "Wbudowane w Python (sqlite3), PHP, Android, iOS — zero instalacji"
+      - "Idealne do testów, prototypów, aplikacji desktopowych i mobilnych"
+      - "Serverless — działa bez żadnego serwera, plik można skopiować"
+    cons:
+      - "Jeden writer na raz — brak prawdziwej współbieżności zapisów"
+      - "Brak serwera — nie nadaje się do aplikacji multi-user przez sieć"
+      - "Brak zaawansowanych typów, funkcji i replikacji"
+      - "Słaba wydajność powyżej kilku GB danych"
+    vs: "SQLite dla testów, dev, aplikacji desktopowych i embedded. MySQL gdy masz wielu użytkowników, potrzebujesz połączeń sieciowych i skalowania. Migracja z SQLite do MySQL jest prosta dzięki SQLAlchemy i ORM."
+
+  - name: MariaDB
+    icon: "🦁"
+    color: "#c0765a"
+    tagline: "Fork MySQL — kompatybilny, szybszy, z rozszerzeniami których brakuje MySQL"
+    pros:
+      - "Drop-in replacement — te same klienty, SQL, narzędzia co MySQL"
+      - "Szybszy niż MySQL w niektórych benchmarkach (Aria, ColumnStore)"
+      - "Więcej silników tabel: Aria, ColumnStore (analityczny), Spider (sharding)"
+      - "Bardziej aktywny rozwój open-source po przejęciu MySQL przez Oracle"
+      - "Galera Cluster — wbudowany multi-master replication"
+    cons:
+      - "Rosnące rozbieżności z MySQL — nie zawsze w pełni kompatybilny w obie strony"
+      - "Mniejsze wsparcie komercyjne niż MySQL Enterprise"
+      - "Niektóre narzędzia (PlanetScale, Vitess) celowane w MySQL, nie MariaDB"
+    vs: "MariaDB gdy chcesz MySQL-kompatybilnej bazy z aktywniejszym open-source rozwojem i dodatkowymi silnikami. MySQL gdy korzystasz z ekosystemu Oracle (MySQL Enterprise, PlanetScale, narzędzia które celują ściśle w MySQL)."
+
+  - name: MongoDB
+    icon: "🍃"
+    color: "#47a248"
+    tagline: "Dokumentowa baza NoSQL — elastyczny schemat, JSON natywnie"
+    pros:
+      - "Elastyczny schemat — nie definiujesz kolumn, dokumenty mogą różnić się strukturą"
+      - "Naturalny dla JavaScript / Node.js (JSON wszędzie, Mongoose ORM)"
+      - "Wbudowany sharding i replikacja (replica sets)"
+      - "Atlas — zarządzany cloud ze świetnym UI i wyszukiwaniem wektorowym"
+    cons:
+      - "Brak JOIN — musisz denormalizować lub używać $lookup (wolniejszy)"
+      - "Brak prawdziwego ACID dla transakcji multi-document przez długi czas"
+      - "Wyższe zużycie pamięci RAM i dysku niż MySQL dla tabelarycznych danych"
+      - "MySQL JSON (5.7+) często wystarczy zamiast przejścia na MongoDB"
+    vs: "MongoDB gdy schemat jest bardzo zmienny, dane są hierarchiczne i nie masz relacji między encjami. MySQL gdy masz relacje, potrzebujesz JOIN i integralności referenycjnej — a JSON kolumna wystarczy dla elastycznych danych."

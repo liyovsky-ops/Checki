@@ -1,0 +1,322 @@
+title: "Narzędzia i Klienty MySQL"
+
+items:
+  - name: "mysql2 — Node.js"
+    desc: "Najszybszy sterownik MySQL dla Node.js. Obsługuje promises, prepared statements i connection pooling. Standard w Express, Fastify, NestJS."
+    icon: "🟢"
+    code: |
+      npm install mysql2
+
+      import mysql from 'mysql2/promise';
+
+      // Connection Pool (zalecane — reużywa połączeń)
+      const pool = mysql.createPool({
+        host:     'localhost',
+        port:     3306,
+        database: 'myapp',
+        user:     'root',
+        password: 'secret',
+        waitForConnections: true,
+        connectionLimit: 10,
+        charset: 'utf8mb4',
+      });
+
+      // SELECT — fetchAll
+      const [rows] = await pool.query(
+        'SELECT * FROM users WHERE role = ?',
+        ['admin']
+      );
+
+      // SELECT — jeden rekord
+      const [users] = await pool.query(
+        'SELECT * FROM users WHERE email = ? LIMIT 1',
+        ['jan@example.com']
+      );
+      const user = users[0];
+
+      // INSERT
+      const [result] = await pool.execute(
+        'INSERT INTO users (email, name) VALUES (?, ?)',
+        ['jan@example.com', 'Jan Kowalski']
+      );
+      console.log(result.insertId);  // ID nowego rekordu
+
+      // UPDATE / DELETE
+      const [upd] = await pool.execute(
+        'UPDATE users SET role = ? WHERE id = ?',
+        ['admin', 1]
+      );
+      console.log(upd.affectedRows);
+
+      // Transakcja
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        await conn.execute('UPDATE accounts SET balance = balance - ? WHERE id = ?', [100, 1]);
+        await conn.execute('UPDATE accounts SET balance = balance + ? WHERE id = ?', [100, 2]);
+        await conn.commit();
+      } catch (err) {
+        await conn.rollback();
+        throw err;
+      } finally {
+        conn.release();
+      }
+
+  - name: "PyMySQL i mysql-connector-python"
+    desc: "Sterowniki MySQL dla Pythona. PyMySQL — pure Python, prosty. mysql-connector-python — oficjalny Oracle, bardziej rozbudowany."
+    icon: "🐍"
+    code: |
+      pip install pymysql
+      # lub:
+      pip install mysql-connector-python
+
+      # PyMySQL
+      import pymysql
+      import pymysql.cursors
+
+      conn = pymysql.connect(
+          host='localhost',
+          port=3306,
+          db='myapp',
+          user='root',
+          password='secret',
+          charset='utf8mb4',
+          cursorclass=pymysql.cursors.DictCursor  # wyniki jako dict
+      )
+
+      with conn.cursor() as cursor:
+          # SELECT
+          cursor.execute("SELECT * FROM users WHERE role = %s", ('admin',))
+          users = cursor.fetchall()         # lista słowników
+          user  = cursor.fetchone()         # jeden słownik
+
+          # INSERT
+          cursor.execute(
+              "INSERT INTO users (email, name) VALUES (%s, %s)",
+              ('jan@example.com', 'Jan')
+          )
+          new_id = cursor.lastrowid
+          conn.commit()
+
+      # Context manager (automatyczny commit/rollback)
+      with pymysql.connect(...) as conn:
+          with conn.cursor() as cur:
+              cur.execute("SELECT COUNT(*) AS total FROM users")
+              result = cur.fetchone()
+              print(result['total'])
+          conn.commit()
+
+      # mysql-connector-python (składnia podobna)
+      import mysql.connector
+      cnx = mysql.connector.connect(
+          host='localhost', database='myapp',
+          user='root', password='secret'
+      )
+      cursor = cnx.cursor(dictionary=True)
+      cursor.execute("SELECT * FROM users LIMIT 10")
+      rows = cursor.fetchall()
+      cursor.close()
+      cnx.close()
+
+  - name: "TablePlus i DBeaver"
+    desc: "Graficzne klienty do zarządzania MySQL. TablePlus — natywny, szybki (macOS/Windows). DBeaver — open-source, wszystkie bazy."
+    icon: "🖥️"
+    code: |
+      # TablePlus (macOS, Windows, Linux)
+      # https://tableplus.com/
+      # - natywny GUI, bardzo szybki
+      # - obsługuje MySQL, PostgreSQL, SQLite, Redis, MongoDB
+      # - SSH tunneling, SSL, safe mode (ostrzegaj przed DELETE bez WHERE)
+
+      # Połączenie w TablePlus:
+      # Host: localhost  Port: 3306
+      # User: root       Password: ****
+      # Database: myapp
+      # → Test → Connect
+
+      # DBeaver (open-source, wszystkie platformy)
+      # https://dbeaver.io/
+      # - obsługuje 100+ baz danych
+      # - ER diagram z relacjami
+      # - eksport do CSV/Excel/JSON
+      # - autokompletowanie SQL z dokumentacją
+      # - wbudowany query plan visualizer
+
+      # Połączenie w DBeaver:
+      # New Connection → MySQL
+      # Server Host: localhost  Port: 3306
+      # Database: myapp
+      # Username: root  Password: ****
+      # → Test Connection → Finish
+
+      # MySQL Workbench (oficjalny GUI od Oracle)
+      # https://www.mysql.com/products/workbench/
+      # - darmowy, cross-platform
+      # - ER diagramy, migration wizard
+      # - query profiler (visual EXPLAIN)
+      # - backup/restore wizard
+
+  - name: "PlanetScale — Serverless MySQL"
+    desc: "Zarządzany MySQL-kompatybilny cloud zbudowany na Vitess. Branch-based schema changes, auto-scaling. Używany przez GitHub."
+    icon: "🌍"
+    code: |
+      # PlanetScale — https://planetscale.com/
+      # Serverless MySQL (Vitess pod spodem)
+      # Branch schema: zmień schemat jak kod (dev → staging → main)
+
+      npm install @planetscale/database
+
+      import { connect } from '@planetscale/database';
+
+      const conn = connect({
+        host:     process.env.DATABASE_HOST,
+        username: process.env.DATABASE_USERNAME,
+        password: process.env.DATABASE_PASSWORD,
+      });
+
+      // Zapytania przez HTTP (nie TCP!) — serverless-friendly
+      const results = await conn.execute(
+        'SELECT * FROM users WHERE id = ?',
+        [1]
+      );
+      console.log(results.rows);
+
+      # CLI PlanetScale
+      pscale auth login
+      pscale database create myapp
+      pscale branch create myapp add-phone-column
+      pscale connect myapp add-phone-column --port 3309
+      # → edytuj schemat, sprawdź
+      pscale deploy-request create myapp add-phone-column
+      # → PlanetScale wykrywa konflikty i blokuje niebezpieczne zmiany
+
+  - name: Prisma (MySQL)
+    desc: "Najpopularniejszy Node.js ORM dla MySQL (i PostgreSQL). Type-safe, auto-generated klient, migracje przez CLI."
+    icon: "🔺"
+    code: |
+      npm install prisma @prisma/client
+      npx prisma init --datasource-provider mysql
+
+      # prisma/schema.prisma
+      datasource db {
+        provider = "mysql"
+        url      = env("DATABASE_URL")
+      }
+
+      model User {
+        id        Int      @id @default(autoincrement())
+        email     String   @unique @db.VarChar(255)
+        name      String   @db.VarChar(100)
+        role      Role     @default(USER)
+        createdAt DateTime @default(now()) @map("created_at")
+        orders    Order[]
+        @@map("users")
+      }
+
+      enum Role {
+        USER
+        ADMIN
+        MODERATOR
+      }
+
+      model Order {
+        id        Int      @id @default(autoincrement())
+        userId    Int      @map("user_id")
+        total     Decimal  @db.Decimal(10, 2)
+        status    String   @default("pending")
+        user      User     @relation(fields: [userId], references: [id])
+        @@map("orders")
+      }
+
+      # Migracje
+      npx prisma migrate dev --name init
+      npx prisma generate         # regeneruj klienta po zmianach
+
+      # Użycie
+      import { PrismaClient } from '@prisma/client';
+      const prisma = new PrismaClient();
+
+      const users = await prisma.user.findMany({
+        where: { role: 'ADMIN' },
+        include: { orders: true },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const user = await prisma.user.create({
+        data: { email: 'jan@example.com', name: 'Jan' },
+      });
+
+  - name: mysqldump i mysqlpump
+    desc: "Backup i restore bazy MySQL. mysqldump — klasyczny, niezawodny. mysqlpump — równoległy, szybszy dla wielu tabel."
+    icon: "💾"
+    code: |
+      # Backup całej bazy
+      mysqldump -u root -p myapp > backup.sql
+
+      # Backup z kompresją
+      mysqldump -u root -p myapp | gzip > backup_$(date +%Y%m%d).sql.gz
+
+      # Backup tylko struktury (bez danych)
+      mysqldump -u root -p --no-data myapp > schema.sql
+
+      # Backup tylko danych (bez struktury)
+      mysqldump -u root -p --no-create-info myapp > data.sql
+
+      # Backup konkretnej tabeli
+      mysqldump -u root -p myapp users orders > tables.sql
+
+      # Backup wielu baz
+      mysqldump -u root -p --databases myapp myapp_test > multi.sql
+
+      # Backup wszystkich baz
+      mysqldump -u root -p --all-databases > all.sql
+
+      # Restore
+      mysql -u root -p myapp < backup.sql
+      # lub z gzip:
+      gunzip < backup.sql.gz | mysql -u root -p myapp
+
+      # mysqlpump — równoległy (szybszy dla dużych baz, MySQL 5.7+)
+      mysqlpump -u root -p --parallel-schemas=4 myapp > backup.sql
+
+      # Przez Docker
+      docker exec mysql_container mysqldump -u root -p myapp > backup.sql
+      docker exec -i mysql_container mysql -u root -p myapp < backup.sql
+
+  - name: Vitess i ProxySQL
+    desc: "Vitess — horizontalne skalowanie MySQL (GitHub, YouTube). ProxySQL — connection pooling i query routing."
+    icon: "🚀"
+    code: |
+      # Vitess — https://vitess.io/
+      # Używany przez: GitHub, YouTube, Slack, Square
+      # - horizontalne sharding MySQL
+      # - automatyczny failover
+      # - connection pooling (50k+ połączeń → kilka połączeń do bazy)
+      # - query rewriting i routing
+      # - PlanetScale używa Vitess pod spodem
+
+      # ProxySQL — https://proxysql.com/
+      # - connection pooling (wiele połączeń → pula)
+      # - read/write splitting (zapytania SELECT → replika, INSERT → primary)
+      # - failover i load balancing
+      # - query caching i routing
+      # - firewall (blokuj niebezpieczne zapytania)
+
+      # Przykładowa konfiguracja ProxySQL (read/write split):
+      # mysql_query_rules:
+      #   - match_digest: '^SELECT'
+      #     destination_hostgroup: 10  # replika read-only
+      #   - match_digest: '.*'
+      #     destination_hostgroup: 20  # primary read-write
+
+      # Percona Server for MySQL
+      # Drop-in replacement MySQL z lepszą wydajnością
+      # - XtraDB (ulepszone InnoDB)
+      # - Percona XtraBackup (hot backup bez blokad)
+      # - Percona Toolkit (analiza, replikacja, migracje)
+      # https://www.percona.com/mysql/software/percona-server-for-mysql
+
+      # Percona XtraBackup — hot backup (bez blokad)
+      xtrabackup --backup --target-dir=/backup/mysql/
+      xtrabackup --prepare --target-dir=/backup/mysql/
+      xtrabackup --copy-back --target-dir=/backup/mysql/

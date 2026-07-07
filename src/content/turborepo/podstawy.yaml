@@ -1,0 +1,105 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Turborepo?
+  firstComponent: Quickstart — nowe monorepo
+  firstComponentLang: bash
+
+intro:
+  title: Czym jest Turborepo?
+  desc: >
+    Turborepo to inteligentny system budowania dla monorepo JavaScript/TypeScript
+    stworzony przez Jareda Palmera i przejęty przez Vercel w 2021 roku.
+    Rozwiązuje główny problem monorepo — wolne buildy. Turborepo analizuje zależności
+    między zadaniami (task graph), uruchamia je równolegle gdzie to możliwe i cache'uje
+    wyniki lokalnie i zdalnie. Jeśli kod się nie zmienił — wynik jest odtwarzany z cache
+    w milisekundach zamiast budować od nowa. Konfiguracja to jeden plik turbo.json.
+    Turborepo nie zarządza zależnościami — to rola package managera (pnpm, npm, yarn).
+    Turbo siedzi na wierzchu i zarządza wykonaniem zadań.
+
+concepts:
+  - title: Monorepo
+    desc: >
+      Monorepo to jedno repozytorium git zawierające wiele projektów (apps, packages).
+      Zalety — współdzielony kod, atomowe commity przez projekty, spójna konfiguracja
+      narzędzi (ESLint, TypeScript, testy). Wady bez Turborepo — wolne buildy (budujesz
+      wszystko), brak cache, kolejność zadań zarządzana ręcznie. Turborepo rozwiązuje
+      właśnie te problemy — jest "silnikiem" dla monorepo opartego na workspaces
+      package managera.
+    icon: "📦"
+  - title: Pipeline (task graph)
+    desc: >
+      Pipeline to definicja zależności między zadaniami w turbo.json. Turborepo
+      buduje graf zależności i wie które zadania mogą być uruchamiane równolegle
+      a które muszą czekać na inne. Przykład — "build" w każdej paczce może zależeć
+      od "build" jej zależności (dependsOn ["^build"]). Turbo najpierw buduje
+      zależności topologicznie, potem uruchamia niezależne zadania równolegle.
+    icon: "🔗"
+  - title: Cache lokalny
+    desc: >
+      Turborepo hash'uje wejścia zadania (pliki źródłowe, zmienne env, config)
+      i zapisuje wynik (output files + logi) w lokalnym cache (.turbo/cache).
+      Jeśli hash jest taki sam przy kolejnym uruchomieniu — wynik jest odtwarzany
+      z cache. Widać to po komunikacie "cache hit, replaying output" w logach.
+      Zysk — sekundy lub minuty buildu redukują się do milisekund.
+    icon: "💾"
+  - title: Remote Cache
+    desc: >
+      Remote Cache to cache współdzielony między maszynami — CI/CD i teamem developerów.
+      Wyniki zbudowane przez CI są dostępne lokalnie dla programistów i odwrotnie.
+      Oficjalny Remote Cache to Vercel — darmowy dla open source, płatny dla prywatnych
+      projektów. API Remote Cache jest otwarte — możliwy self-hosted (ducktape, własny serwer).
+      Konfiguracja — turbo login + turbo link.
+    icon: "☁️"
+  - title: Workspace
+    desc: >
+      Workspace (lub package) to podprojekt w monorepo z własnym package.json.
+      Workspaces są zarządzane przez package manager — pnpm-workspace.yaml
+      lub pole "workspaces" w root package.json. Turborepo nie zarządza workspaces
+      — to zadanie package managera. Turborepo korzysta z grafu zależności workspace
+      żeby wiedzieć co od czego zależy i w jakiej kolejności budować.
+    icon: "🗂️"
+  - title: Incremental builds
+    desc: >
+      Kluczowa cecha Turborepo — buduje tylko to co się zmieniło. Zmiana w
+      packages/ui → rebuild tylko packages/ui i aplikacji które od niej zależą.
+      Reszta pochodzi z cache. W dużych monorepo to różnica między 10 minutami
+      a 30 sekundami buildu w CI. Incremental builds działają zarówno lokalnie
+      jak i w CI dzięki Remote Cache — nowe commity korzystają z cache poprzednich.
+    icon: "⚡"
+
+whenToUse:
+  - Masz monorepo z wieloma aplikacjami i bibliotekami współdzielącymi kod
+  - Buildy trwają długo — chcesz cache i równoległe wykonanie
+  - Zespół traci czas na budowanie kodu który się nie zmienił
+  - Używasz już pnpm/npm/yarn workspaces i chcesz przyspieszyć
+  - CI/CD jest wąskim gardłem — Remote Cache eliminuje zbędne rebuildy
+  - Chcesz jasno zdefiniować kolejność zadań (lint → test → build)
+  - Szukasz prostszej alternatywy dla Nx z mniejszą ilością konfiguracji
+
+firstComponent: |
+  # Stwórz nowe monorepo z Turborepo
+  npx create-turbo@latest my-monorepo
+  cd my-monorepo
+  pnpm install
+  pnpm turbo build
+
+  # Struktura projektu:
+  # my-monorepo/
+  # ├── apps/
+  # │   ├── web/              # Aplikacja Next.js
+  # │   │   └── package.json  # { "name": "web" }
+  # │   └── docs/             # Kolejna aplikacja
+  # │       └── package.json  # { "name": "docs" }
+  # ├── packages/
+  # │   ├── ui/               # Shared React component library
+  # │   │   └── package.json  # { "name": "@acme/ui" }
+  # │   ├── typescript-config/ # Shared tsconfig
+  # │   └── eslint-config/    # Shared ESLint
+  # ├── turbo.json            # Konfiguracja Turborepo
+  # └── package.json          # Root — workspaces config
+
+  # Pierwsze uruchomienie (cold):
+  # turbo run build  →  ~30s (buduje wszystko)
+
+  # Drugie uruchomienie (bez zmian):
+  # turbo run build  →  ~300ms (cache hit dla wszystkich paczek!)

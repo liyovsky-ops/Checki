@@ -1,0 +1,265 @@
+title: "Indeksy i Optymalizacja"
+
+items:
+  - name: EXPLAIN i plany zapytań
+    icon: "🔬"
+    desc: "EXPLAIN i EXPLAIN ANALYZE — jak MySQL wykonuje zapytania, czy używa indeksów, ile skanuje wierszy."
+    code: |
+      -- EXPLAIN — plan wykonania zapytania
+      EXPLAIN SELECT * FROM users WHERE email = 'jan@example.com';
+
+      -- Kolumny EXPLAIN:
+      -- id        — kolejność wykonania
+      -- select_type — SIMPLE, SUBQUERY, DERIVED, UNION...
+      -- table     — nazwa tabeli
+      -- type      — JAK skanuje: system > const > eq_ref > ref > range > index > ALL
+      -- possible_keys — indeksy które mogły być użyte
+      -- key       — indeks który faktycznie użyto (NULL = brak indeksu!)
+      -- key_len   — ile bajtów indeksu użyto
+      -- rows      — oszacowanie liczby skanowanych wierszy
+      -- Extra     — Using index, Using where, Using filesort...
+
+      -- EXPLAIN FORMAT=JSON (MySQL 8.0 — więcej szczegółów)
+      EXPLAIN FORMAT=JSON SELECT * FROM orders WHERE user_id = 1;
+
+      -- EXPLAIN ANALYZE (MySQL 8.0.18+ — rzeczywiste czasy)
+      EXPLAIN ANALYZE SELECT o.id, u.name
+      FROM orders o JOIN users u ON o.user_id = u.id
+      WHERE o.status = 'paid';
+
+      -- Złe: type=ALL (full table scan) — potrzebujesz indeksu
+      -- Dobre: type=ref lub const (używa indeksu)
+
+  - name: CREATE INDEX
+    icon: "⚡"
+    desc: "Tworzenie indeksów B-tree, FULLTEXT i złożonych — przyspiesz zapytania nawet 1000x."
+    code: |
+      -- Podstawowy indeks (B-tree — domyślny)
+      CREATE INDEX idx_users_email ON users(email);
+      CREATE INDEX idx_orders_status ON orders(status);
+
+      -- Indeks złożony (composite) — kolejność kolumn ważna!
+      -- Użyty gdy WHERE ma user_id LUB user_id + created_at
+      CREATE INDEX idx_orders_user_date
+          ON orders(user_id, created_at DESC);
+
+      -- UNIQUE INDEX
+      CREATE UNIQUE INDEX idx_users_email_unique ON users(email);
+
+      -- FULLTEXT INDEX — wyszukiwanie pełnotekstowe
+      CREATE FULLTEXT INDEX idx_articles_content
+          ON articles(title, content);
+
+      -- Indeks przez ALTER TABLE
+      ALTER TABLE users ADD INDEX idx_role (role);
+      ALTER TABLE users ADD UNIQUE INDEX idx_email (email);
+
+      -- Usuń indeks
+      DROP INDEX idx_users_email ON users;
+      ALTER TABLE users DROP INDEX idx_users_email;
+
+      -- Lista indeksów tabeli
+      SHOW INDEX FROM users;
+      SHOW INDEX FROM users WHERE Key_name != 'PRIMARY';
+
+  - name: Covering Index i Selectivity
+    icon: "🎯"
+    desc: "Covering index — indeks zawierający wszystkie potrzebne kolumny. Selectivity — jak unikalny jest indeks."
+    code: |
+      -- Covering index — zapytanie obsługiwane w całości przez indeks
+      -- (Extra: "Using index" w EXPLAIN — brak dostępu do tabeli)
+      CREATE INDEX idx_orders_covering
+          ON orders(user_id, status, total, created_at);
+
+      -- Teraz to zapytanie używa tylko indeksu (nie dotyka tabeli):
+      SELECT user_id, status, total, created_at
+      FROM orders
+      WHERE user_id = 1 AND status = 'paid';
+
+      -- Sprawdź selectivity (unikalność) kolumny
+      -- Im bliżej 1, tym lepszy kandydat na indeks
+      SELECT
+          COUNT(DISTINCT email) / COUNT(*) AS email_selectivity,
+          COUNT(DISTINCT role)  / COUNT(*) AS role_selectivity,
+          COUNT(DISTINCT status)/ COUNT(*) AS status_selectivity
+      FROM users;
+
+      -- Indeks na kolumnie o niskiej selektywności jest bezużyteczny
+      -- (np. boolean: tylko 2 wartości — full scan często szybszy)
+
+      -- Prefix index dla długich VARCHAR/TEXT
+      CREATE INDEX idx_users_email_prefix ON users(email(50));
+
+      -- Sprawdź rozmiar indeksów
+      SELECT
+          index_name,
+          ROUND(stat_value * @@innodb_page_size / 1024 / 1024, 2) AS size_mb
+      FROM mysql.innodb_index_stats
+      WHERE database_name = DATABASE()
+        AND table_name = 'users'
+        AND stat_name = 'size';
+
+  - name: slow_query_log
+    icon: "🐌"
+    desc: "Logowanie wolnych zapytań — znajdź i napraw bottlenecki w bazie danych."
+    code: |
+      -- Włącz slow query log (w sesji)
+      SET GLOBAL slow_query_log = 'ON';
+      SET GLOBAL long_query_time = 1;       -- zapytania > 1 sekundy
+      SET GLOBAL log_queries_not_using_indexes = 'ON';
+
+      -- Sprawdź ustawienia
+      SHOW VARIABLES LIKE 'slow_query_log%';
+      SHOW VARIABLES LIKE 'long_query_time';
+
+      -- Gdzie jest plik logów?
+      SHOW VARIABLES LIKE 'slow_query_log_file';
+
+      -- Konfiguracja stała (my.cnf / my.ini):
+      -- [mysqld]
+      -- slow_query_log = 1
+      -- slow_query_log_file = /var/log/mysql/slow.log
+      -- long_query_time = 1
+      -- log_queries_not_using_indexes = 1
+
+      -- Analiza slow log przez mysqldumpslow (CLI):
+      -- mysqldumpslow -s t -t 10 /var/log/mysql/slow.log
+      -- -s t = sortuj po czasie, -t 10 = top 10
+
+      -- Performance Schema — zapytania w bazie
+      SELECT
+          DIGEST_TEXT                         AS query,
+          COUNT_STAR                          AS calls,
+          ROUND(AVG_TIMER_WAIT/1e9, 2)        AS avg_ms,
+          ROUND(SUM_TIMER_WAIT/1e9, 2)        AS total_ms
+      FROM performance_schema.events_statements_summary_by_digest
+      ORDER BY avg_ms DESC
+      LIMIT 10;
+
+  - name: Partycjonowanie
+    icon: "🗂️"
+    desc: "Partycjonowanie tabel — podział dużych tabel na fizyczne kawałki dla lepszej wydajności."
+    code: |
+      -- RANGE partitioning — np. po roku (logi, archiwum)
+      CREATE TABLE logs (
+          id         INT NOT NULL AUTO_INCREMENT,
+          message    TEXT,
+          created_at DATETIME NOT NULL,
+          PRIMARY KEY (id, created_at)
+      )
+      PARTITION BY RANGE (YEAR(created_at)) (
+          PARTITION p2022 VALUES LESS THAN (2023),
+          PARTITION p2023 VALUES LESS THAN (2024),
+          PARTITION p2024 VALUES LESS THAN (2025),
+          PARTITION p_future VALUES LESS THAN MAXVALUE
+      );
+
+      -- HASH partitioning — równomierny rozkład po kluczu
+      CREATE TABLE orders (
+          id      INT NOT NULL AUTO_INCREMENT,
+          user_id INT NOT NULL,
+          total   DECIMAL(10,2),
+          PRIMARY KEY (id, user_id)
+      )
+      PARTITION BY HASH(user_id)
+      PARTITIONS 4;
+
+      -- Sprawdź partycje
+      SELECT
+          PARTITION_NAME,
+          TABLE_ROWS,
+          DATA_LENGTH
+      FROM INFORMATION_SCHEMA.PARTITIONS
+      WHERE TABLE_NAME = 'logs';
+
+      -- Usuń partycję (szybsze niż DELETE — nie loguje wierszy)
+      ALTER TABLE logs DROP PARTITION p2022;
+
+      -- Dodaj partycję
+      ALTER TABLE logs REORGANIZE PARTITION p_future INTO (
+          PARTITION p2025 VALUES LESS THAN (2026),
+          PARTITION p_future VALUES LESS THAN MAXVALUE
+      );
+
+  - name: InnoDB Buffer Pool
+    icon: "🧠"
+    desc: "Bufor InnoDB — cache danych i indeksów w pamięci. Najważniejszy parametr wydajności MySQL."
+    code: |
+      -- Sprawdź aktualny rozmiar buffer pool
+      SHOW VARIABLES LIKE 'innodb_buffer_pool_size';
+
+      -- Sprawdź utilization buffer pool
+      SHOW STATUS LIKE 'Innodb_buffer_pool%';
+      -- Innodb_buffer_pool_read_requests  — żądania z cache
+      -- Innodb_buffer_pool_reads          — odczyty z dysku
+      -- Hit ratio = reads_requests / (reads_requests + reads) powinien być > 99%
+
+      -- Oblicz hit ratio
+      SELECT
+          (1 - (
+              variable_value /
+              (SELECT variable_value FROM performance_schema.global_status
+               WHERE variable_name = 'Innodb_buffer_pool_read_requests')
+          )) * 100 AS hit_ratio_pct
+      FROM performance_schema.global_status
+      WHERE variable_name = 'Innodb_buffer_pool_reads';
+
+      -- Konfiguracja (my.cnf) — zalecane ustawienia:
+      -- innodb_buffer_pool_size = 4G        -- 60-80% dostępnego RAM
+      -- innodb_buffer_pool_instances = 4    -- 1 instancja na 1GB (MySQL 5.7+)
+      -- innodb_log_file_size = 512M         -- większy log = lepsza wydajność zapisu
+
+      -- Sprawdź aktualny hit ratio z Performance Schema
+      SELECT
+          FORMAT_BYTES(SUM(data_length + index_length)) AS total_size
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE();
+
+  - name: Window Functions (MySQL 8.0+)
+    icon: "📊"
+    desc: "ROW_NUMBER, RANK, LAG, LEAD, SUM OVER — analityka bez GROUP BY, wyniki bez utraty wierszy."
+    code: |
+      -- ROW_NUMBER — numeracja wierszy w grupie
+      SELECT
+          user_id,
+          total,
+          created_at,
+          ROW_NUMBER() OVER (
+              PARTITION BY user_id
+              ORDER BY created_at DESC
+          ) AS order_rank
+      FROM orders;
+
+      -- RANK i DENSE_RANK
+      SELECT
+          name,
+          salary,
+          RANK()       OVER (ORDER BY salary DESC) AS rank_with_gaps,
+          DENSE_RANK() OVER (ORDER BY salary DESC) AS rank_no_gaps
+      FROM employees;
+
+      -- SUM OVER — kumulatywna suma
+      SELECT
+          created_at,
+          total,
+          SUM(total) OVER (
+              ORDER BY created_at
+              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+          ) AS running_total
+      FROM orders
+      WHERE user_id = 1;
+
+      -- LAG / LEAD — poprzedni / następny wiersz
+      SELECT
+          month,
+          revenue,
+          LAG(revenue, 1)  OVER (ORDER BY month) AS prev_month,
+          revenue - LAG(revenue, 1) OVER (ORDER BY month) AS growth
+      FROM monthly_sales;
+
+      -- Ostatnie N zamówień per użytkownik
+      SELECT * FROM (
+          SELECT *,
+                 ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+          FROM orders
+      ) t WHERE rn <= 3;

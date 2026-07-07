@@ -1,0 +1,232 @@
+title: "Queries & CRUD"
+
+items:
+  - name: "find() — pobierz dokumenty z filtrem"
+    desc: >
+      find() zwraca Query (nie Promise). Możesz chainować metody (select, sort, limit, skip)
+      i zakończyć await lub .exec(). Bez filtra zwraca wszystkie dokumenty.
+      Używaj lean() dla read-only — szybszy o ~30% bo zwraca plain object.
+    code: |
+      import { User } from './models/User';
+
+      // Podstawowe query
+      const users = await User.find({ role: 'admin' });
+
+      // Z chainowaniem
+      const result = await User.find({ age: { $gte: 18 } })
+        .select('name email -_id')    // -_id wyklucz pole
+        .sort({ createdAt: -1 })      // DESC
+        .limit(10)
+        .skip(20)
+        .lean();                       // plain object
+
+      // Operatory MongoDB
+      const filtered = await User.find({
+        age:   { $gte: 18, $lte: 65 },
+        role:  { $in: ['admin', 'moderator'] },
+        email: { $exists: true },
+        name:  { $regex: /^Jan/i },
+      });
+
+      // exec() — jawne wywołanie query
+      const q = User.find({ active: true }).sort({ name: 1 });
+      const data = await q.exec();
+
+  - name: "findById() i findOne()"
+    desc: >
+      findById(id) to shortcut dla findOne({ _id: id }).
+      findOne() zwraca pierwszy pasujący dokument lub null.
+      findByIdAndUpdate/findOneAndUpdate z opcją returnDocument: 'after' zwraca zaktualizowany dokument.
+    code: |
+      // findById — po ObjectId
+      const user = await User.findById('64f1a2b3c4d5e6f7a8b9c0d1');
+      if (!user) throw new Error('User not found');
+
+      // findOne — pierwszy pasujący
+      const admin = await User.findOne({ role: 'admin', active: true });
+
+      // findById + lean (read-only)
+      const dto = await User.findById(id).select('name email').lean();
+
+      // Rzuć błąd jeśli nie znaleziono (Mongoose 7+)
+      const user2 = await User.findById(id).orFail(
+        new Error('User not found')
+      );
+
+  - name: "create() i insertMany()"
+    desc: >
+      create() tworzy jeden lub wiele dokumentów — uruchamia walidację i middleware.
+      insertMany() jest szybszy dla bulk insert — domyślnie omija middleware.
+      Opcja ordered: false kontynuuje insert nawet przy błędach w niektórych dokumentach.
+    code: |
+      // Jeden dokument
+      const user = await User.create({
+        name:  'Jan Kowalski',
+        email: 'jan@firma.pl',
+        age:   30,
+      });
+      console.log(user._id); // auto-generated ObjectId
+
+      // Wiele dokumentów
+      const users = await User.create([
+        { name: 'Anna', email: 'anna@firma.pl' },
+        { name: 'Piotr', email: 'piotr@firma.pl' },
+      ]);
+
+      // insertMany — szybszy bulk, ale bez middleware/walidacji per doc
+      const result = await User.insertMany(
+        [{ name: 'A', email: 'a@test.pl' }, { name: 'B', email: 'b@test.pl' }],
+        { ordered: false }  // kontynuuj przy błędach
+      );
+      console.log(result.insertedCount);
+
+  - name: "findByIdAndUpdate() i findOneAndUpdate()"
+    desc: >
+      findByIdAndUpdate zwraca stary dokument domyślnie. Ustaw new: true (lub
+      returnDocument: 'after') żeby dostać zaktualizowany. runValidators: true
+      uruchamia walidację Schema przy update. upsert: true tworzy dokument jeśli nie istnieje.
+    code: |
+      // Zaktualizuj i zwróć nowy dokument
+      const updated = await User.findByIdAndUpdate(
+        id,
+        { $set: { name: 'Jan Nowak' }, $inc: { loginCount: 1 } },
+        { new: true, runValidators: true }
+      );
+
+      // findOneAndUpdate z filtrem
+      const promoted = await User.findOneAndUpdate(
+        { email: 'jan@firma.pl' },
+        { $set: { role: 'admin' } },
+        { new: true }
+      );
+
+      // Upsert — stwórz jeśli nie istnieje
+      const upserted = await User.findOneAndUpdate(
+        { email: 'new@firma.pl' },
+        { $setOnInsert: { name: 'Nowy', createdAt: new Date() } },
+        { upsert: true, new: true }
+      );
+
+      // Operatory aktualizacji MongoDB
+      await User.findByIdAndUpdate(id, {
+        $set:       { name: 'Nowy' },
+        $inc:       { views: 1 },
+        $push:      { tags: 'nodejs' },
+        $addToSet:  { roles: 'editor' },  // unikalne elementy
+        $pull:      { tags: 'old' },
+        $unset:     { tempField: '' },
+      });
+
+  - name: "updateMany() i deleteMany()"
+    desc: >
+      updateMany i deleteMany operują na wielu dokumentach jednocześnie.
+      Nie uruchamiają document middleware (pre/post save) — tylko query middleware.
+      Zwracają { matchedCount, modifiedCount, acknowledged } dla update.
+    code: |
+      // Zaktualizuj wszystkich nieaktywnych
+      const result = await User.updateMany(
+        { lastLogin: { $lt: new Date(Date.now() - 90 * 86400000) } },
+        { $set: { active: false } }
+      );
+      console.log(`Dezaktywowano: ${result.modifiedCount}`);
+
+      // Usuń dokumenty spełniające warunek
+      const deleted = await User.deleteMany({ role: 'banned' });
+      console.log(`Usunięto: ${deleted.deletedCount}`);
+
+      // deleteOne — jeden dokument
+      await User.deleteOne({ email: 'spam@firma.pl' });
+
+      // findByIdAndDelete — usuń i zwróć usunięty dokument
+      const removed = await User.findByIdAndDelete(id);
+
+  - name: "countDocuments() i exists()"
+    desc: >
+      countDocuments() liczy dokumenty spełniające warunek.
+      exists() zwraca { _id } jeśli dokument istnieje lub null — szybszy niż findOne.
+      estimatedDocumentCount() używa metadanych kolekcji — dużo szybszy ale przybliżony.
+    code: |
+      // Policz aktywnych userów
+      const count = await User.countDocuments({ active: true });
+
+      // Sprawdź czy email istnieje
+      const exists = await User.exists({ email: 'jan@firma.pl' });
+      if (exists) {
+        console.log('Email zajęty, _id:', exists._id);
+      }
+
+      // Szybkie przybliżone count całej kolekcji
+      const approx = await User.estimatedDocumentCount();
+
+      // Distinct — unikalne wartości pola
+      const roles = await User.distinct('role');
+      // ['user', 'admin', 'moderator']
+
+  - name: "Query Builder — chainable API"
+    desc: >
+      Query Mongoose jest lazy — nie wykonuje się dopóki nie wywołasz await lub exec().
+      Możesz budować query warunkowo, dodawać kolejne ograniczenia i finalnie
+      wywoływać. where() i operatory ($gt, $lt, $in) można mieszać ze składnią obiektową.
+    code: |
+      // Buduj query warunkowo
+      const query = User.find();
+
+      if (role) query.where('role').equals(role);
+      if (minAge) query.where('age').gte(minAge);
+      if (search) query.where('name').regex(new RegExp(search, 'i'));
+
+      const users = await query
+        .select('name email role age')
+        .sort('-createdAt')
+        .limit(pageSize)
+        .skip((page - 1) * pageSize)
+        .lean()
+        .exec();
+
+      // where() jako alternatywa dla obiektu filtru
+      const admins = await User.find()
+        .where('role').in(['admin', 'superadmin'])
+        .where('active').equals(true)
+        .where('age').gt(18).lt(65)
+        .select('name email')
+        .sort({ name: 1 });
+
+  - name: "bulkWrite() — operacje wsadowe"
+    desc: >
+      bulkWrite wysyła wiele operacji jednym requestem do MongoDB — najwydajniejsza
+      opcja dla mieszanych operacji (insert, update, delete).
+      ordered: false pozwala kontynuować przy błędach w niektórych operacjach.
+    code: |
+      const result = await User.bulkWrite([
+        {
+          insertOne: {
+            document: { name: 'Nowy', email: 'nowy@test.pl', role: 'user' },
+          },
+        },
+        {
+          updateOne: {
+            filter: { email: 'jan@firma.pl' },
+            update: { $set: { role: 'admin' } },
+          },
+        },
+        {
+          updateMany: {
+            filter: { role: 'banned' },
+            update: { $set: { active: false } },
+          },
+        },
+        {
+          deleteOne: {
+            filter: { email: 'spam@firma.pl' },
+          },
+        },
+        {
+          replaceOne: {
+            filter: { email: 'old@firma.pl' },
+            replacement: { email: 'new@firma.pl', name: 'Zmieniony' },
+            upsert: true,
+          },
+        },
+      ], { ordered: false });
+
+      console.log(result.insertedCount, result.modifiedCount, result.deletedCount);

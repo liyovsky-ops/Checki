@@ -1,0 +1,74 @@
+title: SvelteKit vs alternatywy full-stack
+
+items:
+  - name: Next.js
+    icon: "▲"
+    color: "#ffffff"
+    tagline: Full-stack React — App Router, RSC, Vercel ecosystem
+    pros:
+      - Największy ekosystem — komponenty UI, integracje, tutoriale
+      - React Server Components — rendering na serwerze z interaktywnością
+      - ISR (Incremental Static Regeneration) — statyczne strony z auto-revalidation
+      - Vercel backing — zero-config deploy, edge functions, analytics
+      - Największy rynek pracy — React dev = Next.js dev
+    cons:
+      - React bundle (~130KB) zawsze trafia do klienta
+      - App Router complexity — Server vs Client components, "use client" boilerplate
+      - useEffect, useState, useCallback — hooks boilerplate
+      - Vendor lock-in na Vercel dla najlepszej DX
+      - RSC learning curve — nowy model mentalny dla React devów
+    vs: Next.js gdy potrzebujesz największego ekosystemu, rynku pracy i React ecosystem. SvelteKit gdy priorytetem jest prostota składni, mały bundle i lepsza DX.
+
+  - name: Nuxt
+    icon: "💚"
+    color: "#00dc82"
+    tagline: Full-stack Vue.js — auto-imports, Nitro server, Composition API
+    pros:
+      - Auto-imports — nie musisz importować ref, computed, useState
+      - Nitro server engine — deploy anywhere (Vercel, Cloudflare, Node, edge)
+      - Vue.js ekosystem — Pinia, Vuetify, PrimeVue, VueUse
+      - Prostsza mental model niż React Server Components
+      - Layers — composable application architecture
+    cons:
+      - Vue runtime overhead — Virtual DOM jak React
+      - Mniejszy ekosystem niż React/Next.js
+      - Mniejszy rynek pracy niż React
+      - Magia auto-imports może utrudniać debugging
+      - Nuxt 3 ciągle dojrzewa — mniej battle-tested niż Next.js
+    vs: Nuxt dla Vue.js devów szukających full-stack rozwiązania. SvelteKit wygrywa wydajnością (zero runtime), prostszą składnią i file-based routing bez magii.
+
+  - name: Remix
+    icon: "💿"
+    color: "#e8f2ff"
+    tagline: Web-standards-first full-stack React — nested routes, progressive enhancement
+    pros:
+      - Web standards (fetch, Response, FormData) zamiast custom abstrakcji
+      - Nested routes z granularnymi error boundaries i loading states
+      - Progressive enhancement przez design — formularze działają bez JS
+      - Brak custom cache layer — polega na HTTP cache (poprawna semantyka)
+      - React Router v6 integracja — familiar dla React devów
+    cons:
+      - Mniejszy ekosystem i community niż Next.js
+      - Brak SSG — tylko SSR (nie nadaje się do static sites)
+      - Brak Image optimization wbudowanej
+      - Szybko ewoluuje — breaking changes między wersjami
+      - React overhead — duży bundle mimo web-standards podejścia
+    vs: Remix gdy cenisz web standards i progressive enhancement w React. SvelteKit ma identyczne podejście do form actions + progressive enhancement, ale z mniejszym bundle (Svelte kompiluje do vanilla JS).
+
+  - name: Astro
+    icon: "🚀"
+    color: "#ff5d01"
+    tagline: Content-first MPA — zero JS domyślnie, islands architecture
+    pros:
+      - Zero JS domyślnie — czyste HTML, JS tylko gdy potrzebne (islands)
+      - Framework agnostic — użyj React, Vue, Svelte, Solid razem w jednym projekcie
+      - Idealny dla content-heavy stron (blogi, dokumentacja, marketing, e-commerce)
+      - Najszybszy first load — brak JavaScript = brak parsowania JS
+      - Content Collections — type-safe MDX/Markdown management
+    cons:
+      - Nie nadaje się do SPA/aplikacji z dużą interaktywnością
+      - Islands architecture = trudne state sharing między komponentami
+      - Brak server-side API routes jak SvelteKit (podstawowe tylko)
+      - Brak form actions z progressive enhancement
+      - Wymaga zewnętrznego backend dla dynamicznych danych
+    vs: Astro dla content sites — blog, docs, landing pages, marketing. SvelteKit dla full-stack web applications wymagających interaktywności, auth, formularzy i API. Astro + SvelteKit = możliwe (użyj Svelte komponentów w Astro).

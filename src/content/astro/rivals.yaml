@@ -1,0 +1,67 @@
+title: Astro vs inne frameworki
+
+items:
+  - name: Next.js
+    icon: "▲"
+    color: "#ffffff"
+    tagline: Full-stack React framework od Vercel — SSR, SSG, ISR, App Router, Server Components
+    pros:
+      - React ecosystem — ogromna społeczność, nieograniczona liczba bibliotek
+      - App Router — Server Components, streaming, parallel routes, intercepting routes
+      - ISR (Incremental Static Regeneration) — statyczne strony regenerowane w tle
+      - Vercel platform — zero-config deploy z edge functions i analytics
+      - "Full-stack out of the box — API routes, Server Actions, middleware"
+    cons:
+      - JavaScript bundle domyślnie duży — każda strona dostaje React runtime (~130KB)
+      - App Router complexity — Server vs Client Components wymaga zrozumienia
+      - Vendor lock-in na Vercel dla niektórych funkcji (Image optimization, Analytics)
+      - Cold start dla serverless functions — wolniejsze pierwsze ładowanie
+    vs: Next.js wygrywa gdy budujesz pełnoprawną aplikację React z dynamicznymi danymi i autentykacją. Astro wygrywa dla content-heavy sites — blogi, dokumentacja, marketing — gdzie priorytetem jest maksymalna wydajność i minimalny JS.
+
+  - name: Gatsby
+    icon: "💜"
+    color: "#663399"
+    tagline: React SSG z GraphQL data layer — popularny w erze JAMstack
+    pros:
+      - Gatsby Cloud — inkrementalne buildy, bardzo szybkie rebuild
+      - GraphQL data layer — ujednolicony interfejs do wszystkich źródeł danych
+      - Duży ekosystem pluginów — gatsby-source-*, gatsby-transformer-*
+      - Gatsby Image — wbudowana optymalizacja obrazów (pionier tego podejścia)
+    cons:
+      - GraphQL overhead — obowiązkowy nawet dla prostych projektów
+      - Wolne buildy dla dużych stron (choć Cloud to poprawia)
+      - Starzejący się — mniejsza aktywność społeczności po przejęciu przez Netlify
+      - React runtime w bundlu — jak Next.js, duży bundle bazowy
+    vs: Astro jest nowocześniejszą alternatywą dla Gatsby. Zero-JS by default vs React runtime, prostszy data fetching (fetch API zamiast GraphQL), szybsze buildy. Gatsby wygrywa gdy masz duży ekosystem pluginów którego nie chcesz porzucać.
+
+  - name: SvelteKit
+    icon: "🔥"
+    color: "#ff3e00"
+    tagline: Full-stack framework na Svelte — SSR, SSG, file-based routing, form actions
+    pros:
+      - Svelte kompiluje do minimalnego JS — mniejszy bundle niż React/Vue
+      - Adapter system — deploy na Vercel, Netlify, Cloudflare, Node jedną komendą
+      - Form Actions — obsługa formularzy bez JS (progressive enhancement)
+      - Prostota Svelte — mniej boilerplate niż React
+    cons:
+      - Mniejszy ekosystem niż React — mniej gotowych bibliotek UI
+      - Mniejszy rynek pracy — mniej ofert niż React/Next.js
+      - Brak Islands Architecture — albo wszystko hydruje (SPA mode) albo nic
+      - Svelte 5 Runes — duży breaking change, fragmentacja zasobów edukacyjnych
+    vs: SvelteKit vs Astro to kwestia podejścia. SvelteKit = pełnoprawny framework aplikacji z własnym systemem reaktywności. Astro = content-first z Islands — możesz użyć Svelte WEWNĄTRZ Astro jako wyspy. Wybierz SvelteKit dla aplikacji, Astro dla treści.
+
+  - name: Nuxt (Vue)
+    icon: "💚"
+    color: "#00DC82"
+    tagline: Full-stack framework na Vue 3 — SSR, SSG, auto-imports, Nitro server
+    pros:
+      - Auto-imports — zero importów w plikach (useRouter, useFetch, useState)
+      - Nitro server — deployment na wszystkie platformy z jednego outputu
+      - Vue DevTools — najlepsze dev tools wśród frameworków
+      - Nuxt Content — wbudowany CMS podobny do Astro Content Collections
+    cons:
+      - Vue runtime w bundlu — jak React, nie zero-JS
+      - Magia auto-importów — trudne debugowanie "skąd to pochodzi?"
+      - Mniejszy ekosystem niż React/Next.js
+      - Nuxt specyficzne konwencje — steep learning curve dla nowych
+    vs: Nuxt to Vue odpowiednik Next.js — pełnoprawny framework aplikacji. Astro wygrywa w wydajności dla content sites. Wybierz Nuxt gdy budujesz aplikację w Vue 3, wybierz Astro gdy budujesz stronę z contentem i chcesz opcjonalnie dodać interaktywne wyspy (które możesz zrobić w Vue!).

@@ -1,0 +1,75 @@
+title: Turborepo vs alternatywy dla monorepo
+
+items:
+  - name: Nx
+    icon: "🏗️"
+    color: "#143055"
+    tagline: Zaawansowany build system — generators, plugins, computation caching
+    pros:
+      - Potężny ekosystem pluginów — React, Angular, Node, Next.js, NestJS out-of-the-box
+      - Generators i executors — scaffolding komponentów, modułów, projektów
+      - Nx Cloud — Remote Cache i Distributed Task Execution (DTE) — wolne zadania na wielu agentach
+      - '"affected" command — uruchamia tylko to co dotknęła zmiana (jak Turbo --filter)'
+      - Nx Console — rozszerzenie VS Code z GUI do zarządzania projektem
+      - Task graph visualizer wbudowany — podgląd grafu zależności
+    cons:
+      - Duża złożoność konfiguracji — nx.json, project.json per pakiet, executors
+      - Generuje dużo boilerplate — więcej plików do zarządzania niż Turborepo
+      - Nx Cloud w pełni płatny dla prywatnych projektów — Turborepo Remote Cache darmowy przez Vercel
+      - Trudniejszy onboarding w istniejącym projekcie bez generatorów
+      - Vendor lock-in — ciężej wyjść z ekosystemu Nx niż z Turborepo
+    vs: Nx dla dużych enterprise monorepo (100+ pakietów) z zespołem który chce pełnego frameworka i generatorów. Turborepo dla typowych startup/scale-up — prostszy setup, mniej opinii, darmowy Remote Cache.
+
+  - name: Lerna
+    icon: "🐉"
+    color: "#CC34DA"
+    tagline: Pionier narzędzi monorepo JS — teraz z Nx pod spodem
+    pros:
+      - Historycznie pierwsze popularne narzędzie monorepo JavaScript
+      - Lerna 6+ bazuje na Nx — szybszy cache niż stary Lerna
+      - Dobre wsparcie dla publishowania paczek — bump wersji, changelogs, npm publish
+      - Integracja z conventional commits (lerna version --conventional-commits)
+      - Znajomy interfejs dla projektów które od dawna używają Lerna
+    cons:
+      - Stracił przodownictwo — Turborepo i Nx go wyprzedziły pod względem szybkości i DX
+      - Wersjonowanie multi-package w "independent mode" bywa skomplikowane
+      - Lerna deprecatuje własne wersjonowanie — kieruje na Changesets
+      - Overhead konfiguracji lerna.json + nx.json (jeśli używasz Nx pod spodem)
+      - Mniejsza aktywna społeczność niż Turborepo w 2024+
+    vs: Lerna historycznie dla projektów publishujących wiele paczek na npm z kompleksowym wersjonowaniem. Dziś Turborepo + Changesets daje lepszy DX. Lerna wybieraj tylko jeśli już go masz i migracja jest kosztowna.
+
+  - name: Rush
+    icon: "⚡"
+    color: "#0078D4"
+    tagline: Enterprise monorepo od Microsoft — deterministyczne buildy, pnpm-based
+    pros:
+      - Stworzony przez Microsoft — używany w ogromnych projektach (wiele dziesiątek paczek)
+      - Deterministyczne buildy — gwarantuje identyczne wyniki między maszynami
+      - Phantom dependency detection — wykrywa ukryte importy których nie deklarujesz
+      - Rush Stack — ekosystem narzędzi (API Extractor, API Documenter, Heft build)
+      - Precyzyjne zarządzanie wersjami między paczkami
+    cons:
+      - Wysoki próg wejścia — rozbudowana konfiguracja rush.json i rig packages
+      - Rush narzuca własny wrapper nad pnpm — ogranicza elastyczność
+      - Mniejsza społeczność niż Turborepo — mniej tutoriali, przykładów
+      - Dokumentacja dobra ale interfejs mniej przyjazny dla mniejszych teamów
+      - Trudniejszy setup dla nowych developerów
+    vs: Rush dla bardzo dużych enterprise monorepo (Microsoft, dziesiątki teamów) gdzie deterministyczność i phantom dependency detection są krytyczne. Turborepo dla typowych teamów — szybszy setup i przyjemniejszy DX.
+
+  - name: pnpm workspaces (bez Turbo)
+    icon: "📦"
+    color: "#F69220"
+    tagline: Wbudowane workspaces w pnpm — zero dodatkowego build systemu
+    pros:
+      - Zero konfiguracji narzędzi do zadań — tylko pnpm-workspace.yaml
+      - Szybka instalacja zależności — hard links, content-addressable store
+      - Natywne filtrowanie — pnpm --filter=web build
+      - Catalogs (pnpm 9+) — centralne zarządzanie wersjami zależności (jak dependabot ale lokalny)
+      - Minimalny overhead — brak turbo.json, brak dodatkowych binarek
+    cons:
+      - Brak cache buildu — każde uruchomienie od zera, niezależnie od zmian
+      - Brak inteligentnego grafu zadań — kolejność i równoległość ręcznie lub skryptami
+      - Brak Remote Cache — CI/CD zawsze buduje wszystko od zera
+      - Przy 10+ workspace buildy zaczynają boleć czasowo
+      - Brak wizualizacji grafu zależności zadań
+    vs: pnpm workspaces bez Turbo dla małych monorepo (2-4 paczki) lub gdy buildy są szybkie i cache nie jest potrzebny. Dodanie Turborepo to 5 minut konfiguracji — dodaje cache, graf zależności i Remote Cache bez zmiany struktury workspaces.

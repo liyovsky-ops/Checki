@@ -1,0 +1,293 @@
+labels:
+  title: Struktura Helm Chart
+  subtitle: Anatomia paczki Helm
+
+intro:
+  title: Czym jest Helm Chart?
+  desc: >
+    Chart to katalog z plikami YAML definiującymi zasoby Kubernetes. Każdy chart ma
+    ściśle określoną strukturę: Chart.yaml z metadanymi, values.yaml z domyślną
+    konfiguracją i katalog templates/ z szablonami Go templates. Charty mogą zależeć
+    od innych chartów (subcharty) i zawierać hooki do operacji pre/post-deploy.
+    Dobrze napisany chart jest reużywalny — działa w dev, staging i prod przez różne
+    pliki values bez zmiany szablonów.
+
+items:
+  - name: Chart.yaml — metadane charta
+    desc: >
+      Obowiązkowy plik z metadanymi charta. Pola name, version i apiVersion są wymagane.
+      version (semver) to wersja charta, appVersion to wersja aplikacji wewnątrz.
+      Sekcja dependencies definiuje subcharty (np. PostgreSQL jako zależność twojej aplikacji).
+    code: |
+      apiVersion: v2
+      name: myapp
+      description: A Helm chart for My Application
+      type: application          # application lub library
+      version: 0.3.1             # wersja CHARTA (semver)
+      appVersion: "2.1.0"        # wersja APLIKACJI wewnątrz
+
+      maintainers:
+        - name: Jan Kowalski
+          email: jan@firma.pl
+
+      dependencies:
+        - name: postgresql
+          version: "12.x.x"
+          repository: https://charts.bitnami.com/bitnami
+          condition: postgresql.enabled   # włącz/wyłącz przez values
+
+        - name: redis
+          version: "17.x.x"
+          repository: https://charts.bitnami.com/bitnami
+          condition: redis.enabled
+
+  - name: values.yaml — domyślna konfiguracja
+    desc: >
+      Plik z domyślnymi wartościami charta. Użytkownik nadpisuje je przez -f my-values.yaml
+      lub --set klucz=wartość. Dobry values.yaml jest dobrze skomentowany i ma sensowne
+      wartości domyślne. Struktura zagnieżdżona YAML odzwierciedla hierarchię konfiguracji.
+    code: |
+      # Liczba replik Deployment
+      replicaCount: 2
+
+      image:
+        repository: myregistry.pl/myapp
+        tag: "2.1.0"
+        pullPolicy: IfNotPresent
+
+      service:
+        type: ClusterIP
+        port: 80
+
+      ingress:
+        enabled: false
+        className: nginx
+        host: myapp.example.com
+        tls: false
+
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+      # Konfiguracja subcharta postgresql (z dependencies)
+      postgresql:
+        enabled: true
+        auth:
+          database: myapp
+          username: myapp
+          password: changeme
+
+      redis:
+        enabled: false
+
+  - name: templates/deployment.yaml — szablon Deployment
+    desc: >
+      Szablon K8s Deployment używający Go templates. Wartości z values.yaml są wstrzykiwane
+      przez .Values.*. .Release.Name zapewnia unikalne nazwy dla wielu instancji tego samego
+      charta. Funkcja include "_helpers.tpl" reużywa nazwane fragmenty.
+    code: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: {{ include "myapp.fullname" . }}
+        labels:
+          {{- include "myapp.labels" . | nindent 4 }}
+      spec:
+        replicas: {{ .Values.replicaCount }}
+        selector:
+          matchLabels:
+            {{- include "myapp.selectorLabels" . | nindent 6 }}
+        template:
+          metadata:
+            labels:
+              {{- include "myapp.selectorLabels" . | nindent 8 }}
+          spec:
+            containers:
+              - name: {{ .Chart.Name }}
+                image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+                imagePullPolicy: {{ .Values.image.pullPolicy }}
+                ports:
+                  - containerPort: 8080
+                resources:
+                  {{- toYaml .Values.resources | nindent 12 }}
+
+  - name: templates/service.yaml — szablon Service
+    desc: >
+      Szablon Service kierujący ruch do Podów. Typ serwisu (ClusterIP/NodePort/LoadBalancer)
+      pochodzi z values.yaml. Selector używa helper labels żeby zawsze trafiać w Pody
+      tego konkretnego release — nawet gdy zainstalowanych jest kilka instancji tego charta.
+    code: |
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: {{ include "myapp.fullname" . }}
+        labels:
+          {{- include "myapp.labels" . | nindent 4 }}
+      spec:
+        type: {{ .Values.service.type }}
+        ports:
+          - port: {{ .Values.service.port }}
+            targetPort: 8080
+            protocol: TCP
+            name: http
+        selector:
+          {{- include "myapp.selectorLabels" . | nindent 4 }}
+
+  - name: templates/ingress.yaml — warunkowo renderowany Ingress
+    desc: >
+      Szablon Ingress renderowany tylko gdy ingress.enabled=true w values. Wzorzec
+      warunkowego renderowania z {{ if .Values.ingress.enabled }} jest bardzo często
+      stosowany — pozwala opcjonalnie włączać zasoby K8s przez values.
+    code: |
+      {{- if .Values.ingress.enabled -}}
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: {{ include "myapp.fullname" . }}
+        labels:
+          {{- include "myapp.labels" . | nindent 4 }}
+        {{- with .Values.ingress.annotations }}
+        annotations:
+          {{- toYaml . | nindent 4 }}
+        {{- end }}
+      spec:
+        {{- if .Values.ingress.className }}
+        ingressClassName: {{ .Values.ingress.className }}
+        {{- end }}
+        rules:
+          - host: {{ .Values.ingress.host }}
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: {{ include "myapp.fullname" . }}
+                      port:
+                        number: {{ .Values.service.port }}
+      {{- end }}
+
+  - name: templates/_helpers.tpl — named templates
+    desc: >
+      Plik z nazwanymi szablonami (helpers) reużywanymi w innych szablonach przez include.
+      Konwencja: plik zaczyna się od _ żeby Helm nie renderował go bezpośrednio jako manifest.
+      Typowe helpery: fullname (unikalna nazwa release), labels (standardowe etykiety K8s), selectorLabels.
+    code: |
+      {{/*
+        Expand the name of the chart.
+      */}}
+      {{- define "myapp.name" -}}
+      {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+      {{- end }}
+
+      {{/*
+        Full name: release-name + chart-name (max 63 znaki dla DNS)
+      */}}
+      {{- define "myapp.fullname" -}}
+      {{- if .Values.fullnameOverride }}
+      {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+      {{- else }}
+      {{- $name := default .Chart.Name .Values.nameOverride }}
+      {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+      {{- end }}
+      {{- end }}
+
+      {{/*
+        Standardowe etykiety Kubernetes
+      */}}
+      {{- define "myapp.labels" -}}
+      helm.sh/chart: {{ include "myapp.chart" . }}
+      {{ include "myapp.selectorLabels" . }}
+      app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+      app.kubernetes.io/managed-by: {{ .Release.Service }}
+      {{- end }}
+
+      {{- define "myapp.selectorLabels" -}}
+      app.kubernetes.io/name: {{ include "myapp.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- end }}
+
+  - name: Chart.lock — zablokowane wersje zależności
+    desc: >
+      Chart.lock to automatycznie generowany plik (przez helm dependency update) z dokładnymi
+      wersjami pobranych zależności — analogicznie do package-lock.json w npm.
+      Commituj Chart.lock do repo dla reproducible builds. Katalog charts/ zawiera pobrane subcharty.
+    code: |
+      # Chart.lock (generowany automatycznie — nie edytuj ręcznie)
+      dependencies:
+      - name: postgresql
+        repository: https://charts.bitnami.com/bitnami
+        version: 12.5.6          # dokładna wersja pobrana (nie "12.x.x")
+      - name: redis
+        repository: https://charts.bitnami.com/bitnami
+        version: 17.11.3
+      digest: sha256:a1b2c3d4...  # hash dla weryfikacji
+      generated: "2024-01-15T10:30:00.000Z"
+
+      # Struktura katalogów po helm dependency update:
+      # mychart/
+      #   charts/
+      #     postgresql-12.5.6.tgz   ← pobrany subchart
+      #     redis-17.11.3.tgz       ← pobrany subchart
+      #   Chart.lock                ← zablokowane wersje
+
+      # Komendy:
+      helm dependency update ./mychart    # pobierz/zaktualizuj zależności
+      helm dependency build  ./mychart    # pobierz Z Chart.lock (szybsze w CI)
+      helm dependency list   ./mychart    # lista z statusem (ok/missing)
+
+  - name: templates/NOTES.txt — wiadomość po instalacji
+    desc: >
+      NOTES.txt jest renderowany i wyświetlany po każdym helm install i helm upgrade.
+      Idealne miejsce na URL do aplikacji, jak się zalogować i pierwsze kroki.
+      Bitnami używa NOTES.txt do pokazywania wygenerowanych haseł i komend kubectl.
+    code: |
+      Thank you for installing {{ .Chart.Name }}!
+
+      {{- if .Values.ingress.enabled }}
+      Application is available at:
+        http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.host }}
+      {{- else }}
+      Get the application URL by running:
+        kubectl port-forward svc/{{ include "myapp.fullname" . }} 8080:{{ .Values.service.port }} -n {{ .Release.Namespace }}
+        Then open: http://localhost:8080
+      {{- end }}
+
+      Release name:  {{ .Release.Name }}
+      Chart version: {{ .Chart.Version }}
+      App version:   {{ .Chart.AppVersion }}
+
+      # Wyświetl po instalacji:
+      helm get notes {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+  - name: .helmignore — pliki wykluczone z paczki
+    desc: >
+      .helmignore definiuje które pliki są wykluczane przy helm package — analogicznie do .gitignore.
+      Wyklucz pliki developerskie, dokumentację, lokalne wartości testowe i środowisko.
+      Wpływa tylko na helm package — przy helm install z lokalnego katalogu wszystko jest brane.
+    code: |
+      # Ignoruj pliki OS
+      .DS_Store
+      .idea/
+      *.swp
+
+      # Pliki testowe i developerskie
+      values-local.yaml
+      values-secrets.yaml
+      test/
+      tests/
+
+      # CI/CD
+      .github/
+      .gitlab-ci.yml
+
+      # Dokumentacja deweloperska (nie README.md — ten jest brany!)
+      docs/
+      DEVELOPMENT.md
+
+      # Verify .helmignore działa:
+      helm package ./mychart --debug 2>&1 | grep "Ignoring"

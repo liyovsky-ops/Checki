@@ -1,0 +1,1681 @@
+title: Pydantic — wzorce i API
+
+groups:
+  - name: Podstawowe modele
+    icon: "📋"
+    commands:
+      - code: |
+          from pydantic import BaseModel
+          from typing import Optional
+
+          class User(BaseModel):
+              id: int
+              name: str
+              email: str
+              age: Optional[int] = None
+
+          user = User(id=1, name="Łukasz", email="l@example.com")
+          print(user.model_dump())
+          # {'id': 1, 'name': 'Łukasz', 'email': 'l@example.com', 'age': None}
+        desc: Podstawowy model Pydantic v2
+        detail:
+          what: BaseModel waliduje dane przy inicjalizacji używając type hints. Błędy = ValidationError.
+          how: Pydantic v2 używa Rust core (pydantic-core) — 5-50x szybszy od v1. Koercja typów automatyczna.
+          tips:
+            - 'user.model_dump() — dict z walidowanymi danymi (v2, było .dict() w v1)'
+            - 'User.model_validate({"id": 1, ...}) — waliduj dict (v2, było .parse_obj() w v1)'
+            - 'Optional[int] = None — pole opcjonalne, domyślnie None'
+
+      - code: |
+          from pydantic import BaseModel
+
+          class Product(BaseModel):
+              price: float
+              quantity: int
+              name: str
+
+          # Koercja — Pydantic konwertuje typy gdy to możliwe
+          p = Product(price="99.99", quantity="5", name="Laptop")
+          print(p.price)     # 99.99 (float, nie string)
+          print(p.quantity)  # 5 (int, nie string)
+
+          # Błąd koercji
+          try:
+              bad = Product(price="abc", quantity=1, name="X")
+          except Exception as e:
+              print(e)  # price: Input should be a valid number
+        desc: Koercja typów — Pydantic konwertuje kompatybilne typy
+        detail:
+          what: Pydantic próbuje skonwertować wartość do żądanego typu przed walidacją. str → int → float.
+          how: Surowa walidacja (bez koercji) wymaga model_config = ConfigDict(strict=True).
+          tips:
+            - '"42" → int 42 — string cyfr konwertuje się na int'
+            - 'ConfigDict(strict=True) wyłącza koercję — tylko dokładne typy'
+            - 'Koercja działa dla: str→int, str→float, int→float, ale NIE float→int'
+
+      - code: |
+          from pydantic import BaseModel, ValidationError
+
+          class User(BaseModel):
+              id: int
+              name: str
+              age: int
+
+          try:
+              bad = User(id="abc", name=None, age=-1)
+          except ValidationError as e:
+              print(e.error_count())  # 2 (id + name)
+              for err in e.errors():
+                  print(err["loc"], err["msg"], err["type"])
+              # ('id',) 'Input should be a valid integer' 'int_parsing'
+              # ('name',) 'Input should be a valid string' 'string_type'
+        desc: ValidationError — obsługa błędów walidacji
+        detail:
+          what: ValidationError zawiera WSZYSTKIE błędy naraz (nie tylko pierwszy). Każdy błąd ma loc, msg, type, input.
+          how: e.errors() zwraca listę dict. e.error_count() = liczba błędów. str(e) = czytelny opis.
+          tips:
+            - 'e.errors() — lista dict z polami: loc, msg, type, input, url'
+            - 'err["loc"] to tuple — ("address", "city") dla zagnieżdżonych pól'
+            - 'from pydantic import ValidationError — importuj osobno z pydantic'
+
+      - code: |
+          from pydantic import BaseModel
+          from typing import Optional
+
+          class Config(BaseModel):
+              host: str
+              port: int = 5432
+              debug: bool = False
+              password: Optional[str] = None
+
+          # Domyślne wartości — nie musisz podawać wszystkich pól
+          c = Config(host="localhost")
+          print(c.port)     # 5432
+          print(c.debug)    # False
+          print(c.password) # None
+
+          # model_fields — introspection pól
+          for name, field in Config.model_fields.items():
+              print(f"{name}: required={field.is_required()}")
+        desc: Domyślne wartości i introspection model_fields
+        detail:
+          what: Pola z wartością domyślną są opcjonalne. model_fields zwraca słownik FieldInfo per pole.
+          how: field.is_required() → True jeśli brak default. field.default → wartość domyślna lub PydanticUndefined.
+          tips:
+            - 'Model.model_fields — dict {nazwa: FieldInfo} dla wszystkich pól'
+            - 'FieldInfo.is_required() — True jeśli pole nie ma default'
+            - 'default_factory=list — dla mutowalnych defaultów (lista, dict)'
+
+      - code: |
+          from pydantic import BaseModel
+          import json
+
+          class Address(BaseModel):
+              street: str
+              city: str
+              zip_code: str
+
+          # JSON Schema automatycznie z modelu
+          schema = Address.model_json_schema()
+          print(json.dumps(schema, indent=2))
+          # {
+          #   "title": "Address",
+          #   "type": "object",
+          #   "properties": {
+          #     "street": {"title": "Street", "type": "string"},
+          #     ...
+          #   },
+          #   "required": ["street", "city", "zip_code"]
+          # }
+        desc: model_json_schema() — automatyczny JSON Schema
+        detail:
+          what: Pydantic generuje JSON Schema zgodny z draft-07/2020-12 z każdego modelu. FastAPI używa tego do /docs.
+          how: Field(description="...", title="...") wzbogaca schema. Annotated z metadanymi też wchodzi do schema.
+          tips:
+            - 'Model.model_json_schema() — JSON Schema jako dict Pythona'
+            - 'FastAPI automatycznie eksponuje schema w /openapi.json'
+            - 'Field(description="...", examples=[...]) wzbogaca dokumentację'
+
+      - code: |
+          from pydantic import BaseModel, ConfigDict
+
+          class ImmutablePoint(BaseModel):
+              model_config = ConfigDict(frozen=True)
+              x: float
+              y: float
+
+          p = ImmutablePoint(x=1.0, y=2.0)
+
+          # model_copy — jedyna droga modyfikacji frozen modelu
+          p2 = p.model_copy(update={"x": 10.0})
+          print(p2.x)  # 10.0
+          print(p.x)   # 1.0 (oryginał niezmieniony)
+
+          # Deep copy dla zagnieżdżonych obiektów
+          p3 = p.model_copy(deep=True)
+        desc: model_copy() — kopiowanie z podmianą pól
+        detail:
+          what: model_copy(update={...}) tworzy nową instancję z podmienionymi polami. Konieczne dla frozen=True.
+          how: Domyślnie shallow copy. model_copy(deep=True) robi deep copy zagnieżdżonych struktur.
+          tips:
+            - 'model_copy(update={"field": value}) — podmień wybrane pola'
+            - 'model_copy(deep=True) — deep copy, zagnieżdżone obiekty są niezależne'
+            - 'frozen=True + model_copy = immutable value objects (wzorzec DDD)'
+
+      - code: |
+          from pydantic import BaseModel
+
+          class User(BaseModel):
+              id: int
+              name: str
+
+          # Różne sposoby tworzenia instancji
+          u1 = User(id=1, name="Łukasz")           # keyword args
+          u2 = User.model_validate({"id": 2, "name": "Jan"})  # z dict
+          u3 = User.model_validate_json('{"id": 3, "name": "Anna"}')  # z JSON string
+
+          # Sprawdź czy dane są poprawne bez tworzenia instancji
+          User.model_validate({"id": 1, "name": "OK"})  # rzuca ValidationError jeśli błąd
+
+          # __repr__ i __eq__
+          print(u1)          # id=1 name='Łukasz'
+          print(u1 == User(id=1, name="Łukasz"))  # True
+        desc: Różne sposoby tworzenia instancji modelu
+        detail:
+          what: Model(kwargs), model_validate(dict), model_validate_json(str) to trzy główne wejścia.
+          how: Wszystkie przechodzą przez ten sam silnik walidacji. model_validate_json parsuje JSON i waliduje naraz.
+          tips:
+            - 'model_validate_json() — szybsze niż json.loads() + model_validate() bo Rust parsuje JSON'
+            - 'BaseModel implementuje __eq__ — porównanie instancji po wartościach pól'
+            - 'model_validate(obj, from_attributes=True) — konwersja z ORM obiektów'
+
+  - name: "Field() i walidacja pól"
+    icon: "🔧"
+    commands:
+      - code: |
+          from pydantic import BaseModel, Field
+          from typing import Optional
+
+          class Product(BaseModel):
+              name: str = Field(
+                  description="Nazwa produktu",
+                  title="Nazwa",
+                  min_length=3,
+                  max_length=100,
+              )
+              price: float = Field(gt=0, description="Cena w PLN")
+              category: Optional[str] = Field(
+                  default=None,
+                  description="Kategoria produktu"
+              )
+
+          p = Product(name="Laptop", price=4999.99)
+          print(p.model_json_schema()["properties"]["price"])
+          # {'title': 'Price', 'description': 'Cena w PLN', 'exclusiveMinimum': 0, 'type': 'number'}
+        desc: Field() — podstawowe użycie z metadanymi
+        detail:
+          what: Field() dodaje metadane (description, title) i ograniczenia do pola. Uwzględniane w JSON Schema.
+          how: Field() jako wartość domyślna pola. Dla wymaganych pól bez default — Field(...) lub sam Field(constraints).
+          tips:
+            - 'Field(...) — wymagane pole z ograniczeniami (trzy kropki = brak default)'
+            - 'Field(description="...", examples=[...]) wchodzi do /docs FastAPI'
+            - 'Dla Optional z Field: Optional[str] = Field(default=None, ...)'
+
+      - code: |
+          from pydantic import BaseModel, Field
+
+          class Score(BaseModel):
+              # Ograniczenia liczbowe
+              value: int = Field(ge=0, le=100)      # 0 <= value <= 100
+              temperature: float = Field(gt=-273.15) # > zero absolutne
+              rating: float = Field(ge=1.0, le=5.0, multiple_of=0.5)  # 1, 1.5, 2.0...
+              rank: int = Field(ge=1)                # >= 1
+
+          s = Score(value=85, temperature=20.0, rating=4.5, rank=3)
+          # Score(value=101) → ValidationError: Input should be less than or equal to 100
+        desc: Field() — ograniczenia liczbowe gt/ge/lt/le/multiple_of
+        detail:
+          what: gt (greater than, >), ge (>=), lt (<), le (<=), multiple_of — ograniczenia na liczbach.
+          how: Generują odpowiednie słowa kluczowe JSON Schema (exclusiveMinimum, maximum, multipleOf).
+          tips:
+            - 'gt=0 → exclusiveMinimum: 0 (liczba musi być > 0, nie >= 0)'
+            - 'ge=0 → minimum: 0 (liczba musi być >= 0)'
+            - 'multiple_of=0.5 → akceptuje 1.0, 1.5, 2.0 ale nie 1.3'
+
+      - code: |
+          from pydantic import BaseModel, Field
+
+          class UserInput(BaseModel):
+              username: str = Field(min_length=3, max_length=30)
+              password: str = Field(min_length=8)
+              phone: str = Field(
+                  pattern=r"^\+?[1-9]\d{8,14}$",
+                  description="Numer telefonu z kodem kraju"
+              )
+              postal_code: str = Field(
+                  pattern=r"^\d{2}-\d{3}$",
+                  description="Format: 00-000"
+              )
+
+          u = UserInput(
+              username="lukasz",
+              password="haslo123",
+              phone="+48123456789",
+              postal_code="30-001",
+          )
+        desc: Field() — ograniczenia string min_length/max_length/pattern
+        detail:
+          what: min_length/max_length na string = liczba znaków (nie bajtów). pattern = regex.
+          how: pattern używa re.search() pod spodem — upewnij się że regex jest zakotwiczony (^ i $).
+          tips:
+            - 'pattern=r"^...$" — zakotwicz regex żeby nie matchował fragmentu'
+            - 'min_length/max_length działa też na list (minimalna/maksymalna długość listy)'
+            - 'strip_whitespace — użyj BeforeValidator(str.strip) zamiast Field'
+
+      - code: |
+          from pydantic import BaseModel, Field
+
+          class Item(BaseModel):
+              # alias — inna nazwa w JSON/dict vs atrybut Python
+              item_id: int = Field(alias="itemId")
+              # serialization_alias — tylko przy serializacji
+              internal_name: str = Field(serialization_alias="name")
+              # validation_alias — tylko przy walidacji
+              product_code: str = Field(validation_alias="productCode")
+
+          # Tworzenie: użyj alias
+          item = Item(itemId=1, name="ignored", productCode="PC-001")
+          # Lub: model_validate z by_alias=False
+          item2 = Item.model_validate({"itemId": 1, "internal_name": "X", "productCode": "Y"})
+
+          # Serializacja: alias w output
+          print(item.model_dump(by_alias=True))
+          # {'itemId': 1, 'name': 'X', 'productCode': 'PC-001'}
+        desc: Field() alias, validation_alias, serialization_alias
+        detail:
+          what: alias = inna nazwa pola w JSON (input i output). validation_alias = tylko przy input. serialization_alias = tylko output.
+          how: model_dump(by_alias=True) używa alias lub serialization_alias w wyjściu.
+          tips:
+            - 'alias="camelCase" — przydatne przy konsumpcji API które zwraca camelCase'
+            - 'populate_by_name=True w ConfigDict — akceptuj i alias i oryginalną nazwę'
+            - 'serialization_alias — zmień nazwę w output bez zmiany walidacji input'
+
+      - code: |
+          from pydantic import BaseModel
+          from typing import Union, Optional, Literal
+
+          class Response(BaseModel):
+              # Union — jedno z kilku typów
+              value: Union[int, str, None]
+
+              # Python 3.10+ składnia
+              status: int | str
+
+              # Literal — tylko konkretne wartości
+              role: Literal["admin", "user", "guest"] = "user"
+
+              # Optional[X] = Union[X, None] = X | None
+              notes: Optional[str] = None
+
+          r = Response(value=42, status="ok", role="admin")
+          # role="manager" → ValidationError: Input should be 'admin', 'user' or 'guest'
+        desc: Union, Optional, Literal — typy złożone
+        detail:
+          what: Union[A, B] akceptuje A lub B. Literal["x", "y"] = enum inline. Optional[X] = X | None.
+          how: Union sprawdza od lewej — pierwsze pasujące wygrywa. Literal szybszy niż Union bo sprawdza równość.
+          tips:
+            - 'Literal["a", "b"] w JSON Schema → enum: ["a", "b"]'
+            - 'Union[int, str] — Pydantic próbuje int pierwszy, jeśli nie — str'
+            - 'str | None jest szybsze niż Optional[str] w v2 (Python 3.10+)'
+
+      - code: |
+          from pydantic import BaseModel, Field
+          from pydantic import conint, constr, confloat
+
+          class Order(BaseModel):
+              quantity: conint(gt=0, le=1000) = 1
+              reference: constr(pattern=r"^ORD-\d{6}$")
+              discount: confloat(ge=0.0, le=1.0) = 0.0
+              unit_price: float = Field(gt=0)
+
+          o = Order(quantity=5, reference="ORD-123456", unit_price=49.99)
+          print(o.quantity)    # 5
+          print(o.discount)    # 0.0
+        desc: conint, constr, confloat — typy z ograniczeniami
+        detail:
+          what: conint/constr/confloat to shortcut do Annotated[int/str/float, Field(...)]. Styl alternatywny do Field().
+          how: W Pydantic v2 są to aliasy Annotated — identyczny efekt co Field() z tymi samymi parametrami.
+          tips:
+            - 'conint(gt=0) = Annotated[int, Field(gt=0)] — ten sam efekt'
+            - 'constr(pattern=r"...") — string z wymaganym wzorcem regex'
+            - 'Preferuj Annotated[int, Field(...)] w v2 — bardziej explicite'
+
+      - code: |
+          from pydantic import BaseModel, Field
+          from pydantic import conlist
+
+          class Cart(BaseModel):
+              items: conlist(str, min_length=1, max_length=50)
+              tags: list[str] = Field(default=[], max_length=10)
+              # set — unikalne wartości
+              categories: set[str] = set()
+
+          c = Cart(items=["laptop", "myszka"], tags=["promo", "tech"])
+          print(len(c.items))   # 2
+
+          # Lista z zagnieżdżonym modelem
+          class Item(BaseModel):
+              name: str
+              qty: int = Field(ge=1)
+
+          class Order(BaseModel):
+              lines: list[Item] = Field(min_length=1)
+
+          o = Order(lines=[{"name": "Kurs", "qty": 2}])
+          print(o.lines[0].name)  # Kurs
+        desc: conlist, list z Field — ograniczone listy
+        detail:
+          what: conlist(Type, min_length=N, max_length=M) ogranicza rozmiar listy. list[SubModel] waliduje każdy element.
+          how: Field(max_length=10) na list działa jak conlist — ta sama funkcjonalność w v2.
+          tips:
+            - 'list[SubModel] — każdy element walidowany jako SubModel'
+            - 'conlist = Annotated[list[T], Field(min_length=..., max_length=...)]'
+            - 'set[str] — automatycznie usuwa duplikaty, waliduje każdy element'
+
+  - name: "@field_validator i @model_validator"
+    icon: "✅"
+    commands:
+      - code: |
+          from pydantic import BaseModel, field_validator
+
+          class User(BaseModel):
+              name: str
+              email: str
+
+              @field_validator("name")
+              @classmethod
+              def name_must_not_be_empty(cls, v: str) -> str:
+                  v = v.strip()
+                  if not v:
+                      raise ValueError("Imię nie może być puste")
+                  return v.title()
+
+              @field_validator("email")
+              @classmethod
+              def email_lowercase(cls, v: str) -> str:
+                  return v.lower().strip()
+
+          u = User(name="  łukasz  ", email="L@EXAMPLE.COM")
+          print(u.name)   # Łukasz
+          print(u.email)  # l@example.com
+        desc: "@field_validator — podstawy (mode='after', domyślny)"
+        detail:
+          what: '@field_validator uruchamia się po koercji Pydantic — wartość jest już właściwego typu.'
+          how: Musi być classmethod. Zwraca (ewentualnie zmodyfikowaną) wartość. Rzuca ValueError przy błędzie.
+          tips:
+            - '@classmethod jest wymagany w v2 (w v1 nie było konieczne)'
+            - 'Zwróć wartość — nawet jeśli jej nie zmieniasz (return v)'
+            - 'raise ValueError("msg") → ValidationError z tą wiadomością'
+
+      - code: |
+          from pydantic import BaseModel, field_validator
+
+          class Config(BaseModel):
+              tags: list[str]
+              timeout_ms: int
+
+              # mode='before' — dostaje surowy input przed koercją Pydantic
+              @field_validator("tags", mode="before")
+              @classmethod
+              def parse_tags(cls, v):
+                  if isinstance(v, str):
+                      # Przyjmij "python,pydantic" jako listę
+                      return [t.strip() for t in v.split(",") if t.strip()]
+                  return v
+
+              @field_validator("timeout_ms", mode="before")
+              @classmethod
+              def parse_timeout(cls, v):
+                  if isinstance(v, str) and v.endswith("s"):
+                      return int(v[:-1]) * 1000   # "5s" → 5000
+                  return v
+
+          c = Config(tags="python, pydantic, fastapi", timeout_ms="3s")
+          print(c.tags)        # ['python', 'pydantic', 'fastapi']
+          print(c.timeout_ms)  # 3000
+        desc: "@field_validator mode='before' — preprocessowanie surowego input"
+        detail:
+          what: "'before' uruchamia się PRZED koercją — dostaje raw input (string, dict, cokolwiek)."
+          how: Przydatne gdy chcesz znormalizować format przed walidacją Pydantic.
+          tips:
+            - "mode='before' → v może być dowolnego typu — sprawdź isinstance()"
+            - "mode='after' → v jest już skonwertowane do docelowego typu"
+            - 'Można też użyć BeforeValidator(fn) w Annotated dla reużywalności'
+
+      - code: |
+          from pydantic import BaseModel, field_validator
+
+          class Address(BaseModel):
+              street: str
+              city: str
+              country: str
+
+              # Jeden walidator dla wielu pól
+              @field_validator("street", "city", "country")
+              @classmethod
+              def strip_and_capitalize(cls, v: str) -> str:
+                  v = v.strip()
+                  if not v:
+                      raise ValueError("Pole nie może być puste")
+                  return v.title()
+
+          a = Address(street="  krakowska 1 ", city=" kraków", country="polska")
+          print(a.street)   # Krakowska 1
+          print(a.city)     # Kraków
+          print(a.country)  # Polska
+        desc: "@field_validator — jeden walidator dla wielu pól"
+        detail:
+          what: Podaj listę nazw pól — walidator wywołuje się osobno dla każdego. Upraszcza kod przy tej samej logice.
+          how: Walidator nie widzi innych pól — tylko swoją wartość. Do porównania między polami użyj @model_validator.
+          tips:
+            - 'field_validator("a", "b", "c") wywołuje się 3 razy — raz na pole'
+            - 'Do walidacji zależności między polami → @model_validator(mode="after")'
+            - 'Kolejność pól w dekoratorze nie ma znaczenia'
+
+      - code: |
+          from pydantic import BaseModel, model_validator
+
+          class DateRange(BaseModel):
+              start: str
+              end: str
+
+              @model_validator(mode="after")
+              def end_after_start(self) -> "DateRange":
+                  if self.end < self.start:
+                      raise ValueError(f"end ({self.end}) musi być >= start ({self.start})")
+                  return self
+
+          class PasswordForm(BaseModel):
+              password: str
+              confirm: str
+
+              @model_validator(mode="after")
+              def passwords_match(self) -> "PasswordForm":
+                  if self.password != self.confirm:
+                      raise ValueError("Hasła nie są identyczne")
+                  return self
+
+          pf = PasswordForm(password="secret123", confirm="secret123")  # OK
+          # PasswordForm(password="a", confirm="b")  → ValueError
+        desc: "@model_validator mode='after' — walidacja zależności między polami"
+        detail:
+          what: "'after' dostaje gotową instancję — możesz walidować relacje między polami przez self."
+          how: Musi zwrócić self (lub zmodyfikowaną instancję). Rzuca ValueError przy błędzie.
+          tips:
+            - 'mode="after" → self jest gotową instancją modelu z wszystkimi polami'
+            - 'Zwróć self po walidacji — return self'
+            - 'Możesz też modyfikować pola w model_validator: self.field = value; return self'
+
+      - code: |
+          from pydantic import BaseModel, model_validator
+          from typing import Any
+
+          class UserCreate(BaseModel):
+              first_name: str
+              last_name: str
+              email: str
+
+              @model_validator(mode="before")
+              @classmethod
+              def handle_legacy_format(cls, data: Any) -> Any:
+                  if isinstance(data, dict):
+                      # Stary format: {"full_name": "Jan Kowalski"}
+                      if "full_name" in data and "first_name" not in data:
+                          parts = data.pop("full_name", "").split(" ", 1)
+                          data["first_name"] = parts[0]
+                          data["last_name"] = parts[1] if len(parts) > 1 else ""
+                  return data
+
+          u1 = UserCreate(first_name="Jan", last_name="Kowalski", email="j@ex.com")
+          u2 = UserCreate(**{"full_name": "Jan Kowalski", "email": "j@ex.com"})
+          print(u2.first_name)  # Jan
+          print(u2.last_name)   # Kowalski
+        desc: "@model_validator mode='before' — transformacja danych przed modelem"
+        detail:
+          what: "'before' dostaje surowy dict/obiekt przed tworzeniem instancji. Pozwala przepisać strukturę."
+          how: Musi być classmethod. Zwraca zmodyfikowany dict który trafi do normalnej walidacji.
+          tips:
+            - 'Używaj do migracji formatu API — stary format → nowy'
+            - 'mode="before" + @classmethod (wymagane w v2)'
+            - 'Zwróć dict — nie instancję modelu'
+
+      - code: |
+          from pydantic import BaseModel, field_validator, model_validator
+
+          class Registration(BaseModel):
+              username: str
+              email: str
+              age: int
+              referral_code: str = ""
+
+              @field_validator("username")
+              @classmethod
+              def username_valid(cls, v: str) -> str:
+                  v = v.strip().lower()
+                  if len(v) < 3:
+                      raise ValueError("Username min 3 znaki")
+                  if not v.isalnum():
+                      raise ValueError("Tylko litery i cyfry")
+                  return v
+
+              @field_validator("age")
+              @classmethod
+              def must_be_adult(cls, v: int) -> int:
+                  if v < 18:
+                      raise ValueError("Musisz mieć 18+ lat")
+                  return v
+
+              @model_validator(mode="after")
+              def validate_business_rules(self) -> "Registration":
+                  if self.age < 21 and self.referral_code == "VIP":
+                      raise ValueError("Kod VIP tylko dla 21+")
+                  return self
+        desc: Łączenie @field_validator i @model_validator
+        detail:
+          what: field_validator uruchamia się przed model_validator. Kolejność wykonania — field validators → model_after.
+          how: Błąd w field_validator przerywa przetwarzanie tego pola ale inne pola nadal są walidowane.
+          tips:
+            - 'field_validator → (walidacja Pydantic) → model_validator(after)'
+            - 'Jeśli field_validator rzuci błąd — model_validator(after) może nie dostać pola'
+            - 'Używaj field_validator do reguł per pole, model_validator do reguł między polami'
+
+      - code: |
+          from pydantic import BaseModel, field_validator, ValidationError
+
+          class Score(BaseModel):
+              value: int
+
+              @field_validator("value")
+              @classmethod
+              def must_be_in_range(cls, v: int) -> int:
+                  if not (0 <= v <= 100):
+                      raise ValueError(f"Wartość {v} musi być w zakresie 0-100")
+                  return v
+
+          # ValueError wewnątrz field_validator → automatycznie ValidationError
+          try:
+              Score(value=150)
+          except ValidationError as e:
+              err = e.errors()[0]
+              print(err["type"])    # "value_error"
+              print(err["msg"])     # "Value error, Wartość 150 musi być w zakresie 0-100"
+              print(err["loc"])     # ('value',)
+
+          # Można też rzucić AssertionError (assert) → ValidationError
+          class Positive(BaseModel):
+              n: int
+
+              @field_validator("n")
+              @classmethod
+              def check(cls, v: int) -> int:
+                  assert v > 0, f"Musi być > 0, podano {v}"
+                  return v
+        desc: "ValueError vs AssertionError w walidatorach → ValidationError"
+        detail:
+          what: "ValueError i AssertionError rzucone w @field_validator są automatycznie konwertowane na ValidationError."
+          how: "Preferuj ValueError — bardziej explicite. AssertionError działa ale jest mniej czytelny w logach."
+          tips:
+            - 'raise ValueError("msg") → err["type"] = "value_error"'
+            - 'assert cond, "msg" → err["type"] = "assertion_error" — działa ale mniej czytelne'
+            - 'NIE rzucaj ValidationError bezpośrednio w walidatorze — tylko ValueError lub AssertionError'
+
+  - name: Zagnieżdżone modele i listy
+    icon: "🗂️"
+    commands:
+      - code: |
+          from pydantic import BaseModel
+          from typing import Optional
+
+          class Address(BaseModel):
+              street: str
+              city: str
+              country: str = "PL"
+
+          class User(BaseModel):
+              id: int
+              name: str
+              address: Address
+              billing: Optional[Address] = None
+
+          # Możesz podać dict — Pydantic automatycznie konwertuje na Address
+          user = User(
+              id=1,
+              name="Łukasz",
+              address={"street": "Krakowska 1", "city": "Kraków"},
+          )
+          print(user.address.city)       # Kraków
+          print(user.address.country)    # PL
+          print(user.model_dump())       # zagnieżdżony dict
+        desc: Zagnieżdżone modele — dict automatycznie konwertowany
+        detail:
+          what: Pole typu SubModel przyjmuje dict lub gotową instancję SubModel. Pydantic waliduje rekurencyjnie.
+          how: Walidacja kaskadowa — błędy w zagnieżdżonym modelu mają loc = ("address", "city") itp.
+          tips:
+            - 'Zagnieżdżony dict → SubModel automatycznie przy walidacji'
+            - 'err["loc"] = ("address", "city") dla błędu w zagnieżdżonym polu'
+            - 'model_dump() zwraca zagnieżdżone dicts, model_dump_json() → JSON string'
+
+      - code: |
+          from pydantic import BaseModel, Field
+
+          class OrderLine(BaseModel):
+              product_id: int
+              quantity: int = Field(ge=1)
+              unit_price: float = Field(gt=0)
+
+              @property
+              def total(self) -> float:
+                  return self.quantity * self.unit_price
+
+          class Order(BaseModel):
+              id: str
+              lines: list[OrderLine] = Field(min_length=1)
+              tags: list[str] = []
+
+          o = Order(
+              id="ORD-001",
+              lines=[
+                  {"product_id": 1, "quantity": 2, "unit_price": 49.99},
+                  {"product_id": 2, "quantity": 1, "unit_price": 199.0},
+              ],
+          )
+          print(o.lines[0].total)    # 99.98
+          print(len(o.lines))        # 2
+        desc: Lista zagnieżdżonych modeli
+        detail:
+          what: list[SubModel] waliduje każdy element listy jako SubModel. Błąd zawiera loc=("lines", 0, "quantity").
+          how: Field(min_length=1) na liście modeli = niepusta lista. min_length/max_length działa na list[T].
+          tips:
+            - 'list[SubModel] — każdy element przechodzi przez pełną walidację SubModel'
+            - 'Błąd w elemencie: loc = ("lines", 2, "pole_z_bledem")'
+            - 'list[dict] — nie waliduje struktury, list[SubModel] — waliduje'
+
+      - code: |
+          from pydantic import BaseModel
+          from typing import Union, Literal
+
+          class TextBlock(BaseModel):
+              type: Literal["text"]
+              content: str
+
+          class ImageBlock(BaseModel):
+              type: Literal["image"]
+              url: str
+              alt: str = ""
+
+          class VideoBlock(BaseModel):
+              type: Literal["video"]
+              url: str
+              duration_s: int
+
+          class Page(BaseModel):
+              title: str
+              blocks: list[Union[TextBlock, ImageBlock, VideoBlock]]
+              # Lub z Field(discriminator=...) dla lepszej wydajności:
+              # blocks: list[Annotated[
+              #     Union[TextBlock, ImageBlock, VideoBlock],
+              #     Field(discriminator="type")
+              # ]]
+
+          page = Page(
+              title="Strona główna",
+              blocks=[
+                  {"type": "text", "content": "Witaj!"},
+                  {"type": "image", "url": "img.png"},
+              ],
+          )
+          print(type(page.blocks[0]))  # TextBlock
+          print(type(page.blocks[1]))  # ImageBlock
+        desc: Discriminated union — lista różnych typów z discriminatorem
+        detail:
+          what: Literal["text"] jako discriminator pozwala Pydantic wybrać właściwy model bez próbowania każdego.
+          how: Field(discriminator="type") przyspiesza walidację — O(1) zamiast O(n) prób.
+          tips:
+            - 'Discriminated union szybszy niż zwykły Union — Pydantic sprawdza tylko "type"'
+            - 'Wszystkie warianty muszą mieć to samo pole discriminator'
+            - 'Użyj Annotated[Union[...], Field(discriminator="type")] dla list'
+
+      - code: |
+          from pydantic import BaseModel
+          from typing import Generic, TypeVar, Optional
+
+          T = TypeVar("T")
+
+          class Page(BaseModel, Generic[T]):
+              items: list[T]
+              total: int
+              page: int
+              per_page: int
+              has_next: bool
+
+          class User(BaseModel):
+              id: int
+              name: str
+
+          class Product(BaseModel):
+              id: int
+              title: str
+
+          users_page = Page[User](
+              items=[User(id=1, name="Łukasz")],
+              total=1, page=1, per_page=20, has_next=False
+          )
+          print(users_page.items[0].name)  # Łukasz
+          print(type(users_page.items[0]))  # User
+        desc: Generic model — reużywalny szablon z parametrem typowym
+        detail:
+          what: Generic[T] tworzy szablon modelu. Page[User], Page[Product] — ten sam model, różne typy.
+          how: Pydantic v2 w pełni wspiera generyczne modele. JSON Schema generowany per konkretny typ.
+          tips:
+            - 'BaseModel + Generic[T] — kolejność ważna: class X(BaseModel, Generic[T])'
+            - 'Page[User].model_validate(data) — walidacja z konkretnym typem'
+            - 'TypeVar("T") bez ograniczeń — przyjmuje każdy typ'
+
+      - code: |
+          from __future__ import annotations
+          from pydantic import BaseModel
+          from typing import Optional
+
+          class Category(BaseModel):
+              name: str
+              parent: Optional[Category] = None   # rekurencja
+              children: list[Category] = []
+
+          # model_rebuild() konieczne z from __future__ import annotations
+          Category.model_rebuild()
+
+          tree = Category(
+              name="Elektronika",
+              children=[
+                  Category(name="Laptopy"),
+                  Category(
+                      name="Smartfony",
+                      children=[Category(name="iPhone")],
+                  ),
+              ],
+          )
+          print(tree.children[1].children[0].name)  # iPhone
+        desc: Rekurencyjne modele i model_rebuild()
+        detail:
+          what: Modele które odwołują się do siebie wymagają from __future__ import annotations i model_rebuild().
+          how: model_rebuild() rozwiązuje forward references po zdefiniowaniu wszystkich klas.
+          tips:
+            - 'from __future__ import annotations pozwala na forward references w całym module'
+            - 'Bez from __future__ — użyj stringa: parent: Optional["Category"] = None'
+            - 'model_rebuild() wywołaj na każdym modelu z forward references'
+
+      - code: |
+          from pydantic import BaseModel
+
+          class Metrics(BaseModel):
+              counters: dict[str, int]
+              labels: dict[str, str] = {}
+              nested: dict[str, list[int]] = {}
+
+          m = Metrics(
+              counters={"requests": 1000, "errors": 5},
+              labels={"env": "prod", "region": "eu"},
+              nested={"latencies": [10, 20, 15]},
+          )
+          print(m.counters["requests"])    # 1000
+          print(m.model_dump())
+          # {'counters': {'requests': 1000, 'errors': 5}, ...}
+        desc: Dict z typowanymi kluczami i wartościami
+        detail:
+          what: dict[str, int] waliduje każdy klucz jako str i każdą wartość jako int. Działa dla zagnieżdżonych typów.
+          how: dict[str, SubModel] waliduje każdą wartość jako SubModel. Klucze zawsze muszą być string w JSON.
+          tips:
+            - 'dict[str, int] — walidacja każdego klucza i wartości'
+            - 'dict[str, list[int]] — zagnieżdżone typy działają'
+            - 'dict[str, SubModel] — wartości walidowane jako SubModel'
+
+  - name: Serializacja i deserializacja
+    icon: "🔄"
+    commands:
+      - code: |
+          from pydantic import BaseModel
+          from typing import Optional
+          from datetime import datetime
+
+          class User(BaseModel):
+              id: int
+              name: str
+              email: Optional[str] = None
+              created_at: datetime = None
+
+          u = User(id=1, name="Łukasz", created_at=datetime.now())
+
+          # Podstawowe model_dump()
+          print(u.model_dump())
+          # {'id': 1, 'name': 'Łukasz', 'email': None, 'created_at': datetime(...)}
+
+          # Wykluczanie None
+          print(u.model_dump(exclude_none=True))
+          # {'id': 1, 'name': 'Łukasz', 'created_at': datetime(...)}
+
+          # Tylko wybrane pola
+          print(u.model_dump(include={"id", "name"}))
+          # {'id': 1, 'name': 'Łukasz'}
+
+          # Pomiń wybrane pola
+          print(u.model_dump(exclude={"email", "created_at"}))
+          # {'id': 1, 'name': 'Łukasz'}
+        desc: model_dump() — podstawy i filtrowanie pól
+        detail:
+          what: model_dump() zwraca dict z wartościami Pythona. exclude_none=True usuwa pola None. include/exclude filtrują.
+          how: mode='json' w model_dump konwertuje typy do JSON-serializowalnych (datetime → str, UUID → str).
+          tips:
+            - 'exclude_none=True — usuwa pola z wartością None'
+            - 'exclude_defaults=True — usuwa pola z wartością domyślną'
+            - 'include={"pole1", "pole2"} lub exclude={"pole3"} — zestaw nazw'
+
+      - code: |
+          from pydantic import BaseModel
+          from datetime import datetime
+          import uuid
+
+          class Event(BaseModel):
+              id: uuid.UUID
+              name: str
+              timestamp: datetime
+
+          e = Event(id=uuid.uuid4(), name="Deploy", timestamp=datetime.now())
+
+          # model_dump_json() → JSON string (szybkie, Rust)
+          json_str = e.model_dump_json()
+          print(json_str)
+          # {"id":"...uuid...","name":"Deploy","timestamp":"2024-01-15T10:30:00"}
+
+          # model_dump(mode='json') → dict z JSON-compatible typami
+          d = e.model_dump(mode="json")
+          print(type(d["timestamp"]))  # str (nie datetime!)
+          print(type(d["id"]))         # str (nie UUID!)
+
+          # Odczyt z JSON
+          e2 = Event.model_validate_json(json_str)
+          print(type(e2.id))           # UUID (zparsowany!)
+        desc: model_dump_json() i mode='json' — serializacja do JSON
+        detail:
+          what: model_dump_json() to najszybszy sposób na JSON (Rust). model_dump(mode='json') zwraca dict z JSON-safe typami.
+          how: datetime → ISO string, UUID → string, Decimal → string. Typy Pythona konwertowane do JSON-serializowalnych.
+          tips:
+            - 'model_dump_json() szybsze niż json.dumps(model_dump()) — Rust robi to naraz'
+            - 'model_dump(mode="json") → dict z typami kompatybilnymi z json.dumps()'
+            - 'model_validate_json(str) — parsuj JSON string i waliduj naraz'
+
+      - code: |
+          from pydantic import BaseModel
+          from datetime import date
+
+          class Product(BaseModel):
+              name: str
+              price: float
+              available_from: date
+
+          json_data = '{"name": "Laptop", "price": 4999.99, "available_from": "2024-01-01"}'
+
+          # Parsuj JSON i waliduj naraz
+          p = Product.model_validate_json(json_data)
+          print(p.name)            # Laptop
+          print(p.price)           # 4999.99 (float)
+          print(type(p.available_from))  # datetime.date (nie string!)
+
+          # Z dict
+          data = {"name": "Mouse", "price": 49.99, "available_from": "2024-06-01"}
+          p2 = Product.model_validate(data)
+
+          # Roundtrip: model → JSON → model
+          json_str = p.model_dump_json()
+          p3 = Product.model_validate_json(json_str)
+          assert p == p3  # True
+        desc: model_validate_json() i model_validate() — parsowanie z JSON/dict
+        detail:
+          what: model_validate_json() parsuje JSON string i waliduje naraz. model_validate() przyjmuje dict.
+          how: Daty w JSON jako ISO string "2024-01-01" → date Pythona automatycznie.
+          tips:
+            - 'model_validate_json(str) szybsze niż model_validate(json.loads(str))'
+            - 'Daty: "2024-01-01" → date, "2024-01-01T10:00:00" → datetime'
+            - 'Roundtrip: model_dump_json() + model_validate_json() = lossless'
+
+      - code: |
+          from pydantic import BaseModel, ConfigDict
+
+          class UserSchema(BaseModel):
+              model_config = ConfigDict(from_attributes=True)
+              id: int
+              name: str
+              email: str
+
+          # Symulacja ORM obiektu (SQLAlchemy, Django ORM itp.)
+          class FakeOrmUser:
+              def __init__(self, id, name, email):
+                  self.id = id
+                  self.name = name
+                  self.email = email
+
+          orm_user = FakeOrmUser(id=1, name="Łukasz", email="l@example.com")
+
+          # Konwersja ORM → Pydantic
+          schema = UserSchema.model_validate(orm_user)
+          print(schema.id)    # 1
+          print(schema.name)  # Łukasz
+
+          # Lub w FastAPI: response_model=UserSchema automatycznie konwertuje
+        desc: from_attributes=True — konwersja z ORM obiektów
+        detail:
+          what: from_attributes=True pozwala model_validate() czytać atrybuty zamiast kluczy dict. Dla SQLAlchemy/Django ORM.
+          how: Pydantic wywołuje getattr(obj, field_name) zamiast obj[field_name]. Działa z dowolnym obiektem.
+          tips:
+            - 'ConfigDict(from_attributes=True) w klasie LUB model_validate(obj, from_attributes=True)'
+            - 'FastAPI: response_model=UserSchema automatycznie używa from_attributes'
+            - 'SQLModel ma wbudowane from_attributes — nie potrzebujesz ConfigDict'
+
+      - code: |
+          from pydantic import BaseModel, field_serializer
+          from datetime import datetime
+
+          class Event(BaseModel):
+              name: str
+              timestamp: datetime
+              tags: list[str]
+
+              # Niestandardowa serializacja timestamp
+              @field_serializer("timestamp")
+              def serialize_timestamp(self, v: datetime, _info) -> str:
+                  return v.strftime("%d.%m.%Y %H:%M")
+
+              # Serializuj tagi jako string (tylko w JSON mode)
+              @field_serializer("tags", when_used="json")
+              def serialize_tags(self, v: list[str], _info) -> str:
+                  return ",".join(v)
+
+          e = Event(name="Deploy", timestamp=datetime(2024, 1, 15, 10, 30), tags=["prod", "urgent"])
+          print(e.model_dump())
+          # {'name': 'Deploy', 'timestamp': '15.01.2024 10:30', 'tags': ['prod', 'urgent']}
+          print(e.model_dump_json())
+          # {"name":"Deploy","timestamp":"15.01.2024 10:30","tags":"prod,urgent"}
+        desc: "@field_serializer — niestandardowa serializacja pola"
+        detail:
+          what: "@field_serializer kontroluje jak pole jest serializowane w model_dump() i model_dump_json()."
+          how: when_used='json' — tylko przy JSON serializacji. when_used='python' — tylko przy model_dump(). Domyślnie zawsze.
+          tips:
+            - 'when_used="json" — niestandardowa serializacja tylko w model_dump_json()'
+            - 'when_used="python" — tylko w model_dump() (nie JSON)'
+            - '@model_serializer dla całego modelu (nie jednego pola)'
+
+      - code: |
+          from pydantic import BaseModel, Field
+
+          class UserPublic(BaseModel):
+              id: int
+              name: str
+              # Pole z alias w output
+              user_email: str = Field(serialization_alias="email")
+
+          class UserInternal(BaseModel):
+              id: int
+              name: str
+              password_hash: str = Field(exclude=True)  # nigdy w output
+              is_admin: bool = Field(exclude=True)
+
+          u = UserPublic(id=1, name="Łukasz", user_email="l@ex.com")
+          print(u.model_dump())                  # {'id': 1, 'name': 'Łukasz', 'user_email': 'l@ex.com'}
+          print(u.model_dump(by_alias=True))     # {'id': 1, 'name': 'Łukasz', 'email': 'l@ex.com'}
+
+          ui = UserInternal(id=1, name="Łukasz", password_hash="abc", is_admin=False)
+          print(ui.model_dump())  # {'id': 1, 'name': 'Łukasz'} — bez hasła!
+        desc: "Field(exclude=True) i serialization_alias — kontrola output"
+        detail:
+          what: 'Field(exclude=True) całkowicie wyklucza pole z model_dump(). serialization_alias zmienia nazwę w output.'
+          how: model_dump(by_alias=True) używa serialization_alias (lub alias jeśli nie ma serialization_alias).
+          tips:
+            - 'Field(exclude=True) — pole istnieje w modelu ale nie ma go w model_dump()'
+            - 'Użyj do ukrywania password_hash, internal_flags itp.'
+            - 'model_dump(exclude={"password"}) — wyklucz dynamicznie przy wywołaniu'
+
+  - name: Pydantic Settings
+    icon: "⚙️"
+    commands:
+      - code: |
+          # pip install pydantic-settings
+          from pydantic_settings import BaseSettings
+          from pydantic import Field
+
+          class Settings(BaseSettings):
+              app_name: str = "MyApp"
+              debug: bool = False
+              database_url: str
+              secret_key: str
+              port: int = Field(default=8000, ge=1, le=65535)
+
+          # Automatycznie czyta z env vars
+          # DATABASE_URL="postgresql://..." python app.py
+          settings = Settings()
+          print(settings.database_url)  # z env var DATABASE_URL
+          print(settings.debug)         # False (lub z env DEBUG=true)
+
+          # Nadpisanie — przydatne w testach
+          test_settings = Settings(database_url="sqlite:///test.db", secret_key="test")
+        desc: BaseSettings — konfiguracja z env vars
+        detail:
+          what: BaseSettings automatycznie czyta wartości z zmiennych środowiskowych. Waliduje jak normalny BaseModel.
+          how: Env vars są case-insensitive. DATABASE_URL, database_url, Database_Url — wszystkie działają.
+          tips:
+            - 'pip install pydantic-settings — osobny pakiet od Pydantic v2'
+            - 'Env vars case-insensitive — DATABASE_URL = database_url = Database_Url'
+            - 'Pole bez default = wymagane env var — brak → ValidationError'
+
+      - code: |
+          from pydantic_settings import BaseSettings, SettingsConfigDict
+
+          class Settings(BaseSettings):
+              model_config = SettingsConfigDict(
+                  env_file=".env",
+                  env_file_encoding="utf-8",
+                  env_prefix="APP_",          # APP_DEBUG, APP_PORT itp.
+                  case_sensitive=False,
+                  extra="ignore",             # ignoruj nieznane env vars
+              )
+
+              debug: bool = False
+              port: int = 8000
+              database_url: str
+              api_key: str
+
+          # .env file:
+          # APP_DEBUG=true
+          # APP_PORT=9000
+          # APP_DATABASE_URL=postgresql://...
+          # APP_API_KEY=secret123
+
+          settings = Settings()
+          print(settings.port)   # 9000 (z .env APP_PORT)
+          print(settings.debug)  # True (z .env APP_DEBUG=true)
+        desc: BaseSettings z .env file i env_prefix
+        detail:
+          what: SettingsConfigDict(env_file=".env") automatycznie ładuje plik .env. env_prefix dodaje prefix do nazw env vars.
+          how: Plik .env jest ładowany przez python-dotenv (wbudowany w pydantic-settings). Zmienne env mają priorytet nad .env.
+          tips:
+            - 'env_prefix="APP_" → pole port = env var APP_PORT'
+            - 'Priorytet: env vars > .env file > wartości domyślne'
+            - 'env_file=(".env", ".env.local") — lista plików, ostatni ma priorytet'
+
+      - code: |
+          from pydantic_settings import BaseSettings, SettingsConfigDict
+          from pydantic import BaseModel
+
+          class DatabaseConfig(BaseModel):
+              host: str = "localhost"
+              port: int = 5432
+              name: str
+              user: str
+              password: str
+
+          class RedisConfig(BaseModel):
+              url: str = "redis://localhost:6379"
+              db: int = 0
+
+          class Settings(BaseSettings):
+              model_config = SettingsConfigDict(
+                  env_file=".env",
+                  env_nested_delimiter="__",  # DATABASE__HOST, DATABASE__PORT
+              )
+
+              app_name: str = "MyApp"
+              database: DatabaseConfig
+              redis: RedisConfig = RedisConfig(url="redis://localhost", db=0)
+
+          # .env:
+          # DATABASE__HOST=prod-db.example.com
+          # DATABASE__PORT=5432
+          # DATABASE__NAME=myapp
+          # DATABASE__USER=admin
+          # DATABASE__PASSWORD=secret
+          settings = Settings()
+          print(settings.database.host)  # prod-db.example.com
+        desc: BaseSettings z zagnieżdżoną konfiguracją i env_nested_delimiter
+        detail:
+          what: env_nested_delimiter="__" pozwala konfigurować zagnieżdżone modele przez DATABASE__HOST itp.
+          how: BaseModel (nie BaseSettings) jako typ zagnieżdżony — walidacja normalna Pydantic.
+          tips:
+            - 'env_nested_delimiter="__" → DATABASE__HOST = settings.database.host'
+            - 'Zagnieżdżony model jako BaseModel (nie BaseSettings)'
+            - 'Możesz też podać cały nested jako JSON: DATABASE={"host": "...", "port": 5432}'
+
+      - code: |
+          from pydantic_settings import BaseSettings
+          from pydantic import field_validator, SecretStr
+          from functools import lru_cache
+
+          class Settings(BaseSettings):
+              environment: str = "development"
+              database_url: str
+              secret_key: SecretStr    # nie wyświetla się w logach
+              max_connections: int = 10
+
+              @field_validator("environment")
+              @classmethod
+              def validate_env(cls, v: str) -> str:
+                  allowed = {"development", "staging", "production"}
+                  if v not in allowed:
+                      raise ValueError(f"environment musi być jednym z: {allowed}")
+                  return v
+
+              @property
+              def is_production(self) -> bool:
+                  return self.environment == "production"
+
+          # Singleton pattern z lru_cache
+          @lru_cache
+          def get_settings() -> Settings:
+              return Settings()
+
+          # FastAPI Depends
+          # def endpoint(settings: Settings = Depends(get_settings)): ...
+          settings = get_settings()
+          print(settings.is_production)     # False
+          print(settings.secret_key)        # ***** (SecretStr ukrywa wartość)
+          print(settings.secret_key.get_secret_value())  # prawdziwa wartość
+        desc: BaseSettings z walidatorem, SecretStr i lru_cache singleton
+        detail:
+          what: SecretStr ukrywa wartość w logach i repr. lru_cache singleton — Settings tworzone raz. Walidatory działają jak w BaseModel.
+          how: SecretStr.get_secret_value() do odczytu w kodzie. str(secret) → '**********'.
+          tips:
+            - 'SecretStr — ukrywa wartość w str() i repr() — bezpieczne logowanie'
+            - '@lru_cache na get_settings() → singleton — env vars czytane raz'
+            - 'FastAPI: Depends(get_settings) — przekazuj settings do endpointów'
+
+      - code: |
+          from pydantic_settings import BaseSettings, SettingsConfigDict
+          from pydantic_settings import (
+              YamlSettingsSource,
+              TomlSettingsSource,
+              PydanticBaseSettingsSource,
+          )
+          from typing import Tuple, Type
+
+          class Settings(BaseSettings):
+              model_config = SettingsConfigDict(
+                  yaml_file="config.yaml",
+                  toml_file="config.toml",
+              )
+
+              app_name: str
+              debug: bool = False
+              port: int = 8000
+
+              @classmethod
+              def settings_customise_sources(
+                  cls,
+                  settings_cls: Type[BaseSettings],
+                  init_settings,
+                  env_settings,
+                  dotenv_settings,
+                  file_secret_settings,
+              ) -> Tuple[PydanticBaseSettingsSource, ...]:
+                  # Kolejność priorytetów (od najwyższego):
+                  return (
+                      init_settings,      # Settings(port=9000) — najwyższy priorytet
+                      env_settings,       # env vars
+                      dotenv_settings,    # .env file
+                      YamlSettingsSource(settings_cls),  # config.yaml
+                  )
+        desc: BaseSettings — multiple sources z własnym priorytetem
+        detail:
+          what: settings_customise_sources() definiuje kolejność źródeł konfiguracji. Pierwsze = najwyższy priorytet.
+          how: Pydantic-settings obsługuje YAML, TOML, JSON, dotenv, env vars i własne źródła.
+          tips:
+            - 'pip install pydantic-settings[yaml] — dla YamlSettingsSource'
+            - 'pip install pydantic-settings[toml] — dla TomlSettingsSource'
+            - 'Kolejność w tuple = priorytet (wyżej = ważniejsze)'
+
+  - name: Custom types i Annotated
+    icon: "🏷️"
+    commands:
+      - code: |
+          from pydantic import BaseModel
+          from pydantic.functional_validators import AfterValidator
+          from typing import Annotated
+
+          def must_be_positive(v: float) -> float:
+              if v <= 0:
+                  raise ValueError(f"Wartość {v} musi być > 0")
+              return v
+
+          def strip_whitespace(v: str) -> str:
+              return v.strip()
+
+          def to_upper(v: str) -> str:
+              return v.upper()
+
+          # Reużywalne typy
+          PositiveFloat = Annotated[float, AfterValidator(must_be_positive)]
+          CleanStr = Annotated[str, AfterValidator(strip_whitespace)]
+          UpperCode = Annotated[str, AfterValidator(strip_whitespace), AfterValidator(to_upper)]
+
+          class Invoice(BaseModel):
+              amount: PositiveFloat
+              currency: UpperCode
+              description: CleanStr
+
+          inv = Invoice(amount=99.99, currency="  pln  ", description="  Kurs Python  ")
+          print(inv.amount)      # 99.99
+          print(inv.currency)    # PLN
+          print(inv.description) # Kurs Python
+        desc: "Annotated z AfterValidator — reużywalne typy z walidacją"
+        detail:
+          what: Annotated[typ, AfterValidator(fn)] tworzy typ z logiką uruchamianą po standardowej walidacji Pydantic.
+          how: Komponowalny — wiele AfterValidator można łączyć. Uruchamiają się od lewej do prawej.
+          tips:
+            - 'Annotated[T, AfterValidator(fn)] — fn dostaje już skonwertowaną wartość (właściwego typu)'
+            - 'Możesz komponować: Annotated[str, AfterValidator(strip), AfterValidator(upper)]'
+            - 'Definiuj raz, używaj w wielu modelach — nie powtarzaj Field()'
+
+      - code: |
+          from pydantic import BaseModel
+          from pydantic.functional_validators import BeforeValidator
+          from typing import Annotated
+          import json
+
+          def parse_json_string(v):
+              """Akceptuj string JSON lub gotowy dict."""
+              if isinstance(v, str):
+                  try:
+                      return json.loads(v)
+                  except json.JSONDecodeError:
+                      raise ValueError(f"Nieprawidłowy JSON: {v!r}")
+              return v
+
+          def parse_comma_list(v):
+              """Akceptuj string CSV lub listę."""
+              if isinstance(v, str):
+                  return [x.strip() for x in v.split(",") if x.strip()]
+              return v
+
+          JsonDict = Annotated[dict, BeforeValidator(parse_json_string)]
+          CommaSeparated = Annotated[list[str], BeforeValidator(parse_comma_list)]
+
+          class Config(BaseModel):
+              metadata: JsonDict
+              tags: CommaSeparated
+
+          c = Config(
+              metadata='{"env": "prod", "version": "2"}',
+              tags="python, pydantic, fastapi",
+          )
+          print(c.metadata)  # {'env': 'prod', 'version': '2'}
+          print(c.tags)      # ['python', 'pydantic', 'fastapi']
+        desc: "Annotated z BeforeValidator — preprocessowanie przed typem"
+        detail:
+          what: BeforeValidator(fn) uruchamia się PRZED koercją Pydantic — dostaje surowy input.
+          how: Przydatne gdy wejście może być string lub gotowy typ — normalizujesz przed walidacją.
+          tips:
+            - 'BeforeValidator → fn dostaje surowy input (str, dict, cokolwiek)'
+            - 'Zwróć znormalizowaną wartość — Pydantic zrobi resztę walidacji'
+            - 'Użyj do obsługi wielu formatów wejściowych (str, dict, lista)'
+
+      - code: |
+          from pydantic import BaseModel
+          from pydantic.functional_validators import PlainValidator
+          from typing import Annotated, Any
+          import re
+
+          def validate_polish_phone(v: Any) -> str:
+              """Akceptuj int lub string — normalizuj do "+48XXXXXXXXX"."""
+              s = str(v).strip().replace(" ", "").replace("-", "")
+              if s.startswith("0048"):
+                  s = "+" + s[2:]
+              elif not s.startswith("+"):
+                  s = "+48" + s
+              if not re.match(r"^\+48\d{9}$", s):
+                  raise ValueError(f"Nieprawidłowy numer PL: {v}")
+              return s
+
+          PolishPhone = Annotated[str, PlainValidator(validate_polish_phone)]
+
+          class Contact(BaseModel):
+              name: str
+              phone: PolishPhone
+
+          c1 = Contact(name="Łukasz", phone="123456789")
+          c2 = Contact(name="Jan", phone="+48 123 456 789")
+          c3 = Contact(name="Anna", phone=48123456789)
+
+          print(c1.phone)  # +48123456789
+          print(c2.phone)  # +48123456789
+          print(c3.phone)  # +48123456789
+        desc: "PlainValidator — całkowite przejęcie walidacji"
+        detail:
+          what: PlainValidator zastępuje CAŁĄ logikę walidacji Pydantic — tylko Twoja funkcja. Akceptuje dowolny typ wejściowy.
+          how: W przeciwieństwie do AfterValidator/BeforeValidator — Pydantic nie robi żadnej koercji ani walidacji.
+          tips:
+            - 'PlainValidator: fn dostaje surowy input, zwraca ostateczną wartość'
+            - 'Brak koercji Pydantic — Ty decydujesz co akceptujesz'
+            - 'Przydatne dla typów zewnętrznych (numpy, pandas, custom classes)'
+
+      - code: |
+          from pydantic import BaseModel
+          from pydantic.functional_validators import WrapValidator
+          from typing import Annotated, Any, Callable
+
+          def log_and_validate(v: Any, handler: Callable, info) -> int:
+              """Loguj każdą walidację i wywołaj standardową."""
+              print(f"Walidacja {info.field_name!r}: {v!r}")
+              try:
+                  result = handler(v)  # standardowa walidacja Pydantic
+                  print(f"  OK → {result!r}")
+                  return result
+              except Exception as e:
+                  print(f"  BŁĄD: {e}")
+                  raise
+
+          LoggedInt = Annotated[int, WrapValidator(log_and_validate)]
+
+          class Form(BaseModel):
+              age: LoggedInt
+              score: LoggedInt
+
+          f = Form(age="30", score=95)
+          # Walidacja 'age': '30'
+          #   OK → 30
+          # Walidacja 'score': 95
+          #   OK → 95
+        desc: WrapValidator — otaczanie standardowej walidacji własną logiką
+        detail:
+          what: WrapValidator dostaje handler (standardowa walidacja Pydantic) — możesz wywołać ją i opakować swoją logiką.
+          how: handler(v) = standardowa walidacja. Możesz przechwycić wyjątek i rzucić własny błąd.
+          tips:
+            - 'handler(v) wywołuje standardową walidację Pydantic — możesz try/except'
+            - 'info.field_name — nazwa walidowanego pola (przydatne do logowania)'
+            - 'WrapValidator do logowania, metryki, fallback values itp.'
+
+      - code: |
+          from pydantic import BaseModel
+          from pydantic.functional_validators import AfterValidator
+          from pydantic.functional_serializers import PlainSerializer
+          from typing import Annotated
+          import re
+
+          class Color:
+              """Własny typ — kolor hex."""
+              def __init__(self, hex_code: str):
+                  self.hex_code = hex_code.upper()
+
+              def __repr__(self):
+                  return f"Color({self.hex_code!r})"
+
+          def parse_color(v) -> Color:
+              if isinstance(v, Color):
+                  return v
+              if isinstance(v, str):
+                  if not re.match(r"^#[0-9A-Fa-f]{6}$", v):
+                      raise ValueError(f"Nieprawidłowy kolor hex: {v}")
+                  return Color(v)
+              raise ValueError("Oczekiwano string hex lub Color")
+
+          # Annotated z walidatorem i serializerem
+          HexColor = Annotated[
+              Color,
+              AfterValidator(parse_color),
+              PlainSerializer(lambda c: c.hex_code, return_type=str),
+          ]
+
+          class Theme(BaseModel):
+              primary: HexColor
+              secondary: HexColor
+
+          t = Theme(primary="#FF5733", secondary="#1A2B3C")
+          print(t.primary.hex_code)       # FF5733 (bez #)
+          print(t.model_dump())           # {'primary': '#FF5733', 'secondary': '#1A2B3C'}
+          print(t.model_dump_json())      # {"primary":"#FF5733","secondary":"#1A2B3C"}
+        desc: Custom typ z walidatorem i serializerem przez Annotated
+        detail:
+          what: Annotated łączy walidację i serializację w jednym miejscu. Własny typ klasy + Pydantic pipeline.
+          how: AfterValidator konwertuje string → Color. PlainSerializer konwertuje Color → string przy serializacji.
+          tips:
+            - 'PlainSerializer(fn, return_type=str) — niestandardowa serializacja dla własnego typu'
+            - 'Zdefiniuj raz jako HexColor = Annotated[...] — używaj w wielu modelach'
+            - 'Ta sama technika dla numpy arrays, Decimal z formatowaniem, dat'
+
+  - name: model_config
+    icon: "⚙️"
+    commands:
+      - code: |
+          from pydantic import BaseModel, ConfigDict
+
+          class UserORM(BaseModel):
+              model_config = ConfigDict(from_attributes=True)
+              id: int
+              name: str
+              email: str
+
+          # Symulacja SQLAlchemy ORM row
+          class DBUser:
+              id = 42
+              name = "Łukasz"
+              email = "l@example.com"
+              _private = "ignored"
+
+          db_user = DBUser()
+
+          # Konwersja ORM → Pydantic przez getattr()
+          user = UserORM.model_validate(db_user)
+          print(user.id)    # 42
+          print(user.name)  # Łukasz
+
+          # FastAPI: response_model=UserORM automatycznie konwertuje ORM
+        desc: "ConfigDict(from_attributes=True) — ORM obiekt → Pydantic"
+        detail:
+          what: from_attributes=True pozwala model_validate() czytać atrybuty przez getattr(). Niezbędne dla SQLAlchemy/Django ORM.
+          how: Pydantic wywołuje getattr(obj, "id") zamiast obj["id"]. Prywatne atrybuty (_private) są ignorowane jeśli nie ma pola.
+          tips:
+            - 'Bez from_attributes=True → TypeError: nie można walidować z obiektu'
+            - 'FastAPI response_model automatycznie używa from_attributes gdy jest ustawione'
+            - 'SQLModel ma from_attributes domyślnie — nie potrzebujesz ConfigDict'
+
+      - code: |
+          from pydantic import BaseModel, ConfigDict
+
+          class StrictUser(BaseModel):
+              model_config = ConfigDict(extra="forbid")
+              id: int
+              name: str
+
+          # extra="forbid" — błąd przy nieznanych polach
+          try:
+              u = StrictUser(id=1, name="Łukasz", age=30, role="admin")
+          except Exception as e:
+              print(e)
+              # 2 validation errors for StrictUser
+              # age: Extra inputs are not permitted
+              # role: Extra inputs are not permitted
+
+          # extra="ignore" — domyślne — dodatkowe pola są ignorowane
+          class FlexUser(BaseModel):
+              model_config = ConfigDict(extra="ignore")
+              id: int
+              name: str
+
+          u2 = FlexUser(id=1, name="Łukasz", age=30)  # age jest ignorowane
+          print(u2.model_dump())  # {'id': 1, 'name': 'Łukasz'}
+        desc: "ConfigDict(extra='forbid') — kontrola nieznanych pól"
+        detail:
+          what: extra='forbid' rzuca błąd przy nieznanych polach. extra='ignore' (domyślne) ignoruje. extra='allow' zachowuje.
+          how: Używaj extra='forbid' w API response modelach do wykrywania zmian w API trzecich stron.
+          tips:
+            - "extra='forbid' — strict mode, dobry dla requestów API"
+            - "extra='ignore' — domyślne, dodatkowe pola znikają"
+            - "extra='allow' — nieznane pola zachowane w __pydantic_extra__"
+
+      - code: |
+          from pydantic import BaseModel, ConfigDict
+
+          class ImmutableConfig(BaseModel):
+              model_config = ConfigDict(frozen=True)
+              host: str
+              port: int
+              debug: bool = False
+
+          cfg = ImmutableConfig(host="localhost", port=8000)
+
+          # frozen=True → instancja jest hashable (można używać w set i dict)
+          configs = {cfg}
+          cache = {cfg: "result"}
+
+          # Modyfikacja niemożliwa
+          try:
+              cfg.port = 9000
+          except Exception as e:
+              print(e)  # Instance is frozen
+
+          # Jedyna droga zmiany — model_copy
+          dev_cfg = cfg.model_copy(update={"debug": True})
+          print(dev_cfg.debug)   # True
+          print(cfg.debug)       # False
+        desc: "ConfigDict(frozen=True) — immutable, hashable modele"
+        detail:
+          what: frozen=True uniemożliwia modyfikację pól po inicjalizacji. Sprawia że model jest hashable.
+          how: Implementuje __hash__ — możesz używać modeli jako klucze dict i elementy set.
+          tips:
+            - 'frozen=True → model hashable → użycie jako klucz słownika'
+            - 'model_copy(update={...}) — jedyna droga "modyfikacji"'
+            - 'Wzorzec Value Object (DDD) — immutable encje bez identity'
+
+      - code: |
+          from pydantic import BaseModel, ConfigDict, Field
+
+          class ExternalAPIModel(BaseModel):
+              model_config = ConfigDict(
+                  populate_by_name=True,   # alias i oryginalna nazwa działają
+                  str_strip_whitespace=True,  # automatyczny strip stringów
+                  validate_default=True,   # waliduj też wartości domyślne
+              )
+
+              user_id: int = Field(alias="userId")
+              full_name: str = Field(alias="fullName")
+              is_active: bool = Field(alias="isActive", default=True)
+
+          # Z alias (API response)
+          m1 = ExternalAPIModel(userId=1, fullName="Łukasz K", isActive=True)
+          # Z oryginalną nazwą (Python code) — dzięki populate_by_name=True
+          m2 = ExternalAPIModel(user_id=1, full_name="  Łukasz K  ", is_active=True)
+
+          print(m1.user_id)    # 1
+          print(m2.full_name)  # Łukasz K (stripped!)
+        desc: "ConfigDict(populate_by_name, str_strip_whitespace) — dodatkowe opcje"
+        detail:
+          what: populate_by_name=True — akceptuj alias I oryginalną nazwę pola. str_strip_whitespace=True — strip wszystkich stringów.
+          how: validate_default=True sprawdza też wartości domyślne. Domyślnie Pydantic nie waliduje defaultów.
+          tips:
+            - 'populate_by_name=True — przydatne gdy API zwraca camelCase a chcesz python_case'
+            - 'str_strip_whitespace=True — automatyczny strip bez BeforeValidator'
+            - 'validate_default=True — waliduj default_factory wyniki'
+
+  - name: Specjalne typy Pydantic
+    icon: "🔑"
+    commands:
+      - code: |
+          # pip install pydantic[email]
+          from pydantic import BaseModel, EmailStr, HttpUrl, AnyUrl
+
+          class UserProfile(BaseModel):
+              email: EmailStr
+              website: HttpUrl
+              avatar: AnyUrl
+
+          u = UserProfile(
+              email="user@example.com",
+              website="https://example.com/page",
+              avatar="ftp://files.example.com/avatar.png",
+          )
+          print(u.email)    # user@example.com (walidowany)
+          print(u.website)  # https://example.com/page/
+          print(type(u.website))  # <class 'pydantic.networks.HttpUrl'>
+
+          # Błędy
+          # EmailStr("invalid-email") → value is not a valid email address
+          # HttpUrl("not-a-url") → Input should be a valid URL
+        desc: EmailStr, HttpUrl, AnyUrl — specjalne typy sieciowe
+        detail:
+          what: EmailStr waliduje format email. HttpUrl waliduje URL HTTP/HTTPS. AnyUrl akceptuje dowolny URL.
+          how: HttpUrl to obiekt, nie string — str(url) zwraca string. pip install pydantic[email] dla EmailStr.
+          tips:
+            - 'pip install "pydantic[email]" — dla EmailStr (wymaga email-validator)'
+            - 'HttpUrl → str(url) lub model_dump(mode="json") konwertuje na string'
+            - 'AnyUrl — HTTP, HTTPS, FTP, S3 itp.'
+
+      - code: |
+          from pydantic import BaseModel, SecretStr, SecretBytes
+          import uuid
+
+          class APICredentials(BaseModel):
+              client_id: uuid.UUID
+              client_secret: SecretStr
+              api_key: SecretStr
+
+          creds = APICredentials(
+              client_id="550e8400-e29b-41d4-a716-446655440000",
+              client_secret="super-secret-password",
+              api_key="sk-1234567890abcdef",
+          )
+
+          # SecretStr ukrywa wartość
+          print(creds.client_secret)                         # **********
+          print(repr(creds.client_secret))                   # SecretStr('**********')
+          print(creds.client_secret.get_secret_value())      # super-secret-password
+
+          # UUID — przyjmuje string i konwertuje
+          print(creds.client_id)                             # UUID('550e8400-...')
+          print(type(creds.client_id))                       # <class 'uuid.UUID'>
+          print(str(creds.client_id))                        # 550e8400-e29b-41d4-a716-446655440000
+        desc: SecretStr i UUID — bezpieczne sekrety i identyfikatory
+        detail:
+          what: SecretStr ukrywa wartość w str/repr — bezpieczne logowanie. UUID waliduje i konwertuje string do uuid.UUID.
+          how: SecretStr.get_secret_value() do faktycznego odczytu. model_dump_json() serializuje SecretStr jako "**********".
+          tips:
+            - 'SecretStr nie trafia do logów w czytelnej formie'
+            - 'model_dump_json() na SecretStr → "**********" (bezpieczne!)'
+            - 'uuid.uuid4() lub string UUID w dowolnym formacie — wszystko konwertuje'
+
+      - code: |
+          from pydantic import BaseModel
+          from datetime import datetime, date, time, timedelta
+          from decimal import Decimal
+
+          class FinancialTransaction(BaseModel):
+              amount: Decimal                   # precyzja finansowa
+              currency: str
+              transaction_date: date
+              processed_at: datetime
+              settlement_delay: timedelta
+
+          t = FinancialTransaction(
+              amount="1234.56",                  # string → Decimal
+              currency="PLN",
+              transaction_date="2024-01-15",     # string → date
+              processed_at="2024-01-15T10:30:00",# string → datetime
+              settlement_delay="P2D",            # ISO 8601 duration → timedelta
+          )
+
+          print(type(t.amount))       # decimal.Decimal
+          print(t.amount)             # 1234.56
+          print(t.transaction_date)   # 2024-01-15
+          print(t.settlement_delay)   # 2 days, 0:00:00
+        desc: Datetime, Date, Decimal, timedelta — typy danych finansowych i czasu
+        detail:
+          what: Pydantic konwertuje ISO string na datetime/date/time automatycznie. Decimal zachowuje precyzję finansową.
+          how: timedelta akceptuje ISO 8601 duration ("P2D" = 2 days) lub sekundy (int). Decimal z string = bez błędów zaokrąglenia.
+          tips:
+            - 'Decimal zamiast float dla finansów — "1234.56" → Decimal("1234.56") bez błędu zaokrąglenia'
+            - 'ISO 8601 datetime: "2024-01-15T10:30:00Z" lub "2024-01-15T10:30:00+01:00"'
+            - 'timedelta z "P1DT2H" (ISO 8601) lub z int/float (sekundy)'

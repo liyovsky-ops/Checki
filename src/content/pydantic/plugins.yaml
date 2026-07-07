@@ -1,0 +1,224 @@
+title: Ekosystem Pydantic — pluginy i integracje
+
+items:
+  - name: pydantic-settings
+    desc: >
+      Zarządzanie konfiguracją aplikacji z env vars, plików .env, YAML, TOML.
+      BaseSettings czyta zmienne automatycznie — walidacja jak normalny BaseModel.
+      Niezbędny w każdej produkcyjnej aplikacji Python.
+    icon: "⚙️"
+    code: |
+      # pip install pydantic-settings
+      from pydantic_settings import BaseSettings, SettingsConfigDict
+      from pydantic import SecretStr
+
+      class Settings(BaseSettings):
+          model_config = SettingsConfigDict(
+              env_file=".env",
+              env_prefix="APP_",
+              env_nested_delimiter="__",
+          )
+
+          debug: bool = False
+          port: int = 8000
+          database_url: str
+          secret_key: SecretStr
+
+      # Singleton — czyta env raz
+      from functools import lru_cache
+
+      @lru_cache
+      def get_settings() -> Settings:
+          return Settings()
+
+      # APP_DATABASE_URL=postgresql://... python app.py
+      settings = get_settings()
+      print(settings.port)          # 8000 (lub APP_PORT=9000)
+      print(settings.secret_key)    # **********
+
+  - name: pydantic-extra-types
+    desc: >
+      Zestaw gotowych typów wykraczających poza stdlib: numery telefonów, kolory,
+      karty płatnicze, kody krajów/walut/języków (ISO), adresy MAC, adresy IPv4/IPv6.
+      Zaoszczędza pisanie własnych walidatorów dla typowych danych.
+    icon: "🎨"
+    code: |
+      # pip install pydantic-extra-types
+      from pydantic import BaseModel
+      from pydantic_extra_types.phone_numbers import PhoneNumber
+      from pydantic_extra_types.color import Color
+      from pydantic_extra_types.country import CountryAlpha2
+      from pydantic_extra_types.currency_code import Currency
+      from pydantic_extra_types.payment import PaymentCardNumber
+
+      class ContactForm(BaseModel):
+          phone: PhoneNumber           # E.164 format
+          color_preference: Color      # "#FF5733", "red", "rgb(255,87,51)"
+          country: CountryAlpha2       # "PL", "DE", "US" (ISO 3166-1)
+          currency: Currency           # "PLN", "EUR", "USD" (ISO 4217)
+
+      class Payment(BaseModel):
+          card: PaymentCardNumber      # waliduje numer karty (Luhn)
+
+      c = ContactForm(
+          phone="+48123456789",
+          color_preference="#FF5733",
+          country="PL",
+          currency="PLN",
+      )
+      print(c.color_preference.as_hex())   # #ff5733
+      print(c.country)                     # PL
+
+  - name: FastAPI — natywna integracja
+    desc: >
+      FastAPI używa Pydantic do walidacji request body, query params, path params
+      i response_model. Automatycznie generuje OpenAPI docs (/docs) z JSON Schema.
+      Pydantic v2 + FastAPI v0.100+ = natywna para — najszybszy Python API framework.
+    icon: "⚡"
+    code: |
+      # pip install fastapi pydantic
+      from fastapi import FastAPI, HTTPException
+      from pydantic import BaseModel, Field, EmailStr
+      from typing import Optional
+
+      class UserCreate(BaseModel):
+          name: str = Field(min_length=2, max_length=50)
+          email: EmailStr
+          age: Optional[int] = Field(default=None, ge=0, le=150)
+
+      class UserResponse(BaseModel):
+          id: int
+          name: str
+          email: str
+
+      app = FastAPI()
+
+      @app.post("/users", response_model=UserResponse, status_code=201)
+      async def create_user(user: UserCreate):
+          # FastAPI automatycznie waliduje body przez Pydantic
+          # ValidationError → 422 Unprocessable Entity automatycznie
+          new_user = {"id": 1, **user.model_dump()}
+          return new_user  # automatyczna konwersja przez response_model
+
+      # GET /docs → pełna dokumentacja OpenAPI z JSON Schema z modeli Pydantic
+
+  - name: SQLModel
+    desc: >
+      SQLModel łączy SQLAlchemy (ORM) i Pydantic w jedną klasę. Jeden model działa
+      jako tabela bazy danych i schema API. Stworzony przez twórcę FastAPI (Sebastián
+      Ramírez) — idealny stack: FastAPI + SQLModel + Pydantic.
+    icon: "🗄️"
+    code: |
+      # pip install sqlmodel
+      from sqlmodel import SQLModel, Field, Session, create_engine, select
+      from typing import Optional
+
+      # Jeden model = tabela DB + Pydantic model
+      class Hero(SQLModel, table=True):
+          id: Optional[int] = Field(default=None, primary_key=True)
+          name: str = Field(index=True)
+          secret_name: str
+          age: Optional[int] = None
+
+      # Schema bez tabeli (tylko Pydantic — dla request/response)
+      class HeroCreate(SQLModel):
+          name: str
+          secret_name: str
+          age: Optional[int] = None
+
+      class HeroPublic(SQLModel):
+          id: int
+          name: str
+          age: Optional[int] = None
+
+      engine = create_engine("sqlite:///heroes.db")
+      SQLModel.metadata.create_all(engine)
+
+      with Session(engine) as session:
+          hero = Hero(name="Spider-Boy", secret_name="Pedro")
+          session.add(hero)
+          session.commit()
+          session.refresh(hero)
+          print(hero.id)   # 1 (auto-generated)
+
+          heroes = session.exec(select(Hero).where(Hero.name == "Spider-Boy")).all()
+
+  - name: Pydantic AI
+    desc: >
+      Pydantic AI to framework do budowania agentów AI opartych na Pydantic.
+      Typowane wejścia i wyjścia przez BaseModel. Model-agnostic (OpenAI, Anthropic,
+      Gemini). Integracja z Logfire do observability. Stworzony przez twórcę Pydantic.
+    icon: "🤖"
+    code: |
+      # pip install pydantic-ai
+      from pydantic import BaseModel
+      from pydantic_ai import Agent
+
+      # Typowany output przez Pydantic BaseModel
+      class ExtractedData(BaseModel):
+          company_name: str
+          revenue: float
+          employees: int
+          founded_year: int
+
+      agent = Agent(
+          model="anthropic:claude-sonnet-4-6",
+          result_type=ExtractedData,
+          system_prompt=(
+              "Wyciągnij dane o firmie z tekstu. "
+              "Zwróć wynik jako JSON pasujący do schematu."
+          ),
+      )
+
+      text = "Firma XYZ założona w 2010 zatrudnia 500 osób i osiąga 50M PLN przychodu."
+      result = agent.run_sync(text)
+
+      print(result.data.company_name)  # XYZ
+      print(result.data.revenue)       # 50000000.0
+      print(result.data.employees)     # 500
+      print(result.data.founded_year)  # 2010
+
+  - name: pydantic-factories
+    desc: >
+      Automatyczne generowanie instancji modeli Pydantic do testów — bez ręcznego
+      wypełniania pól. ModelFactory generuje realistyczne dane przez Faker.
+      Idealne do fixtures w pytest i seeding bazy testowej.
+    icon: "🏭"
+    code: |
+      # pip install pydantic-factories
+      from pydantic import BaseModel, Field, EmailStr
+      from pydantic_factories import ModelFactory
+      from typing import Optional
+      from datetime import datetime
+
+      class Address(BaseModel):
+          street: str
+          city: str
+          country: str = "PL"
+
+      class User(BaseModel):
+          id: int
+          name: str
+          email: str
+          age: int = Field(ge=18, le=100)
+          address: Address
+          created_at: datetime
+          bio: Optional[str] = None
+
+      class UserFactory(ModelFactory):
+          __model__ = User
+
+      # Generuj pojedynczą instancję
+      user = UserFactory.build()
+      print(user.name)     # "Sarah Johnson" (fake)
+      print(user.email)    # "sarah.j@example.com" (fake)
+      print(user.age)      # 35 (w zakresie 18-100)
+
+      # Generuj wiele instancji
+      users = UserFactory.batch(10)
+      print(len(users))  # 10
+
+      # Override wybranych pól
+      admin = UserFactory.build(name="Admin User", age=25)
+      print(admin.name)  # Admin User (nadpisane)
+      print(admin.age)   # 25 (nadpisane)

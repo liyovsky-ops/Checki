@@ -1,0 +1,240 @@
+title: Adaptery Hono — multi-runtime deployment
+
+items:
+  - name: Cloudflare Workers
+    desc: >
+      Natywne środowisko Hono — zero cold start, globalny edge network.
+      Dostęp do CF bindings (KV, D1, R2, Queues) przez c.env.
+      Eksport default app = automatyczne podpięcie do Workers runtime.
+    code: |
+      import { Hono } from 'hono'
+
+      type Bindings = {
+        KV: KVNamespace
+        DB: D1Database
+        R2: R2Bucket
+      }
+
+      const app = new Hono<{ Bindings: Bindings }>()
+
+      app.get('/kv/:key', async (c) => {
+        const key = c.req.param('key')
+        const value = await c.env.KV.get(key)
+        return c.json({ key, value })
+      })
+
+      app.get('/db/users', async (c) => {
+        const { results } = await c.env.DB.prepare(
+          'SELECT * FROM users LIMIT 10'
+        ).all()
+        return c.json({ users: results })
+      })
+
+      app.post('/r2/upload', async (c) => {
+        const body = await c.req.arrayBuffer()
+        await c.env.R2.put('file.bin', body)
+        return c.json({ uploaded: true })
+      })
+
+      // wrangler.toml: kv_namespaces, d1_databases, r2_buckets
+      export default app
+    lang: typescript
+
+  - name: Bun runtime
+    desc: >
+      Bun ma natywne wsparcie Web Fetch API — Hono działa bez adaptera.
+      Eksport default app z type: serve. Bun.serve() z fetch handler.
+      Najszybszy runtime dla Hono — sub-millisecond response times.
+    code: |
+      import { Hono } from 'hono'
+
+      const app = new Hono()
+
+      app.get('/', (c) => c.text('Hello Bun + Hono!'))
+
+      app.get('/users', async (c) => {
+        // Bun natywne API - np. Bun.sql()
+        return c.json({ users: [] })
+      })
+
+      // Opcja 1: eksport default (Bun automatycznie wykrywa)
+      export default app
+
+      // Opcja 2: jawne Bun.serve()
+      // Bun.serve({
+      //   fetch: app.fetch,
+      //   port: 3000,
+      // })
+
+      // bun run src/index.ts
+    lang: typescript
+
+  - name: Deno runtime
+    desc: >
+      Hono na Deno przez Deno.serve() lub Deno Deploy (edge). Import z npm:hono
+      lub jsr:@hono/hono. Dostęp do Deno.env.get() dla env variables.
+    code: |
+      import { Hono } from 'npm:hono'
+      // lub: import { Hono } from 'jsr:@hono/hono'
+
+      const app = new Hono()
+
+      app.get('/', (c) => c.text('Hello Deno + Hono!'))
+
+      app.get('/env', (c) => {
+        const secret = Deno.env.get('SECRET_KEY') ?? 'none'
+        return c.json({ secret: secret.slice(0, 4) + '...' })
+      })
+
+      // Deno.serve() — natywny HTTP server
+      Deno.serve(app.fetch)
+
+      // Lub z portem
+      // Deno.serve({ port: 8080 }, app.fetch)
+
+      // deno run --allow-net --allow-env src/index.ts
+    lang: typescript
+
+  - name: Node.js — @hono/node-server
+    desc: >
+      Hono na Node.js przez @hono/node-server adapter. Tworzy HTTP server
+      przez createServer. Kompatybilny z Node 18+. Idealny gdy musisz
+      zostać na Node.js ale chcesz Hono API.
+    code: |
+      import { serve } from '@hono/node-server'
+      import { Hono } from 'hono'
+
+      const app = new Hono()
+
+      app.get('/', (c) => c.text('Hello Node.js + Hono!'))
+
+      app.get('/api/users', async (c) => {
+        // Możesz używać node: modułów przez import
+        return c.json({ users: [] })
+      })
+
+      // Statyczne pliki z @hono/node-server/serve-static
+      import { serveStatic } from '@hono/node-server/serve-static'
+      app.use('/static/*', serveStatic({ root: './' }))
+
+      // Start serwera
+      serve({
+        fetch: app.fetch,
+        port: 3000,
+      }, (info) => {
+        console.log(`Server running on http://localhost:${info.port}`)
+      })
+
+      // package.json: "start": "node --experimental-strip-types src/index.ts"
+    lang: typescript
+
+  - name: AWS Lambda — @hono/aws-lambda
+    desc: >
+      Hono na AWS Lambda przez handle() adapter. Obsługuje API Gateway v1/v2
+      i Lambda Function URL. Idealne do serverless API na AWS.
+    code: |
+      import { Hono } from 'hono'
+      import { handle } from 'hono/aws-lambda'
+
+      const app = new Hono()
+
+      app.get('/', (c) => c.text('Hello Lambda + Hono!'))
+
+      app.get('/api/data', async (c) => {
+        // Lambda context dostępny przez c.env.event, c.env.context
+        return c.json({ source: 'lambda', ts: Date.now() })
+      })
+
+      // Handler eksportowany do Lambda
+      export const handler = handle(app)
+
+      // serverless.yml / SAM template:
+      // Handler: dist/index.handler
+      // Runtime: nodejs20.x
+      // Events:
+      //   - HttpApi: path: /{proxy+}, method: ANY
+    lang: typescript
+
+  - name: Vercel Edge Functions
+    desc: >
+      Hono na Vercel Edge Runtime — zero cold start, globalny CDN.
+      Plik api/[...route].ts z Edge config. Eksport config = { runtime: 'edge' }.
+    code: |
+      // api/[...route].ts
+      import { Hono } from 'hono'
+      import { handle } from 'hono/vercel'
+
+      export const config = { runtime: 'edge' }
+
+      const app = new Hono().basePath('/api')
+
+      app.get('/hello', (c) => {
+        return c.json({ message: 'Hello from Vercel Edge!' })
+      })
+
+      app.get('/geo', (c) => {
+        // Vercel edge headers
+        const country = c.req.header('x-vercel-ip-country') ?? 'unknown'
+        return c.json({ country })
+      })
+
+      export default handle(app)
+    lang: typescript
+
+  - name: Fastly Compute
+    desc: >
+      Hono na Fastly Compute@Edge — najszybszy edge runtime. Eksport handler
+      jako domyślny export. Dostęp do Fastly KV store i backend fetch.
+    code: |
+      import { Hono } from 'hono'
+
+      const app = new Hono()
+
+      app.get('/', (c) => c.text('Hello Fastly + Hono!'))
+
+      app.get('/backend', async (c) => {
+        // Fastly backend fetch
+        const res = await fetch('https://my-origin.example.com/data', {
+          backend: 'my_backend',  // Zdefiniowany w fastly.toml
+        })
+        const data = await res.json()
+        return c.json({ proxied: data })
+      })
+
+      // Fastly wymaga tego patternu
+      addEventListener('fetch', (event) => {
+        event.respondWith(app.fetch(event.request))
+      })
+    lang: typescript
+
+  - name: create-hono CLI — scaffolding projektu
+    desc: >
+      Oficjalny generator projektu Hono z wyborem runtimeu i szablonu.
+      Tworzy gotowy projekt z TypeScript, adapterm i przykładowymi routami.
+    code: |
+      # Interaktywny kreator projektu
+      # npm create hono@latest my-app
+      # bun create hono@latest my-app
+      # pnpm create hono@latest my-app
+
+      # Dostępne szablony (wybierasz interaktywnie):
+      # cloudflare-workers — CF Workers + wrangler
+      # cloudflare-pages  — CF Pages z Functions
+      # bun               — Bun native runtime
+      # deno              — Deno native runtime
+      # nodejs            — Node.js + @hono/node-server
+      # aws-lambda        — AWS Lambda + SAM/CDK
+      # vercel            — Vercel Edge Functions
+      # fastly            — Fastly Compute@Edge
+
+      # Po wyborze runtimeu:
+      cd my-app
+      bun install
+      bun run dev   # uruchom dev server
+
+      # Struktura projektu (Bun):
+      # src/
+      #   index.ts        — entry point z app
+      # package.json
+      # tsconfig.json
+    lang: bash

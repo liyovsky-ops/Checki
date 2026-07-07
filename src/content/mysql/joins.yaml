@@ -1,0 +1,225 @@
+title: "Joins i Subqueries"
+
+items:
+  - name: INNER JOIN
+    icon: "🔗"
+    desc: "INNER JOIN — zwraca tylko rekordy pasujące w obu tabelach. Najczęściej używany join."
+    code: |
+      -- INNER JOIN — podstawowy
+      SELECT
+          o.id        AS order_id,
+          u.name      AS customer,
+          u.email,
+          o.total,
+          o.status
+      FROM orders o
+      INNER JOIN users u ON o.user_id = u.id;
+
+      -- Skrót: JOIN = INNER JOIN
+      SELECT p.name, c.name AS category
+      FROM products p
+      JOIN categories c ON p.category_id = c.id;
+
+      -- JOIN z filtrem
+      SELECT o.id, u.name, o.total
+      FROM orders o
+      JOIN users u ON o.user_id = u.id
+      WHERE o.status = 'paid'
+        AND o.total > 100
+      ORDER BY o.created_at DESC;
+
+      -- JOIN trzech tabel
+      SELECT
+          o.id        AS order_id,
+          u.name      AS customer,
+          p.name      AS product,
+          oi.quantity,
+          oi.price
+      FROM orders o
+      JOIN users u        ON o.user_id    = u.id
+      JOIN order_items oi ON oi.order_id  = o.id
+      JOIN products p     ON oi.product_id = p.id
+      WHERE o.status = 'paid';
+
+  - name: "LEFT JOIN i RIGHT JOIN"
+    icon: "↔️"
+    desc: "LEFT JOIN — wszystkie z lewej + pasujące z prawej. Przydatny dla opcjonalnych relacji."
+    code: |
+      -- LEFT JOIN — wszyscy użytkownicy, nawet bez zamówień
+      SELECT
+          u.id,
+          u.name,
+          COUNT(o.id)  AS order_count,
+          SUM(o.total) AS total_spent
+      FROM users u
+      LEFT JOIN orders o ON o.user_id = u.id
+      GROUP BY u.id, u.name
+      ORDER BY total_spent DESC;
+
+      -- Znajdź użytkowników BEZ zamówień (anti-join)
+      SELECT u.id, u.name, u.email
+      FROM users u
+      LEFT JOIN orders o ON o.user_id = u.id
+      WHERE o.id IS NULL;
+
+      -- RIGHT JOIN — wszystkie zamówienia, nawet bez przypisanego usera
+      -- (rzadko używany — zamień LEFT JOIN z odwróconymi tabelami)
+      SELECT o.id, u.name
+      FROM users u
+      RIGHT JOIN orders o ON o.user_id = u.id;
+
+      -- LEFT JOIN z warunkiem na prawej tabeli (uwaga na NULL)
+      SELECT u.name, a.city
+      FROM users u
+      LEFT JOIN addresses a ON a.user_id = u.id AND a.type = 'billing';
+
+  - name: CROSS JOIN i Self-Join
+    icon: "✖️"
+    desc: "CROSS JOIN — iloczyn kartezjański. Self-join — tabela złączona sama ze sobą."
+    code: |
+      -- CROSS JOIN — każdy z każdym (iloczyn kartezjański)
+      -- Przydatny do generowania kombinacji
+      SELECT s.name AS rozmiar, c.name AS kolor
+      FROM sizes s
+      CROSS JOIN colors c
+      ORDER BY s.name, c.name;
+
+      -- Self-join — hierarchia pracowników
+      SELECT
+          e.name          AS pracownik,
+          m.name          AS manager
+      FROM employees e
+      LEFT JOIN employees m ON e.manager_id = m.id
+      ORDER BY e.name;
+
+      -- Self-join — znajdź użytkowników z tego samego miasta
+      SELECT
+          a.name AS user1,
+          b.name AS user2,
+          a.city
+      FROM users a
+      JOIN users b ON a.city = b.city AND a.id < b.id
+      ORDER BY a.city;
+
+  - name: Subqueries
+    icon: "📦"
+    desc: "Podzapytania w WHERE, FROM, SELECT — zagnieżdżone zapytania SQL."
+    code: |
+      -- Subquery w WHERE
+      SELECT name, email FROM users
+      WHERE id IN (
+          SELECT user_id FROM orders WHERE total > 1000
+      );
+
+      -- Subquery z porównaniem
+      SELECT name, total FROM orders
+      WHERE total > (
+          SELECT AVG(total) FROM orders
+      );
+
+      -- Subquery w FROM (derived table)
+      SELECT dept, avg_salary
+      FROM (
+          SELECT department AS dept, AVG(salary) AS avg_salary
+          FROM employees
+          GROUP BY department
+      ) AS dept_stats
+      WHERE avg_salary > 5000;
+
+      -- Correlated subquery — podzapytanie odwołuje się do zewnętrznego zapytania
+      SELECT u.name,
+             (SELECT COUNT(*) FROM orders WHERE user_id = u.id) AS order_count
+      FROM users u;
+
+      -- EXISTS — sprawdź czy podzapytanie zwróci cokolwiek
+      SELECT name FROM users u
+      WHERE EXISTS (
+          SELECT 1 FROM orders o
+          WHERE o.user_id = u.id AND o.status = 'paid'
+      );
+
+      -- NOT EXISTS — anty-join przez EXISTS
+      SELECT name FROM users u
+      WHERE NOT EXISTS (
+          SELECT 1 FROM orders o WHERE o.user_id = u.id
+      );
+
+  - name: "CTE — WITH (MySQL 8.0+)"
+    icon: "🧩"
+    desc: "Common Table Expressions — WITH — czytelniejsze alternatywy dla podzapytań i widoków tymczasowych."
+    code: |
+      -- Podstawowy CTE
+      WITH top_customers AS (
+          SELECT user_id, SUM(total) AS total_spent
+          FROM orders
+          WHERE status = 'paid'
+          GROUP BY user_id
+          HAVING total_spent > 500
+      )
+      SELECT u.name, u.email, tc.total_spent
+      FROM users u
+      JOIN top_customers tc ON tc.user_id = u.id
+      ORDER BY tc.total_spent DESC;
+
+      -- Wiele CTE
+      WITH
+      paid_orders AS (
+          SELECT * FROM orders WHERE status = 'paid'
+      ),
+      monthly_stats AS (
+          SELECT
+              YEAR(created_at)  AS rok,
+              MONTH(created_at) AS miesiac,
+              COUNT(*)          AS count,
+              SUM(total)        AS revenue
+          FROM paid_orders
+          GROUP BY rok, miesiac
+      )
+      SELECT * FROM monthly_stats
+      ORDER BY rok DESC, miesiac DESC;
+
+      -- Rekurencyjny CTE (hierarchia)
+      WITH RECURSIVE emp_tree AS (
+          -- Anchor: korzeń
+          SELECT id, name, manager_id, 0 AS level
+          FROM employees
+          WHERE manager_id IS NULL
+
+          UNION ALL
+
+          -- Rekurencja
+          SELECT e.id, e.name, e.manager_id, et.level + 1
+          FROM employees e
+          JOIN emp_tree et ON e.manager_id = et.id
+      )
+      SELECT level, REPEAT('  ', level) AS indent, name
+      FROM emp_tree
+      ORDER BY level, name;
+
+  - name: "UNION i UNION ALL"
+    icon: "🔀"
+    desc: "UNION — łączenie wyników wielu SELECT. UNION ALL zachowuje duplikaty (szybszy)."
+    code: |
+      -- UNION ALL — zachowuj duplikaty (szybszy!)
+      SELECT id, name, 'user' AS source FROM users
+      UNION ALL
+      SELECT id, name, 'admin' AS source FROM admins;
+
+      -- UNION — usuń duplikaty (działa jak DISTINCT)
+      SELECT email FROM customers
+      UNION
+      SELECT email FROM subscribers;
+
+      -- UNION z ORDER BY (tylko na końcu)
+      SELECT id, name, created_at FROM users WHERE role = 'admin'
+      UNION ALL
+      SELECT id, name, created_at FROM users WHERE role = 'moderator'
+      ORDER BY created_at DESC
+      LIMIT 20;
+
+      -- Łączenie wyników z różnych logicznych kategorii
+      SELECT 'Zamówienia' AS kategoria, COUNT(*) AS total FROM orders
+      UNION ALL
+      SELECT 'Użytkownicy',             COUNT(*) FROM users
+      UNION ALL
+      SELECT 'Produkty',                COUNT(*) FROM products;

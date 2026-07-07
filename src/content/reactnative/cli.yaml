@@ -1,0 +1,446 @@
+title: Komendy React Native
+
+groups:
+  - name: Inicjalizacja — Expo
+    icon: "🚀"
+    commands:
+      - cmd: npx create-expo-app@latest MyApp --template blank-typescript
+        desc: Nowy projekt Expo z TypeScript (zalecane)
+        detail:
+          what: Tworzy projekt React Native z Expo SDK, TypeScript i plikiem app.json. Najszybszy start bez konfiguracji Xcode/Android Studio.
+          how: "blank-typescript = minimalna struktura. Alternatywa: --template tabs (gotowa nawigacja tabową)."
+          tips:
+            - 'npx create-expo-app@latest MyApp — wersja JS bez TypeScript'
+            - 'npx create-expo-app@latest MyApp --template tabs — z React Navigation i Bottom Tabs gotowym'
+      - cmd: npx expo start
+        desc: Uruchom dev server Expo
+        detail:
+          what: Uruchamia Metro bundler i serwer Expo — wyświetla QR kod do skanowania Expo Go.
+          how: "Expo Go na telefonie skanuje QR → ładuje app przez WiFi. Fast Refresh automatyczny."
+          tips:
+            - 'npx expo start --tunnel — przez ngrok (gdy telefon i komputer w różnych sieciach)'
+            - 'npx expo start --clear — wyczyść cache Metro przed uruchomieniem'
+      - cmd: npx expo start --ios
+        desc: Uruchom symulator iOS
+        detail:
+          what: Otwiera app w iOS Simulator (macOS + Xcode wymagane). Szybsze niż na urządzeniu dla developmentu.
+          how: Expo uruchamia Metro, buduje JS bundle i otwiera Simulator automatycznie.
+          tips:
+            - 'Skrót w terminalu: i — otwórz iOS Simulator'
+            - 'Symulator nie obsługuje Push Notifications i niektórych API hardware'
+      - cmd: npx expo start --android
+        desc: Uruchom emulator Android
+        detail:
+          what: Otwiera app w Android Emulator (Android Studio wymagane). Możesz też użyć fizycznego telefonu przez USB.
+          how: Expo automatycznie wykrywa uruchomiony emulator lub podpięty telefon z USB debugging.
+          tips:
+            - 'Skrót w terminalu: a — otwórz Android emulator'
+            - 'Android Studio AVD Manager — utwórz emulator z API 33+'
+      - cmd: npx create-expo-app@latest MyApp --template expo-template-blank
+        desc: Blank template bez TypeScript
+        detail:
+          what: Projekt Expo z JavaScript (bez TypeScript). Dobry dla szybkich prototypów lub nauki.
+          how: Generuje App.js i minimalne pliki konfiguracyjne.
+          tips:
+            - 'Możesz dodać TypeScript później: npx expo install typescript @types/react @types/react-native'
+            - 'Zmień rozszerzenie App.js → App.tsx i zainstaluj typy'
+
+  - name: Inicjalizacja — React Native CLI
+    icon: "⚙️"
+    commands:
+      - cmd: npx @react-native-community/cli@latest init MyApp --template react-native-template-typescript
+        desc: Nowy projekt RN CLI z TypeScript (bare workflow)
+        detail:
+          what: Tworzy projekt bez Expo — pełna kontrola nad native code iOS i Android. Wymaga Xcode i Android Studio.
+          how: Generuje /ios i /android foldery z natywnym kodem. Możesz modyfikować Swift/Kotlin/Objective-C.
+          tips:
+            - 'Expo managed jest prostszy dla 90% projektów — użyj CLI gdy potrzebujesz custom native modules'
+            - 'Wymaga: Node 18+, Ruby (iOS), Java 17, Android SDK'
+      - cmd: npx react-native run-ios
+        desc: Uruchom na iOS (RN CLI)
+        detail:
+          what: Buduje aplikację przez Xcode i uruchamia na symulatorze lub podłączonym iPhone.
+          how: Kompiluje kod Swift/ObjC, łączy z JS bundle. Pierwsze uruchomienie trwa 5-15 minut.
+          tips:
+            - 'npx react-native run-ios --simulator="iPhone 15 Pro" — wybierz konkretny symulator'
+            - 'npx react-native run-ios --device — na fizycznym iPhone (wymaga konta Apple Developer)'
+      - cmd: npx react-native run-android
+        desc: Uruchom na Android (RN CLI)
+        detail:
+          what: Buduje APK i instaluje na emulatorze lub podłączonym telefonie z USB debugging.
+          how: Gradle kompiluje Android kod, Metro bundler serwuje JS. Pierwsze uruchomienie ~5 minut.
+          tips:
+            - 'npx react-native run-android --deviceId=emulator-5554 — konkretne urządzenie'
+            - 'Włącz USB Debugging w Ustawienia → Opcje deweloperskie'
+
+  - name: Metro Bundler
+    icon: "📦"
+    commands:
+      - cmd: npx expo start --clear
+        desc: Uruchom z czystym cache Metro
+        detail:
+          what: Czyści cache bundlera przed uruchomieniem — rozwiązuje błędy "module not found" po instalacji nowych pakietów.
+          how: Metro cache może być nieaktualny po zmianach w node_modules lub konfiguracji.
+          tips:
+            - 'Uruchom po każdej instalacji nowego pakietu jeśli Metro nie wykrywa zmian'
+            - 'npx react-native start --reset-cache — wersja dla RN CLI'
+      - cmd: npx react-native start --reset-cache
+        desc: Zrestartuj Metro z resetem cache (RN CLI)
+        detail:
+          what: Resetuje cache transformacji Metro — rozwiązuje większość tajemniczych błędów bundlera.
+          how: Metro trzyma w cache transformacje Babel — reset wymusza ponowną kompilację wszystkich modułów.
+          tips:
+            - 'Pierwsze uruchomienie po resecie wolniejsze — odbudowuje cache'
+            - 'watchman watch-del-all — dodatkowy reset watcher''a'
+      - cmd: watchman watch-del-all
+        desc: Wyczyść cache Watchman (macOS/Linux)
+        detail:
+          what: Watchman śledzi zmiany w plikach — czyszczenie jego cache rozwiązuje błędy "file not found" i brakujących modułów po zmianach w strukturze projektu.
+          how: "Watchman = demon śledzący system plików. Stare wpisy mogą powodować problemy po rename/move plików."
+          tips:
+            - 'Uruchom razem z Metro reset: watchman watch-del-all && npx react-native start --reset-cache'
+            - 'Na Windows: Watchman nie jest wymagany — Metro używa native file watcher'
+      - cmd: npx expo export --platform android
+        desc: Eksportuj statyczny bundle (Android)
+        detail:
+          what: Generuje statyczny JS bundle i assety dla Androida — do hostowania OTA updates lub analizy bundle size.
+          how: Tworzy folder dist/ z bundle.js i assets/. Używany przez EAS Update do OTA deployów.
+          tips:
+            - 'npx expo export --platform ios — wersja dla iOS'
+            - 'npx expo export --platform all — oba jednocześnie'
+
+  - name: Android Build
+    icon: "🤖"
+    commands:
+      - cmd: eas build --platform android --profile preview
+        desc: EAS Build — APK do testów (bez sklepu)
+        detail:
+          what: Buduje APK w chmurze Expo bez potrzeby Android Studio. Profile preview = APK do bezpośredniej instalacji.
+          how: "EAS przesyła kod do chmury, buduje i zwraca link do pobrania APK. Wymaga konta Expo."
+          tips:
+            - 'eas build:configure — skonfiguruj EAS pierwszy raz'
+            - 'APK preview instalujesz bezpośrednio na telefonie (bez sklepu Play)'
+      - cmd: eas build --platform android --profile production
+        desc: EAS Build — AAB do Google Play
+        detail:
+          what: Buduje Android App Bundle (AAB) zoptymalizowany dla Google Play Store.
+          how: AAB > APK dla produkcji — Google Play generuje optymalne APK per urządzenie.
+          tips:
+            - 'Wymaga skonfigurowanego keystore w EAS Secrets'
+            - 'eas credentials — zarządzaj keystore i certyfikatami'
+      - cmd: cd android && ./gradlew assembleRelease
+        desc: Lokalny release build Android (RN CLI)
+        detail:
+          what: Buduje release APK lokalnie bez EAS. Wymaga skonfigurowanego keystore w gradle.properties.
+          how: Gradle kompiluje, minifix JS bundle i podpisuje APK kluczem release.
+          tips:
+            - 'Wynikowy APK: android/app/build/outputs/apk/release/'
+            - 'Wymaga MYAPP_UPLOAD_KEY_ALIAS, MYAPP_UPLOAD_STORE_FILE w gradle.properties'
+      - cmd: adb install android/app/build/outputs/apk/release/app-release.apk
+        desc: Zainstaluj APK na podłączonym urządzeniu
+        detail:
+          what: Android Debug Bridge instaluje APK bezpośrednio na telefonie przez USB.
+          how: Wymaga USB debugging na telefonie i adb w PATH.
+          tips:
+            - 'adb devices — sprawdź podłączone urządzenia'
+            - 'adb -s emulator-5554 install app.apk — konkretne urządzenie'
+
+  - name: iOS Build
+    icon: "🍎"
+    commands:
+      - cmd: eas build --platform ios --profile preview
+        desc: EAS Build — IPA do testów (bez Mac)
+        detail:
+          what: Buduje iOS app w chmurze Expo — nie potrzebujesz Maca z Xcode.
+          how: EAS zarządza provisioningiem, certyfikatami i Xcode. Zwraca IPA do TestFlight lub bezpośredniej instalacji.
+          tips:
+            - 'Wymaga konta Apple Developer (99$/rok) dla fizycznych urządzeń'
+            - 'eas credentials --platform ios — skonfiguruj certyfikaty'
+      - cmd: eas build --platform ios --profile production
+        desc: EAS Build — release IPA dla App Store
+        detail:
+          what: Buduje production-ready IPA do submisji na App Store Connect.
+          how: "EAS automatycznie konfiguruje distribution certificate i provisioning profile dla App Store."
+          tips:
+            - 'eas submit --platform ios — prześlij do App Store Connect po buildzie'
+            - 'Wymagane: bundle identifier, App Store Connect API key'
+      - cmd: npx expo run:ios --configuration Release
+        desc: Lokalny release build iOS (z Mac)
+        detail:
+          what: Buduje release build przez lokalny Xcode — pełna kontrola bez EAS.
+          how: Kompiluje Swift/ObjC z flagami Release, łączy z produkcyjnym JS bundle.
+          tips:
+            - 'Wymaga macOS + Xcode 15+, Apple Developer account'
+            - 'Otwórz ios/MyApp.xcworkspace w Xcode dla zaawansowanych ustawień'
+      - cmd: npx pod-install
+        desc: Zainstaluj CocoaPods dla iOS
+        detail:
+          what: Instaluje native dependencies iOS zdefiniowane w Podfile — po zainstalowaniu nowych bibliotek RN.
+          how: Pod install czyta Podfile, pobiera i linkuje natywne moduły Objective-C/Swift.
+          tips:
+            - 'cd ios && pod install — alternatywa'
+            - 'Uruchom po każdym npm install biblioteki z native code (np. react-native-reanimated)'
+
+  - name: Debugging
+    icon: "🐛"
+    commands:
+      - cmd: npx expo start --dev-client
+        desc: Uruchom z Expo Dev Client (custom native code)
+        detail:
+          what: Uruchamia development build z customowym natywnym kodem — gdy Expo Go nie wystarczy (np. z react-native-reanimated v3).
+          how: Wymaga wcześniejszego eas build --profile development lub npx expo run:ios.
+          tips:
+            - 'eas build --profile development --platform ios — zbuduj dev client'
+            - 'Dev Client = Expo Go + Twój natywny kod'
+      - cmd: npx react-devtools
+        desc: React DevTools (inspektor komponentów)
+        detail:
+          what: Otwiera React DevTools — inspektor drzewa komponentów, props i state dla React Native.
+          how: Połącz telefon/emulator z dev serverem, następnie uruchom DevTools w przeglądarce lub Electron app.
+          tips:
+            - 'npm install -g react-devtools — instalacja globalna'
+            - 'Shake telefon → "Open Debugger" lub Cmd+D (iOS Simulator) / Ctrl+M (Android)'
+      - cmd: adb logcat -s ReactNativeJS
+        desc: Logi JS z Android (adb)
+        detail:
+          what: Wyświetla logi JavaScript z działającej aplikacji Android w terminalu.
+          how: adb logcat filtruje logi systemu — tag ReactNativeJS to wyłącznie logi z twojego kodu JS.
+          tips:
+            - 'adb logcat -s "ReactNative" — logi React Native frameworka'
+            - 'console.log() w RN pojawia się w logcat'
+      - cmd: npx expo diagnostics
+        desc: Sprawdź środowisko Expo
+        detail:
+          what: Drukuje diagnostykę środowiska — wersje Expo, Node, Ruby, Xcode, Android SDK.
+          how: Przydatne gdy coś nie działa — sprawdź czy wersje są kompatybilne.
+          tips:
+            - 'Uruchom przed zgłoszeniem buga do Expo GitHub Issues'
+            - 'npx react-native info — odpowiednik dla RN CLI'
+      - cmd: npx expo install --check
+        desc: Sprawdź kompatybilność pakietów z Expo SDK
+        detail:
+          what: Weryfikuje czy zainstalowane pakiety są w wersjach kompatybilnych z aktualnym Expo SDK.
+          how: Expo utrzymuje listę kompatybilnych wersji peer dependencies — ta komenda je sprawdza.
+          tips:
+            - 'npx expo install --fix — automatycznie zaktualizuj do kompatybilnych wersji'
+            - 'Uruchom po upgrade Expo SDK'
+
+  - name: Komponenty bazowe (snippety)
+    icon: "🧩"
+    commands:
+      - cmd: "const styles = StyleSheet.create({ container: { flex: 1 } })"
+        desc: StyleSheet.create — podstawowa struktura stylów
+        detail:
+          what: Tworzy zoptymalizowany obiekt stylów. Waliduje właściwości w dev mode, optymalizuje transfer do native.
+          how: Przekazujesz klucze style do prop style komponentów. Możesz łączyć tablicą.
+          tips:
+            - 'style={[styles.base, isActive && styles.active]} — warunkowe style'
+            - 'StyleSheet.absoluteFillObject — skrót dla { position: absolute, top: 0, left: 0, right: 0, bottom: 0 }'
+      - cmd: "<FlatList data={items} keyExtractor={item => item.id} renderItem={({ item }) => <ItemRow item={item} />} />"
+        desc: FlatList — wirtualizowana lista
+        detail:
+          what: Renderuje tylko widoczne elementy — obowiązkowy dla list > 50 elementów.
+          how: keyExtractor musi zwracać unikalny string. renderItem to funkcja renderująca każdy element.
+          tips:
+            - 'getItemLayout — optymalizacja gdy elementy mają stałą wysokość'
+            - 'initialNumToRender={10} windowSize={5} — kontroluj ile elementów prerenderowan'
+      - cmd: "const { width, height } = useWindowDimensions()"
+        desc: useWindowDimensions — wymiary ekranu z auto-update
+        detail:
+          what: Hook zwracający aktualne wymiary okna — aktualizuje się automatycznie przy rotacji.
+          how: Lepszy niż Dimensions.get('window') bo reaguje na zmiany w runtime.
+          tips:
+            - 'const isLandscape = width > height — wykryj orientację'
+            - 'const isTablet = width >= 768 — prosta detekcja tabletu'
+      - cmd: "Platform.select({ ios: { shadowOpacity: 0.1 }, android: { elevation: 4 } })"
+        desc: Platform.select — różne wartości per platforma
+        detail:
+          what: Elegancki sposób definiowania różnych wartości dla iOS i Android w jednym miejscu.
+          how: Platform.select zwraca wartość odpowiadającą aktualnej platformie. Możesz użyć wewnątrz StyleSheet.create.
+          tips:
+            - 'Platform.OS === ''ios'' — prostszy warunek binarny'
+            - 'Platform.Version — wersja iOS (string) lub Android API level (number)'
+      - cmd: "<SafeAreaView style={{ flex: 1 }}>{children}</SafeAreaView>"
+        desc: SafeAreaView — ochrona przed notchami i paskami systemu
+        detail:
+          what: Automatycznie dodaje padding chroniący treść przed notchem, status barem i home indicatorem.
+          how: Zamień root View na SafeAreaView. Na Androidzie brak efektu — używaj tylko na iOS lub react-native-safe-area-context.
+          tips:
+            - 'Zainstaluj react-native-safe-area-context dla lepszej kontroly przez useSafeAreaInsets()'
+            - 'SafeAreaProvider z safe-area-context musi owijać całą aplikację'
+
+  - name: Hooki i logika
+    icon: "🪝"
+    commands:
+      - cmd: "const [data, setData] = useState<User | null>(null)"
+        desc: useState z TypeScript — typowany stan
+        detail:
+          what: Stan lokalny komponentu z pełnym type safety. null oznacza brak danych (loading state pattern).
+          how: TypeScript inferuje typ z initialState lub podajesz explicit generic.
+          tips:
+            - 'useState(false) — TypeScript inferuje boolean automatycznie'
+            - 'Dla złożonego stanu rozważ useReducer lub Zustand'
+      - cmd: "useEffect(() => { fetchData(); return () => { cleanup(); }; }, [dependency])"
+        desc: useEffect z cleanup i dependency array
+        detail:
+          what: Efekt uboczny uruchamiany po renderze. Return funkcja = cleanup (np. unsubscribe). Tablica deps kontroluje kiedy re-run.
+          how: "[] = tylko przy mount. [dep] = przy zmianie dep. Brak tablicy = po każdym renderze."
+          tips:
+            - 'Zawsze zwracaj cleanup dla subskrypcji, timerów i listenerów (AppState, NetInfo)'
+            - 'useEffect z async: utwórz wewnątrz async function i wywołaj ją'
+      - cmd: "const navigation = useNavigation<NativeStackNavigationProp<RootStack>>()"
+        desc: useNavigation z typowaniem React Navigation
+        detail:
+          what: Hook nawigacji z pełnym TypeScript — autocomplete dla nazw ekranów i params.
+          how: Zdefiniuj RootStackParamList z typami params dla każdego ekranu, przekaż do generica.
+          tips:
+            - 'Zdefiniuj RootStackParamList globalnie i eksportuj — użyj wszędzie w app'
+            - 'navigation.navigate vs navigation.push — navigate nie dodaje jeśli już na stosie'
+      - cmd: "const { data, isLoading, error } = useQuery({ queryKey: ['users'], queryFn: fetchUsers })"
+        desc: useQuery (TanStack Query) — fetching z cache
+        detail:
+          what: Pobiera dane z automatycznym cacheowaniem, retry, loading state i background refresh.
+          how: queryKey = unikalny identyfikator (używany do invalidacji). queryFn = async funkcja zwracająca dane.
+          tips:
+            - 'queryClient.invalidateQueries({ queryKey: [''users''] }) — wymuś odświeżenie'
+            - 'useInfiniteQuery — dla paginacji i infinite scroll w FlatList'
+      - cmd: "const store = useStore(state => state.user)"
+        desc: Zustand store — global state
+        detail:
+          what: Pobiera wartość z Zustand store. Komponent re-renderuje tylko gdy wybrana wartość się zmienia.
+          how: Selector function (state => state.user) memoizuje — bez niego każda zmiana store re-renderuje.
+          tips:
+            - 'Trzymaj store w osobnym pliku: store/authStore.ts'
+            - 'persist middleware + AsyncStorage = trwały store między sesjami'
+
+  - name: Nawigacja (komendy)
+    icon: "🧭"
+    commands:
+      - cmd: npm install @react-navigation/native @react-navigation/native-stack
+        desc: Zainstaluj React Navigation (Stack)
+        detail:
+          what: Instaluje core i stack navigator — podstawowy zestaw dla aplikacji z hierarchią ekranów.
+          how: Po instalacji wymagane peer dependencies native screens i safe area context.
+          tips:
+            - 'npx expo install react-native-screens react-native-safe-area-context — Expo peer deps'
+            - 'npm install @react-navigation/bottom-tabs — dodaj Bottom Tabs'
+      - cmd: npm install @react-navigation/bottom-tabs
+        desc: Dodaj Bottom Tab Navigator
+        detail:
+          what: Dolny pasek zakładek — standardowy wzorzec nawigacji dla większości aplikacji mobilnych.
+          how: Tab.Navigator opakowuje Tab.Screen komponenty. Każda zakładka może mieć własny Stack.
+          tips:
+            - 'tabBarIcon — ikona zakładki, tabBarBadge — czerwony badge z liczbą'
+            - 'Zagnieżdż Stack wewnątrz Tab dla nawigacji per zakładka'
+      - cmd: "navigation.navigate('ScreenName', { id: '123' })"
+        desc: Nawiguj do ekranu z parametrami
+        detail:
+          what: Przechodzi do ekranu. Jeśli ekran jest już na stosie, wraca do niego (nie dodaje duplikatu).
+          how: Drugi argument to obiekt params dostępny przez useRoute().params lub route.params.
+          tips:
+            - 'navigation.push(''Screen'', params) — zawsze dodaje nowy ekran na stos'
+            - 'navigation.replace(''Screen'') — zastąp aktualny ekran (bez możliwości powrotu)'
+      - cmd: navigation.goBack()
+        desc: Wróć do poprzedniego ekranu
+        detail:
+          what: Zdejmuje aktualny ekran ze stosu i wraca do poprzedniego.
+          how: Odpowiednik hardware back button na Android. Nie działa gdy brak poprzedniego ekranu.
+          tips:
+            - 'navigation.canGoBack() — sprawdź przed wywołaniem'
+            - 'navigation.popToTop() — wróć do pierwszego ekranu na stosie'
+      - cmd: "navigation.reset({ index: 0, routes: [{ name: 'Home' }] })"
+        desc: Reset stosu nawigacji
+        detail:
+          what: Całkowicie resetuje stos nawigacji — przydatne po logout lub onboardingu.
+          how: index określa aktywny ekran, routes to nowy stos. Brak możliwości powrotu do poprzednich ekranów.
+          tips:
+            - 'Po logout: navigation.reset({ index: 0, routes: [{ name: ''Login'' }] })'
+            - 'CommonActions.reset — alternatywa z @react-navigation/native'
+
+  - name: Stylowanie i UI
+    icon: "🎨"
+    commands:
+      - cmd: npm install nativewind && npx tailwindcss init
+        desc: Zainstaluj NativeWind (Tailwind dla RN)
+        detail:
+          what: NativeWind v4 pozwala używać className z klasami Tailwind w React Native.
+          how: Kompiluje klasy Tailwind do StyleSheet w build time. Wymaga konfiguracji babel.config.js i tailwind.config.js.
+          tips:
+            - 'Expo: npx expo install nativewind tailwindcss'
+            - 'Dodaj preset: content: [''./app/**/*.{js,jsx,ts,tsx}''] w tailwind.config.js'
+      - cmd: npm install react-native-reanimated
+        desc: Zainstaluj Reanimated (zaawansowane animacje)
+        detail:
+          what: Animacje na UI thread — brak jank przy ciężkim JS. useSharedValue, useAnimatedStyle, withSpring, withTiming.
+          how: Dodaj plugin do babel.config.js. Wymaga dodatkowej konfiguracji dla Expo (expo install).
+          tips:
+            - 'npx expo install react-native-reanimated — Expo (doda plugin automatycznie)'
+            - 'LayoutAnimation (wbudowany) dla prostszych animacji bez Reanimated'
+      - cmd: "Animated.timing(value, { toValue: 1, duration: 300, useNativeDriver: true }).start()"
+        desc: Animacja wbudowana (Animated API)
+        detail:
+          what: Prostsza alternatywa dla Reanimated — wbudowana w RN. useNativeDriver offloaduje animację na UI thread.
+          how: Utwórz Animated.Value, animuj przez timing/spring/decay, użyj Animated.View z animowanym stylem.
+          tips:
+            - 'useNativeDriver: true — zawsze używaj dla transform i opacity (szybsze)'
+            - 'useNativeDriver: false — wymagane dla layout (width, height, padding)'
+      - cmd: npm install react-native-svg
+        desc: Zainstaluj react-native-svg
+        detail:
+          what: Renderuje SVG w React Native — Svg, Path, Rect, Circle, G i inne elementy SVG.
+          how: Komponenty SVG importujesz z react-native-svg. Wymaga konfiguracji z transformer dla plików .svg.
+          tips:
+            - 'npx expo install react-native-svg — Expo'
+            - 'react-native-svg-transformer — importuj pliki .svg jako komponenty React'
+      - cmd: npm install react-native-paper
+        desc: Zainstaluj React Native Paper (Material Design)
+        detail:
+          what: Zestaw komponentów Material Design 3 — Button, Card, Chip, Dialog, FAB, TextInput i 40+ innych.
+          how: Opakuj aplikację w PaperProvider, konfiguruj theme. Komponenty dostępne z react-native-paper.
+          tips:
+            - 'Wymaga react-native-vector-icons lub @expo/vector-icons dla ikon'
+            - 'Alternatywa: Tamagui, Gluestack UI, React Native Elements'
+
+  - name: Platform-specific
+    icon: "📱"
+    commands:
+      - cmd: "Platform.OS === 'ios' ? <IOSComponent /> : <AndroidComponent />"
+        desc: Warunkowy rendering per platforma
+        detail:
+          what: Renderuje różne komponenty w zależności od platformy. Czysty i czytelny sposób na platform-specific UI.
+          how: "Platform.OS to string 'ios' | 'android' | 'web'. Używaj operator ? : dla JSX."
+          tips:
+            - 'Pliki .ios.tsx i .android.tsx — Metro automatycznie wybiera plik per platforma'
+            - 'Platform.select({}) — bardziej eleganckie dla wartości (nie komponentów)'
+      - cmd: "import { Haptics } from 'expo-haptics'; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)"
+        desc: Haptyczny feedback (dotykowy)
+        detail:
+          what: Natywne haptyczne sprzężenie zwrotne — silnik Taptic Engine (iOS) lub wibracja (Android).
+          how: impactAsync na przyciski, notificationAsync na sukces/błąd, selectionAsync na zmianę opcji.
+          tips:
+            - 'Używaj oszczędnie — zbyt dużo haptyki irytuje użytkowników'
+            - 'ImpactFeedbackStyle.Light dla subtelnych interakcji, Heavy dla ważnych akcji'
+      - cmd: npx expo install expo-status-bar
+        desc: Zainstaluj kontrolę StatusBar
+        detail:
+          what: expo-status-bar to komponent do kontroli paska statusu — kolor tekstu (light/dark), widoczność.
+          how: "<StatusBar style=\"light\" /> — biały tekst na ciemnym tle. Zastępuje wbudowany StatusBar RN."
+          tips:
+            - 'style="auto" — automatycznie dobiera kontrast do koloru tła'
+            - 'Na Androidzie możesz też ustawić backgroundColor paska'
+      - cmd: npx expo install expo-screen-orientation
+        desc: Zablokuj orientację ekranu
+        detail:
+          what: Kontroluje orientację ekranu — zablokuj na portrait (typowe dla mobile) lub landscape (tabela, wideo).
+          how: ScreenOrientation.lockAsync() blokuje, unlockAsync() odblokowuje. Możesz reagować na zmiany.
+          tips:
+            - 'ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP) — tylko pionowo'
+            - 'Konfiguracja w app.json: "orientation": "portrait" — blokada dla całej app'
+      - cmd: npx expo install expo-font && npx expo install @expo-google-fonts/inter
+        desc: Załaduj niestandardowe czcionki
+        detail:
+          what: expo-font ładuje niestandardowe czcionki, @expo-google-fonts daje dostęp do Google Fonts.
+          how: useFonts() hook ładuje czcionki asynchronicznie. Wyświetl SplashScreen aż czcionki załadowane.
+          tips:
+            - 'const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_700Bold })'
+            - 'expo-splash-screen — trzymaj splash screen podczas ładowania czcionek'

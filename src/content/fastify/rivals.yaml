@@ -1,0 +1,66 @@
+title: Fastify vs alternatywy backend Node.js
+
+items:
+  - name: Express.js
+    icon: "🟨"
+    color: "#f7df1e"
+    tagline: "Dojrzały, wszechobecny — middleware-first, maksymalna prostota"
+    pros:
+      - Ogromny ekosystem — tysiące gotowych middleware
+      - Każdy zna Express — łatwe zatrudnianie, mnóstwo dokumentacji
+      - Minimalna krzywa uczenia — app.get('/path', handler) to wszystko
+      - Działa z każdą biblioteką — React, Angular, Vue bez zmian
+    cons:
+      - 2-3x wolniejszy niż Fastify w benchmarkach throughput
+      - Brak wbudowanej walidacji — trzeba dodawać joi/zod/yup osobno
+      - Callbacks i brak async/await w starej wersji — pułapki
+      - Brak wbudowanego TypeScript — wymaga @types/express i ręcznej konfiguracji
+    vs: "Express gdy potrzebujesz maksymalnej prostoty, znajomego API lub gdy zespół go zna. Fastify gdy wydajność i wbudowana walidacja JSON Schema mają znaczenie."
+
+  - name: Hono
+    icon: "🔥"
+    color: "#e36002"
+    tagline: "Edge-first, ultra-lekki — Cloudflare Workers, Deno, Bun, Node.js"
+    pros:
+      - Działa na edge runtimeach (Cloudflare Workers, Deno Deploy, Bun)
+      - TypeScript-first z type-safe routing i RPC client
+      - Zero zależności — mały bundle, idealne dla serverless
+      - Web Standards API (Request/Response) — przenośny między runtimeami
+    cons:
+      - Nie ma wbudowanej walidacji JSON Schema (tylko @hono/zod-validator)
+      - Plugin system mniej rozbudowany niż Fastify
+      - Gorszy niż Fastify dla tradycyjnych serwerów (I/O-bound workloads)
+      - Mniejszy ekosystem oficjalnych pluginów
+    vs: "Hono gdy budujesz na edge/serverless i potrzebujesz przenośności między runtimeami. Fastify gdy masz Node.js serwer i zależy Ci na maksymalnym throughput i JSON Schema."
+
+  - name: NestJS
+    icon: "🐱"
+    color: "#e0234e"
+    tagline: "Enterprise DI framework — moduły, dekoratory, Angular-inspired"
+    pros:
+      - Kompletna architektura — moduły, serwisy, kontrolery, guards, pipes
+      - Dependency Injection wbudowane — czyste testowanie i loose coupling
+      - Może używać Fastify jako adapter — NestJS + Fastify speed
+      - Duży ekosystem oficjalnych pakietów (@nestjs/*)
+    cons:
+      - Ogromny boilerplate — simple endpoint wymaga 3 plików
+      - Steep learning curve — dekoratory, DI, circular dependencies
+      - Abstrakcja ukrywa co Fastify/Express robią pod spodem
+      - Wolniejszy cold start i wyższe zużycie pamięci niż Fastify
+    vs: "NestJS gdy budujesz duży system enterprise z wieloma modułami i zespołem. Fastify gdy chcesz wydajności bez opinionated struktury — możesz sam zaorganizować kod."
+
+  - name: Koa
+    icon: "🌿"
+    color: "#33333d"
+    tagline: "Minimalistyczny następca Express — async middleware, no batteries"
+    pros:
+      - Czysty async/await middleware przez ctx — nie ma callback hell
+      - Minimalne core — tylko routing i middleware, reszta opcjonalna
+      - Dobra kontrola przepływu — next() i ctx zamiast req/res
+      - Używany przez duże projekty (Strapi, Lobe Chat)
+    cons:
+      - Bardzo mały ekosystem w porównaniu do Express i Fastify
+      - Brak wbudowanego routera — trzeba dodawać koa-router osobno
+      - Brak walidacji, brak TypeScript first-class support
+      - Znacznie wolniejszy od Fastify w benchmarkach
+    vs: "Koa gdy chcesz minimalizmu Express z lepszym async/await. Fastify gdy potrzebujesz wydajności i wbudowanego JSON Schema — Koa nie ma żadnego z tych."

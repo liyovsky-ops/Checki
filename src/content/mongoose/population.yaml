@@ -1,0 +1,172 @@
+title: "Population & Refs"
+
+items:
+  - name: "ref — definiowanie referencji"
+    desc: >
+      Pole typu ObjectId z opcją ref wskazuje na inny Model.
+      Mongoose nie enforces referencji na poziomie bazy (MongoDB nie ma FK) —
+      ref to metadane dla Mongoose żeby wiedział skąd ładować przy populate().
+    code: |
+      import { Schema } from 'mongoose';
+
+      const PostSchema = new Schema({
+        title:   { type: String, required: true },
+        content: String,
+        author: {
+          type: Schema.Types.ObjectId,
+          ref:  'User',             // nazwa Modelu — 'User' (string)
+          required: true,
+        },
+        tags: [{
+          type: Schema.Types.ObjectId,
+          ref:  'Tag',
+        }],
+        comments: [{
+          type: Schema.Types.ObjectId,
+          ref:  'Comment',
+        }],
+      });
+
+  - name: "populate() — ładowanie powiązanych dokumentów"
+    desc: >
+      populate() zastępuje ObjectId pełnym dokumentem z innej kolekcji.
+      Mongoose wysyła osobne query do referenced collection — to nie jest JOIN.
+      Możesz chainować populate() lub zagnieżdżać. select ogranicza pola w załadowanym dokumencie.
+    code: |
+      import { Post } from './models/Post';
+
+      // Podstawowe populate — załaduj autora
+      const post = await Post.findById(id).populate('author');
+      console.log(post.author.name); // pełny obiekt User
+
+      // Populate z selekcją pól (select)
+      const post2 = await Post.findById(id)
+        .populate('author', 'name email -_id');  // tylko name i email
+
+      // Populate wielu pól
+      const post3 = await Post.findById(id)
+        .populate('author')
+        .populate('tags')
+        .populate('comments');
+
+      // Populate na tablicy dokumentów
+      const posts = await Post.find({ published: true })
+        .populate('author', 'name')
+        .lean();
+
+  - name: "Zagnieżdżone populate i populate z opcjami"
+    desc: >
+      Populate z obiektem konfiguracyjnym pozwala na match (filtr), select pól,
+      limit wyników i zagnieżdżone populate (populate w populate).
+      Każdy poziom zagnieżdżenia = osobne query do MongoDB.
+    code: |
+      // Pełna konfiguracja populate
+      const post = await Post.findById(id).populate({
+        path:   'author',
+        select: 'name email avatar',
+        match:  { active: true },   // populate tylko jeśli active === true
+        model:  'User',             // jawnie wskaż model (domyślnie z ref)
+      });
+
+      // Zagnieżdżone populate — autor → posty autora
+      const user = await User.findById(userId).populate({
+        path: 'posts',
+        populate: {
+          path:   'comments',
+          select: 'content author',
+          populate: {
+            path:   'author',
+            select: 'name',
+          },
+        },
+      });
+
+      // Populate z limitem
+      const post2 = await Post.findById(id).populate({
+        path:    'comments',
+        options: { sort: { createdAt: -1 }, limit: 5 },
+      });
+
+  - name: "Virtual populate — referencje odwrotne"
+    desc: >
+      Virtual populate nie wymaga trzymania tablicy ID w dokumencie.
+      Definiujesz na Schema pole wirtualne wskazujące gdzie szukać dokumentów.
+      localField to pole na tym modelu, foreignField to pole na modelu docelowym.
+    code: |
+      import { Schema } from 'mongoose';
+
+      const AuthorSchema = new Schema({ name: String }, {
+        toJSON:   { virtuals: true },
+        toObject: { virtuals: true },
+      });
+
+      // Nie trzymamy tablicy postIds w Autorze
+      // Zamiast tego virtual populate szuka Post.authorId === Author._id
+      AuthorSchema.virtual('posts', {
+        ref:          'Post',
+        localField:   '_id',       // Author._id
+        foreignField: 'authorId',  // Post.authorId
+        justOne:      false,       // tablica wyników (true = jeden dokument)
+        count:        false,       // true = zwróć count zamiast dokumentów
+      });
+
+      // Wirtualny count
+      AuthorSchema.virtual('postCount', {
+        ref:         'Post',
+        localField:  '_id',
+        foreignField: 'authorId',
+        count:       true,         // zwraca liczbę zamiast dokumentów
+      });
+
+      // Użycie
+      const author = await Author.findById(id)
+        .populate('posts')
+        .populate('postCount');
+      console.log(author.posts.length, author.postCount);
+
+  - name: "lean() + populate"
+    desc: >
+      lean() zwraca plain objects zamiast Mongoose Documents — szybszy i lżejszy.
+      Działa z populate — powiązane dokumenty też są plain objects.
+      lean() + populate jest optymalny dla API endpoints gdzie nie potrzebujesz save().
+    code: |
+      // lean + populate — optymalne dla API response
+      const posts = await Post.find({ published: true })
+        .populate('author', 'name email')
+        .select('title content createdAt')
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean();
+
+      // Wynik to tablica plain JS objects
+      // post.author.name działa, ale post.save() nie istnieje
+
+      // mongoose-lean-virtuals plugin — virtuale w lean()
+      import mongooseLeanVirtuals from 'mongoose-lean-virtuals';
+      PostSchema.plugin(mongooseLeanVirtuals);
+
+      const postsWithVirtuals = await Post.find()
+        .populate('author', 'name')
+        .lean({ virtuals: true });  // uwzględnij pola wirtualne
+
+  - name: "Model.populate() — populate poza query"
+    desc: >
+      mongoose.populate() lub Model.populate() pozwala populować dokumenty
+      które już masz — np. po odebraniu z cache lub po agregacji.
+      Przydatne gdy dane przyszły z innego źródła niż bezpośrednie query Mongoose.
+    code: |
+      import mongoose from 'mongoose';
+
+      // Populuj już istniejący dokument
+      const post = await Post.findById(id).lean();
+      // post.author to ObjectId
+
+      await mongoose.model('Post').populate(post, { path: 'author', select: 'name' });
+      // teraz post.author to pełny obiekt
+
+      // Populuj tablicę dokumentów
+      const posts = await Post.find().lean();
+      await Post.populate(posts, [
+        { path: 'author', select: 'name email' },
+        { path: 'tags',   select: 'name color'  },
+      ]);

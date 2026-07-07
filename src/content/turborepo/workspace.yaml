@@ -1,0 +1,323 @@
+labels:
+  main: Struktura monorepo i workspace
+  mainLang: bash
+
+intro:
+  title: Workspace — struktura monorepo w Turborepo
+  desc: >
+    Turborepo nie zarządza workspace — to rola package managera (pnpm, npm, yarn).
+    Turborepo "siedzi na wierzchu" i zarządza wykonaniem zadań. Workspace to podkatalog
+    z własnym package.json. Konwencja to apps/ dla aplikacji (Next.js, Remix, Express)
+    i packages/ dla bibliotek (UI, utils, config). Każdy workspace może importować
+    inne workspace przez zależności workspace w package.json — bez publishowania
+    na npm. Turborepo czyta graf zależności workspace żeby wiedzieć co od czego
+    zależy i w jakiej kolejności budować zadania.
+
+items:
+  - title: Struktura katalogów monorepo
+    desc: >
+      Standardowa struktura monorepo Turborepo — apps/ dla aplikacji końcowych,
+      packages/ dla współdzielonych bibliotek. Root package.json definiuje
+      workspaces dla package managera i zawiera scripts wywołujące turbo.
+    code: |
+      my-monorepo/
+      ├── apps/
+      │   ├── web/                    # Aplikacja Next.js
+      │   │   ├── src/
+      │   │   ├── package.json        # { "name": "web" }
+      │   │   └── next.config.js
+      │   └── docs/                   # Dokumentacja (Nextra, Docusaurus)
+      │       ├── pages/
+      │       └── package.json        # { "name": "docs" }
+      ├── packages/
+      │   ├── ui/                     # Shared UI component library
+      │   │   ├── src/
+      │   │   └── package.json        # { "name": "@acme/ui" }
+      │   ├── utils/                  # Shared utility functions
+      │   │   └── package.json        # { "name": "@acme/utils" }
+      │   ├── typescript-config/      # Shared tsconfig.json presets
+      │   │   └── package.json        # { "name": "@acme/typescript-config" }
+      │   └── eslint-config/          # Shared ESLint configuration
+      │       └── package.json        # { "name": "@acme/eslint-config" }
+      ├── turbo.json                  # Konfiguracja Turborepo
+      ├── pnpm-workspace.yaml         # pnpm workspaces definition
+      └── package.json                # Root — scripts, devDependencies
+    lang: bash
+
+  - title: Root package.json — scripts i workspaces
+    desc: >
+      Root package.json definiuje workspace dla npm/yarn lub wskazuje na pnpm-workspace.yaml.
+      Turborepo jest zainstalowane jako devDependency w root. Scripts w root wywołują
+      turbo — przekazuje wykonanie do wszystkich workspace automatycznie.
+    code: |
+      {
+        "name": "my-monorepo",
+        "private": true,
+        "scripts": {
+          "build":      "turbo run build",
+          "dev":        "turbo run dev",
+          "lint":       "turbo run lint",
+          "test":       "turbo run test",
+          "type-check": "turbo run type-check",
+          "clean":      "turbo run clean"
+        },
+        "devDependencies": {
+          "turbo": "latest"
+        },
+        "packageManager": "pnpm@9.0.0",
+
+        // Dla npm/yarn — pole workspaces w package.json:
+        "workspaces": [
+          "apps/*",
+          "packages/*"
+        ]
+      }
+
+      // Dla pnpm — oddzielny plik pnpm-workspace.yaml:
+      // packages:
+      //   - 'apps/*'
+      //   - 'packages/*'
+    lang: json
+
+  - title: Internal package — shared UI library
+    desc: >
+      Shared package (biblioteka wewnętrzna) — private true, nie jest publikowana
+      na npm. Importowana bezpośrednio ze źródła (just-in-time transpilacja) lub
+      z dist/ po buildzie. Aplikacje importują ją przez zależność workspace w package.json.
+    code: |
+      // packages/ui/package.json
+      {
+        "name": "@acme/ui",
+        "version": "0.0.1",
+        "private": true,
+        "main": "./src/index.ts",      // bezpośredni import TS — JIT
+        "types": "./src/index.ts",
+        "exports": {
+          ".": {
+            "types":   "./src/index.ts",
+            "default": "./src/index.ts"
+          }
+        },
+        "devDependencies": {
+          "@acme/typescript-config": "workspace:*",
+          "typescript": "^5.0.0"
+        },
+        "peerDependencies": {
+          "react": "^18.0.0"
+        }
+      }
+
+      // packages/ui/src/index.ts
+      export { Button }    from './button';
+      export { Card }      from './card';
+      export { Input }     from './input';
+      export type { ButtonProps } from './button';
+    lang: json
+
+  - title: Używanie shared package w aplikacji
+    desc: >
+      Aplikacja w apps/ importuje package z packages/ przez zależność workspace
+      (workspace:* w pnpm, * w npm/yarn). Po instalacji importujesz jak zwykłą
+      bibliotekę npm — bez ścieżek względnych między katalogami.
+    code: |
+      // apps/web/package.json
+      {
+        "name": "web",
+        "dependencies": {
+          "@acme/ui":    "workspace:*",
+          "@acme/utils": "workspace:*",
+          "next":  "^14.0.0",
+          "react": "^18.0.0"
+        },
+        "devDependencies": {
+          "@acme/typescript-config": "workspace:*",
+          "@acme/eslint-config":     "workspace:*"
+        }
+      }
+
+      // apps/web/src/app/page.tsx
+      import { Button, Card } from '@acme/ui';
+      import { formatDate }   from '@acme/utils';
+
+      export default function HomePage() {
+        return (
+          <Card>
+            <Button variant="primary">Kliknij</Button>
+            <p>Dziś: {formatDate(new Date())}</p>
+          </Card>
+        );
+      }
+    lang: tsx
+
+  - title: Shared TypeScript config
+    desc: >
+      packages/typescript-config zawiera bazowe tsconfig.json współdzielone przez
+      wszystkie workspace. Każdy workspace ekstenuje odpowiedni preset — base,
+      nextjs, react-library. Eliminuje duplikację compilerOptions w monorepo.
+    code: |
+      // packages/typescript-config/package.json
+      {
+        "name": "@acme/typescript-config",
+        "version": "0.0.0",
+        "private": true,
+        "files": ["base.json", "nextjs.json", "react-library.json"]
+      }
+
+      // packages/typescript-config/base.json
+      {
+        "$schema": "https://json.schemastore.org/tsconfig",
+        "compilerOptions": {
+          "target": "ES2020",
+          "lib": ["dom", "dom.iterable", "esnext"],
+          "module": "ESNext",
+          "moduleResolution": "bundler",
+          "strict": true,
+          "skipLibCheck": true,
+          "esModuleInterop": true,
+          "incremental": true
+        }
+      }
+
+      // packages/typescript-config/nextjs.json
+      {
+        "$schema": "https://json.schemastore.org/tsconfig",
+        "extends": "./base.json",
+        "compilerOptions": {
+          "plugins": [{ "name": "next" }],
+          "jsx": "preserve"
+        }
+      }
+
+      // apps/web/tsconfig.json — ekstenuje preset
+      {
+        "extends": "@acme/typescript-config/nextjs.json",
+        "include": ["src", "next-env.d.ts"],
+        "exclude": ["node_modules"]
+      }
+    lang: json
+
+  - title: Shared ESLint config
+    desc: >
+      packages/eslint-config zawiera konfigurację ESLint współdzieloną przez
+      wszystkie workspace. Eliminuje duplikację reguł w każdej aplikacji.
+      Każdy workspace ekstenuje shared config i może nadpisać konkretne reguły.
+    code: |
+      // packages/eslint-config/package.json
+      {
+        "name": "@acme/eslint-config",
+        "version": "0.0.0",
+        "private": true,
+        "main": "index.js",
+        "dependencies": {
+          "@typescript-eslint/eslint-plugin": "latest",
+          "@typescript-eslint/parser": "latest",
+          "eslint-config-prettier": "latest"
+        }
+      }
+
+      // packages/eslint-config/index.js
+      module.exports = {
+        extends: [
+          'plugin:@typescript-eslint/recommended',
+          'prettier',
+        ],
+        parser: '@typescript-eslint/parser',
+        rules: {
+          '@typescript-eslint/no-unused-vars': 'error',
+          '@typescript-eslint/no-explicit-any': 'warn',
+        },
+      };
+
+      // apps/web/.eslintrc.js — ekstenuje shared config
+      module.exports = {
+        root: true,
+        extends: ['@acme/eslint-config'],
+        parserOptions: {
+          tsconfigRootDir: __dirname,
+          project: ['./tsconfig.json'],
+        },
+        rules: {
+          // nadpisz konkretne reguły dla tej aplikacji
+        },
+      };
+    lang: js
+
+  - title: Remote Cache — konfiguracja Vercel
+    desc: >
+      Remote Cache współdzieli wyniki buildu między maszynami — CI i developerzy
+      korzystają z tego samego cache. Oficjalny provider to Vercel. Lokalna
+      konfiguracja przez turbo login i turbo link. W CI — zmienne środowiskowe.
+    code: |
+      # Konfiguracja lokalna (jednorazowo)
+      turbo login       # Zaloguj się przez przeglądarkę do Vercel
+      turbo link        # Powiąż projekt z Vercel Remote Cache
+
+      # Weryfikacja — buduj i sprawdź logi
+      turbo run build
+      # Powinieneś zobaczyć: "Remote caching enabled"
+
+      # Konfiguracja CI/CD — GitHub Actions
+      # .github/workflows/ci.yml
+      env:
+        TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+        TURBO_TEAM:  ${{ vars.TURBO_TEAM }}
+
+      # TURBO_TOKEN — z Vercel account settings (Access Tokens)
+      # TURBO_TEAM  — slug Twojego Vercel team (np. "acme")
+
+      # Self-hosted Remote Cache (bez Vercel)
+      # turbo.json:
+      # {
+      #   "remoteCache": {
+      #     "enabled": true,
+      #     "apiUrl": "https://your-cache-server.com"
+      #   }
+      # }
+    lang: bash
+
+  - title: Dodawanie nowego workspace
+    desc: >
+      Dwa sposoby na dodanie nowego workspace — przez generator turbo gen
+      (szybki i poprawny) lub ręcznie (pełna kontrola). Generator tworzy
+      poprawną strukturę według szablonu z istniejącego workspace.
+    code: |
+      # Sposób 1: turbo gen workspace (generator — zalecany)
+      turbo gen workspace --name=@acme/analytics --type=package
+
+      # Sposób 2: ręcznie
+      mkdir packages/analytics && cd packages/analytics
+
+      # package.json dla nowego workspace
+      cat > package.json << 'EOF'
+      {
+        "name": "@acme/analytics",
+        "version": "0.0.1",
+        "private": true,
+        "main": "./src/index.ts",
+        "types": "./src/index.ts",
+        "devDependencies": {
+          "@acme/typescript-config": "workspace:*",
+          "typescript": "^5.0.0"
+        }
+      }
+      EOF
+
+      # tsconfig.json dla nowego workspace
+      cat > tsconfig.json << 'EOF'
+      {
+        "extends": "@acme/typescript-config/base.json",
+        "include": ["src"],
+        "exclude": ["node_modules", "dist"]
+      }
+      EOF
+
+      mkdir src && touch src/index.ts
+
+      # Wróć do root i zainstaluj zależności
+      cd ../..
+      pnpm install
+
+      # Dodaj do aplikacji która go potrzebuje
+      # apps/web/package.json → "@acme/analytics": "workspace:*"
+      pnpm install
+    lang: bash

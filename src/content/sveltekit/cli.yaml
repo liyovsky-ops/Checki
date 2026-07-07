@@ -1,0 +1,1481 @@
+title: Komendy SvelteKit
+
+groups:
+  - name: Inicjalizacja i CLI
+    icon: "🚀"
+    commands:
+      - cmd: npm create svelte@latest my-app
+        desc: Utwórz nowy projekt SvelteKit
+        detail:
+          what: Kreator projektu SvelteKit — pyta o TypeScript, ESLint, Prettier, Playwright, Vitest. Tworzy gotową strukturę katalogów.
+          how: Używa pakietu create-svelte. Po tym cd my-app && npm install && npm run dev.
+          tips:
+            - 'npm create svelte@latest . — w istniejącym katalogu'
+            - 'Wybierz "Skeleton project" dla czystego startu bez demo kodu'
+
+      - cmd: npx sv create my-app
+        desc: Nowe CLI sv (Svelte 5+) — alternatywa create-svelte
+        detail:
+          what: Nowy oficjalny CLI od Svelte team, zastępuje create-svelte. Obsługuje Svelte 5 i SvelteKit.
+          how: npx sv create my-app — interaktywny wizard jak poprzedni, ale nowszy pakiet.
+          tips:
+            - 'npx sv add drizzle — dodaj integrację Drizzle po stworzeniu projektu'
+            - 'npx sv add lucia — dodaj auth Lucia'
+
+      - cmd: npm run dev
+        desc: Uruchom dev server z HMR
+        detail:
+          what: Startuje Vite dev server z Hot Module Replacement. Zmiany w .svelte plikach = instant update bez reloadu.
+          how: Domyślnie http://localhost:5173. Wspiera TypeScript, SCSS, PostCSS natywnie przez Vite.
+          tips:
+            - 'npm run dev -- --open — otwórz przeglądarkę automatycznie'
+            - 'npm run dev -- --port 3000 --host — inny port + udostępnij w sieci'
+
+      - cmd: npm run build
+        desc: Zbuduj produkcyjną wersję
+        detail:
+          what: Kompiluje Svelte do zoptymalizowanego JS i uruchamia adapter (node, static, vercel). Wynik w katalogu build/.
+          how: Adapter jest skonfigurowany w svelte.config.js. Każdy adapter generuje inny output.
+          tips:
+            - 'npm run preview — podgląd production build lokalnie przed deployem'
+            - 'npx svelte-kit sync — regeneruj typy po buildzie gdy się rozjadą'
+
+      - cmd: npm run preview
+        desc: Lokalny podgląd production build
+        detail:
+          what: Uruchamia production build lokalnie na http://localhost:4173. Sprawdź SSR, routing, API przed deployem.
+          how: Wymaga wcześniejszego npm run build. Emuluje produkcyjny serwer.
+          tips:
+            - 'Zawsze sprawdź preview przed pushem na hosting'
+            - 'Detect różnice między dev a prod — SSR edge cases, missing env vars'
+
+      - cmd: npx svelte-kit sync
+        desc: Synchronizuj typy SvelteKit
+        detail:
+          what: Generuje TypeScript types dla routes, load functions, form actions w .svelte-kit/types/. Odpalany automatycznie przez dev/build.
+          how: Ręcznie uruchom gdy types się rozjadą lub po dodaniu nowych tras.
+          tips:
+            - 'Uruchamia się automatycznie przy dev i build — ręcznie tylko przy problemach'
+            - 'Dodaj do postinstall w package.json dla CI'
+
+  - name: Struktura plików i routing
+    icon: "🗂️"
+    commands:
+      - code: |
+          src/routes/
+            +page.svelte              → /
+            +layout.svelte            → root layout (navbar, footer)
+            +error.svelte             → globalna strona błędu
+            about/
+              +page.svelte            → /about
+            blog/
+              +page.svelte            → /blog
+              [slug]/
+                +page.svelte          → /blog/my-post
+                +page.server.ts       → load z DB dla /blog/:slug
+            (auth)/
+              login/+page.svelte      → /login (group bez URL prefix)
+              register/+page.svelte   → /register
+            api/
+              users/+server.ts        → /api/users REST endpoint
+        desc: Kompletna struktura katalogów SvelteKit
+        detail:
+          what: File-based routing — każdy plik w routes/ odpowiada ścieżce URL. + prefix = plik specjalny SvelteKit.
+          how: Katalogi tworzą ścieżki, [slug] = dynamiczny param, (group) = grupowanie bez wpływu na URL.
+          tips:
+            - 'Tylko pliki z + prefixem są plikami specjalnymi SvelteKit'
+            - 'Każdy katalog może mieć własny +layout.svelte i +error.svelte'
+
+      - code: |
+          <!-- src/routes/+page.svelte — strona główna -->
+          <script lang="ts">
+            import type { PageData } from './$types';
+
+            export let data: PageData;
+          </script>
+
+          <svelte:head>
+            <title>{data.title}</title>
+          </svelte:head>
+
+          <h1>{data.title}</h1>
+          <p>{data.description}</p>
+        desc: Podstawowa strona +page.svelte z danymi z load()
+        detail:
+          what: +page.svelte to komponent Svelte dla danej trasy. data pochodzi z load() w +page.ts lub +page.server.ts.
+          how: export let data — odbiera dane z load(). $types generuje typy automatycznie przez svelte-kit sync.
+          tips:
+            - 'Używaj PageData z ./$types dla pełnego type safety'
+            - '<svelte:head> — dodaj meta tagi, title per strona'
+
+      - code: |
+          <!-- src/routes/blog/[slug]/+page.svelte -->
+          <script lang="ts">
+            import type { PageData } from './$types';
+            export let data: PageData;
+          </script>
+
+          <article>
+            <h1>{data.post.title}</h1>
+            <time>{data.post.date}</time>
+            {@html data.post.content}
+          </article>
+
+          <!-- URL: /blog/hello-world → params.slug = "hello-world" -->
+        desc: Dynamiczne trasy z parametrem [slug]
+        detail:
+          what: Katalog [slug] tworzy dynamiczny segment. params.slug dostępny w load() i page store.
+          how: Nazwa w nawiasach = nazwa parametru. Dowolna nazwa np. [id], [username], [category].
+          tips:
+            - '[[slug]] — opcjonalny parametr (trafia na / i /anything)'
+            - '[...rest] — catch-all (trafia na /a/b/c → rest = ["a","b","c"])'
+
+      - code: |
+          <!-- src/routes/+layout.svelte — root layout -->
+          <script lang="ts">
+            import Nav from '$lib/components/Nav.svelte';
+            import Footer from '$lib/components/Footer.svelte';
+          </script>
+
+          <Nav />
+
+          <main>
+            <slot />  <!-- tutaj renderuje się strona -->
+          </main>
+
+          <Footer />
+
+          <style>
+            main {
+              max-width: 1200px;
+              margin: 0 auto;
+              padding: 2rem;
+            }
+          </style>
+        desc: Root layout opakowujący wszystkie strony
+        detail:
+          what: +layout.svelte opakowuje wszystkie strony w danym katalogu i podkatalogach. <slot /> renderuje aktualną stronę.
+          how: Nested layouts — każdy katalog może mieć swój +layout.svelte nakładający się na parent layout.
+          tips:
+            - '+layout.reset.svelte — resetuje layout do domyślnego (usuwa parent layout)'
+            - 'Nested layouts stackują się: root → dashboard → settings'
+
+      - code: |
+          <!-- src/routes/+error.svelte -->
+          <script lang="ts">
+            import { page } from '$app/stores';
+          </script>
+
+          <div class="error-page">
+            <h1>{$page.status}</h1>
+            <p>{$page.error?.message}</p>
+            <a href="/">Wróć do strony głównej</a>
+          </div>
+        desc: Strona błędu +error.svelte
+        detail:
+          what: Wyświetla się gdy load() rzuci error() lub strona nie istnieje (404). Dostęp do status i message przez $page store.
+          how: Każdy katalog może mieć własny +error.svelte dla granularnych stron błędów.
+          tips:
+            - 'error() z @sveltejs/kit — rzucaj błędy z load()/actions'
+            - 'Osobny +error.svelte w src/routes/dashboard/ dla custom 404 w dashboardzie'
+
+      - code: |
+          // Route groups — (auth)/login/+page.svelte
+          // URL: /login (bez (auth) w URL)
+          // Pozwala na wspólny layout dla grupy tras bez prefix w URL
+
+          // src/routes/(auth)/+layout.svelte
+          // Tylko dla stron w grupie (auth)
+          <script>
+            import { redirect } from '@sveltejs/kit';
+            import { browser } from '$app/environment';
+          </script>
+
+          <div class="auth-wrapper">
+            <slot />
+          </div>
+
+          // Struktura:
+          // (auth)/login/+page.svelte   → /login
+          // (auth)/register/+page.svelte → /register
+          // (app)/dashboard/+page.svelte → /dashboard (inny layout)
+        desc: Route groups — (group) bez wpływu na URL
+        detail:
+          what: Nawiasy okrągłe tworzą grupy tras z własnym layoutem bez dodawania do URL. Idealne do oddzielenia auth/app/marketing layouts.
+          how: (auth), (app), (marketing) — nazwy grup dowolne, nie wpływają na URL.
+          tips:
+            - 'Każda grupa może mieć swój +layout.svelte'
+            - 'Użyj do oddzielenia stron z nawigacją od stron bez nawigacji (np. pełnoekranowy login)'
+
+      - code: |
+          // [[optional]] — opcjonalny parametr
+          // src/routes/[[lang]]/about/+page.svelte
+          // Trafia na: /about i /pl/about i /en/about
+
+          // [...rest] — catch-all
+          // src/routes/docs/[...path]/+page.svelte
+          // Trafia na: /docs/getting-started/installation
+
+          import type { PageServerLoad } from './$types';
+
+          export const load: PageServerLoad = async ({ params }) => {
+            // params.lang = undefined | "pl" | "en"
+            // params.path = "getting-started/installation"
+            const lang = params.lang ?? 'pl';
+            const pathParts = params.path?.split('/') ?? [];
+            return { lang, pathParts };
+          };
+        desc: "Opcjonalne parametry [[optional]] i catch-all [...rest]"
+        detail:
+          what: Zaawansowane wzorce routingu — opcjonalne segmenty i catch-all dla wielopoziomowych ścieżek.
+          how: "[[lang]] pasuje do /about i /pl/about. [...path] pasuje do dowolnej głębokości."
+          tips:
+            - 'Przydatne dla i18n routing (język jako opcjonalny prefiks)'
+            - '[...rest] dla dokumentacji z zagnieżdżonymi sekcjami'
+
+      - code: |
+          // Preloading — $app/navigation
+          import { preloadData, preloadCode } from '$app/navigation';
+
+          // Preload dane dla trasy (uruchamia load function)
+          async function onMouseEnter() {
+            await preloadData('/blog/hello-world');
+          }
+
+          // Preload tylko JS kod bez danych
+          async function prefetchRoute() {
+            await preloadCode('/dashboard');
+          }
+        desc: Preloading tras — preloadData i preloadCode
+        detail:
+          what: preloadData uruchamia load function trasy z wyprzedzeniem (cache'uje dane). preloadCode ładuje tylko JS bundle.
+          how: Użyj na hover linku dla instant navigation feel. SvelteKit robi to automatycznie dla <a data-sveltekit-preload-data>.
+          tips:
+            - '<a href="/blog" data-sveltekit-preload-data="hover"> — automatyczny preload'
+            - 'data-sveltekit-preload-code — tylko kod, bez danych'
+
+  - name: Load Functions
+    icon: "📡"
+    commands:
+      - code: |
+          // src/routes/blog/[slug]/+page.server.ts
+          // Działa TYLKO na serwerze — dostęp do DB, sekretów, cookies
+          import type { PageServerLoad } from './$types';
+          import { error } from '@sveltejs/kit';
+          import { db } from '$lib/server/db';
+
+          export const load: PageServerLoad = async ({ params, cookies, locals }) => {
+            const post = await db.posts.findUnique({
+              where: { slug: params.slug }
+            });
+
+            if (!post) {
+              throw error(404, 'Post nie znaleziony');
+            }
+
+            return {
+              post,
+              user: locals.user  // z hooks.server.ts
+            };
+          };
+        desc: +page.server.ts — load tylko na serwerze (DB, sekrety)
+        detail:
+          what: +page.server.ts load function działa wyłącznie na serwerze. Dostęp do DB, API keys, cookies, locals (z hooks).
+          how: Zwrócone dane są serializable (JSON). Dostęp w +page.svelte przez export let data.
+          tips:
+            - 'Sekrety nigdy nie trafiają do klienta — bezpieczne do env vars'
+            - 'locals — dane z hooks.server.ts (np. zalogowany user)'
+
+      - code: |
+          // src/routes/products/+page.ts
+          // Universal load — działa na serwerze (SSR) i kliencie (nawigacja)
+          import type { PageLoad } from './$types';
+
+          export const load: PageLoad = async ({ fetch, params, url }) => {
+            // fetch = enhanced fetch z SvelteKit (relative URLs, credentials)
+            const res = await fetch(`/api/products?category=${url.searchParams.get('cat')}`);
+
+            if (!res.ok) {
+              throw new Error('Błąd pobierania produktów');
+            }
+
+            return {
+              products: await res.json(),
+              category: url.searchParams.get('cat') ?? 'all'
+            };
+          };
+        desc: +page.ts — universal load (SSR + client)
+        detail:
+          what: +page.ts load działa zarówno na serwerze (pierwszy render) jak i na kliencie (nawigacja SPA). Używa enhanced fetch.
+          how: Nie ma dostępu do DB ani sekretów bezpośrednio — używaj API routes lub +page.server.ts.
+          tips:
+            - 'Enhanced fetch — automatycznie przekazuje cookies, obsługuje relative URLs'
+            - 'Używaj gdy chcesz SPA navigation bez round-trip do serwera'
+
+      - code: |
+          // src/routes/dashboard/+layout.server.ts
+          // Parent layout load — dane dostępne dla WSZYSTKICH podstron
+          import type { LayoutServerLoad } from './$types';
+          import { redirect } from '@sveltejs/kit';
+
+          export const load: LayoutServerLoad = async ({ locals, url }) => {
+            if (!locals.user) {
+              throw redirect(303, `/login?redirectTo=${url.pathname}`);
+            }
+
+            return {
+              user: locals.user,
+              notifications: await getNotifications(locals.user.id)
+            };
+          };
+
+          // src/routes/dashboard/settings/+page.server.ts
+          import type { PageServerLoad } from './$types';
+
+          export const load: PageServerLoad = async ({ parent }) => {
+            const { user } = await parent();  // dane z layout load
+            return { settings: await getUserSettings(user.id) };
+          };
+        desc: Layout load + parent() — dane dla podstron
+        detail:
+          what: +layout.server.ts load daje dane wszystkim stronom w katalogu. await parent() w page load pobiera dane z nadrzędnego layout load.
+          how: Idealny do sprawdzania auth w jednym miejscu dla całego dashboardu.
+          tips:
+            - 'parent() czeka na zakończenie parent load — uwaga na waterfalle'
+            - 'Użyj Promise.all dla równoległego fetching'
+
+      - code: |
+          // src/routes/blog/[slug]/+page.server.ts
+          import { error, redirect } from '@sveltejs/kit';
+
+          export const load = async ({ params, locals }) => {
+            // Redirect
+            if (params.slug === 'old-post') {
+              throw redirect(301, '/blog/new-post');  // 301 permanent, 303 see other
+            }
+
+            // Error — pojawi się +error.svelte
+            const post = await getPost(params.slug);
+            if (!post) throw error(404, { message: 'Post nie znaleziony' });
+            if (post.draft && !locals.user?.admin) throw error(403, 'Brak dostępu');
+
+            return { post };
+          };
+        desc: error() i redirect() w load function
+        detail:
+          what: error() wyświetla +error.svelte z kodem HTTP. redirect() przekierowuje z kodem 3xx.
+          how: Oba rzucają specjalne obiekty które SvelteKit przechwytuje — nie zwykłe Error.
+          tips:
+            - '301 = permanent redirect (SEO), 303 = see other (po POST), 307 = temporary'
+            - 'error() przyjmuje status + obiekt z message lub string'
+
+      - code: |
+          // Streaming danych z promises (SvelteKit 1.8+)
+          // src/routes/dashboard/+page.server.ts
+          export const load = async ({ locals }) => {
+            // Zwróć promise — SvelteKit stream-uje dane do klienta
+            return {
+              user: locals.user,  // natychmiastowe
+              stats: getHeavyStats(locals.user.id),  // promise — streamed
+              recommendations: getRecommendations(),   // promise — streamed
+            };
+          };
+
+          <!-- +page.svelte -->
+          <script lang="ts">
+            export let data;
+          </script>
+
+          <!-- Natychmiastowe dane -->
+          <h1>Witaj {data.user.name}</h1>
+
+          <!-- Streamed promise -->
+          {#await data.stats}
+            <p>Ładowanie statystyk...</p>
+          {:then stats}
+            <Stats {stats} />
+          {:catch error}
+            <p>Błąd: {error.message}</p>
+          {/await}
+        desc: Streaming promises — skeleton UI bez blokowania
+        detail:
+          what: Zwróć promise z load() — SvelteKit stream-uje dane do klienta bez blokowania renderowania strony. Natywny skeleton loading.
+          how: Szybkie dane renderują się natychmiast, wolne (AI, ciężkie DB) doganiają przez stream.
+          tips:
+            - 'Idealne dla dashboardów z różnymi prędkościami danych'
+            - 'Działa tylko z adapter-node i adapter-vercel (nie static)'
+
+      - code: |
+          // depends() — manualna invalidacja
+          // src/routes/cart/+page.ts
+          export const load = async ({ fetch, depends }) => {
+            depends('app:cart');  // zarejestruj dependency
+
+            const cart = await fetch('/api/cart').then(r => r.json());
+            return { cart };
+          };
+
+          // Gdziekolwiek w komponencie:
+          import { invalidate, invalidateAll } from '$app/navigation';
+
+          async function addToCart(productId: string) {
+            await fetch('/api/cart', { method: 'POST', body: JSON.stringify({ productId }) });
+            await invalidate('app:cart');  // re-run load z depends('app:cart')
+          }
+
+          // invalidateAll() — re-run wszystkich load functions
+        desc: depends() i invalidate() — reaktywne odświeżanie danych
+        detail:
+          what: depends() rejestruje dependency — invalidate() powoduje ponowne uruchomienie load functions które ją mają.
+          how: Alternatywa dla pełnego reload strony. Odśwież tylko potrzebne dane po mutacji.
+          tips:
+            - 'invalidateAll() — nuclear option, odświeża wszystko'
+            - 'Używaj URL dependency: depends(url.href) — odświeża przy zmianie URL'
+
+      - code: |
+          // Load function z url, setHeaders, cookies
+          import type { PageServerLoad } from './$types';
+
+          export const load: PageServerLoad = async ({
+            params,
+            url,
+            request,
+            cookies,
+            setHeaders,
+            getClientAddress,
+          }) => {
+            // Cache control
+            setHeaders({ 'cache-control': 'max-age=60' });
+
+            // Cookies
+            const sessionId = cookies.get('session');
+            cookies.set('lastVisit', new Date().toISOString(), { path: '/' });
+
+            // URL params
+            const page = Number(url.searchParams.get('page') ?? '1');
+            const sort = url.searchParams.get('sort') ?? 'date';
+
+            return { sessionId, page, sort };
+          };
+        desc: Pełne API load function — url, cookies, setHeaders
+        detail:
+          what: "Load function ma dostęp do wielu narzędzi: params, url, request, cookies, setHeaders, locals, getClientAddress."
+          how: setHeaders ustawia HTTP headers response. cookies — read/write HTTP cookies.
+          tips:
+            - 'setHeaders({ "cache-control": "max-age=3600" }) — cache dla stron statycznych'
+            - 'cookies.set() — HttpOnly cookies bezpiecznie z serwera'
+
+      - code: |
+          // Równoległe fetching — unikaj waterfallów
+          export const load = async ({ fetch, params }) => {
+            // ZLE — sekwencyjnie (waterfall)
+            const user = await fetch('/api/user').then(r => r.json());
+            const posts = await fetch('/api/posts').then(r => r.json());  // czeka na user
+
+            // DOBRZE — równoległe
+            const [user, posts, comments] = await Promise.all([
+              fetch('/api/user').then(r => r.json()),
+              fetch('/api/posts').then(r => r.json()),
+              fetch(`/api/comments/${params.id}`).then(r => r.json()),
+            ]);
+
+            return { user, posts, comments };
+          };
+        desc: Promise.all — równoległe fetching bez waterfallów
+        detail:
+          what: await Promise.all() uruchamia wszystkie fetche jednocześnie zamiast sekwencyjnie. Krytyczne dla wydajności.
+          how: Jeśli nie ma zależności między danymi — zawsze fetchuj równolegle.
+          tips:
+            - 'Waterfall = każdy request czeka na poprzedni — zły pattern w load()'
+            - 'Zwróć Promise bez await dla streaming (nie blokuje renderowania)'
+
+  - name: Form Actions
+    icon: "📬"
+    commands:
+      - code: |
+          // src/routes/login/+page.server.ts
+          import type { Actions } from './$types';
+          import { fail, redirect } from '@sveltejs/kit';
+
+          export const actions: Actions = {
+            default: async ({ request, cookies }) => {
+              const data = await request.formData();
+              const email = data.get('email') as string;
+              const password = data.get('password') as string;
+
+              if (!email || !password) {
+                return fail(400, { email, error: 'Email i hasło są wymagane' });
+              }
+
+              const user = await authenticate(email, password);
+              if (!user) {
+                return fail(401, { email, error: 'Nieprawidłowe dane logowania' });
+              }
+
+              cookies.set('session', user.token, {
+                path: '/',
+                httpOnly: true,
+                secure: true,
+                sameSite: 'strict',
+                maxAge: 60 * 60 * 24 * 7  // 7 dni
+              });
+
+              throw redirect(303, '/dashboard');
+            }
+          };
+        desc: Podstawowy form action — login z cookies
+        detail:
+          what: actions.default obsługuje POST z formularza. fail() zwraca błąd z danymi (bez redirect). redirect() przekierowuje po sukcesie.
+          how: Progressive enhancement — działa bez JS, z JS brak pełnego page reload. Dane z request.formData().
+          tips:
+            - 'fail() wraca do strony z danymi form i błędem — nie redirect'
+            - 'cookies.set() z httpOnly: true — bezpieczne session cookie'
+
+      - code: |
+          // Named actions — kilka akcji na jednej stronie
+          // src/routes/profile/+page.server.ts
+          import type { Actions } from './$types';
+          import { fail } from '@sveltejs/kit';
+
+          export const actions: Actions = {
+            updateName: async ({ request, locals }) => {
+              const data = await request.formData();
+              const name = data.get('name') as string;
+              if (name.length < 2) return fail(400, { error: 'Za krótkie imię' });
+              await updateUser(locals.user.id, { name });
+              return { success: true, action: 'name' };
+            },
+
+            updateEmail: async ({ request, locals }) => {
+              const data = await request.formData();
+              const email = data.get('email') as string;
+              await updateUser(locals.user.id, { email });
+              return { success: true, action: 'email' };
+            },
+
+            deleteAccount: async ({ locals, cookies }) => {
+              await deleteUser(locals.user.id);
+              cookies.delete('session', { path: '/' });
+            }
+          };
+
+          <!-- +page.svelte — named actions -->
+          <!-- <form method="POST" action="?/updateName"> -->
+          <!-- <form method="POST" action="?/deleteAccount"> -->
+        desc: Named actions — kilka formularzy na jednej stronie
+        detail:
+          what: "Każda named action ma własny URL: action=\"?/updateName\". Można mieć wiele niezależnych formularzy na stronie."
+          how: Konwencja ?/nazwaAkcji — SvelteKit routuje do właściwej funkcji w actions.
+          tips:
+            - 'Nie można mieć "default" razem z named actions (jedno albo drugie)'
+            - 'action="?/delete" — URL-safe, działa bez JS'
+
+      - code: |
+          <!-- src/routes/login/+page.svelte — use:enhance -->
+          <script lang="ts">
+            import { enhance } from '$app/forms';
+            import type { ActionData } from './$types';
+
+            export let form: ActionData;
+            let loading = false;
+          </script>
+
+          <form
+            method="POST"
+            use:enhance={() => {
+              loading = true;
+              return async ({ result, update }) => {
+                loading = false;
+                if (result.type === 'redirect') {
+                  // SvelteKit automatycznie robi redirect
+                }
+                await update();  // odśwież dane strony
+              };
+            }}
+          >
+            <input name="email" value={form?.email ?? ''} required />
+            <input name="password" type="password" required />
+
+            {#if form?.error}
+              <p class="error">{form.error}</p>
+            {/if}
+
+            <button disabled={loading}>
+              {loading ? 'Logowanie...' : 'Zaloguj'}
+            </button>
+          </form>
+        desc: use:enhance — progressive enhancement formularza
+        detail:
+          what: use:enhance zamienia zwykły formularz w SPA-style — brak pełnego page reload, loading state, obsługa result.
+          how: Import z $app/forms. Callback pozwala na custom logikę po submit (loading state, toast notifications).
+          tips:
+            - 'use:enhance bez argumentu = domyślne zachowanie (update strony po success)'
+            - 'result.type: "success" | "failure" | "redirect" | "error"'
+
+      - code: |
+          // Walidacja po stronie serwera z Zod
+          // src/routes/register/+page.server.ts
+          import { z } from 'zod';
+          import { fail } from '@sveltejs/kit';
+
+          const schema = z.object({
+            email: z.string().email('Nieprawidłowy email'),
+            password: z.string().min(8, 'Min 8 znaków'),
+            name: z.string().min(2, 'Min 2 znaki'),
+          });
+
+          export const actions = {
+            default: async ({ request }) => {
+              const raw = Object.fromEntries(await request.formData());
+              const result = schema.safeParse(raw);
+
+              if (!result.success) {
+                const errors = result.error.flatten().fieldErrors;
+                return fail(400, {
+                  data: raw,
+                  errors: {
+                    email: errors.email?.[0],
+                    password: errors.password?.[0],
+                    name: errors.name?.[0],
+                  }
+                });
+              }
+
+              await createUser(result.data);
+              return { success: true };
+            }
+          };
+        desc: Walidacja formularza z Zod w action
+        detail:
+          what: z.safeParse() waliduje dane po stronie serwera. Błędy wracają przez fail() do formularza bez JS reload.
+          how: flatten().fieldErrors zwraca błędy per pole. raw data wraca do formularza żeby user nie tracił wpisanych danych.
+          tips:
+            - 'Zawsze waliduj PO STRONIE SERWERA — klient-side walidacja jest tylko UX'
+            - 'Przywróć wartości pól: value={form?.data?.email ?? ""}'
+
+      - code: |
+          // Superforms — kompleksowe zarządzanie formularzami
+          // npm install sveltekit-superforms zod
+          // src/routes/contact/+page.server.ts
+          import { superValidate, message } from 'sveltekit-superforms';
+          import { zod } from 'sveltekit-superforms/adapters';
+          import { fail } from '@sveltejs/kit';
+          import { z } from 'zod';
+
+          const schema = z.object({
+            name: z.string().min(2),
+            email: z.string().email(),
+            message: z.string().min(10),
+          });
+
+          export const load = async () => {
+            const form = await superValidate(zod(schema));
+            return { form };
+          };
+
+          export const actions = {
+            default: async ({ request }) => {
+              const form = await superValidate(request, zod(schema));
+              if (!form.valid) return fail(400, { form });
+              await sendEmail(form.data);
+              return message(form, 'Wiadomość wysłana!');
+            }
+          };
+        desc: Superforms — walidacja formularzy z auto-binding
+        detail:
+          what: sveltekit-superforms automatycznie binduje schemat Zod do formularza, zarządza błędami, loading state i messages.
+          how: superValidate() w load() inicjalizuje formularz. W action waliduje i zwraca wynik.
+          tips:
+            - 'npm install sveltekit-superforms zod — dwie paczki'
+            - 'Zod, Yup, Valibot — wszystkie obsługiwane przez adaptery'
+
+      - code: |
+          <!-- Superforms w komponencie +page.svelte -->
+          <script lang="ts">
+            import { superForm } from 'sveltekit-superforms';
+            import type { PageData } from './$types';
+
+            export let data: PageData;
+
+            const { form, errors, enhance, message, submitting } = superForm(data.form);
+          </script>
+
+          {#if $message}
+            <p class="success">{$message}</p>
+          {/if}
+
+          <form method="POST" use:enhance>
+            <div>
+              <label>Imię</label>
+              <input name="name" bind:value={$form.name} />
+              {#if $errors.name}<span class="error">{$errors.name}</span>{/if}
+            </div>
+
+            <div>
+              <label>Email</label>
+              <input name="email" type="email" bind:value={$form.email} />
+              {#if $errors.email}<span class="error">{$errors.email}</span>{/if}
+            </div>
+
+            <button disabled={$submitting}>
+              {$submitting ? 'Wysyłanie...' : 'Wyślij'}
+            </button>
+          </form>
+        desc: Superforms — komponent z auto-binding i błędami
+        detail:
+          what: superForm() zwraca reactive stores dla danych formularza, błędów, stanu submit i wiadomości.
+          how: bind:value={$form.name} — dwustronne bindowanie. $errors.name — błędy per pole. $submitting — loading state.
+          tips:
+            - 'use:enhance z superForm automatycznie obsługuje submit bez full reload'
+            - '$message — sukces/error message po submit'
+
+  - name: Hooks — server i client
+    icon: "🪝"
+    commands:
+      - code: |
+          // src/hooks.server.ts — główny plik server hooks
+          import type { Handle } from '@sveltejs/kit';
+          import { db } from '$lib/server/db';
+
+          export const handle: Handle = async ({ event, resolve }) => {
+            // Uruchamia się przy KAŻDYM request
+            const sessionId = event.cookies.get('session');
+
+            if (sessionId) {
+              const session = await db.sessions.findUnique({
+                where: { id: sessionId },
+                include: { user: true }
+              });
+              if (session) {
+                event.locals.user = session.user;
+              }
+            }
+
+            const response = await resolve(event);
+
+            // Modyfikuj response headers
+            response.headers.set('X-Frame-Options', 'DENY');
+            response.headers.set('X-Content-Type-Options', 'nosniff');
+
+            return response;
+          };
+        desc: hooks.server.ts — middleware dla każdego requestu
+        detail:
+          what: handle() uruchamia się przy każdym request — auth, logging, headers. event.locals = dane przekazane do load functions.
+          how: resolve(event) renderuje stronę/endpoint. Możesz modyfikować request przed i response po resolve.
+          tips:
+            - 'event.locals — dane per-request, dostępne w load() i actions'
+            - 'Dodaj security headers tu — działają dla całej aplikacji'
+
+      - code: |
+          // sequence() — kilka handle hooks
+          import { sequence } from '@sveltejs/kit/hooks';
+          import type { Handle } from '@sveltejs/kit';
+
+          const auth: Handle = async ({ event, resolve }) => {
+            const token = event.cookies.get('token');
+            event.locals.user = token ? await verifyToken(token) : null;
+            return resolve(event);
+          };
+
+          const logging: Handle = async ({ event, resolve }) => {
+            const start = Date.now();
+            const response = await resolve(event);
+            console.log(`${event.request.method} ${event.url.pathname} — ${Date.now() - start}ms`);
+            return response;
+          };
+
+          const rateLimit: Handle = async ({ event, resolve }) => {
+            const ip = event.getClientAddress();
+            if (await isRateLimited(ip)) {
+              return new Response('Too Many Requests', { status: 429 });
+            }
+            return resolve(event);
+          };
+
+          export const handle = sequence(auth, logging, rateLimit);
+        desc: sequence() — kilka niezależnych middleware
+        detail:
+          what: sequence() komponuje wiele handle functions w łańcuch. Uruchamiają się po kolei w podanej kolejności.
+          how: Każdy hook może zakończyć request wcześniej (np. rate limiting) lub przepuścić go dalej.
+          tips:
+            - 'Kolejność ważna — auth przed logging, rate limit na początku'
+            - 'Każdy handler jest niezależny — łatwy do testowania i wymiany'
+
+      - code: |
+          // hooks.server.ts — handleFetch i handleError
+          import type { HandleFetch, HandleError } from '@sveltejs/kit';
+
+          // Modyfikuj fetch w load functions po stronie serwera
+          export const handleFetch: HandleFetch = async ({ request, fetch, event }) => {
+            // Dodaj auth header do internal API calls
+            if (request.url.startsWith('http://localhost')) {
+              request = new Request(request, {
+                headers: {
+                  ...Object.fromEntries(request.headers),
+                  'x-internal-token': process.env.INTERNAL_TOKEN ?? '',
+                }
+              });
+            }
+            return fetch(request);
+          };
+
+          // Obsługa nieobsłużonych błędów
+          export const handleError: HandleError = async ({ error, event, status, message }) => {
+            console.error('Nieobsłużony błąd:', { error, url: event.url.pathname, status });
+            // Wyślij do Sentry, etc.
+            await reportToSentry(error, event);
+            // Zwróć bezpieczny komunikat (nie szczegóły błędu)
+            return { message: 'Wystąpił nieoczekiwany błąd' };
+          };
+        desc: handleFetch i handleError — zaawansowane hooks
+        detail:
+          what: handleFetch modyfikuje fetch w load functions (dodaj headers do internal API). handleError obsługuje nieoczekiwane błędy.
+          how: handleError otrzymuje error, event, status — loguj, raportuj, zwróć bezpieczny message.
+          tips:
+            - 'handleFetch — idealny do proxy internal services z auth'
+            - 'handleError — integracja z Sentry, DataDog, custom error tracking'
+
+      - code: |
+          // Protected routes — auth w hooks
+          import type { Handle } from '@sveltejs/kit';
+          import { redirect } from '@sveltejs/kit';
+
+          const PROTECTED_ROUTES = ['/dashboard', '/profile', '/settings', '/admin'];
+
+          export const handle: Handle = async ({ event, resolve }) => {
+            // Sprawdź auth
+            const session = event.cookies.get('session');
+            event.locals.user = session ? await getUser(session) : null;
+
+            // Ochrona tras
+            const isProtected = PROTECTED_ROUTES.some(route =>
+              event.url.pathname.startsWith(route)
+            );
+
+            if (isProtected && !event.locals.user) {
+              throw redirect(303, `/login?redirectTo=${event.url.pathname}`);
+            }
+
+            // Admin-only
+            if (event.url.pathname.startsWith('/admin') && !event.locals.user?.admin) {
+              throw redirect(303, '/403');
+            }
+
+            return resolve(event);
+          };
+        desc: Protected routes — auth middleware w hooks
+        detail:
+          what: Centralny auth check w hooks.server.ts chroni całe sekcje aplikacji bez duplikowania kodu w każdej load function.
+          how: redirect w hooks działa identycznie jak w load() — SvelteKit obsługuje oba przypadki.
+          tips:
+            - 'event.locals.user — raz sprawdzone, dostępne wszędzie'
+            - 'redirectTo param — wróć user na żądaną stronę po logowaniu'
+
+      - code: |
+          // src/hooks.client.ts — client-side hooks
+          import type { HandleClientError, HandleNavigate } from '@sveltejs/kit';
+
+          // Obsługa błędów po stronie klienta
+          export const handleError: HandleClientError = ({ error, event, status, message }) => {
+            console.error('Client error:', error);
+            // analytics.trackError(error);
+            return { message: 'Coś poszło nie tak' };
+          };
+        desc: hooks.client.ts — client-side error handling
+        detail:
+          what: hooks.client.ts działa w przeglądarce. handleError obsługuje błędy client-side (JavaScript runtime errors).
+          how: Oddzielny plik od hooks.server.ts — server i client hooks są osobne.
+          tips:
+            - 'Integracja z Google Analytics, Sentry Browser SDK'
+            - 'Nie ma dostępu do DB ani sekretów — to jest klient'
+
+  - name: API Routes (+server.ts)
+    icon: "🔌"
+    commands:
+      - code: |
+          // src/routes/api/users/+server.ts
+          import { json, error } from '@sveltejs/kit';
+          import type { RequestHandler } from './$types';
+          import { db } from '$lib/server/db';
+
+          export const GET: RequestHandler = async ({ url, locals }) => {
+            // Auth check
+            if (!locals.user) throw error(401, 'Unauthorized');
+
+            const page = Number(url.searchParams.get('page') ?? '1');
+            const limit = Number(url.searchParams.get('limit') ?? '20');
+
+            const users = await db.users.findMany({
+              skip: (page - 1) * limit,
+              take: limit,
+              select: { id: true, name: true, email: true, createdAt: true }
+            });
+
+            const total = await db.users.count();
+
+            return json({ users, total, page, limit });
+          };
+        desc: GET endpoint — lista użytkowników z paginacją
+        detail:
+          what: +server.ts eksportuje GET, POST, PUT, PATCH, DELETE — pełne REST API. json() helper tworzy Response z JSON.
+          how: RequestHandler z ./$types zapewnia type safety. url.searchParams dla query params.
+          tips:
+            - 'Wszystkie endpointy mają dostęp do locals (user z hooks)'
+            - 'json() automatycznie ustawia Content-Type: application/json'
+
+      - code: |
+          // POST endpoint — tworzenie zasobu
+          import { json, error } from '@sveltejs/kit';
+          import type { RequestHandler } from './$types';
+          import { z } from 'zod';
+
+          const createUserSchema = z.object({
+            name: z.string().min(2),
+            email: z.string().email(),
+          });
+
+          export const POST: RequestHandler = async ({ request, locals }) => {
+            if (!locals.user?.admin) throw error(403, 'Forbidden');
+
+            const body = await request.json();
+            const result = createUserSchema.safeParse(body);
+
+            if (!result.success) {
+              throw error(400, result.error.flatten().fieldErrors.toString());
+            }
+
+            const user = await db.users.create({ data: result.data });
+            return json(user, { status: 201 });
+          };
+
+          export const DELETE: RequestHandler = async ({ params, locals }) => {
+            if (!locals.user?.admin) throw error(403, 'Forbidden');
+            await db.users.delete({ where: { id: params.id } });
+            return new Response(null, { status: 204 });
+          };
+        desc: POST i DELETE — tworzenie i usuwanie zasobu
+        detail:
+          what: request.json() parsuje body. Walidacja Zod. Zwróć 201 dla create, 204 dla delete (bez body).
+          how: error() z @sveltejs/kit zwraca HTTP error response. Zod waliduje input.
+          tips:
+            - 'new Response(null, { status: 204 }) — brak body dla DELETE'
+            - 'Zawsze waliduj input w API endpoints'
+
+      - code: |
+          // CORS headers dla API
+          import type { RequestHandler } from './$types';
+          import { json } from '@sveltejs/kit';
+
+          const CORS_HEADERS = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          };
+
+          // Obsługa preflight
+          export const OPTIONS: RequestHandler = async () => {
+            return new Response(null, { headers: CORS_HEADERS });
+          };
+
+          export const GET: RequestHandler = async ({ url }) => {
+            const data = await fetchPublicData();
+            return json(data, { headers: CORS_HEADERS });
+          };
+        desc: CORS headers w API endpoints
+        detail:
+          what: CORS pozwala na cross-origin requests. OPTIONS handler obsługuje preflight request (przeglądarka wysyła przed właściwym request).
+          how: Dodaj CORS_HEADERS do każdej Response lub użyj globalnych headers w hooks.server.ts.
+          tips:
+            - 'W hooks.server.ts możesz dodać CORS raz dla wszystkich /api/ tras'
+            - 'Access-Control-Allow-Origin: "*" — otwarte API publiczne'
+
+      - code: |
+          // Webhook handler — weryfikacja sygnatury
+          import type { RequestHandler } from './$types';
+          import { error } from '@sveltejs/kit';
+          import { STRIPE_WEBHOOK_SECRET } from '$env/static/private';
+
+          export const POST: RequestHandler = async ({ request }) => {
+            const body = await request.text();
+            const signature = request.headers.get('stripe-signature') ?? '';
+
+            try {
+              const event = stripe.webhooks.constructEvent(body, signature, STRIPE_WEBHOOK_SECRET);
+
+              switch (event.type) {
+                case 'payment_intent.succeeded':
+                  await handlePayment(event.data.object);
+                  break;
+                case 'customer.subscription.deleted':
+                  await handleCancellation(event.data.object);
+                  break;
+              }
+
+              return new Response(JSON.stringify({ received: true }));
+            } catch (err) {
+              throw error(400, `Webhook error: ${err.message}`);
+            }
+          };
+        desc: Webhook handler — Stripe z weryfikacją sygnatury
+        detail:
+          what: Endpointy API służą jako webhook receivers. $env/static/private — bezpieczne env vars tylko na serwerze.
+          how: request.text() zamiast request.json() — surowy body do weryfikacji sygnatury.
+          tips:
+            - '$env/static/private — build-time env vars (SEKRETY)'
+            - '$env/dynamic/private — runtime env vars'
+
+      - code: |
+          // Server-Sent Events (SSE) — real-time streaming
+          import type { RequestHandler } from './$types';
+
+          export const GET: RequestHandler = async ({ request }) => {
+            const stream = new ReadableStream({
+              start(controller) {
+                const encoder = new TextEncoder();
+                let count = 0;
+
+                const interval = setInterval(() => {
+                  const data = JSON.stringify({ count: count++, time: new Date() });
+                  controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+
+                  if (count > 10) {
+                    clearInterval(interval);
+                    controller.close();
+                  }
+                }, 1000);
+
+                request.signal.addEventListener('abort', () => {
+                  clearInterval(interval);
+                  controller.close();
+                });
+              }
+            });
+
+            return new Response(stream, {
+              headers: {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+              }
+            });
+          };
+        desc: Server-Sent Events — real-time streaming z API
+        detail:
+          what: SSE umożliwia serwer→klient streaming (live data, AI responses, progress). Działa przez zwykły HTTP GET.
+          how: "ReadableStream + Content-Type: text/event-stream. Klient łączy się przez EventSource API lub fetch."
+          tips:
+            - 'Prostsze niż WebSockets dla one-way streaming'
+            - 'Idealne dla AI chat streaming (LLM token-by-token response)'
+
+  - name: Adaptery i Deployment
+    icon: "🚢"
+    commands:
+      - code: |
+          // svelte.config.js — adapter-node (VPS, Docker, Railway)
+          import adapter from '@sveltejs/adapter-node';
+          import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+          export default {
+            preprocess: vitePreprocess(),
+            kit: {
+              adapter: adapter({
+                out: 'build',        // output katalog
+                precompress: true,   // gzip/brotli kompresja plików
+                envPrefix: 'APP_',   // prefix dla env vars w runtime
+              }),
+              alias: {
+                $components: 'src/lib/components',
+                $server: 'src/lib/server',
+              }
+            }
+          };
+
+          // Dockerfile:
+          // FROM node:20-alpine
+          // COPY build/ build/
+          // COPY package.json .
+          // CMD ["node", "build"]
+        desc: adapter-node — deploy na VPS, Docker, Railway
+        detail:
+          what: adapter-node generuje Node.js server. Działa na każdym hostingu z Node — VPS, Docker, Railway, Render.
+          how: npm run build → output w build/. node build startuje serwer. PORT env kontroluje port.
+          tips:
+            - 'PORT=8080 node build — custom port'
+            - 'precompress: true — serwuj brotli/gzip bez nginx'
+
+      - code: |
+          // svelte.config.js — adapter-static (GitHub Pages, Netlify, S3)
+          import adapter from '@sveltejs/adapter-static';
+
+          export default {
+            kit: {
+              adapter: adapter({
+                pages: 'build',      // HTML output
+                assets: 'build',     // assets output
+                fallback: '404.html', // SPA fallback lub null
+                precompress: false,
+                strict: true,        // błąd jeśli strona nie może być prerendered
+              })
+            }
+          };
+
+          // Prerender całej aplikacji:
+          // src/routes/+layout.server.ts
+          export const prerender = true;
+
+          // Lub per-strona:
+          // src/routes/about/+page.ts
+          export const prerender = true;
+          export const ssr = false;  // CSR only
+        desc: adapter-static — SSG dla GitHub Pages, Netlify, S3
+        detail:
+          what: adapter-static prerenderuje całą aplikację do statycznych HTML/JS/CSS. Zero server runtime.
+          how: Każda trasa musi być prerenderable — brak dynamicznych danych per-request (cookies, user-specific).
+          tips:
+            - 'fallback: "200.html" — SPA mode, wszystkie trasy to client-side'
+            - 'export const prerender = true — per strona lub globalnie w layout'
+
+      - code: |
+          // svelte.config.js — adapter-vercel
+          import adapter from '@sveltejs/adapter-vercel';
+
+          export default {
+            kit: {
+              adapter: adapter({
+                runtime: 'nodejs20.x',
+                split: false,          // jedna serverless function vs per-route
+                isr: {
+                  expiration: 60,      // ISR — revalidate co 60s
+                }
+              })
+            }
+          };
+
+          // Per-route runtime (edge vs serverless):
+          // src/routes/api/fast/+server.ts
+          export const config = {
+            runtime: 'edge',  // Edge Runtime — globalny deploy
+          };
+
+          // .vercel/output/ — automatyczny output, git push = deploy
+        desc: adapter-vercel — zero-config deploy na Vercel
+        detail:
+          what: adapter-vercel automatycznie konfiguruje Serverless Functions, Edge Runtime i ISR dla każdej trasy.
+          how: git push = deploy. Vercel wykrywa SvelteKit automatycznie. Środowisko env w Vercel dashboard.
+          tips:
+            - 'Edge Runtime — najszybszy, ale ograniczone API (brak Node-specific)'
+            - 'ISR — statyczne strony z automatycznym revalidation'
+
+      - code: |
+          // svelte.config.js — adapter-cloudflare
+          import adapter from '@sveltejs/adapter-cloudflare';
+
+          export default {
+            kit: {
+              adapter: adapter({
+                routes: {
+                  include: ['/*'],
+                  exclude: ['<all>']
+                }
+              })
+            }
+          };
+
+          // Access Cloudflare bindings (KV, R2, D1, Durable Objects):
+          // src/routes/api/data/+server.ts
+          import type { RequestHandler } from './$types';
+
+          export const GET: RequestHandler = async ({ platform }) => {
+            const kv = platform?.env?.MY_KV;
+            const value = await kv?.get('key');
+            return new Response(value);
+          };
+        desc: adapter-cloudflare — Cloudflare Workers i Pages
+        detail:
+          what: adapter-cloudflare deployuje na Cloudflare Workers (edge) lub Pages. Dostęp do KV, R2, D1, Durable Objects przez platform.env.
+          how: platform?.env zawiera Cloudflare bindings skonfigurowane w wrangler.toml lub Cloudflare dashboard.
+          tips:
+            - 'Globalny edge network — najniższe latency na świecie'
+            - 'D1 — SQLite na edge, idealne z Drizzle ORM'
+
+      - code: |
+          // Environment Variables w SvelteKit
+          // .env — lokalny development
+          DATABASE_URL=postgresql://localhost:5432/mydb
+          SECRET_KEY=super-secret
+          PUBLIC_API_URL=https://api.example.com
+
+          // Import w kodzie:
+          import { DATABASE_URL, SECRET_KEY } from '$env/static/private';  // build-time, server-only
+          import { PUBLIC_API_URL } from '$env/static/public';              // build-time, klient OK
+          import { env } from '$env/dynamic/private';                       // runtime, server-only
+          import { env } from '$env/dynamic/public';                        // runtime, klient OK
+
+          // Reguły:
+          // $env/static/private  — tylko serwer, tylko build-time (SEKRETY)
+          // $env/static/public   — klient + serwer, prefix PUBLIC_
+          // $env/dynamic/private — runtime, tylko serwer (Docker env vars)
+          // $env/dynamic/public  — runtime, klient (runtime config)
+        desc: Environment Variables — 4 moduły $env
+        detail:
+          what: "SvelteKit ma 4 moduły env: static/dynamic × private/public. Private = server-only. Public = dostępne wszędzie."
+          how: PUBLIC_ prefix = safe do wysyłki do klienta. Bez prefix = tylko serwer.
+          tips:
+            - '$env/static/* — sprawdzane w build time, błąd gdy brak'
+            - '$env/dynamic/* — runtime, adapter-node czyta process.env'
+
+  - name: Stores i nawigacja
+    icon: "🧭"
+    commands:
+      - code: |
+          // $page store — URL, params, data, form, status
+          <script lang="ts">
+            import { page } from '$app/stores';
+          </script>
+
+          <!-- Aktualna ścieżka -->
+          <p>Jesteś tutaj: {$page.url.pathname}</p>
+
+          <!-- Parametry trasy -->
+          <p>Slug: {$page.params.slug}</p>
+
+          <!-- Dane z load() -->
+          <p>Tytuł: {$page.data.title}</p>
+
+          <!-- Status HTTP -->
+          {#if $page.status === 404}
+            <p>Strona nie znaleziona</p>
+          {/if}
+
+          <!-- Form result -->
+          {#if $page.form?.error}
+            <p class="error">{$page.form.error}</p>
+          {/if}
+
+          <!-- Active link -->
+          <a
+            href="/about"
+            class:active={$page.url.pathname === '/about'}
+          >
+            O nas
+          </a>
+        desc: $page store — URL, params, dane, status
+        detail:
+          what: $page to reaktywny store z informacjami o aktualnej stronie. Dostępny w każdym komponencie Svelte.
+          how: Import z $app/stores. Aktualizuje się przy każdej nawigacji.
+          tips:
+            - '$page.url.pathname — aktualny URL'
+            - '$page.data — dane z load(), reaktywne'
+
+      - code: |
+          // navigating store — loading state podczas nawigacji
+          <script lang="ts">
+            import { navigating } from '$app/stores';
+          </script>
+
+          {#if $navigating}
+            <div class="loading-bar" />
+          {/if}
+
+          <!-- navigating.from / navigating.to -->
+          {#if $navigating}
+            <p>Ładowanie {$navigating.to?.url.pathname}...</p>
+          {/if}
+
+          // updated store — nowa wersja aplikacji dostępna
+          <script>
+            import { updated } from '$app/stores';
+
+            // Sprawdź co 30 minut (domyślnie)
+            $: if ($updated) {
+              // Nowa wersja deploymentu
+              console.log('Nowa wersja aplikacji!');
+            }
+          </script>
+
+          {#if $updated}
+            <button on:click={() => location.reload()}>
+              Dostępna aktualizacja — kliknij aby odświeżyć
+            </button>
+          {/if}
+        desc: navigating i updated — loading state i aktualizacje
+        detail:
+          what: navigating = null gdy brak nawigacji, obiekt z from/to podczas. updated = true gdy nowy deployment jest dostępny.
+          how: navigating do globalnego loading bar/spinner. updated do "new version" baneru.
+          tips:
+            - 'navigating.from i navigating.to — poprzedni i następny URL'
+            - 'updated sprawdza /[hash].json — serwer musi być żywy'
+
+      - code: |
+          // goto() — programatyczna nawigacja
+          import { goto, invalidate, invalidateAll } from '$app/navigation';
+
+          // Podstawowa nawigacja
+          await goto('/dashboard');
+
+          // Z opcjami
+          await goto('/search?q=svelte', {
+            replaceState: false,    // czy replace w history
+            noScroll: false,        // czy scrolluj na górę
+            keepFocus: false,       // czy zachowaj focus elementu
+            invalidateAll: true,    // odśwież wszystkie load functions
+            state: { source: 'button' }  // history state
+          });
+
+          // Użycie w komponencie
+          <script lang="ts">
+            import { goto } from '$app/navigation';
+
+            async function handleSubmit() {
+              await saveData();
+              await goto('/success', { replaceState: true });
+            }
+          </script>
+        desc: goto() — programatyczna nawigacja
+        detail:
+          what: goto() nawiguje do URL programatycznie — po submit formularza, po akcji, warunkowy redirect.
+          how: Zwraca Promise — await jeśli chcesz poczekać na zakończenie nawigacji.
+          tips:
+            - 'replaceState: true — nie dodaje do history (nie możesz "cofnąć")'
+            - 'goto() tylko w przeglądarce — guard: if (browser) await goto(...)'
+
+      - code: |
+          // beforeNavigate i afterNavigate — lifecycle nawigacji
+          import { beforeNavigate, afterNavigate } from '$app/navigation';
+          import { onDestroy } from 'svelte';
+
+          // Pytanie o potwierdzenie przed opuszczeniem strony
+          beforeNavigate(({ cancel, from, to, type }) => {
+            if (hasUnsavedChanges) {
+              const confirmed = confirm('Masz niezapisane zmiany. Opuścić stronę?');
+              if (!confirmed) cancel();  // anuluj nawigację
+            }
+          });
+
+          // Analityka po nawigacji
+          afterNavigate(({ from, to, type }) => {
+            console.log(`Nawigacja z ${from?.url.pathname} do ${to?.url.pathname} (${type})`);
+            analytics.trackPageView(to?.url.pathname);
+          });
+        desc: beforeNavigate i afterNavigate — lifecycle nawigacji
+        detail:
+          what: beforeNavigate uruchamia się przed zmianą trasy. afterNavigate po. Oba działają reaktywnie przez całe życie komponentu.
+          how: 'cancel() w beforeNavigate anuluje nawigację (np. niezapisane zmiany). type: "link" | "goto" | "popstate".'
+          tips:
+            - 'Automatycznie cleanup przy destroy komponentu'
+            - 'type "popstate" = user kliknął back/forward w przeglądarce'
+
+      - code: |
+          // browser i dev — env detection
+          import { browser, dev, building, version } from '$app/environment';
+
+          // Kod tylko w przeglądarce
+          if (browser) {
+            const token = localStorage.getItem('token');
+            window.addEventListener('resize', handleResize);
+          }
+
+          // Kod tylko w development
+          if (dev) {
+            console.log('DEBUG mode');
+          }
+
+          // Wersja deploymentu (z kit.version.name)
+          console.log('App version:', version);
+
+          // W komponencie Svelte:
+          <script>
+            import { browser } from '$app/environment';
+
+            let isClient = false;
+            $: if (browser) isClient = true;  // reactive po hydration
+          </script>
+
+          {#if browser}
+            <ClientOnlyWidget />
+          {/if}
+        desc: $app/environment — browser, dev, building, version
+        detail:
+          what: "browser = true tylko w przeglądarce. dev = true w development mode. building = true podczas npm run build."
+          how: "Użyj do code-splitting: biblioteki SSR-incompatible tylko gdy browser === true."
+          tips:
+            - 'import dynamiczny: if (browser) { const lib = await import("client-lib") }'
+            - 'building — usuń heavy debugowanie w trakcie build'
+
+  - name: TypeScript i narzędzia
+    icon: "📘"
+    commands:
+      - code: |
+          // tsconfig.json — SvelteKit auto-generuje rozszerzenie
+          // .svelte-kit/tsconfig.json — NIE EDYTUJ
+          // tsconfig.json — Twoje zmiany (extends .svelte-kit)
+          {
+            "extends": "./.svelte-kit/tsconfig.json",
+            "compilerOptions": {
+              "strict": true,
+              "moduleResolution": "bundler",
+              "allowImportingTsExtensions": true
+            }
+          }
+
+          // Generowane typy per-route (.svelte-kit/types/):
+          // ./$types → PageData, PageServerLoad, Actions, LayoutData
+
+          import type { PageServerLoad, Actions, PageData } from './$types';
+
+          export const load: PageServerLoad = async ({ params }) => {
+            return { slug: params.slug };
+          };
+
+          export const actions: Actions = {
+            default: async ({ request }) => { /* ... */ }
+          };
+        desc: TypeScript konfiguracja i ./$types
+        detail:
+          what: SvelteKit generuje typy per-route w .svelte-kit/types/. Import ./$types dla pełnego type safety bez ręcznego pisania typów.
+          how: npx svelte-kit sync regeneruje typy. Działa automatycznie przy dev i build.
+          tips:
+            - 'Nigdy nie edytuj .svelte-kit/ — generowane automatycznie'
+            - 'PageServerLoad vs PageLoad — server vs universal load function'
+
+      - cmd: npx svelte-check
+        desc: Sprawdź typy i błędy Svelte w całym projekcie
+        detail:
+          what: svelte-check sprawdza TypeScript types, a11y errors, i Svelte-specific problemy we wszystkich .svelte plikach.
+          how: Odpowiednik tsc --noEmit ale rozumie składnię .svelte.
+          tips:
+            - 'npm run check — skrót w package.json'
+            - 'npx svelte-check --watch — watch mode w osobnym terminalu'
+
+      - code: |
+          // vite.config.ts — konfiguracja Vite w SvelteKit
+          import { sveltekit } from '@sveltejs/kit/vite';
+          import { defineConfig } from 'vite';
+
+          export default defineConfig({
+            plugins: [sveltekit()],
+            server: {
+              proxy: {
+                '/external-api': {
+                  target: 'https://api.external.com',
+                  changeOrigin: true,
+                  rewrite: (path) => path.replace(/^\/external-api/, '')
+                }
+              }
+            },
+            test: {
+              // Vitest config
+              include: ['src/**/*.{test,spec}.{js,ts}'],
+              environment: 'jsdom',
+              globals: true,
+              setupFiles: ['src/setupTests.ts'],
+            }
+          });
+        desc: vite.config.ts — Vite konfiguracja z proxy i Vitest
+        detail:
+          what: vite.config.ts konfiguruje Vite (dev proxy, aliases, optymalizacje) i Vitest (testy jednostkowe) w jednym miejscu.
+          how: sveltekit() plugin to wszystko co potrzeba. Proxy przydatny do zewnętrznych API bez CORS w dev.
+          tips:
+            - 'server.proxy — proxy do zewnętrznych API w development'
+            - 'test.environment: "jsdom" — testuj komponenty Svelte z DOM'

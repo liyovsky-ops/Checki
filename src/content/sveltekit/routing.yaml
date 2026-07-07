@@ -1,0 +1,299 @@
+title: SvelteKit — Routing i nawigacja
+
+labels:
+  section: Routing
+  example: Przykład
+
+intro: >
+  SvelteKit używa file-based routingu — struktura katalogów src/routes/ bezpośrednio
+  odpowiada ścieżkom URL. Pliki specjalne mają + prefix (+page.svelte, +layout.svelte).
+  Dynamiczne segmenty [param], opcjonalne [[param]], catch-all [...rest] i route groups (group)
+  dają pełną elastyczność. Nawigacja między stronami odbywa się przez zwykłe linki <a>
+  lub programatycznie przez goto(). SvelteKit automatycznie prerenderuje trasy,
+  obsługuje prefetching i zarządza historią przeglądarki.
+
+items:
+  - name: Struktura src/routes/ — mapa ścieżek
+    desc: >
+      Każdy katalog w src/routes/ to segment URL. Pliki +page.svelte tworzą strony.
+      Katalog bez +page.svelte to tylko organizacja — nie tworzy trasy.
+    code: |
+      src/routes/
+        +page.svelte              → /
+        +layout.svelte            → root layout (wszystkie strony)
+        +error.svelte             → globalna strona błędu
+        about/
+          +page.svelte            → /about
+        blog/
+          +page.svelte            → /blog (lista postów)
+          +layout.svelte          → layout dla /blog i podstron
+          [slug]/
+            +page.svelte          → /blog/hello-world
+            +page.server.ts       → load z DB
+        (marketing)/
+          +layout.svelte          → layout bez sidebar
+          pricing/+page.svelte    → /pricing (nie /(marketing)/pricing!)
+        (app)/
+          +layout.svelte          → layout z sidebar + auth
+          dashboard/+page.svelte  → /dashboard
+          settings/+page.svelte   → /settings
+        api/
+          users/
+            +server.ts            → /api/users (REST endpoint)
+          posts/[id]/
+            +server.ts            → /api/posts/:id
+
+  - name: Dynamiczne parametry — [param], [[optional]], [...rest]
+    desc: >
+      Trzy rodzaje dynamicznych segmentów w nazwach katalogów.
+      [param] = wymagany, [[param]] = opcjonalny, [...rest] = catch-all.
+    code: |
+      // [slug] — wymagany parametr
+      // src/routes/blog/[slug]/+page.server.ts
+      export const load = async ({ params }) => {
+        // params.slug = "hello-world" dla /blog/hello-world
+        const post = await db.posts.findFirst({ where: { slug: params.slug } });
+        return { post };
+      };
+
+      // [[lang]] — opcjonalny parametr
+      // src/routes/[[lang]]/+page.svelte
+      // Trafia na: / i /pl i /en
+      export const load = async ({ params }) => {
+        const lang = params.lang ?? 'pl';  // undefined jeśli brak
+        return { lang };
+      };
+
+      // [...path] — catch-all
+      // src/routes/docs/[...path]/+page.svelte
+      // Trafia na: /docs/a, /docs/a/b, /docs/a/b/c
+      export const load = async ({ params }) => {
+        const segments = params.path.split('/');  // ["a", "b", "c"]
+        return { segments };
+      };
+
+  - name: +layout.svelte — shared layout
+    desc: >
+      +layout.svelte opakowuje wszystkie strony w danym katalogu i podkatalogach.
+      <slot /> renderuje aktualną stronę. Layouty stackują się (nested layouts).
+    code: |
+      <!-- src/routes/+layout.svelte — root layout -->
+      <script lang="ts">
+        import Nav from '$lib/components/Nav.svelte';
+        import Footer from '$lib/components/Footer.svelte';
+        import type { LayoutData } from './$types';
+
+        export let data: LayoutData;  // z +layout.server.ts
+      </script>
+
+      <Nav user={data.user} />
+
+      <main>
+        <slot />  <!-- aktualny +page.svelte tu -->
+      </main>
+
+      <Footer />
+
+      <!-- src/routes/(app)/+layout.svelte — nested layout -->
+      <script>
+        import Sidebar from '$lib/components/Sidebar.svelte';
+      </script>
+
+      <div class="app-layout">
+        <Sidebar />
+        <div class="content">
+          <slot />
+        </div>
+      </div>
+
+  - name: +layout.reset.svelte — reset layoutu
+    desc: >
+      Specjalny plik który "resetuje" stack layoutów — usuwa wszystkie parent layouty.
+      Przydatny gdy strona (np. fullscreen modal, print view) nie powinna dziedziczyć navbar/footer.
+    code: |
+      // Bez reset — stackuje layouty:
+      // root layout → (app) layout → dashboard layout → +page.svelte
+
+      // Z reset — kasuje wszystkie parent layouty:
+      // src/routes/(app)/fullscreen/+layout.reset.svelte
+      <!-- Tylko slot, zero wrappera -->
+      <slot />
+
+      // Alternatywnie: named layouts (zaawansowane)
+      // Pozwala wybrać który layout użyć per-strona:
+      // @layout.svelte → src/routes/+layout@.svelte (root bez parent)
+
+  - name: +error.svelte — strony błędów
+    desc: >
+      +error.svelte wyświetla się gdy load() rzuci error() lub strona nie istnieje.
+      Każdy katalog może mieć własny +error.svelte dla granularnych błędów.
+    code: |
+      <!-- src/routes/+error.svelte — globalny error -->
+      <script lang="ts">
+        import { page } from '$app/stores';
+      </script>
+
+      <div class="error-container">
+        <h1>{$page.status}</h1>
+        <h2>
+          {#if $page.status === 404}
+            Strona nie znaleziona
+          {:else if $page.status === 403}
+            Brak dostępu
+          {:else}
+            Coś poszło nie tak
+          {/if}
+        </h2>
+        <p>{$page.error?.message}</p>
+        <a href="/">Wróć do strony głównej</a>
+      </div>
+
+      <!-- src/routes/dashboard/+error.svelte — error dla dashboardu -->
+      <!-- Nadpisuje globalny dla tras /dashboard/* -->
+      <script>
+        import { page } from '$app/stores';
+      </script>
+      <div class="dashboard-error">
+        <h1>Błąd w dashboardzie: {$page.status}</h1>
+        <a href="/dashboard">Wróć do dashboardu</a>
+      </div>
+
+  - name: goto() i redirect() — nawigacja programatyczna
+    desc: >
+      goto() do nawigacji z JavaScript (po submit, po akcji).
+      redirect() z @sveltejs/kit do przekierowania w load() lub actions.
+    code: |
+      // goto() — client-side navigation
+      import { goto } from '$app/navigation';
+
+      // Podstawowe
+      await goto('/dashboard');
+
+      // Z opcjami
+      await goto('/settings', {
+        replaceState: true,     // nie dodaj do browser history
+        noScroll: true,         // nie scrolluj na górę
+        invalidateAll: true,    // odśwież wszystkie load functions
+      });
+
+      // goto z query params
+      await goto(`/search?q=${encodeURIComponent(query)}&page=1`);
+
+      // redirect() — w load() lub actions — server-side
+      import { redirect, error } from '@sveltejs/kit';
+
+      export const load = async ({ locals, params }) => {
+        if (!locals.user) throw redirect(303, '/login');
+        if (!params.id) throw redirect(301, '/posts');
+        const post = await getPost(params.id);
+        if (!post) throw error(404, 'Post nie znaleziony');
+        return { post };
+      };
+
+  - name: Protected routes w hooks
+    desc: >
+      Centralny auth check w hooks.server.ts chroni całe sekcje aplikacji.
+      Lepsze niż sprawdzanie auth w każdej load function osobno.
+    code: |
+      // src/hooks.server.ts
+      import type { Handle } from '@sveltejs/kit';
+      import { redirect } from '@sveltejs/kit';
+
+      export const handle: Handle = async ({ event, resolve }) => {
+        // 1. Sprawdź sesję i ustaw locals
+        const sessionId = event.cookies.get('session');
+        event.locals.user = sessionId
+          ? await getUserFromSession(sessionId)
+          : null;
+
+        const path = event.url.pathname;
+
+        // 2. Ochrona tras wymagających logowania
+        if (path.startsWith('/dashboard') || path.startsWith('/settings')) {
+          if (!event.locals.user) {
+            throw redirect(303, `/login?redirectTo=${encodeURIComponent(path)}`);
+          }
+        }
+
+        // 3. Admin-only
+        if (path.startsWith('/admin')) {
+          if (event.locals.user?.role !== 'admin') {
+            throw redirect(303, '/403');
+          }
+        }
+
+        // 4. Przekieruj zalogowanych ze stron auth
+        if ((path === '/login' || path === '/register') && event.locals.user) {
+          throw redirect(303, '/dashboard');
+        }
+
+        return resolve(event);
+      };
+
+  - name: Preloading i link opcje
+    desc: >
+      SvelteKit automatycznie prefetchuje trasy na hover/tap. Można to kontrolować
+      przez atrybuty data-sveltekit-* na linkach lub globalnie w +layout.svelte.
+    code: |
+      <!-- Automatyczny preload on hover (domyślnie) -->
+      <a href="/blog">Blog</a>
+
+      <!-- Preload on tap (mobile-friendly) -->
+      <a href="/pricing" data-sveltekit-preload-data="tap">Cennik</a>
+
+      <!-- Bez preloadu -->
+      <a href="/heavy-page" data-sveltekit-preload-data="off">Ciężka strona</a>
+
+      <!-- Preload tylko kodu (bez danych) -->
+      <a href="/dashboard" data-sveltekit-preload-code="hover">Dashboard</a>
+
+      <!-- Pełny reload (nie SPA navigation) -->
+      <a href="/external" data-sveltekit-reload>External page</a>
+
+      <!-- Nie dodawaj do browser history -->
+      <a href="/modal" data-sveltekit-replacestate>Modal view</a>
+
+      <!-- Globalnie w +layout.svelte dla całej aplikacji -->
+      <svelte:head>
+        <meta name="description" content="My SvelteKit app" />
+      </svelte:head>
+
+  - name: Active links i nawigacja store
+    desc: >
+      $page.url.pathname do podświetlania aktywnych linków w nawigacji.
+      Bez zewnętrznych bibliotek.
+    code: |
+      <!-- src/lib/components/Nav.svelte -->
+      <script lang="ts">
+        import { page } from '$app/stores';
+        import { navigating } from '$app/stores';
+
+        const links = [
+          { href: '/', label: 'Strona główna' },
+          { href: '/blog', label: 'Blog' },
+          { href: '/about', label: 'O nas' },
+          { href: '/contact', label: 'Kontakt' },
+        ];
+      </script>
+
+      <nav>
+        {#if $navigating}
+          <div class="loading-bar" />
+        {/if}
+
+        {#each links as { href, label }}
+          <a
+            {href}
+            class:active={$page.url.pathname === href ||
+              ($page.url.pathname.startsWith(href) && href !== '/')}
+            aria-current={$page.url.pathname === href ? 'page' : undefined}
+          >
+            {label}
+          </a>
+        {/each}
+      </nav>
+
+      <style>
+        a.active { font-weight: bold; color: #FF3E00; }
+        .loading-bar { /* progress bar */ }
+      </style>

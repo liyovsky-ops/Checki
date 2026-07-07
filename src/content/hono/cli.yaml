@@ -1,0 +1,1737 @@
+title: Komendy Hono
+
+groups:
+  - name: Instalacja i setup
+    icon: "📦"
+    commands:
+      - cmd: npm install hono
+        desc: Zainstaluj Hono (npm)
+        detail:
+          what: Instaluje core Hono — działa na wszystkich runtimeach bez dodatkowych zależności. Zero zewnętrznych pakietów.
+          how: Hono core ma zero zewnętrznych zależności. Adaptery runtime (bun, deno, node) są oddzielne paczkami.
+          tips:
+            - 'bun add hono — dla Bun runtime (zalecany)'
+            - 'deno add npm:hono lub jsr:@hono/hono — dla Deno'
+
+      - cmd: bun create hono@latest my-app
+        desc: Utwórz nowy projekt Hono (Bun)
+        detail:
+          what: Oficjalny generator projektu Hono. Pyta o runtime (Cloudflare Workers, Bun, Deno, Node.js) i tworzy gotową strukturę.
+          how: Uruchamia interaktywny kreator — wybierasz runtime, szablon i nazwę projektu. Tworzy tsconfig.json, package.json, entry point.
+          tips:
+            - 'npm create hono@latest — jeśli nie używasz Bun'
+            - 'pnpm create hono@latest — dla pnpm'
+
+      - cmd: bun run dev
+        desc: Uruchom dev server (Bun)
+        detail:
+          what: Startuje Hono w trybie dev z hot reload. Bun natywnie wspiera TypeScript — bez kompilacji.
+          how: Skrypt "dev" w package.json to zwykle bun --hot run src/index.ts. --hot = hot module replacement.
+          tips:
+            - 'bun --watch run src/index.ts — restart przy każdej zmianie pliku'
+            - 'PORT=8080 bun run dev — zmień port'
+
+      - code: |
+          import { Hono } from 'hono'
+
+          const app = new Hono()
+
+          app.get('/', (c) => c.text('Hello Hono!'))
+          app.get('/json', (c) => c.json({ ok: true, ts: Date.now() }))
+          app.post('/echo', async (c) => {
+            const body = await c.req.json()
+            return c.json({ echo: body })
+          })
+
+          export default app
+        desc: Minimalna aplikacja Hono
+        detail:
+          what: Tworzy instancję Hono, definiuje trasy. Eksport default app — każdy runtime wie jak to podpiąć.
+          how: c (Context) zawiera request, response helpers i shared state. Hono używa Web Standards API (Request/Response).
+          tips:
+            - 'app.all() — obsługuje wszystkie metody HTTP'
+            - "Hono<{Bindings: Env}>() — typowany dostęp do c.env (CF Workers KV, D1)"
+
+      - code: |
+          import { Hono } from 'hono'
+
+          type Bindings = {
+            DATABASE_URL: string
+            JWT_SECRET: string
+          }
+
+          type Variables = {
+            userId: string
+            role: 'admin' | 'user'
+          }
+
+          const app = new Hono<{
+            Bindings: Bindings
+            Variables: Variables
+          }>()
+
+          app.get('/config', (c) => {
+            const dbUrl = c.env.DATABASE_URL  // TypeScript: string
+            return c.json({ connected: !!dbUrl })
+          })
+
+          export default app
+        desc: Typowany kontekst — Bindings i Variables
+        detail:
+          what: Generic Hono<{Bindings, Variables}> zapewnia type safety dla c.env (env variables/bindings) i c.get/c.set (shared state).
+          how: Bindings = zmienne środowiskowe i CF bindings. Variables = dane ustawiane przez middleware (c.set/c.get).
+          tips:
+            - 'Bindings są readonly — nie możesz ich zmieniać w runtime'
+            - 'Variables możesz ustawiać przez c.set() w middleware'
+
+  - name: Routing — metody HTTP
+    icon: "🛣️"
+    commands:
+      - code: |
+          import { Hono } from 'hono'
+
+          const app = new Hono()
+
+          app.get('/users', (c) => {
+            return c.json({ users: [] })
+          })
+
+          app.get('/users/:id', (c) => {
+            const id = c.req.param('id')
+            return c.json({ id, name: 'Jan Kowalski' })
+          })
+
+          app.get('/search', (c) => {
+            const q = c.req.query('q') ?? ''
+            const limit = Number(c.req.query('limit') ?? '20')
+            return c.json({ q, limit, results: [] })
+          })
+        desc: GET — pobieranie danych
+        detail:
+          what: app.get() definiuje handler dla HTTP GET. c.req.param() — parametry URL, c.req.query() — query string.
+          how: c.json() automatycznie ustawia Content-Type application/json i serializuje obiekt.
+          tips:
+            - 'c.req.param() bez argumentu zwraca obiekt ze wszystkimi params'
+            - 'c.req.query() bez argumentu zwraca wszystkie query params'
+
+      - code: |
+          import { Hono } from 'hono'
+
+          const app = new Hono()
+
+          app.post('/users', async (c) => {
+            const body = await c.req.json<{
+              name: string
+              email: string
+            }>()
+            // Zapisz do bazy...
+            return c.json({ id: 'new-id', ...body }, 201)
+          })
+
+          app.post('/upload', async (c) => {
+            const form = await c.req.formData()
+            const file = form.get('file') as File
+            return c.json({
+              name: file.name,
+              size: file.size,
+              type: file.type,
+            })
+          })
+        desc: POST — tworzenie zasobów
+        detail:
+          what: c.req.json() parsuje JSON body. c.req.formData() parsuje multipart/form-data (upload plików).
+          how: Drugi argument c.json() to status code — 201 Created dla nowych zasobów.
+          tips:
+            - 'Zawsze waliduj body z @hono/zod-validator — nigdy nie ufaj input od klienta'
+            - 'c.req.text() — raw body jako string, c.req.arrayBuffer() — binary'
+
+      - code: |
+          import { Hono } from 'hono'
+
+          const app = new Hono()
+
+          // PUT — pełna aktualizacja
+          app.put('/users/:id', async (c) => {
+            const id = c.req.param('id')
+            const body = await c.req.json()
+            return c.json({ id, ...body, updatedAt: new Date().toISOString() })
+          })
+
+          // PATCH — częściowa aktualizacja
+          app.patch('/users/:id', async (c) => {
+            const id = c.req.param('id')
+            const updates = await c.req.json()
+            return c.json({ id, ...updates })
+          })
+
+          // DELETE — usunięcie
+          app.delete('/users/:id', (c) => {
+            const id = c.req.param('id')
+            return c.body(null, 204)  // 204 No Content
+          })
+        desc: PUT / PATCH / DELETE — mutacje
+        detail:
+          what: PUT = pełna aktualizacja (wymaga całego obiektu). PATCH = częściowa (tylko zmienione pola). DELETE = usunięcie.
+          how: c.body(null, 204) — pusta odpowiedź z kodem 204 No Content. Standard dla DELETE.
+          tips:
+            - 'c.body(null, 204) zamiast c.json({}) dla DELETE'
+            - 'PATCH jest lepszy niż PUT dla częściowych aktualizacji — mniej danych przez sieć'
+
+      - code: |
+          import { Hono } from 'hono'
+
+          const app = new Hono()
+
+          // Wiele parametrów URL
+          app.get('/org/:orgId/repo/:repoId/issues/:issueId', (c) => {
+            const { orgId, repoId, issueId } = c.req.param()
+            return c.json({ orgId, repoId, issueId })
+          })
+
+          // Wildcard — dopasowanie ścieżek
+          app.get('/docs/*', (c) => {
+            const path = c.req.param('*')
+            return c.text(`Doc: ${path}`)
+          })
+
+          // Regex — tylko liczby w :id
+          app.get('/posts/:id{[0-9]+}', (c) => {
+            const id = Number(c.req.param('id'))
+            return c.json({ id })
+          })
+
+          // Optional extension
+          app.get('/files/:filename{.+\\.png}', (c) => {
+            return c.text('PNG file: ' + c.req.param('filename'))
+          })
+        desc: Parametry URL — zaawansowane wzorce
+        detail:
+          what: c.req.param() bez argumentu destrukturuje wszystkie params. Wildcards (*) i regex {} dla zaawansowanego matchowania.
+          how: Parametry są zawsze stringiem. Coerce do number przez Number() lub parseInt(). Regex w {} waliduje format na poziomie routingu.
+          tips:
+            - 'Kolejność route definicji ma znaczenie — bardziej konkretne trasy przed wildcardami'
+            - 'c.req.param("*") dla wildcard routes zwraca całą resztę ścieżki'
+
+      - code: |
+          // routes/users.ts
+          import { Hono } from 'hono'
+
+          const users = new Hono()
+
+          users.get('/', (c) => c.json({ users: [] }))
+          users.post('/', async (c) => c.json(await c.req.json(), 201))
+          users.get('/:id', (c) => c.json({ id: c.req.param('id') }))
+          users.put('/:id', async (c) => c.json(await c.req.json()))
+          users.delete('/:id', (c) => c.body(null, 204))
+
+          export default users
+
+          // index.ts
+          import { Hono } from 'hono'
+          import users from './routes/users'
+          import posts from './routes/posts'
+
+          const app = new Hono()
+
+          app.route('/api/users', users)
+          app.route('/api/posts', posts)
+
+          export default app
+        desc: app.route() — modularne sub-aplikacje
+        detail:
+          what: app.route(prefix, subApp) montuje osobną instancję Hono z prefixem. Każda sub-app ma własne middleware i routing.
+          how: Osobny plik per zasób — routes/users.ts, routes/posts.ts. Czystsza architektura niż jeden plik z wszystkim.
+          tips:
+            - 'Sub-aplikacja to pełny Hono — może mieć własne app.use() middleware'
+            - 'Hono<Type>() w sub-app — dziedzicz typ z parent przez generic'
+
+      - code: |
+          import { Hono } from 'hono'
+
+          const app = new Hono()
+
+          // app.all() — wszystkie metody HTTP
+          app.all('/webhook', async (c) => {
+            const method = c.req.method
+            const body = method !== 'GET' ? await c.req.json() : null
+            return c.json({ method, body, received: true })
+          })
+
+          // Chaining na tej samej ścieżce
+          app
+            .get('/items', (c) => c.json({ items: [] }))
+            .post('/items', async (c) => c.json(await c.req.json(), 201))
+            .get('/items/:id', (c) => c.json({ id: c.req.param('id') }))
+            .put('/items/:id', async (c) => c.json(await c.req.json()))
+            .delete('/items/:id', (c) => c.body(null, 204))
+
+          // Fallback — catch-all 404
+          app.get('*', (c) => c.json({ error: 'Not Found' }, 404))
+
+          export default app
+        desc: app.all() i chaining metod
+        detail:
+          what: app.all() obsługuje każdą metodę HTTP. Chaining .get().post().put() na jednej instancji — cleaner CRUD.
+          how: Catch-all GET '*' na końcu — fallback 404. Kolejność routów ma znaczenie — bardziej konkretne najpierw.
+          tips:
+            - 'app.on(["GET","POST"], "/path", handler) — explicit lista metod'
+            - 'Catch-all na początku przechwytuje wszystko — umieść go na końcu'
+
+      - code: |
+          import { Hono } from 'hono'
+
+          const app = new Hono()
+
+          // Wersjonowanie API przez basePath
+          const v1 = new Hono().basePath('/v1')
+          const v2 = new Hono().basePath('/v2')
+
+          v1.get('/users', (c) => c.json({ version: 1, users: [] }))
+          v2.get('/users', (c) => c.json({ version: 2, users: [], meta: {} }))
+
+          app.route('/api', v1)
+          app.route('/api', v2)
+
+          // GET /api/v1/users — v1
+          // GET /api/v2/users — v2
+
+          export default app
+        desc: Wersjonowanie API z basePath
+        detail:
+          what: basePath() ustawia prefix dla całej aplikacji. Pozwala na czystą obsługę wersji API (/v1, /v2) bez powtarzania prefixu w każdym route.
+          how: new Hono().basePath('/v1') = wszystkie trasy tej instancji mają prefix /v1. app.route('/api', v1) = finalny prefix /api/v1.
+          tips:
+            - 'basePath() jest immutable — zwraca nową instancję Hono'
+            - 'Kombinuj z app.route() dla pełnej modularyzacji'
+
+  - name: Middleware wbudowane
+    icon: "🔧"
+    commands:
+      - code: |
+          import { Hono } from 'hono'
+          import { cors } from 'hono/cors'
+
+          const app = new Hono()
+
+          // Development — allow all
+          app.use('*', cors())
+
+          // Production — konfiguracja
+          app.use('/api/*', cors({
+            origin: (origin, c) => {
+              const allowed = ['https://myapp.com', 'https://admin.myapp.com']
+              return allowed.includes(origin) ? origin : allowed[0]
+            },
+            allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+            allowHeaders: ['Content-Type', 'Authorization'],
+            exposeHeaders: ['Content-Length', 'X-Request-Id'],
+            credentials: true,
+            maxAge: 600,
+          }))
+
+          export default app
+        desc: cors() — Cross-Origin Resource Sharing
+        detail:
+          what: Wbudowany CORS middleware z hono/cors. Ustawia Access-Control-* headers. origin może być string, string[] lub funkcja.
+          how: 'origin jako funkcja: pełna kontrola — sprawdź origin i zwróć dozwolony. credentials: true wymagane dla cookies cross-origin.'
+          tips:
+            - 'cors() bez konfiguracji = allow all — NIGDY na produkcji'
+            - "maxAge: 600 = przeglądarka cachuje preflight 10 minut — mniej requestów OPTIONS"
+
+      - code: |
+          import { Hono } from 'hono'
+          import { logger } from 'hono/logger'
+          import { prettyJSON } from 'hono/pretty-json'
+          import { requestId } from 'hono/request-id'
+
+          const app = new Hono()
+
+          // Request ID — X-Request-Id header
+          app.use('*', requestId())
+
+          // Logger — method + url + status + time
+          app.use('*', logger())
+
+          // Pretty JSON — ?pretty query param
+          app.use('*', prettyJSON())
+
+          app.get('/data', (c) => {
+            const id = c.get('requestId')
+            return c.json({ requestId: id, data: { users: [] } })
+          })
+
+          // curl http://localhost/data?pretty — sformatowany JSON
+          export default app
+        desc: logger() + prettyJSON() + requestId()
+        detail:
+          what: 'logger() loguje każdy request. prettyJSON() formatuje JSON gdy ?pretty w URL. requestId() generuje UUID i ustawia go w X-Request-Id header.'
+          how: requestId() dostępny przez c.get('requestId') w handlerach. Wszystkie trzy są wbudowane — brak npm install.
+          tips:
+            - "prettyJSON() — świetne do debugowania, wyłącz na produkcji gdy performance ważny"
+            - 'logger() można zastąpić własną funkcją: logger((str) => myLogger.info(str))'
+
+      - code: |
+          import { Hono } from 'hono'
+          import { jwt, sign, verify, decode } from 'hono/jwt'
+
+          const SECRET = 'my-secret-key'
+
+          const app = new Hono()
+
+          // Login — generuj token
+          app.post('/login', async (c) => {
+            const { email, password } = await c.req.json()
+            // Sprawdź credentials...
+            const token = await sign(
+              {
+                sub: email,
+                role: 'user',
+                exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,  // 24h
+              },
+              SECRET
+            )
+            return c.json({ token })
+          })
+
+          // Chronione endpointy
+          app.use('/api/*', jwt({ secret: SECRET }))
+
+          app.get('/api/me', (c) => {
+            const payload = c.get('jwtPayload')
+            return c.json({ sub: payload.sub, role: payload.role })
+          })
+
+          export default app
+        desc: jwt() — autentykacja JWT
+        detail:
+          what: Wbudowany JWT z hono/jwt. sign() generuje token, jwt() middleware weryfikuje. Payload w c.get('jwtPayload'). Algorytm HS256 domyślnie.
+          how: exp w payload jako Unix timestamp. Math.floor(Date.now() / 1000) + sekundy. jwt() zwraca 401 gdy token niepoprawny lub wygasły.
+          tips:
+            - "jwt({ secret, alg: 'RS256' }) — wsparcie RSA dla publicznego klucza"
+            - 'decode() bez weryfikacji — podgląd payload bez sprawdzania sygnatury'
+
+      - code: |
+          import { Hono } from 'hono'
+          import { bearerAuth } from 'hono/bearer-auth'
+          import { basicAuth } from 'hono/basic-auth'
+          import { apiKey } from 'hono/api-key'
+
+          const app = new Hono()
+
+          // Bearer token (statyczny)
+          app.use('/api/*', bearerAuth({ token: 'my-api-token' }))
+
+          // Basic Auth
+          app.use('/admin/*', basicAuth({
+            username: 'admin',
+            password: 'secret',
+          }))
+
+          // API Key w query lub header
+          app.use('/webhook/*', apiKey({
+            key: 'my-webhook-key',
+            queryKey: 'api_key',  // ?api_key=...
+            headerKey: 'X-API-Key',
+          }))
+
+          app.get('/api/data', (c) => c.json({ data: 'ok' }))
+          export default app
+        desc: bearerAuth() + basicAuth() + apiKey()
+        detail:
+          what: Trzy wbudowane sposoby autentykacji. bearerAuth = Bearer token w Authorization header. basicAuth = Base64 credentials. apiKey = klucz w query lub header.
+          how: Wszystkie zwracają 401 przy błędnych credentials. Można podać własny token przez dynamiczne sprawdzanie (verifyUser callback).
+          tips:
+            - 'bearerAuth({ token: [...tokens] }) — lista wielu ważnych tokenów'
+            - 'basicAuth({ verifyUser: async (user, pass, c) => checkDB(user, pass) }) — dynamiczne credentials'
+
+      - code: |
+          import { Hono } from 'hono'
+          import { cache } from 'hono/cache'
+
+          const app = new Hono()
+
+          // Cache publiczny — 1 godzina
+          app.use('/api/products/*', cache({
+            cacheName: 'products-v1',
+            cacheControl: 'public, max-age=3600, s-maxage=3600',
+          }))
+
+          // Cache prywatny — 5 minut
+          app.use('/api/user/preferences', cache({
+            cacheName: 'user-prefs',
+            cacheControl: 'private, max-age=300',
+          }))
+
+          // Brak cache — dla danych real-time
+          app.use('/api/prices/*', cache({
+            cacheName: 'no-cache',
+            cacheControl: 'no-store, no-cache',
+          }))
+
+          app.get('/api/products', (c) => c.json({ products: [] }))
+          export default app
+        desc: cache() — HTTP i Cloudflare Cache
+        detail:
+          what: Ustawia Cache-Control header i integruje z Cloudflare Cache API (na Workers). s-maxage kontroluje cache na CDN, max-age w przeglądarce.
+          how: cacheName = nazwa cache storage (używane przez CF Cache API). Na non-CF runtimeach tylko ustawia nagłówki.
+          tips:
+            - 's-maxage dla shared/CDN cache, max-age dla przeglądarki'
+            - 'Invalidacja przez nową nazwę cacheName (cache-v2, cache-v3) lub CF Cache Purge API'
+
+      - code: |
+          import { Hono } from 'hono'
+          import { compress } from 'hono/compress'
+          import { etag } from 'hono/etag'
+          import { csrf } from 'hono/csrf'
+          import { secureHeaders } from 'hono/secure-headers'
+
+          const app = new Hono()
+
+          // Security headers (jak helmet w Express)
+          app.use('*', secureHeaders())
+
+          // CSRF ochrona
+          app.use('*', csrf({ origin: 'https://myapp.com' }))
+
+          // Kompresja gzip
+          app.use('*', compress())
+
+          // ETag — conditional caching
+          app.use('*', etag())
+
+          app.get('/data', (c) => c.json({ data: Array(1000).fill(0) }))
+          export default app
+        desc: secureHeaders() + compress() + etag() + csrf()
+        detail:
+          what: 'secureHeaders() = CSP, HSTS, X-Frame-Options w jednej linii. compress() = gzip/deflate odpowiedzi. etag() = conditional 304. csrf() = CSRF protection.'
+          how: secureHeaders() odpowiednik helmet() z Express — 15 security headers. csrf() weryfikuje Origin/Referer dla POST/PUT/DELETE.
+          tips:
+            - 'secureHeaders({ contentSecurityPolicy: false }) — wyłącz CSP jeśli psuje frontend'
+            - 'etag() + compress() razem — etag na skompresowaną wersję'
+
+      - code: |
+          import { Hono } from 'hono'
+          import { timeout } from 'hono/timeout'
+
+          const app = new Hono()
+
+          // Timeout 5 sekund dla wszystkich endpointów
+          app.use('*', timeout(5000))
+
+          // Custom error handler dla timeout
+          app.use('/api/*', timeout(
+            10000,
+            (c) => c.json({ error: 'Request timeout', code: 408 }, 408)
+          ))
+
+          app.get('/slow', async (c) => {
+            // Symulacja wolnej operacji
+            await new Promise((r) => setTimeout(r, 3000))
+            return c.json({ done: true })
+          })
+
+          // GET /slow — zwróci odpowiedź po 3s (w limicie 5s)
+          // GET /api/very-slow — timeout po 10s
+          export default app
+        desc: timeout() — limity czasu requestu
+        detail:
+          what: Przerywa request jeśli handler nie odpowie w podanym czasie. Zwraca 503 domyślnie lub custom response z callback.
+          how: Timeout w milisekundach. Drugi argument = callback (c) => Response dla custom error message.
+          tips:
+            - 'Ustawiaj timeout na poziomie middleware — nie w handlerze przez setTimeout'
+            - 'Różne limity per route — wolniejszy dla długich operacji (export, report)'
+
+  - name: Request i Response
+    icon: "📨"
+    commands:
+      - code: |
+          import { Hono } from 'hono'
+
+          const app = new Hono()
+
+          // Czytanie różnych typów body
+          app.post('/json', async (c) => {
+            const data = await c.req.json<{ name: string }>()
+            return c.json({ received: data.name })
+          })
+
+          app.post('/text', async (c) => {
+            const text = await c.req.text()
+            return c.text(`Echo: ${text}`)
+          })
+
+          app.post('/binary', async (c) => {
+            const buffer = await c.req.arrayBuffer()
+            return c.json({ bytes: buffer.byteLength })
+          })
+
+          app.post('/form', async (c) => {
+            const form = await c.req.formData()
+            const name = form.get('name')
+            const file = form.get('file') as File | null
+            return c.json({
+              name,
+              file: file ? { name: file.name, size: file.size } : null,
+            })
+          })
+
+          export default app
+        desc: c.req — metody odczytu body
+        detail:
+          what: 'c.req.json() — JSON. c.req.text() — string. c.req.arrayBuffer() — binary. c.req.formData() — FormData z plikami. c.req.blob() — Blob.'
+          how: Wszystkie są async (Promise). Każdą metodę można wywołać tylko raz — body jest stream, po przeczytaniu jest zużyty.
+          tips:
+            - 'c.req.raw — dostęp do surowego Web Request obiektu'
+            - 'Nie wywołuj c.req.json() i c.req.text() na tym samym requeście — body zużyty'
+
+      - code: |
+          import { Hono } from 'hono'
+
+          const app = new Hono()
+
+          app.get('/info', (c) => {
+            // Headers
+            const auth = c.req.header('Authorization')
+            const contentType = c.req.header('content-type')  // case-insensitive
+            const allHeaders = c.req.header()  // Record<string, string>
+
+            // URL info
+            const url = c.req.url          // pełny URL
+            const path = c.req.path        // /info
+            const method = c.req.method    // GET
+            const raw = c.req.raw          // Web Request
+            const routePath = c.req.routePath  // /info (pattern)
+
+            return c.json({ auth, contentType, path, method })
+          })
+
+          export default app
+        desc: c.req — headers i metadata
+        detail:
+          what: c.req.header('Name') — case-insensitive. c.req.url — pełny URL ze schemą. c.req.path — tylko ścieżka. c.req.method — uppercase HTTP method.
+          how: c.req.header() bez argumentu zwraca wszystkie headers jako obiekt. c.req.raw = natywny Web Request — escape hatch do Web API.
+          tips:
+            - 'Header names są case-insensitive — "Content-Type" = "content-type"'
+            - 'c.req.routePath — oryginalna ścieżka z placeholderami (/users/:id)'
+
+      - code: |
+          import { Hono } from 'hono'
+
+          const app = new Hono()
+
+          app.get('/responses', (c) => {
+            // JSON response
+            return c.json({ message: 'OK' })
+          })
+
+          app.get('/text', (c) => {
+            // Text response
+            return c.text('Hello World!')
+          })
+
+          app.get('/html', (c) => {
+            return c.html('<h1>Hello!</h1><p>Hono HTML</p>')
+          })
+
+          app.get('/redirect', (c) => {
+            return c.redirect('https://hono.dev', 301)
+          })
+
+          app.get('/empty', (c) => {
+            // 204 No Content
+            return c.body(null, 204)
+          })
+
+          app.get('/custom', (c) => {
+            // Custom headers + status
+            return c.json(
+              { data: 'ok' },
+              200,
+              { 'X-Custom': 'header-value' }
+            )
+          })
+
+          export default app
+        desc: c — metody odpowiedzi
+        detail:
+          what: 'c.json() — JSON z application/json. c.text() — text/plain. c.html() — text/html. c.redirect() — 302 lub 301. c.body(null, 204) — pusta odpowiedź.'
+          how: c.json(data, status, headers) — wszystkie trzy argumenty opcjonalne. Trzeci argument to dodatkowe response headers.
+          tips:
+            - 'c.newResponse(body, status, headers) — maksymalna kontrola nad response'
+            - 'Zwróć wynik funkcji odpowiedzi — return c.json() nie return await c.json()'
+
+      - code: |
+          import { Hono } from 'hono'
+
+          const app = new Hono()
+
+          app.get('/with-headers', (c) => {
+            // Ustaw pojedynczy header
+            c.header('X-Powered-By', 'Hono')
+            c.header('Cache-Control', 'no-store')
+
+            // Ustaw status
+            c.status(200)
+
+            return c.json({ ok: true })
+          })
+
+          app.post('/created', async (c) => {
+            const body = await c.req.json()
+            const id = crypto.randomUUID()
+
+            c.header('Location', `/resources/${id}`)
+            c.status(201)
+
+            return c.json({ id, ...body })
+          })
+
+          app.get('/cookie', (c) => {
+            // Ustaw cookie
+            c.cookie('session', 'abc123', {
+              httpOnly: true,
+              secure: true,
+              sameSite: 'Strict',
+              maxAge: 3600,
+            })
+            return c.json({ ok: true })
+          })
+
+          export default app
+        desc: c.header() + c.status() + c.cookie()
+        detail:
+          what: c.header() ustawia response header przed wysłaniem. c.status() ustawia status code. c.cookie() ustawia Set-Cookie header z opcjami.
+          how: c.header() można wywołać wielokrotnie. c.status() i c.header() muszą być przed c.json()/c.text(). Cookies przyjmują opcje SameSite, HttpOnly, Secure.
+          tips:
+            - 'getCookie(c, "name") — czytaj cookies z hono/cookie'
+            - 'deleteCookie(c, "name") — usuń cookie przez MaxAge=0'
+
+      - code: |
+          import { Hono } from 'hono'
+
+          const app = new Hono()
+
+          // Odpowiedź z natywnym Web Response
+          app.get('/native', (c) => {
+            return new Response('Hello from Web API', {
+              status: 200,
+              headers: {
+                'Content-Type': 'text/plain',
+                'X-Custom': 'native',
+              },
+            })
+          })
+
+          // Fetch z zewnętrznego API i przepuść dalej (proxy)
+          app.get('/proxy', async (c) => {
+            const upstream = await fetch('https://api.example.com/data')
+            // Modyfikuj response przed odesłaniem
+            const data = await upstream.json()
+            return c.json({ proxied: true, data })
+          })
+
+          // Pipe stream z zewnętrznego źródła
+          app.get('/stream-proxy', async (c) => {
+            const upstream = await fetch('https://example.com/large-file')
+            return new Response(upstream.body, {
+              headers: { 'Content-Type': 'application/octet-stream' },
+            })
+          })
+
+          export default app
+        desc: Natywny Web Response i proxy
+        detail:
+          what: Hono akceptuje natywny Web Response jako return value z handlera. Można fetchować zewnętrzne API i przepuszczać response stream bez bufforowania.
+          how: new Response(body, options) — Web Standards. upstream.body to ReadableStream — pipe bez bufforowania całego pliku.
+          tips:
+            - 'Streaming proxy nie bufforuje całego pliku w pamięci — ważne dla dużych plików'
+            - 'Możesz mieszać c.json() i natywny Response w tej samej aplikacji'
+
+  - name: Walidacja z Zod
+    icon: "✅"
+    commands:
+      - cmd: npm install @hono/zod-validator zod
+        desc: Zainstaluj walidator Zod dla Hono
+        detail:
+          what: '@hono/zod-validator to oficjalny plugin Hono dla walidacji z Zod. zod jest peer dependency — musisz zainstalować oba.'
+          how: 'Waliduje: json (body), query (query params), param (URL params), header (headers), form (FormData), cookie.'
+          tips:
+            - 'zod 3.x — wymagana wersja. zod 4 ma inną strukturę (z/v4)'
+            - 'Pełna type safety — c.req.valid() zwraca TypeScript typy z Zod schema'
+
+      - code: |
+          import { Hono } from 'hono'
+          import { zValidator } from '@hono/zod-validator'
+          import { z } from 'zod'
+
+          const app = new Hono()
+
+          const createUserSchema = z.object({
+            name: z.string().min(2, 'Imię min 2 znaki').max(50),
+            email: z.string().email('Niepoprawny email'),
+            age: z.number().int().min(18, 'Musisz mieć 18 lat').max(120),
+            role: z.enum(['user', 'admin']).default('user'),
+          })
+
+          app.post(
+            '/users',
+            zValidator('json', createUserSchema),
+            (c) => {
+              // TypeScript wie że to { name: string, email: string, age: number, role: 'user'|'admin' }
+              const { name, email, age, role } = c.req.valid('json')
+              return c.json({ created: { name, email, age, role } }, 201)
+            }
+          )
+
+          export default app
+        desc: zValidator('json') — walidacja body
+        detail:
+          what: zValidator jako middleware przed handlerem. Przy błędzie walidacji automatycznie zwraca 400. c.req.valid('json') — zwalidowane i typowane dane.
+          how: Schema Zod definiuje kształt i reguły. Błędy walidacji mają pełne ZodError z ścieżkami i wiadomościami.
+          tips:
+            - 'z.coerce.number() — automatycznie konwertuje string "42" na number 42'
+            - '.default() w Zod — wartość gdy pole nie podane'
+
+      - code: |
+          import { Hono } from 'hono'
+          import { zValidator } from '@hono/zod-validator'
+          import { z } from 'zod'
+
+          const app = new Hono()
+
+          // Walidacja query params
+          app.get(
+            '/search',
+            zValidator('query', z.object({
+              q: z.string().min(1).max(100),
+              limit: z.coerce.number().int().min(1).max(100).default(20),
+              page: z.coerce.number().int().min(1).default(1),
+              sort: z.enum(['asc', 'desc']).default('asc'),
+            })),
+            (c) => {
+              const { q, limit, page, sort } = c.req.valid('query')
+              // limit i page są number — nie string!
+              return c.json({ q, limit, page, sort })
+            }
+          )
+
+          // Walidacja path params
+          app.get(
+            '/users/:id',
+            zValidator('param', z.object({
+              id: z.coerce.number().int().positive('ID musi być dodatnią liczbą'),
+            })),
+            (c) => {
+              const { id } = c.req.valid('param')
+              return c.json({ id })  // number, nie string
+            }
+          )
+
+          export default app
+        desc: zValidator('query') i zValidator('param')
+        detail:
+          what: 'query: walidacja i koercja query params (zawsze string z URL → number, boolean). param: walidacja path params z konwersją typów.'
+          how: z.coerce.number() konwertuje "42" → 42. z.coerce.boolean() konwertuje "true" → true. Niezbędne bo URL jest zawsze stringiem.
+          tips:
+            - 'z.coerce jest kluczowe dla query/param — bez niego wszystko jest string'
+            - '.optional() — query param nie wymagany'
+
+      - code: |
+          import { Hono } from 'hono'
+          import { zValidator } from '@hono/zod-validator'
+          import { z } from 'zod'
+
+          const app = new Hono()
+
+          const loginSchema = z.object({
+            email: z.string().email(),
+            password: z.string().min(8),
+          })
+
+          app.post(
+            '/auth/login',
+            zValidator('json', loginSchema, (result, c) => {
+              if (!result.success) {
+                // Formatuj błędy po swojemu
+                const errors = result.error.issues.map((issue) => ({
+                  field: issue.path.join('.'),
+                  message: issue.message,
+                  code: issue.code,
+                }))
+
+                return c.json({
+                  success: false,
+                  message: 'Błąd walidacji',
+                  errors,
+                }, 422)
+              }
+            }),
+            async (c) => {
+              const { email, password } = c.req.valid('json')
+              return c.json({ success: true, email })
+            }
+          )
+
+          export default app
+        desc: Custom error handler walidacji
+        detail:
+          what: Trzeci argument zValidator to callback (result, c) => Response | undefined. Gdy result.success = false możesz zwrócić własną odpowiedź. Gdy undefined — przechodzi dalej.
+          how: result.error.issues — tablica ZodIssue z path, message, code. path.join('.') = ścieżka do pola np. "user.address.city".
+          tips:
+            - 'Zwróć Response z callbacku lub undefined (kontynuuj do następnego middleware)'
+            - '422 Unprocessable Entity — semantycznie poprawniejszy niż 400 dla błędów walidacji'
+
+      - code: |
+          import { Hono } from 'hono'
+          import { zValidator } from '@hono/zod-validator'
+          import { z } from 'zod'
+
+          const app = new Hono()
+
+          // Stacked validators — param + body + query naraz
+          app.put(
+            '/orgs/:orgId/users/:userId',
+            zValidator('param', z.object({
+              orgId: z.string().uuid(),
+              userId: z.coerce.number().int().positive(),
+            })),
+            zValidator('json', z.object({
+              name: z.string().min(2).optional(),
+              role: z.enum(['user', 'admin', 'owner']).optional(),
+            })),
+            zValidator('query', z.object({
+              notify: z.coerce.boolean().default(false),
+            })),
+            (c) => {
+              const { orgId, userId } = c.req.valid('param')
+              const updates = c.req.valid('json')
+              const { notify } = c.req.valid('query')
+
+              return c.json({ orgId, userId, updates, notify })
+            }
+          )
+
+          export default app
+        desc: Wiele walidatorów na jednym route
+        detail:
+          what: Można stackować wiele zValidator() — każdy waliduje inny target. Wszystkie wykonują się przed handlerem. c.req.valid() jest per target.
+          how: Middleware wykonują się w kolejności — param → json → query → handler. Każdy błąd walidacji zatrzymuje chain i zwraca 400/422.
+          tips:
+            - 'c.req.valid("param"), c.req.valid("json") — osobne typy per target'
+            - 'Walidacja header: zValidator("header", z.object({ authorization: z.string() }))'
+
+  - name: RPC — Hono Client
+    icon: "🔌"
+    commands:
+      - code: |
+          // server/index.ts
+          import { Hono } from 'hono'
+          import { zValidator } from '@hono/zod-validator'
+          import { z } from 'zod'
+
+          const app = new Hono()
+
+          // Dla RPC — chain wszystkie route metody
+          const routes = app
+            .get('/api/users', (c) => {
+              return c.json({ users: [{ id: 1, name: 'Jan' }] })
+            })
+            .post(
+              '/api/users',
+              zValidator('json', z.object({
+                name: z.string(),
+                email: z.string().email(),
+              })),
+              async (c) => {
+                const data = c.req.valid('json')
+                return c.json({ id: 2, ...data }, 201)
+              }
+            )
+            .get('/api/users/:id', (c) => {
+              return c.json({ id: c.req.param('id'), name: 'Jan' })
+            })
+
+          // Eksportuj TYP tras — nie dane, tylko typy!
+          export type AppType = typeof routes
+          export default app
+        desc: Definicja typowanych tras RPC (serwer)
+        detail:
+          what: Chainuj metody na zmiennej routes — Hono inferuje typ wszystkich tras. Export type AppType to tylko typ (zero runtime overhead) — frontend używa go dla type checking.
+          how: typeof routes = TypeScript typ z wszystkimi endpointami, metodami, request i response typami. Frontend importuje tylko ten typ, nie kod serwera.
+          tips:
+            - 'Chainuj WSZYSTKIE trasy przez routes = app.get().post().get() — inaczej typ będzie niekompletny'
+            - 'AppType to typ — nie zwiększa bundle size frontendu'
+
+      - code: |
+          // client/api.ts
+          import { hc } from 'hono/client'
+          import type { AppType } from '../server/index'
+
+          // Stwórz typowanego klienta
+          const client = hc<AppType>('http://localhost:3000')
+
+          // GET /api/users — TypeScript zna typ odpowiedzi
+          async function getUsers() {
+            const res = await client.api.users.$get()
+            if (!res.ok) throw new Error('Failed')
+            const data = await res.json()
+            // data.users: Array<{id: number, name: string}> — pełne typy!
+            return data.users
+          }
+
+          // POST /api/users — TypeScript sprawdza body
+          async function createUser(name: string, email: string) {
+            const res = await client.api.users.$post({
+              json: { name, email },  // TypeScript: musi pasować do schema
+            })
+            return res.json()
+          }
+
+          // GET /api/users/:id
+          async function getUser(id: string) {
+            const res = await client.api.users[':id'].$get({
+              param: { id },
+            })
+            return res.json()
+          }
+        desc: hc() — typowany klient RPC (frontend)
+        detail:
+          what: hc<AppType>(baseUrl) tworzy klienta z pełnymi typami. Autocomplete ścieżek, parametrów, body i response w IDE. Żadne schema generation — typy inferowane z kodu serwera.
+          how: 'Ścieżka /api/users → client.api.users. Metoda HTTP → $get, $post, $put. Parametry URL → klient.path[":id"].$get({ param: { id } }).'
+          tips:
+            - 'Monorepo = serwer i frontend w tym samym repozytorium — type import działa natywnie'
+            - "client.api.users.$url() — zwraca URL bez fetchowania (do debugowania)"
+
+      - code: |
+          // client/api.ts — klient z interceptorami
+          import { hc } from 'hono/client'
+          import type { AppType } from '../server/index'
+
+          // Fabryka klienta z shared konfiguracją
+          function createClient(baseUrl: string, token?: string) {
+            return hc<AppType>(baseUrl, {
+              headers: token
+                ? { Authorization: `Bearer ${token}` }
+                : {},
+              fetch: async (url, init) => {
+                const res = await fetch(url, init)
+
+                // Interceptor — obsłuż 401
+                if (res.status === 401) {
+                  // Odśwież token...
+                  const newToken = await refreshToken()
+                  return fetch(url, {
+                    ...init,
+                    headers: { ...init?.headers, Authorization: `Bearer ${newToken}` },
+                  })
+                }
+
+                return res
+              },
+            })
+          }
+
+          export const api = createClient(
+            import.meta.env.VITE_API_URL,
+            localStorage.getItem('token') ?? undefined
+          )
+        desc: hc() z custom fetch i interceptorami
+        detail:
+          what: Drugi argument hc() to opcje — headers (domyślne dla każdego requestu) i fetch (custom implementacja z interceptorami).
+          how: Custom fetch = możliwość retry na 401, dodania auth headera, logowania, error handling per request. hc jest immutable — twórz nowy przy zmianie tokena.
+          tips:
+            - 'Twórz klienta przez fabrykę — łatwiej testować (mock fetch)'
+            - 'Nie przechowuj token w closure — odczytuj z localStorage/cookie przy każdym call'
+
+      - code: |
+          // Generowanie URL bez requestu
+          import { hc } from 'hono/client'
+          import type { AppType } from '../server/index'
+
+          const client = hc<AppType>('https://api.myapp.com')
+
+          // Tylko URL — bez fetch
+          const usersUrl = client.api.users.$url()
+          console.log(usersUrl.href)  // https://api.myapp.com/api/users
+
+          const userUrl = client.api.users[':id'].$url({
+            param: { id: '42' },
+          })
+          console.log(userUrl.href)  // https://api.myapp.com/api/users/42
+
+          // Przydatne do budowania linków bez twardego kodowania URLów
+          const searchUrl = client.api.users.$url({
+            query: { limit: '10', page: '1' },
+          })
+          console.log(searchUrl.href)  // /api/users?limit=10&page=1
+        desc: client.$url() — generowanie URLów
+        detail:
+          what: Każdy endpoint klienta ma metodę $url() która zwraca URL object bez wykonywania fetch. Przydatne do generowania linków, form action, redirect URL.
+          how: $url({ param, query }) — przyjmuje parametry URL i query string. Zwraca natywny URL obiekt z .href, .searchParams itp.
+          tips:
+            - '$url() w komponentach React do wypełniania href bez twardego kodowania ścieżek'
+            - 'Zmiana base URL (dev → prod) wymaga tylko zmiany argumentu hc()'
+
+      - code: |
+          // Inferred types z response
+          import { hc, InferResponseType, InferRequestType } from 'hono/client'
+          import type { AppType } from '../server/index'
+
+          const client = hc<AppType>('http://localhost:3000')
+
+          // Wyciągnij typ response
+          type UsersResponse = InferResponseType<typeof client.api.users.$get>
+          // { users: Array<{id: number, name: string}> }
+
+          // Wyciągnij typ request body
+          type CreateUserBody = InferRequestType<typeof client.api.users.$post>['json']
+          // { name: string, email: string }
+
+          // Użyj w komponencie React
+          async function fetchUsers(): Promise<UsersResponse> {
+            const res = await client.api.users.$get()
+            return res.json()
+          }
+        desc: InferResponseType i InferRequestType
+        detail:
+          what: InferResponseType<> i InferRequestType<> to helper typy dla wyciągania typów z klienta. Przydatne gdy chcesz typed state w React/Vue bez duplikowania definicji.
+          how: Importuj z hono/client. Argument = typeof client.endpoint.$method — dokładnie ten endpoint i metoda.
+          tips:
+            - 'Unika duplikowania typów — jeden source of truth: Zod schema na serwerze'
+            - "InferResponseType<...>[200] — typ dla konkretnego status code jeśli endpoint ma wiele"
+
+  - name: Streaming i WebSocket
+    icon: "⚡"
+    commands:
+      - code: |
+          import { Hono } from 'hono'
+          import { stream, streamText, streamSSE } from 'hono/streaming'
+
+          const app = new Hono()
+
+          // Streaming text — chunk po chunk
+          app.get('/stream/text', (c) => {
+            return streamText(c, async (stream) => {
+              const words = ['Hello', ' ', 'World', '!', ' Streaming...']
+              for (const word of words) {
+                await stream.write(word)
+                await stream.sleep(300)  // 300ms pauza
+              }
+            })
+          })
+
+          // Streaming binary/arbitrary
+          app.get('/stream/data', (c) => {
+            return stream(c, async (stream) => {
+              for (let i = 0; i < 5; i++) {
+                await stream.write(new TextEncoder().encode(`chunk-${i}\n`))
+                await stream.sleep(500)
+              }
+            })
+          })
+
+          export default app
+        desc: streamText() — streaming odpowiedzi
+        detail:
+          what: streamText() / stream() pozwala wysyłać odpowiedź w kawałkach przez ReadableStream. Klient dostaje dane na bieżąco zamiast czekać na całą odpowiedź.
+          how: 'stream.write() — wyślij chunk. stream.sleep(ms) — pauza. stream.pipe(readable) — piping z innego streamu. Content-Type: text/plain; charset=utf-8.'
+          tips:
+            - 'Świetne do długich generacji AI (LLM streaming) — klient widzi tekst od razu'
+            - 'stream.abort() — przerwij stream z błędem'
+
+      - code: |
+          import { Hono } from 'hono'
+          import { streamSSE } from 'hono/streaming'
+
+          const app = new Hono()
+
+          // Server-Sent Events — real-time updates do przeglądarki
+          app.get('/events', (c) => {
+            return streamSSE(c, async (stream) => {
+              let id = 0
+
+              // Wysyłaj eventy co sekundę
+              while (true) {
+                await stream.writeSSE({
+                  data: JSON.stringify({
+                    timestamp: Date.now(),
+                    message: `Event ${id}`,
+                  }),
+                  event: 'update',
+                  id: String(id++),
+                })
+                await stream.sleep(1000)
+
+                // Sprawdź czy klient rozłączony
+                if (await c.req.raw.signal.aborted) break
+              }
+            })
+          })
+
+          // Frontend JavaScript:
+          // const es = new EventSource('/events')
+          // es.addEventListener('update', (e) => console.log(JSON.parse(e.data)))
+          export default app
+        desc: streamSSE() — Server-Sent Events
+        detail:
+          what: SSE = jednostronne push notifications z serwera do przeglądarki przez HTTP. Brak WebSocket — prościej, automatyczny reconnect w przeglądarce.
+          how: 'writeSSE({ data, event, id, retry }) — format SSE. event = nazwa eventu (domyślnie "message"). Klient: EventSource API.'
+          tips:
+            - 'SSE vs WebSocket: SSE = jednostronne (serwer→klient), WS = dwustronne. SSE prostsze dla notyfikacji.'
+            - 'c.req.raw.signal.aborted — sprawdź czy klient się rozłączył żeby nie wysyłać w próżnię'
+
+      - code: |
+          import { Hono } from 'hono'
+          import { upgradeWebSocket } from 'hono/cloudflare-workers'
+          // Node.js: import { upgradeWebSocket } from '@hono/node-ws'
+
+          const app = new Hono()
+
+          app.get('/ws', upgradeWebSocket((c) => ({
+            onOpen: (event, ws) => {
+              console.log('WebSocket connected')
+              ws.send('Welcome!')
+            },
+            onMessage: (event, ws) => {
+              const msg = event.data.toString()
+              console.log('Received:', msg)
+              ws.send(`Echo: ${msg}`)
+            },
+            onClose: (event, ws) => {
+              console.log('WebSocket closed')
+            },
+            onError: (event, ws) => {
+              console.error('WS error:', event)
+            },
+          })))
+
+          export default app
+        desc: upgradeWebSocket() — WebSocket
+        detail:
+          what: upgradeWebSocket() obsługuje HTTP → WebSocket upgrade. onOpen/onMessage/onClose/onError callbacks. Adapter zależy od runtimeu — CF Workers, Node.js, Bun mają osobne paczki.
+          how: 'CF Workers: hono/cloudflare-workers. Node.js: @hono/node-ws (npm install). Bun: hono/bun-ws. Frontend: new WebSocket("ws://localhost/ws").'
+          tips:
+            - 'ws.send(string|Uint8Array) — wyślij wiadomość do klienta'
+            - 'ws.close(1000, "reason") — zamknij WebSocket z kodem i powodem'
+
+      - code: |
+          // Streaming JSON — LLM AI response
+          import { Hono } from 'hono'
+          import { stream } from 'hono/streaming'
+
+          const app = new Hono()
+
+          app.post('/ai/chat', async (c) => {
+            const { message } = await c.req.json()
+
+            // Symulacja LLM streaming (np. Anthropic/OpenAI SDK)
+            return stream(c, async (s) => {
+              const words = `Odpowiedź na: "${message}" Oto szczegółowa odpowiedź...`.split(' ')
+
+              for (const word of words) {
+                // Hono streaming format
+                await s.write(
+                  new TextEncoder().encode(
+                    JSON.stringify({ type: 'text', text: word + ' ' }) + '\n'
+                  )
+                )
+                await s.sleep(50)  // symulacja generowania
+              }
+
+              // Finalny event
+              await s.write(
+                new TextEncoder().encode(
+                  JSON.stringify({ type: 'done', total_tokens: words.length }) + '\n'
+                )
+              )
+            })
+          })
+
+          export default app
+        desc: Streaming JSON — format dla AI/LLM
+        detail:
+          what: Streaming JSON (NDJSON) — każda linia to osobny JSON obiekt. Standard dla LLM API (Anthropic, OpenAI streaming). Klient czyta linię po linii przez EventSource lub fetch streaming.
+          how: 'Frontend: response.body.getReader() + TextDecoder + split("\n"). Każda linia to JSON.parse() jeden obiekt.'
+          tips:
+            - 'Anthropic SDK i OpenAI SDK mają własny streaming — ich stream można pipe do Hono stream'
+            - 'Content-Type: application/x-ndjson lub text/event-stream dla SSE format'
+
+      - code: |
+          import { Hono } from 'hono'
+          import { streamText } from 'hono/streaming'
+
+          const app = new Hono()
+
+          // Streaming z obsługą błędów i cleanup
+          app.get('/stream/safe', (c) => {
+            return streamText(c, async (stream) => {
+              // onAbort — gdy klient się rozłączy
+              stream.onAbort(() => {
+                console.log('Client disconnected — cleanup...')
+                // Anuluj długą operację (np. AI generation)
+              })
+
+              try {
+                for (let i = 0; i < 100; i++) {
+                  await stream.write(`Line ${i}\n`)
+                  await stream.sleep(100)
+                }
+              } catch (err) {
+                console.error('Stream error:', err)
+                await stream.write('ERROR: stream interrupted\n')
+              }
+            })
+          })
+
+          export default app
+        desc: Streaming z onAbort i error handling
+        detail:
+          what: stream.onAbort(fn) wywołuje callback gdy klient przerwie połączenie. Kluczowe dla długich operacji (AI) żeby nie kontynuować generowania po rozłączeniu.
+          how: Bez onAbort serwer generuje dane nawet gdy nikt nie słucha — marnuje zasoby. onAbort = cancel long-running task.
+          tips:
+            - 'AbortController — przekaż sygnał do fetch/DB query żeby też je anulować'
+            - 'c.req.raw.signal — natywny Web AbortSignal z requestu'
+
+  - name: Adaptery runtime
+    icon: "🔌"
+    commands:
+      - code: |
+          // src/index.ts — Bun
+          import { Hono } from 'hono'
+
+          const app = new Hono()
+
+          app.get('/', (c) => c.text('Hello Bun!'))
+          app.get('/bun-version', (c) => {
+            return c.json({ version: Bun.version, bunRevision: Bun.revision })
+          })
+
+          // Opcja 1: eksport default (Bun.serve automatycznie)
+          export default app
+
+          // Opcja 2: jawny Bun.serve
+          // const server = Bun.serve({
+          //   fetch: app.fetch,
+          //   port: 3000,
+          //   hostname: '0.0.0.0',
+          // })
+          // console.log(`Listening on ${server.url}`)
+
+          // package.json: "start": "bun run src/index.ts"
+        desc: Adapter Bun — natywny runtime
+        detail:
+          what: Bun obsługuje Hono natywnie przez Web Fetch API. Eksport default app = Bun automatycznie wywołuje app.fetch. Najszybszy runtime dla Hono.
+          how: Bun.version dostępny globalnie. Bun ma wbudowany SQLite (Bun.sql), file API (Bun.file), test runner. Kompiluje TypeScript natywnie.
+          tips:
+            - 'bun --hot run src/index.ts — hot module replacement bez restartu'
+            - 'Bun.file() zamiast fs.readFile — natywne async file I/O'
+
+      - code: |
+          // src/index.ts — Node.js z @hono/node-server
+          import { serve } from '@hono/node-server'
+          import { serveStatic } from '@hono/node-server/serve-static'
+          import { Hono } from 'hono'
+
+          const app = new Hono()
+
+          app.get('/', (c) => c.text('Hello Node.js!'))
+
+          // Statyczne pliki (wymaga @hono/node-server)
+          app.use('/static/*', serveStatic({ root: './' }))
+
+          // Serwuj SPA — wszystko przez index.html
+          app.use('*', serveStatic({ path: './public/index.html' }))
+
+          // Start server
+          serve({
+            fetch: app.fetch,
+            port: Number(process.env.PORT ?? 3000),
+          }, (info) => {
+            console.log(`Server: http://localhost:${info.port}`)
+          })
+
+          // npm install @hono/node-server
+          // node --experimental-strip-types src/index.ts
+        desc: Adapter Node.js — @hono/node-server
+        detail:
+          what: '@hono/node-server tworzy HTTP server Node.js z Hono app. serve() przyjmuje fetch handler i port. serveStatic() do plików statycznych (wymaga tego adaptera).'
+          how: Node 18+ wymagany (Web Fetch API). Node 22+ wspiera --experimental-strip-types = TypeScript bez ts-node.
+          tips:
+            - 'npm install @hono/node-server — adapter nie wchodzi z core hono'
+            - 'Migracja z Express: serwer HTTP jest identyczny — tylko routing inny'
+
+      - code: |
+          // src/index.ts — Cloudflare Workers
+          import { Hono } from 'hono'
+
+          type Env = {
+            Bindings: {
+              KV: KVNamespace
+              DB: D1Database
+              R2: R2Bucket
+              SECRET_KEY: string
+            }
+          }
+
+          const app = new Hono<Env>()
+
+          app.get('/', (c) => c.text('Hello Cloudflare!'))
+
+          app.get('/kv/:key', async (c) => {
+            const value = await c.env.KV.get(c.req.param('key'))
+            return c.json({ value })
+          })
+
+          app.get('/db/users', async (c) => {
+            const { results } = await c.env.DB.prepare(
+              'SELECT id, name FROM users LIMIT 10'
+            ).all()
+            return c.json({ users: results })
+          })
+
+          export default app
+
+          // wrangler.toml:
+          // [[ kv_namespaces ]]
+          // binding = "KV", id = "xxx"
+        desc: Adapter Cloudflare Workers — c.env
+        detail:
+          what: CF Workers to natywne środowisko Hono. c.env daje dostęp do CF bindings (KV, D1, R2, Queues). Eksport default app — Workers wywołuje app.fetch per request.
+          how: KV = key-value store. D1 = SQLite database. R2 = object storage (S3-compatible). Bindings konfigurowane w wrangler.toml.
+          tips:
+            - 'wrangler dev — lokalny dev server emulujący CF Workers'
+            - 'wrangler deploy — deploy na Cloudflare Edge (174 lokalizacje)'
+
+      - code: |
+          // src/index.ts — Deno
+          import { Hono } from 'npm:hono'
+
+          const app = new Hono()
+
+          app.get('/', (c) => c.text('Hello Deno!'))
+
+          app.get('/env', (c) => {
+            // Deno.env — dostęp do zmiennych środowiskowych
+            const key = Deno.env.get('API_KEY') ?? 'not-set'
+            return c.json({ key: key.slice(0, 4) + '...' })
+          })
+
+          app.get('/file', async (c) => {
+            // Deno natywne file API
+            const content = await Deno.readTextFile('./README.md')
+            return c.text(content)
+          })
+
+          // Deno.serve — natywny HTTP server
+          Deno.serve({ port: 8080 }, app.fetch)
+
+          // deno run --allow-net --allow-env --allow-read src/index.ts
+          // Lub: deno add npm:hono && deno run ...
+        desc: Adapter Deno — natywny runtime
+        detail:
+          what: Deno ma wbudowane Web Fetch API — Hono działa bez adaptera. Import z npm:hono lub jsr:@hono/hono. Deno.serve() = HTTP server.
+          how: Deno wymaga explicitnych uprawnień — --allow-net, --allow-env, --allow-read. Bez flagi = Deno pyta użytkownika.
+          tips:
+            - 'jsr:@hono/hono — JSR (Deno registry) zamiast npm — szybsze, natywne Deno'
+            - 'Deno Deploy = edge hosting jak Cloudflare Workers ale dla Deno'
+
+      - code: |
+          // Vercel Edge Functions
+          // api/[...route].ts
+          import { Hono } from 'hono'
+          import { handle } from 'hono/vercel'
+
+          export const config = { runtime: 'edge' }
+
+          const app = new Hono().basePath('/api')
+
+          app.get('/hello', (c) => {
+            const country = c.req.header('x-vercel-ip-country') ?? 'unknown'
+            return c.json({
+              message: 'Hello from Vercel Edge!',
+              country,
+              region: c.req.header('x-vercel-ip-country-region'),
+            })
+          })
+
+          app.get('/users', (c) => c.json({ users: [] }))
+
+          export default handle(app)
+
+          // vercel.json nie jest potrzebny — plik api/[...route].ts = automatyczny routing
+        desc: Adapter Vercel Edge Functions
+        detail:
+          what: "Hono na Vercel Edge przez handle() adapter. config = { runtime: 'edge' } = Edge Runtime zamiast Node.js. Globalny CDN Vercel, zero cold start."
+          how: Plik api/[...route].ts = catch-all route na Vercel. basePath('/api') bo Vercel mountuje na /api.
+          tips:
+            - 'x-vercel-ip-country header — kraj użytkownika dla geo-routing'
+            - 'import { handle } from "hono/vercel" — Vercel-specific adapter'
+
+  - name: Helpers i utilities
+    icon: "🛠️"
+    commands:
+      - code: |
+          import { Hono } from 'hono'
+
+          type Variables = {
+            user: { id: string; name: string; role: 'admin' | 'user' }
+            requestId: string
+            startTime: number
+          }
+
+          const app = new Hono<{ Variables: Variables }>()
+
+          // Middleware ustawia dane w kontekście
+          app.use('*', async (c, next) => {
+            c.set('requestId', crypto.randomUUID())
+            c.set('startTime', Date.now())
+            await next()
+          })
+
+          app.use('/api/*', async (c, next) => {
+            // Symulacja auth — w realu: weryfikuj JWT
+            c.set('user', { id: '1', name: 'Jan', role: 'user' })
+            await next()
+          })
+
+          app.get('/api/profile', (c) => {
+            const user = c.get('user')         // { id, name, role } — typowany!
+            const reqId = c.get('requestId')   // string
+            const ms = Date.now() - c.get('startTime')
+
+            return c.json({ user, requestId: reqId, responseMs: ms })
+          })
+
+          export default app
+        desc: c.set() / c.get() — typowany shared state
+        detail:
+          what: 'Variables generic w Hono<{Variables}> = type safety dla c.set/c.get. Middleware ustawia dane, handler czyta. TypeScript wie jaki typ per klucz.'
+          how: c.set() w middleware. c.get() w handlerze lub kolejnym middleware. Dane żyją tylko przez request — nie są persistent.
+          tips:
+            - 'Definiuj Variables type w jednym miejscu — importuj przez cały projekt'
+            - 'c.get() zwraca undefined jeśli klucz nie ustawiony — handle to'
+
+      - code: |
+          // Hono JSX — SSR bez React
+          import { Hono } from 'hono'
+          import { jsx } from 'hono/jsx'
+
+          // tsconfig.json:
+          // "jsx": "react-jsx",
+          // "jsxImportSource": "hono/jsx"
+
+          // Komponenty JSX (TypeScript .tsx)
+          const Layout = ({ title, children }: {
+            title: string
+            children: any
+          }) => (
+            <html>
+              <head>
+                <title>{title}</title>
+                <meta charset="UTF-8" />
+              </head>
+              <body>{children}</body>
+            </html>
+          )
+
+          const UserCard = ({ name, role }: { name: string; role: string }) => (
+            <div class="user-card">
+              <h2>{name}</h2>
+              <span>{role}</span>
+            </div>
+          )
+
+          const app = new Hono()
+
+          app.get('/page', (c) => {
+            return c.html(
+              <Layout title="Users">
+                <UserCard name="Jan" role="admin" />
+              </Layout>
+            )
+          })
+
+          export default app
+        desc: JSX w Hono — SSR na serwerze
+        detail:
+          what: Hono ma wbudowane renderowanie JSX. Nie wymaga React. c.html(<Component />) = response HTML. Działa na edge runtimeach — zero React overhead.
+          how: 'tsconfig.json: jsx: "react-jsx", jsxImportSource: "hono/jsx". Pliki .tsx. c.html() ustawia Content-Type: text/html.'
+          tips:
+            - 'hono/jsx renderuje synchronicznie — dla async komponentów używaj streamSSE'
+            - 'class= zamiast className= (jak HTML, nie React)'
+
+      - code: |
+          import { Hono } from 'hono'
+
+          const app = new Hono()
+
+          // Custom 404
+          app.notFound((c) => {
+            return c.json({
+              error: 'Not Found',
+              path: c.req.path,
+              method: c.req.method,
+            }, 404)
+          })
+
+          // Globalny error handler
+          app.onError((err, c) => {
+            console.error(`Error: ${err.message}`, {
+              path: c.req.path,
+              stack: err.stack,
+            })
+
+            // Zwróć user-friendly error
+            if (err.message.includes('Unauthorized')) {
+              return c.json({ error: 'Unauthorized' }, 401)
+            }
+
+            return c.json({
+              error: 'Internal Server Error',
+              message: err.message,
+            }, 500)
+          })
+
+          app.get('/crash', () => {
+            throw new Error('Intentional crash!')
+          })
+
+          export default app
+        desc: app.notFound() + app.onError()
+        detail:
+          what: app.notFound() = handler dla tras które nie pasują do żadnego route. app.onError() = globalny handler nieobsłużonych błędów (throw w handlerze).
+          how: Bez onError Hono zwraca 500 z domyślnym formatem. Zdefiniuj oba w każdej aplikacji — dla konsistentnego formatu błędów.
+          tips:
+            - 'onError łapie wszystkie throw — nie potrzebujesz try/catch w handlerach'
+            - 'Loguj err.stack do monitoring (Sentry, Grafana) — nie wysyłaj do klienta'
+
+      - code: |
+          import { Hono } from 'hono'
+          import { HTTPException } from 'hono/http-exception'
+
+          const app = new Hono()
+
+          // Throw HTTPException — typed błąd z kodem HTTP
+          app.get('/users/:id', async (c) => {
+            const id = c.req.param('id')
+            const user = await getUserFromDB(id)
+
+            if (!user) {
+              throw new HTTPException(404, {
+                message: `User ${id} not found`,
+              })
+            }
+
+            if (!user.isActive) {
+              throw new HTTPException(403, {
+                message: 'Account deactivated',
+                cause: new Error('User account deactivated'),
+              })
+            }
+
+            return c.json({ user })
+          })
+
+          // onError łapie HTTPException
+          app.onError((err, c) => {
+            if (err instanceof HTTPException) {
+              return err.getResponse()  // automatyczna odpowiedź z kodem
+            }
+            return c.json({ error: 'Server Error' }, 500)
+          })
+
+          export default app
+        desc: HTTPException — typowane błędy HTTP
+        detail:
+          what: HTTPException to klasa błędu Hono z kodem HTTP. throw HTTPException(404, ...) zamiast return c.json(error, 404). Łapany przez onError. Czytelniejszy kod.
+          how: err.getResponse() = gotowa Response z kodem i wiadomością. err.status = status code. err.message = wiadomość.
+          tips:
+            - 'throw HTTPException zamiast return w handlerze — łatwiejszy early exit'
+            - 'Zdefiniuj własne klasy błędów extends HTTPException — np. ValidationError(422)'
+
+      - code: |
+          // Testowanie Hono bez uruchamiania serwera
+          import { Hono } from 'hono'
+          import { testClient } from 'hono/testing'
+
+          const app = new Hono()
+
+          app.get('/api/users', (c) => c.json({ users: [{ id: 1, name: 'Jan' }] }))
+          app.post('/api/users', async (c) => {
+            const body = await c.req.json()
+            return c.json({ id: 2, ...body }, 201)
+          })
+
+          // Test z testClient — bez fetch, bez portu
+          const client = testClient(app)
+
+          // Przykład testu (Vitest / Bun test)
+          // import { describe, it, expect } from 'vitest'
+          // describe('Users API', () => {
+          //   it('GET /api/users returns list', async () => {
+          //     const res = await client.api.users.$get()
+          //     expect(res.status).toBe(200)
+          //     const data = await res.json()
+          //     expect(data.users).toHaveLength(1)
+          //   })
+          //
+          //   it('POST /api/users creates user', async () => {
+          //     const res = await client.api.users.$post({
+          //       json: { name: 'Anna', email: 'anna@test.com' },
+          //     })
+          //     expect(res.status).toBe(201)
+          //   })
+          // })
+
+          export default app
+        desc: testClient() — testy bez serwera
+        detail:
+          what: testClient() z hono/testing tworzy klienta RPC działającego bezpośrednio na app.fetch — bez HTTP server, bez portu, bez sieci. Idealne dla unit testów.
+          how: Taki sam API jak hc() klient — $get, $post, $put. Działa z Vitest, Bun test, Jest. Typy inferowane z AppType automatycznie.
+          tips:
+            - 'Łącz z testClient — testy są izolowane, szybkie i nie wymagają wolnego portu'
+            - 'bun test — wbudowany test runner Bun działa z testClient bez konfiguracji'
+
+      - code: |
+          import { Hono } from 'hono'
+          import { createFactory, createMiddleware } from 'hono/factory'
+
+          // Factory pattern — współdzielony typ przez cały projekt
+          type AppEnv = {
+            Bindings: { DB_URL: string }
+            Variables: { userId: string; role: string }
+          }
+
+          const factory = createFactory<AppEnv>()
+
+          // Twórz middleware z typowanym kontekstem
+          const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
+            const token = c.req.header('Authorization')?.split(' ')[1]
+            if (!token) {
+              return c.json({ error: 'Unauthorized' }, 401)
+            }
+            c.set('userId', 'user-from-token')
+            c.set('role', 'user')
+            await next()
+          })
+
+          // Handler z factory — typowany kontekst
+          const getUsersHandler = factory.createHandlers(
+            authMiddleware,
+            (c) => {
+              const userId = c.get('userId')  // string — typowany
+              return c.json({ requestedBy: userId, users: [] })
+            }
+          )
+
+          const app = new Hono<AppEnv>()
+          app.get('/api/users', ...getUsersHandler)
+
+          export default app
+        desc: createFactory() — shared typed middleware
+        detail:
+          what: createFactory<AppEnv>() tworzy factory z przypiętym typem środowiska. createMiddleware() tworzy middleware z type safety bez powtarzania generics w każdym middleware.
+          how: Jeden AppEnv type dla całego projektu. factory.createHandlers() = tablica [middleware, handler] gotowa do spread w route definicji.
+          tips:
+            - 'Eliminuje powtarzanie Hono<AppEnv> w każdym pliku middleware'
+            - 'createMiddleware() eksportuj z osobnego pliku — importuj w routach'

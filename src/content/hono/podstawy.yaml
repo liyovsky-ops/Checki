@@ -1,0 +1,93 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Hono?
+  firstComponent: Pierwsza aplikacja Hono
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Hono?
+  desc: >
+    Hono (炎 — ogień po japońsku) to ultra-szybki, lekki framework webowy działający
+    na wszystkich nowoczesnych runtimeach — Cloudflare Workers, Bun, Deno, Node.js,
+    AWS Lambda, Fastly. Buduje na Web Standards API (Request/Response/URL), co oznacza
+    zero abstrakcji ponad standard. Hono jest 3-5× szybszy od Express, waży <15KB,
+    ma wbudowane RPC, walidację Zod, JSX i typowany kontekst. Idealny dla edge computing
+    i API gdzie liczy się każda milisekunda.
+
+concepts:
+  - title: Web Standards API
+    desc: >
+      Hono używa natywnych Web API — Request, Response, Headers, URL.
+      Brak warstw abstrakcji. Handler zwraca Response zamiast mutować
+      res-obiekt jak Express. Kod przenośny między runtimeami bez zmian.
+    icon: "🌐"
+  - title: Context object (c)
+    desc: >
+      c (Context) to centralny obiekt handlera. c.req — request (params, query,
+      json, header). c.json(), c.text(), c.html() — responses. c.set/c.get
+      — shared state między middleware. c.env — bindings (Cloudflare KV, D1 itp.).
+    icon: "🎯"
+  - title: Middleware chain
+    desc: >
+      app.use() rejestruje middleware globalnie lub na prefixie. await next()
+      zamiast next() callback — pełne async/await. Middleware może działać
+      przed (before) i po (after) route handlerze — jak onion layers.
+    icon: "🔗"
+  - title: Multiple runtimes
+    desc: >
+      Ten sam kod działa na Cloudflare Workers, Bun, Deno, Node.js, AWS Lambda,
+      Vercel Edge. Zmiana runtimeu = zmiana adaptera i jednej linii w entry file.
+      Core Hono ma zero zależności — adaptery są oddzielne.
+    icon: "⚡"
+  - title: RPC mode
+    desc: >
+      Hono RPC — typowane wywołania API bez schema-gen. Serwer eksportuje typ tras,
+      klient hc<AppType>() używa go do autocomplete i type checking w IDE.
+      End-to-end type safety jak tRPC, ale prostszy.
+    icon: "🔌"
+  - title: JSX support
+    desc: >
+      Wbudowane hono/jsx — renderuj komponenty JSX na serwerze bez React.
+      c.html(<Layout><Page /></Layout>) — SSR HTML. Streaming SSR przez
+      streamSSE(). Lekka alternatywa dla Next.js na edge.
+    icon: "⚛️"
+
+whenToUse:
+  - Cloudflare Workers — edge API, zero cold start, globalna dystrybucja
+  - Bun backend — ultra-szybki Node-alternatywny runtime
+  - REST API gdzie wydajność jest kluczowa (3-5× szybszy niż Express)
+  - Typowane API full-stack — Hono RPC + React/Vue frontend
+  - Mikroserwisy edge — cache, auth, routing na CDN
+  - SSR na edge — Hono JSX + streamingowy HTML
+  - Projekty multi-runtime — ten sam kod na Deno + CF Workers + Node
+
+firstComponent: |
+  # Instalacja (Bun)
+  bun create hono@latest my-app
+  cd my-app && bun install
+
+  # src/index.ts — minimalna aplikacja Hono
+  import { Hono } from 'hono'
+
+  const app = new Hono()
+
+  // GET /
+  app.get('/', (c) => c.text('Hello Hono!'))
+
+  // GET /json
+  app.get('/json', (c) => c.json({ message: 'OK', ts: Date.now() }))
+
+  // POST /users — z body
+  app.post('/users', async (c) => {
+    const body = await c.req.json()
+    return c.json({ created: body }, 201)
+  })
+
+  // GET /users/:id — z parametrem URL
+  app.get('/users/:id', (c) => {
+    const id = c.req.param('id')
+    return c.json({ id })
+  })
+
+  // bun run src/index.ts
+  export default app

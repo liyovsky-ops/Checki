@@ -1,0 +1,185 @@
+title: Firestore — baza dokumentów NoSQL
+
+sections:
+  - title: Referencje — kolekcje i dokumenty
+    icon: "📌"
+    desc: >
+      Firestore operuje na referencjach (ref) — wskaźnikach do kolekcji lub dokumentów.
+      Referencja nie pobiera danych — dopiero getDoc/getDocs/onSnapshot je pobiera.
+    code: |
+      import { collection, doc, getFirestore } from 'firebase/firestore';
+      import { db } from './firebase';
+
+      // Referencja do kolekcji
+      const usersRef = collection(db, 'users');
+
+      // Referencja do konkretnego dokumentu
+      const userRef = doc(db, 'users', 'user123');
+
+      // Subcollection — posty użytkownika
+      const postsRef = collection(db, 'users', 'user123', 'posts');
+
+      // Dokument w subcollection
+      const postRef = doc(db, 'users', 'user123', 'posts', 'post456');
+
+  - title: Odczyt — getDoc i getDocs
+    icon: "📖"
+    desc: >
+      getDoc pobiera pojedynczy dokument. getDocs pobiera całą kolekcję lub wyniki zapytania.
+      Oba zwracają snapshot — sprawdź .exists() zanim użyjesz .data().
+    code: |
+      import { getDoc, getDocs, collection, doc } from 'firebase/firestore';
+
+      // Pobierz jeden dokument
+      const snap = await getDoc(doc(db, 'users', 'user123'));
+      if (snap.exists()) {
+        const user = snap.data(); // { name: 'Jan', email: 'jan@example.com' }
+        console.log(snap.id, user);
+      }
+
+      // Pobierz wszystkie dokumenty z kolekcji
+      const querySnap = await getDocs(collection(db, 'users'));
+      const users = querySnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  - title: Zapis — addDoc i setDoc
+    icon: "✏️"
+    desc: >
+      addDoc dodaje dokument z automatycznym ID. setDoc ustawia dokument pod konkretnym ID
+      (nadpisuje jeśli istnieje). Używaj setDoc z merge opcją żeby zaktualizować wybrane pola.
+    code: |
+      import { addDoc, setDoc, collection, doc } from 'firebase/firestore';
+
+      // Dodaj z auto-ID (jak INSERT)
+      const docRef = await addDoc(collection(db, 'users'), {
+        name: 'Jan Kowalski',
+        email: 'jan@example.com',
+        createdAt: new Date(),
+        active: true
+      });
+      console.log('Nowy ID:', docRef.id);
+
+      // Ustaw dokument z konkretnym ID (nadpisuje!)
+      await setDoc(doc(db, 'users', 'custom-id'), {
+        name: 'Anna',
+        role: 'admin'
+      });
+
+      // setDoc z merge — aktualizuj tylko podane pola
+      await setDoc(doc(db, 'users', 'user123'), {
+        lastLogin: new Date()
+      }, { merge: true });
+
+  - title: Aktualizacja i usuwanie
+    icon: "🔄"
+    desc: >
+      updateDoc aktualizuje tylko podane pola (nie nadpisuje całego dokumentu).
+      deleteDoc usuwa dokument. FieldValue.serverTimestamp() i FieldValue.increment()
+      to atomowe operacje serwera.
+    code: |
+      import {
+        updateDoc, deleteDoc, doc,
+        serverTimestamp, increment, arrayUnion, arrayRemove
+      } from 'firebase/firestore';
+
+      // Aktualizuj wybrane pola
+      await updateDoc(doc(db, 'users', 'user123'), {
+        name: 'Jan Nowak',
+        updatedAt: serverTimestamp(), // timestamp z serwera
+        loginCount: increment(1),     // atomowe +1
+        tags: arrayUnion('premium'),  // dodaj do tablicy
+        oldTags: arrayRemove('free')  // usuń z tablicy
+      });
+
+      // Usuń dokument
+      await deleteDoc(doc(db, 'users', 'user123'));
+
+  - title: Zapytania — where, orderBy, limit
+    icon: "🔍"
+    desc: >
+      Firestore wspiera filtrowanie (where), sortowanie (orderBy) i stronicowanie
+      (limit, startAfter). Złożone zapytania mogą wymagać composite index —
+      Firebase poinformuje Cię i da link do stworzenia indeksu.
+    code: |
+      import {
+        collection, query, where, orderBy, limit,
+        startAfter, getDocs
+      } from 'firebase/firestore';
+
+      // Proste filtrowanie
+      const q = query(
+        collection(db, 'users'),
+        where('active', '==', true),
+        orderBy('name', 'asc'),
+        limit(10)
+      );
+      const snap = await getDocs(q);
+
+      // Wiele warunków where
+      const q2 = query(
+        collection(db, 'orders'),
+        where('status', '==', 'pending'),
+        where('amount', '>', 100),
+        orderBy('amount', 'desc')
+      );
+
+      // Stronicowanie — pobierz następną stronę
+      const lastDoc = snap.docs[snap.docs.length - 1];
+      const nextPage = query(
+        collection(db, 'users'),
+        orderBy('name'),
+        startAfter(lastDoc),
+        limit(10)
+      );
+
+  - title: Real-time listener — onSnapshot
+    icon: "📡"
+    desc: >
+      onSnapshot nasłuchuje zmian w czasie rzeczywistym — callback wywoływany przy każdej
+      zmianie danych. Zwraca funkcję unsubscribe — wywołaj ją żeby zatrzymać nasłuchiwanie
+      (np. przy odmontowaniu komponentu).
+    code: |
+      import { onSnapshot, collection, query, where, doc } from 'firebase/firestore';
+
+      // Nasłuchuj kolekcję
+      const q = query(collection(db, 'messages'), orderBy('createdAt', 'asc'));
+      const unsubscribe = onSnapshot(q, (snap) => {
+        const messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setMessages(messages); // aktualizuj state w React
+      });
+
+      // Nasłuchuj jeden dokument
+      const unsub = onSnapshot(doc(db, 'users', userId), (snap) => {
+        if (snap.exists()) setUser(snap.data());
+      });
+
+      // React useEffect — cleanup
+      useEffect(() => {
+        const unsub = onSnapshot(collection(db, 'items'), (snap) => {
+          setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        return unsub; // zatrzymaj przy unmount
+      }, []);
+
+  - title: Batche i transakcje
+    icon: "⚡"
+    desc: >
+      Batch pozwala wykonać wiele operacji atomowo (wszystkie albo żadna) — bez odczytu.
+      Transakcja (runTransaction) pozwala odczytać i zapisać atomowo — przydatna gdy
+      nowy zapis zależy od aktualnej wartości.
+    code: |
+      import { writeBatch, runTransaction, doc } from 'firebase/firestore';
+
+      // Batch — wiele zapisów atomowo (max 500 operacji)
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'users', 'u1'), { name: 'Jan' });
+      batch.update(doc(db, 'users', 'u2'), { active: false });
+      batch.delete(doc(db, 'users', 'u3'));
+      await batch.commit();
+
+      // Transakcja — odczyt + zapis atomowo
+      await runTransaction(db, async (transaction) => {
+        const docRef = doc(db, 'counters', 'page_views');
+        const snap = await transaction.get(docRef);
+        const current = snap.data()?.count ?? 0;
+        transaction.update(docRef, { count: current + 1 });
+      });

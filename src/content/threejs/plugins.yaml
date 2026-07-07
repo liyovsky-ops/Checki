@@ -1,0 +1,195 @@
+title: Ekosystem Three.js
+
+items:
+  - name: "@react-three/fiber (R3F)"
+    desc: "React renderer dla Three.js — budujesz scenę 3D jako drzewo komponentów React. <mesh>, <boxGeometry>, <meshStandardMaterial> zamiast imperatywnego kodu. Stał się standardem dla Three.js w ekosystemie React."
+    icon: "⚛️"
+    code: |
+      npm install @react-three/fiber three
+
+      import { Canvas } from '@react-three/fiber'
+      import { useFrame } from '@react-three/fiber'
+      import { useRef } from 'react'
+
+      function RotatingCube() {
+        const meshRef = useRef()
+        // Hook uruchamiany każdą klatkę animacji
+        useFrame((state, delta) => {
+          meshRef.current.rotation.y += delta
+        })
+        return (
+          <mesh ref={meshRef}>
+            <boxGeometry args={[1, 1, 1]} />
+            <meshStandardMaterial color="#049ef4" />
+          </mesh>
+        )
+      }
+
+      export default function App() {
+        return (
+          <Canvas camera={{ position: [0, 0, 5] }}>
+            <ambientLight intensity={0.5} />
+            <directionalLight position={[5, 5, 5]} />
+            <RotatingCube />
+          </Canvas>
+        )
+      }
+
+  - name: "@react-three/drei"
+    desc: "Kolekcja gotowych helperów i komponentów dla R3F. Ponad 100 utility: OrbitControls, Environment, Text, Html, useGLTF, Sparkles, MeshReflectorMaterial i wiele więcej. Must-have dla każdego projektu R3F."
+    icon: "🧰"
+    code: |
+      npm install @react-three/drei
+
+      import { OrbitControls, Environment, Text, useGLTF } from '@react-three/drei'
+
+      function Scene() {
+        const { scene } = useGLTF('/model.glb') // automatyczny cache
+
+        return (
+          <>
+            {/* Kontrola kamery myszką */}
+            <OrbitControls enablePan={false} maxPolarAngle={Math.PI / 2} />
+
+            {/* HDRI environment map */}
+            <Environment preset="sunset" background />
+
+            {/* 3D tekst */}
+            <Text fontSize={0.5} color="white" position={[0, 2, 0]}>
+              Hello Three.js!
+            </Text>
+
+            {/* GLTF model */}
+            <primitive object={scene} />
+          </>
+        )
+      }
+
+  - name: cannon-es — fizyka
+    desc: "Lekki silnik fizyki 3D (rigid body, kolizje, joinery). Następca cannon.js — aktywnie utrzymywany fork. @react-three/cannon to wrapper dla R3F. Alternatywa: Rapier (Rust/WASM, szybszy)."
+    icon: "🎱"
+    code: |
+      npm install cannon-es
+      # Dla R3F:
+      npm install @react-three/cannon
+
+      import { Physics, useBox, useSphere } from '@react-three/cannon'
+
+      function Ball() {
+        const [ref] = useSphere(() => ({
+          mass: 1,              // > 0 = dynamic body
+          position: [0, 5, 0],
+          args: [0.5],          // promień sfery
+        }))
+        return (
+          <mesh ref={ref}>
+            <sphereGeometry args={[0.5, 32, 32]} />
+            <meshStandardMaterial color="red" />
+          </mesh>
+        )
+      }
+
+      function Floor() {
+        const [ref] = useBox(() => ({
+          mass: 0,              // 0 = static (nie porusza się)
+          position: [0, -1, 0],
+          args: [10, 0.1, 10],
+        }))
+        return <mesh ref={ref}><boxGeometry args={[10, 0.1, 10]} /></mesh>
+      }
+
+      <Physics gravity={[0, -9.81, 0]}>
+        <Ball />
+        <Floor />
+      </Physics>
+
+  - name: leva — GUI kontrolki
+    desc: "Natychmiastowe GUI do tweakowania wartości w czasie rzeczywistym — suwaki, colorpickery, checkboxy, select. Idealne do debugowania materiałów, oświetlenia i parametrów sceny podczas development."
+    icon: "🎛️"
+    code: |
+      npm install leva
+
+      import { useControls } from 'leva'
+
+      function MyMesh() {
+        const { color, metalness, roughness, scale } = useControls('Material', {
+          color: '#049ef4',
+          metalness: { value: 0.5, min: 0, max: 1, step: 0.01 },
+          roughness: { value: 0.5, min: 0, max: 1, step: 0.01 },
+          scale:     { value: 1,   min: 0.1, max: 5 },
+        })
+
+        return (
+          <mesh scale={scale}>
+            <sphereGeometry />
+            <meshStandardMaterial
+              color={color}
+              metalness={metalness}
+              roughness={roughness}
+            />
+          </mesh>
+        )
+      }
+      // Leva automatycznie pokazuje panel GUI w rogu ekranu
+
+  - name: postprocessing — efekty po-renderowania
+    desc: "Zaawansowana biblioteka post-processingu zbudowana na Three.js EffectComposer. Bloom, DepthOfField, ChromaticAberration, Vignette, SSAO, SMAA i 30+ innych efektów. R3F wrapper: @react-three/postprocessing."
+    icon: "✨"
+    code: |
+      npm install postprocessing @react-three/postprocessing
+
+      import { EffectComposer, Bloom, ChromaticAberration, Vignette } from '@react-three/postprocessing'
+      import { BlendFunction } from 'postprocessing'
+
+      function Scene() {
+        return (
+          <>
+            {/* ... meshes ... */}
+
+            <EffectComposer>
+              <Bloom
+                intensity={1.5}
+                luminanceThreshold={0.6}
+                luminanceSmoothing={0.025}
+                mipmapBlur
+              />
+              <ChromaticAberration
+                blendFunction={BlendFunction.NORMAL}
+                offset={[0.002, 0.002]}
+              />
+              <Vignette eskil={false} offset={0.1} darkness={1.1} />
+            </EffectComposer>
+          </>
+        )
+      }
+
+  - name: gltfjsx — konwersja modeli do JSX
+    desc: "CLI tool który konwertuje plik .glb/.gltf do gotowego komponentu React (R3F). Automatycznie generuje kod z prawidłowymi referencjami do geometrii, materiałów i animacji. Draco compression in the box."
+    icon: "🔄"
+    code: |
+      # Konwertuj model do komponentu React
+      npx gltfjsx model.glb
+
+      # Z Draco compression (mniejsze pliki)
+      npx gltfjsx model.glb --draco
+
+      # Wygenerowany plik Model.jsx:
+      import { useGLTF, useAnimations } from '@react-three/drei'
+
+      export function Model(props) {
+        const group = useRef()
+        const { nodes, materials, animations } = useGLTF('/model.glb')
+        const { actions } = useAnimations(animations, group)
+
+        useEffect(() => {
+          actions.Idle?.play() // uruchom animację "Idle"
+        }, [actions])
+
+        return (
+          <group ref={group} {...props}>
+            <mesh geometry={nodes.Body.geometry} material={materials.Skin} />
+            <mesh geometry={nodes.Hair.geometry} material={materials.Hair} />
+          </group>
+        )
+      }
+      useGLTF.preload('/model.glb') // preload przy imporcie

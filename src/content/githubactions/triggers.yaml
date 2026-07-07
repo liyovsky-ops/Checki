@@ -1,0 +1,192 @@
+title: "Triggers & Events"
+
+items:
+  - name: "on: push i pull_request z filtrami"
+    desc: >
+      Najczęstsze triggery — push i pull_request. Możesz filtrować po branches
+      i paths. paths-ignore wyłącza workflow dla zmian w dokumentacji.
+      branches-ignore wyklucza gałęzie deweloperskie.
+    code: |
+      on:
+        push:
+          branches:
+            - main
+            - 'release/**'
+          paths:
+            - 'src/**'
+            - 'package.json'
+          paths-ignore:
+            - '**.md'
+            - 'docs/**'
+
+        pull_request:
+          branches: [main, dev]
+          types: [opened, synchronize, reopened]
+          # types filtruje akcje PR — domyślnie: opened, synchronize, reopened
+
+  - name: "on: schedule — cron jobs"
+    desc: >
+      Scheduled workflows działają bez eventu repo — automatycznie w określonym
+      czasie. Składnia cron UTC. Minimalna częstotliwość to co 5 minut.
+      Nie uruchamiają się jeśli repo jest nieaktywne przez 60 dni.
+    code: |
+      on:
+        schedule:
+          # Codziennie o 8:00 UTC (pon-pt)
+          - cron: '0 8 * * 1-5'
+          # Pierwszego każdego miesiąca o północy
+          - cron: '0 0 1 * *'
+
+      jobs:
+        nightly-build:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@v4
+            - run: npm run build:full
+            - run: npm run test:all
+
+  - name: "on: workflow_dispatch — ręczne uruchomienie z inputami"
+    desc: >
+      workflow_dispatch pozwala uruchomić workflow ręcznie z GitHub UI lub API.
+      inputs: definiuje parametry które użytkownik podaje przed uruchomieniem.
+      Typy inputów: string, boolean, choice, environment, number.
+    code: |
+      on:
+        workflow_dispatch:
+          inputs:
+            environment:
+              description: 'Środowisko docelowe'
+              required: true
+              type: choice
+              options: [staging, production]
+              default: staging
+
+            version:
+              description: 'Wersja do deploya (np. v1.2.3)'
+              required: true
+              type: string
+
+            dry-run:
+              description: 'Symulacja bez faktycznego deploya'
+              type: boolean
+              default: false
+
+      jobs:
+        deploy:
+          runs-on: ubuntu-latest
+          steps:
+            - name: Deploy
+              run: |
+                echo "Środowisko: ${{ inputs.environment }}"
+                echo "Wersja: ${{ inputs.version }}"
+                echo "Dry run: ${{ inputs.dry-run }}"
+
+  - name: "on: release — trigger na GitHub Release"
+    desc: >
+      Trigger na stworzenie lub opublikowanie GitHub Release. Typ published
+      jest najczęstszy — odpala deployment po tagowaniu wersji.
+      types: created|published|edited|deleted|prereleased|released.
+    code: |
+      on:
+        release:
+          types: [published]
+
+      jobs:
+        publish-npm:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                node-version: '20'
+                registry-url: 'https://registry.npmjs.org'
+
+            - run: npm ci
+            - run: npm publish
+              env:
+                NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  - name: "on: workflow_call — trigger z innego workflow"
+    desc: >
+      workflow_call umożliwia wywołanie workflow z innego workflow (reusable).
+      To podstawa wzorca DRY w GitHub Actions — jeden centralny workflow
+      możesz uruchamiać z wielu innych. Może definiować inputs, outputs i secrets.
+    code: |
+      # .github/workflows/reusable-test.yml
+      on:
+        workflow_call:
+          inputs:
+            node-version:
+              type: string
+              default: '20'
+          secrets:
+            NPM_TOKEN:
+              required: false
+
+      jobs:
+        test:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                node-version: ${{ inputs.node-version }}
+            - run: npm ci && npm test
+
+      # Wywołanie z innego workflow:
+      # jobs:
+      #   call-test:
+      #     uses: ./.github/workflows/reusable-test.yml
+      #     with:
+      #       node-version: '22'
+
+  - name: "concurrency — zapobieganie równoległym deployom"
+    desc: >
+      concurrency grupuje workflow i anuluje poprzednie uruchomienia tej samej grupy.
+      cancel-in-progress: true zatrzymuje stary run gdy startuje nowy.
+      Kluczowe dla deploy workflow — nie chcesz dwóch równoległych deployów na prod.
+    code: |
+      on:
+        push:
+          branches: [main]
+
+      concurrency:
+        group: deploy-${{ github.ref }}
+        cancel-in-progress: true
+
+      jobs:
+        deploy:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@v4
+            - run: ./deploy.sh
+
+      # Dla PR — osobna grupa per PR
+      # concurrency:
+      #   group: pr-${{ github.event.pull_request.number }}
+      #   cancel-in-progress: true
+
+  - name: "on: push — paths dla monorepo"
+    desc: >
+      W monorepo możesz skonfigurować osobne workflow dla każdego pakietu/aplikacji
+      używając paths:. Workflow uruchamia się tylko gdy zmienią się pliki
+      w zdefiniowanych ścieżkach — oszczędność minut i czasu.
+    code: |
+      # .github/workflows/api-ci.yml
+      on:
+        push:
+          paths:
+            - 'apps/api/**'
+            - 'packages/shared/**'
+            - '.github/workflows/api-ci.yml'
+
+      # .github/workflows/web-ci.yml
+      on:
+        push:
+          paths:
+            - 'apps/web/**'
+            - 'packages/ui/**'
+            - '.github/workflows/web-ci.yml'
+
+      # Każda aplikacja = osobny workflow = osobny CI

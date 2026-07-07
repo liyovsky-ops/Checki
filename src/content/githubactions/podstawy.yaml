@@ -1,0 +1,100 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać GitHub Actions?
+  firstComponent: Pierwszy workflow CI
+  firstComponentLang: yaml
+
+intro:
+  title: Czym jest GitHub Actions?
+  desc: >
+    GitHub Actions to platforma CI/CD wbudowana bezpośrednio w GitHub — bez zewnętrznych
+    narzędzi. Workflow definiujesz w YAML i trzymasz w repozytorium (.github/workflows/).
+    Actions uruchamiają się automatycznie na eventy (push, PR, schedule, ręczne).
+    GitHub zarządza runnerami (ubuntu/windows/macos) lub możesz użyć własnych
+    (self-hosted). Marketplace zawiera 20 000+ gotowych actions do reużycia.
+
+concepts:
+  - title: Workflow
+    desc: >
+      Workflow to plik YAML w .github/workflows/. Każdy plik = jeden workflow.
+      Workflow zawiera triggery (on:), zmienne środowiskowe (env:) i listę jobów (jobs:).
+      Może być kilka workflow w jednym repo — np. ci.yml, deploy.yml, security.yml.
+    icon: "📋"
+  - title: Job
+    desc: >
+      Job to jednostka równoległa — zbiór kroków (steps) działających na jednym runnerze.
+      Joby domyślnie działają równolegle. Zależności (needs:) wymuszają kolejność.
+      Każdy job dostaje świeży runner — nie ma shared state między jobami (tylko artifacts i outputs).
+    icon: "⚙️"
+  - title: Step
+    desc: >
+      Step to pojedyncza operacja w jobie — może być komendą shell (run:) lub gotową
+      akcją (uses:). Stepy działają sekwencyjnie w ramach jednego joba.
+      Każdy step może mieć id, name, env, if i with (parametry).
+    icon: "▶️"
+  - title: Action
+    desc: >
+      Action to wielokrotnie używalny blok (uses: actions/checkout@v4).
+      Może być z GitHub Marketplace, z innego repozytorium (@ref) lub lokalna (./.github/actions/).
+      Typy action: JavaScript, Docker, Composite. Wersjonowane tagiem, SHA lub branchem.
+    icon: "🧩"
+  - title: Runner
+    desc: >
+      Runner to maszyna wirtualna która wykonuje workflow. GitHub oferuje ubuntu-latest,
+      windows-latest, macos-latest (płatne minuty lub darmowe dla publicznych repo).
+      Self-hosted runner = twoja własna maszyna zarejestrowana w GitHub — bez limitów minut.
+    icon: "🖥️"
+  - title: "Context objects (${{ github.* }})"
+    desc: >
+      Contexts to obiekty z metadanymi dostępnymi w wyrażeniach YAML.
+      github.* — info o repo, evencie, commicie, autorze.
+      env.* — zmienne środowiskowe. secrets.* — zaszyfrowane sekrety.
+      steps.*.outputs.* — outputy z kroków. matrix.* — aktualne wartości matrixa.
+    icon: "🔮"
+  - title: Artifacts i Permissions
+    desc: >
+      Artifacts to pliki przesyłane między jobami lub pobierane po workflow (upload-artifact/download-artifact).
+      Permissions: domyślnie workflow ma read do zawartości repo. Write do PR, packages
+      lub deployments trzeba jawnie zadeklarować. GITHUB_TOKEN jest generowany automatycznie.
+    icon: "📦"
+
+whenToUse:
+  - "CI: automatyczne testy przy każdym push i pull request"
+  - "CD: deploy na Vercel/Netlify/AWS/GCP po merge do main"
+  - Security scanning — CodeQL, Dependabot, SAST tools
+  - Scheduled tasks — cron job (backup, raport, cache warm-up)
+  - Automatyzacja repo — auto-label, release notes, changelog
+  - Matrix builds — testy na wielu wersjach Node.js/Python jednocześnie
+
+firstComponent: |
+  # .github/workflows/ci.yml
+  name: CI
+
+  on:
+    push:
+      branches: [main, dev]
+    pull_request:
+      branches: [main]
+
+  jobs:
+    test:
+      runs-on: ubuntu-latest
+
+      steps:
+        - name: Checkout kodu
+          uses: actions/checkout@v4
+
+        - name: Setup Node.js
+          uses: actions/setup-node@v4
+          with:
+            node-version: '20'
+            cache: 'npm'
+
+        - name: Instalacja zależności
+          run: npm ci
+
+        - name: Uruchom testy
+          run: npm test
+
+        - name: Build
+          run: npm run build

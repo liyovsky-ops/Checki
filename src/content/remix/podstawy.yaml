@@ -1,0 +1,103 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Remix?
+  firstComponent: Pierwsza aplikacja Remix
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Remix?
+  desc: >
+    Remix to full-stack framework React zbudowany na web standards — Fetch API, Web Forms,
+    HTTP semantics. Zamiast wymyślać nowe abstrakcje, Remix wzmacnia to co przeglądarka
+    już umie. Każda trasa może mieć loader (pobieranie danych po stronie serwera) i action
+    (mutacje przez POST/PUT/DELETE). Zagnieżdżone trasy (nested routes) pozwalają na
+    ładowanie danych równolegle i granularne aktualizacje UI. Progressive enhancement
+    — działa bez JS, wzbogaca się z JS.
+
+concepts:
+  - title: Web Standards First
+    desc: >
+      Remix nie wymyśla Request/Response — używa natywnego Fetch API. Formularze HTML
+      to pierwszorzędny mechanizm mutacji. Cookies, Headers, URL — wszystko zgodne
+      ze standardami. Kod serwera i klienta używa tych samych interfejsów.
+    icon: "🌐"
+  - title: Loaders (pobieranie danych)
+    desc: >
+      Każda trasa może eksportować funkcję loader(). Uruchamia się wyłącznie na serwerze,
+      ma dostęp do DB, API keys, cookies. Dane z loadera trafiają do komponentu przez
+      hook useLoaderData(). Loadery dla zagnieżdżonych tras uruchamiają się równolegle.
+    icon: "📡"
+  - title: Actions (mutacje)
+    desc: >
+      Funkcja action() obsługuje POST, PUT, PATCH, DELETE dla danej trasy. Przetwarza
+      dane formularza (FormData), waliduje, zapisuje do DB. Po akcji Remix automatycznie
+      odświeża loadery — UI zawsze ma aktualne dane bez ręcznego zarządzania stanem.
+    icon: "⚡"
+  - title: Nested Routes
+    desc: >
+      Zagnieżdżone trasy to kluczowa cecha Remix. Plik routes/dashboard.tsx to layout,
+      routes/dashboard.users.tsx to child route renderowany przez <Outlet />. Każdy
+      poziom ma własny loader — dane ładują się równolegle, nie sekwencyjnie.
+    icon: "🗂️"
+  - title: Progressive Enhancement
+    desc: >
+      Formularze Remix działają bez JavaScript. Z JS — brak pełnego page reload,
+      loading state, optimistic UI. Jeden kod dla obu przypadków — Remix obsługuje
+      to automatycznie. Dostępność i wydajność out of the box.
+    icon: "📈"
+  - title: File-Based Routing
+    desc: >
+      Trasy definiuje się przez pliki w katalogu app/routes/. Remix v2 używa flat routes
+      — jeden plik zamiast katalogów. Konwencja nazw: dots (.) jako separatory,
+      $ dla params, _ dla layout routes, [] dla escape sekwencji.
+    icon: "📁"
+
+whenToUse:
+  - Aplikacje wymagające doskonałej wydajności i SEO — SSR + streaming out of the box
+  - Projekty gdzie formularze to główny mechanizm interakcji (CRUD, dashboardy)
+  - Zespoły React które chcą pełnego stack bez Next.js lock-in
+  - Progressive web apps gdzie dostępność bez JS jest wymaganiem
+  - Projekty deployowane na edge (Cloudflare Workers, Deno Deploy)
+  - Aplikacje z wieloma zagnieżdżonymi widokami i granularnym data fetching
+
+firstComponent: |
+  # Instalacja
+  npx create-remix@latest my-app
+  cd my-app
+  npm run dev
+
+  # app/routes/_index.tsx — strona główna
+  import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
+  import { json } from "@remix-run/node";
+  import { useLoaderData } from "@remix-run/react";
+
+  export const meta: MetaFunction = () => [
+    { title: "Moja aplikacja Remix" },
+    { name: "description", content: "Witaj w Remix!" },
+  ];
+
+  export async function loader({ request }: LoaderFunctionArgs) {
+    const posts = await db.posts.findMany({ orderBy: { createdAt: "desc" } });
+    return json({ posts });
+  }
+
+  export default function Index() {
+    const { posts } = useLoaderData<typeof loader>();
+
+    return (
+      <main>
+        <h1>Posty</h1>
+        <ul>
+          {posts.map((post) => (
+            <li key={post.id}>
+              <a href={`/posts/${post.slug}`}>{post.title}</a>
+            </li>
+          ))}
+        </ul>
+      </main>
+    );
+  }
+
+  # Uruchomienie
+  npm run dev   # http://localhost:5173
+  npm run build && npm start  # produkcja

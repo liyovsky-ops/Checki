@@ -1,0 +1,95 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Cypress?
+  firstComponent: Pierwsza specyfikacja Cypress
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Cypress?
+  desc: >
+    Cypress to nowoczesne narzędzie do testowania E2E i komponentowego dla aplikacji webowych.
+    Działa bezpośrednio w przeglądarce — nie przez WebDriver, ale przez JavaScript bridge.
+    Oferuje automatyczne czekanie (retry-ability), time travel debugging z screenshotami
+    każdego kroku, live reload przy edycji testów i przyjazny GUI. Domyślnie używa Chromium,
+    obsługuje też Firefox i Edge. Idealne do testowania React, Vue, Angular i każdej aplikacji webowej.
+
+concepts:
+  - title: "Architektura w przeglądarce"
+    desc: >
+      Cypress działa wewnątrz przeglądarki — nie przez proxy WebDriver. Dzięki temu ma
+      pełny dostęp do DOM, network requestów i JavaScript aplikacji. Testy i aplikacja
+      działają w tym samym procesie — zero latency, synchroniczne API (choć asynchroniczne pod spodem).
+    icon: "🌐"
+  - title: Retry-ability (automatyczne czekanie)
+    desc: >
+      Cypress automatycznie powtarza polecenia i asercje dopóki nie spełni warunku lub upłynie
+      timeout. cy.get('.btn') czeka aż element pojawi się w DOM. .should('be.visible') czeka
+      aż stanie się widoczny. Zero ręcznych sleep() i wait().
+    icon: "⏳"
+  - title: Time Travel Debugging
+    desc: >
+      Cypress Test Runner nagrywa screenshota przy każdym kroku. Po teście możesz „cofnąć się
+      w czasie" i zobaczyć stan DOM przed i po każdej akcji. Hover nad krokiem = snapshot.
+      Najlepsze narzędzie do debugowania w E2E.
+    icon: "⏪"
+  - title: "Fixtures i Stubbing"
+    desc: >
+      Cypress pozwala stubować API — cy.intercept() przechwytuje requesty HTTP i zwraca
+      fixture lub custom response. Testy stają się szybkie, przewidywalne i niezależne
+      od backendu. Możesz testować edge case'y których nie da się odtworzyć na prawdziwym API.
+    icon: "🎭"
+  - title: "Component Testing (CT)"
+    desc: >
+      Od wersji 10 Cypress oferuje Component Testing — testuj komponenty React/Vue/Angular
+      w izolacji, bezpośrednio w przeglądarce, z prawdziwym renderowaniem. Alternatywa
+      dla Jest + React Testing Library z wizualnym debugowaniem.
+    icon: "🧩"
+  - title: "Custom Commands"
+    desc: >
+      Cypress.Commands.add() pozwala tworzyć własne komendy cy.* — np. cy.login(), cy.selectUser().
+      Enkapsulują powtarzalne akcje w reużywalne bloki. TypeScript support z deklaracją typów.
+    icon: "🔧"
+
+whenToUse:
+  - "Aplikacje webowe SPA (React, Vue, Angular) — Cypress stworzony dla JS apps"
+  - "Zespoły preferujące szybki feedback i wizualne debugowanie"
+  - "Component Testing jako alternatywa dla Jest + RTL z wizualnym środowiskiem"
+  - "Stubowanie API — testy niezależne od backendu i szybkie"
+  - "Małe i średnie projekty — łatwy setup, zero konfiguracji na start"
+  - "CI/CD pipelines z headless Chrome — szybkie i stabilne"
+
+firstComponent: |
+  # Instalacja
+  npm install --save-dev cypress
+
+  # Otwórz Cypress Test Runner (GUI)
+  npx cypress open
+
+  # cypress/e2e/login.cy.ts
+  describe('Login flow', () => {
+    beforeEach(() => {
+      cy.visit('/login');
+    });
+
+    it('powinien zalogować się prawidłowymi danymi', () => {
+      cy.get('[data-cy="email-input"]').type('user@example.com');
+      cy.get('[data-cy="password-input"]').type('secret123');
+      cy.get('[data-cy="submit-btn"]').click();
+
+      cy.url().should('include', '/dashboard');
+      cy.get('[data-cy="welcome-msg"]').should('contain', 'Witaj');
+    });
+
+    it('powinien pokazać błąd przy złym haśle', () => {
+      cy.get('[data-cy="email-input"]').type('user@example.com');
+      cy.get('[data-cy="password-input"]').type('wrongpassword');
+      cy.get('[data-cy="submit-btn"]').click();
+
+      cy.get('[data-cy="error-msg"]')
+        .should('be.visible')
+        .and('contain', 'Nieprawidłowe dane');
+    });
+  });
+
+  # Uruchom headlessly w CI
+  npx cypress run

@@ -1,0 +1,21 @@
+title: Ekosystem Hono
+
+items:
+  - name: "@hono/zod-validator"
+    desc: Middleware walidacji z Zod. zValidator('json'|'query'|'param'|'header'|'form'|'cookie', schema) — typowane dane przez c.req.valid(). Automatyczny 400 na błędach. Custom handler jako trzeci argument.
+    icon: "✅"
+  - name: "@hono/swagger-ui"
+    desc: "Serwuj Swagger UI na dowolnym endpoincie. swaggerUI({ url: '/openapi.json' }) — interaktywna dokumentacja API. Kombo z @hono/zod-openapi generuje OpenAPI z Zod schematów automatycznie."
+    icon: "📚"
+  - name: "hono/jwt"
+    desc: Wbudowany JWT middleware i helper sign/verify. jwt({ secret }) weryfikuje Bearer token. sign(payload, secret) generuje JWT. Payload dostępny przez c.get('jwtPayload'). Bez zewnętrznych zależności.
+    icon: "🔐"
+  - name: "@hono/oauth-providers"
+    desc: "OAuth 2.0 providers out-of-box: Google, GitHub, Facebook, LinkedIn, Discord, Spotify. authHandler() middleware obsługuje cały flow — redirect, callback, token. Dostępny przez c.get('user-google')."
+    icon: "🌐"
+  - name: "hono/jsx"
+    desc: Wbudowane renderowanie JSX na serwerze bez React. import { jsx } from 'hono/jsx'. c.html(<Layout><Page /></Layout>) — SSR HTML. Streaming SSR przez streamSSE(). tsconfig jsx = 'react-jsx', jsxImportSource = 'hono/jsx'.
+    icon: "⚛️"
+  - name: "@hono/node-server"
+    desc: "Adapter Node.js dla Hono. serve({ fetch: app.fetch, port: 3000 }) — pełny HTTP server. serveStatic() do plików statycznych. Kompatybilny Node.js 18+. Idealny do migracji z Express."
+    icon: "💚"

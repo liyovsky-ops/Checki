@@ -1,0 +1,1049 @@
+title: Komendy GitHub Actions
+
+groups:
+  - name: gh CLI
+    icon: "💻"
+    commands:
+      - cmd: gh workflow list
+        desc: Lista wszystkich workflow w repozytorium
+        detail:
+          what: Wyświetla wszystkie pliki workflow z .github/workflows/ — nazwę, status i ostatni trigger.
+          how: Wymaga zainstalowanego GitHub CLI (gh). Uwierzytelniasz przez gh auth login.
+          tips:
+            - gh workflow list --all — pokaż też wyłączone workflow
+            - gh workflow view ci.yml — szczegóły konkretnego workflow
+
+      - cmd: gh workflow run ci.yml
+        desc: Ręczne uruchomienie workflow z terminala
+        detail:
+          what: Uruchamia workflow workflow_dispatch ręcznie bez wchodzenia w GitHub UI.
+          how: Workflow musi mieć trigger on:workflow_dispatch. Można przekazać inputy przez --field.
+          tips:
+            - "gh workflow run deploy.yml --field environment=staging"
+            - gh workflow run ci.yml --ref feature/my-branch
+
+      - cmd: gh run list --workflow=ci.yml
+        desc: Historia uruchomień workflow
+        detail:
+          what: Lista poprzednich runów danego workflow z statusem i czasem trwania.
+          how: Domyślnie ostatnie 20 runów. --limit zmienia liczbę wyników.
+          tips:
+            - gh run list --status=failure — tylko nieudane runy
+            - gh run list --branch=main -- tylko z gałęzi main
+
+      - cmd: gh run watch
+        desc: Obserwuj aktualnie działający workflow w terminalu
+        detail:
+          what: Streamuje status aktualnego (lub wybranego) workflow run na żywo w terminalu.
+          how: Pokazuje każdy job i step z emoji statusu. Blokuje terminal do końca.
+          tips:
+            - gh run watch 1234567 — obserwuj konkretny run po ID
+            - gh run watch --exit-status — exitcode 1 gdy workflow failuje (przydatne w skryptach)
+
+      - cmd: gh run view --log
+        desc: Wyświetl pełne logi z ostatniego workflow run
+        detail:
+          what: Pobiera i wyświetla logi z GitHub — działa bez wchodzenia w UI przeglądarki.
+          how: Domyślnie ostatni run. --job filtruje logi do konkretnego joba.
+          tips:
+            - gh run view 1234567 --log --job=build — logi tylko z joba build
+            - gh run view --log-failed — logi tylko z failujących stepów
+
+      - cmd: gh run rerun --failed
+        desc: Ponów nieudane joby bez restartu całości
+        detail:
+          what: Restartuje tylko joby które zawiodły w ostatnim run — oszczędza minuty.
+          how: Przydatne gdy test failuje przez flaky test lub tymczasowy problem sieciowy.
+          tips:
+            - gh run rerun 1234567 — ponów cały run
+            - gh run rerun --failed — tylko failujące joby
+
+      - cmd: gh run cancel
+        desc: Anuluj działający workflow run
+        detail:
+          what: Zatrzymuje workflow który się aktualnie wykonuje — np. deploy który poszedł na zły branch.
+          how: Bez argumentu anuluje najnowszy run. Z ID anuluje konkretny.
+          tips:
+            - gh run cancel 1234567 — anuluj konkretny run
+            - Przydatne gdy pushując hotfix chcesz zatrzymać poprzedni wolny deploy
+
+      - cmd: gh secret set API_KEY
+        desc: Ustaw sekret repozytorium z terminala
+        detail:
+          what: Ustawia zaszyfrowany sekret w GitHub Settings bez wchodzenia do UI.
+          how: "Wartość podajesz interaktywnie lub przez pipe: echo 'value' | gh secret set API_KEY"
+          tips:
+            - "gh secret set DB_URL --body 'postgresql://...' — wartość inline"
+            - "gh secret list — lista wszystkich sekretów (bez wartości)"
+
+      - cmd: gh secret list
+        desc: Lista sekretów repozytorium
+        detail:
+          what: Wyświetla nazwy i daty aktualizacji sekretów. Wartości są zawsze ukryte.
+          how: Wymaga write access do repo. Pokazuje sekrety repo, environment i organizacji.
+          tips:
+            - gh secret list --env production — sekrety dla środowiska production
+            - gh secret delete OLD_KEY — usuń sekret który nie jest już potrzebny
+
+      - cmd: gh workflow disable ci.yml
+        desc: Wyłącz workflow bez usuwania pliku
+        detail:
+          what: Wyłącza workflow — nie uruchamia się na eventy, ale plik YAML pozostaje w repo.
+          how: Przydatne gdy chcesz tymczasowo zatrzymać CI bez commitowania zmian.
+          tips:
+            - gh workflow enable ci.yml — ponowne włączenie workflow
+            - Można też wyłączyć przez GitHub UI (Settings > Actions)
+
+      - cmd: gh pr checks
+        desc: Status wszystkich checków dla bieżącego PR
+        detail:
+          what: Wyświetla status wszystkich CI checks (workflow runs) dla aktualnego PR — bez wchodzenia w UI.
+          how: Musi być w repo z otwartym PR na bieżącym branchu.
+          tips:
+            - gh pr checks --watch — czekaj na zakończenie wszystkich checków na żywo
+            - gh pr checks 123 — checks dla konkretnego numeru PR
+
+      - cmd: "gh release create v1.2.3 --generate-notes"
+        desc: Stwórz GitHub Release z auto-generated notes
+        detail:
+          what: Tworzy Release na GitHub z automatycznie wygenerowanymi release notes z merged PR.
+          how: "--generate-notes generuje changelog z merged PR od ostatniego tagu. --draft = draft release."
+          tips:
+            - "gh release create v1.2.3 ./dist/*.tar.gz — dołącz pliki binarne do release"
+            - gh release list — lista wszystkich releases w repo
+
+  - name: Podstawowy workflow CI
+    icon: "🚀"
+    commands:
+      - code: |
+          name: CI
+
+          on:
+            push:
+              branches: [main, dev]
+            pull_request:
+              branches: [main]
+
+          jobs:
+            ci:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-node@v4
+                  with:
+                    node-version: '20'
+                    cache: npm
+                - run: npm ci
+                - run: npm test
+                - run: npm run build
+        desc: Podstawowy CI workflow na push i PR do main
+        detail:
+          what: Minimalna konfiguracja CI — checkout, setup, install, test, build.
+          how: Trigger na push do main/dev i na każdy PR do main. Jeden job, sequential steps.
+          tips:
+            - Dodaj cache npm przez cache:npm w setup-node — oszczędza 30-60 sekund per run
+            - Rozdziel test i build na osobne joby gdy projekt rośnie
+
+      - code: |
+          on: [push, pull_request]
+
+          jobs:
+            lint:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-node@v4
+                  with:
+                    node-version: '20'
+                    cache: npm
+                - run: npm ci
+                - run: npm run lint
+                - run: npm run type-check
+
+            test:
+              runs-on: ubuntu-latest
+              needs: lint
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-node@v4
+                  with:
+                    node-version: '20'
+                    cache: npm
+                - run: npm ci
+                - run: npm test -- --coverage
+        desc: CI z lint i test jako osobne joby (lint blokuje test)
+        detail:
+          what: Lint i type-check uruchomione przed testami — szybki fail gdy jest błąd składniowy.
+          how: needs:lint sprawia że test job startuje tylko gdy lint przejdzie pomyślnie.
+          tips:
+            - Lint jest szybszy niż testy — warto go zrobić pierwszym
+            - Równoległe joby bez needs to szybszy pipeline ale trudniejszy debug
+
+  - name: Node.js CI
+    icon: "🟢"
+    commands:
+      - code: |
+          jobs:
+            test:
+              runs-on: ubuntu-latest
+              strategy:
+                matrix:
+                  node-version: ['18', '20', '22']
+                fail-fast: false
+
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-node@v4
+                  with:
+                    node-version: ${{ matrix.node-version }}
+                    cache: npm
+                - run: npm ci
+                - run: npm test
+        desc: Matrix build — testy na Node.js 18, 20 i 22 jednocześnie
+        detail:
+          what: Testy na 3 wersjach Node.js równolegle — gwarancja kompatybilności.
+          how: GitHub uruchamia 3 joby jednocześnie. fail-fast:false — każdy job kończy się niezależnie.
+          tips:
+            - Matrix cross-product z os i node-version generuje 9 kombinacji
+            - Użyj include/exclude w matrix żeby ominąć konkretne kombinacje
+
+      - code: |
+          steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                node-version: '20'
+                cache: npm
+
+            - run: npm ci
+
+            - run: npm test -- --coverage
+
+            - name: Upload coverage do Codecov
+              uses: codecov/codecov-action@v4
+              with:
+                token: ${{ secrets.CODECOV_TOKEN }}
+                files: ./coverage/lcov.info
+        desc: Node.js CI z coverage upload do Codecov
+        detail:
+          what: Testy z coverage report wysyłanym do Codecov — widoczny diff w PR.
+          how: npm test generuje coverage/lcov.info przez Istanbul/NYC/Jest --coverage.
+          tips:
+            - Codecov automatycznie komentuje PR z diff coverage (nowe linii pokryte/niepokryte)
+            - Ustaw minimum coverage threshold w codecov.yml w repozytorium
+
+      - code: |
+          jobs:
+            ci:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+                  with:
+                    fetch-depth: 0  # pełna historia dla Turbo
+
+                - uses: actions/setup-node@v4
+                  with:
+                    node-version: '20'
+                    cache: npm
+
+                - run: npm ci
+
+                - name: Turbo cache
+                  uses: actions/cache@v4
+                  with:
+                    path: .turbo
+                    key: "turbo-${{ github.sha }}"
+                    restore-keys: turbo-
+
+                - run: npx turbo test lint build --cache-dir=.turbo
+        desc: Monorepo CI z Turborepo i cache
+        detail:
+          what: Turborepo uruchamia tylko taski dla zmienionych pakietów — reszta z cache.
+          how: fetch-depth:0 wymagane dla Turbo do porównania z poprzednimi commitami.
+          tips:
+            - Turborepo Remote Cache (Vercel) eliminuje potrzebę manualnego cache actions
+            - npx turbo run test --filter=...HEAD~1 — tylko pakiety dotknięte ostatnim commitem
+
+      - code: |
+          jobs:
+            publish:
+              runs-on: ubuntu-latest
+              if: startsWith(github.ref, 'refs/tags/v')
+              steps:
+                - uses: actions/checkout@v4
+
+                - uses: actions/setup-node@v4
+                  with:
+                    node-version: '20'
+                    registry-url: "https://registry.npmjs.org"
+
+                - run: npm ci
+                - run: npm run build
+                - run: npm publish --access public
+                  env:
+                    NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        desc: Publish pakietu npm przy tagowaniu wersji
+        detail:
+          what: Automatyczny publish na npm registry gdy tworzysz tag v* (np. v1.2.3).
+          how: registry-url ustawia NPM_CONFIG_REGISTRY. NODE_AUTH_TOKEN jako auth.
+          tips:
+            - "--access public wymagane dla scoped packages (@org/package) na npm free"
+            - Użyj changesets lub semantic-release do automatycznego wersjonowania
+
+  - name: Python CI
+    icon: "🐍"
+    commands:
+      - code: |
+          on: [push, pull_request]
+
+          jobs:
+            test:
+              runs-on: ubuntu-latest
+              strategy:
+                matrix:
+                  python-version: ['3.11', '3.12', '3.13']
+
+              steps:
+                - uses: actions/checkout@v4
+
+                - uses: actions/setup-python@v5
+                  with:
+                    python-version: ${{ matrix.python-version }}
+                    cache: pip
+
+                - run: pip install -r requirements.txt
+
+                - run: pytest --cov=src --cov-report=xml
+
+                - uses: codecov/codecov-action@v4
+                  with:
+                    token: ${{ secrets.CODECOV_TOKEN }}
+        desc: Python CI z pytest na wielu wersjach Pythona
+        detail:
+          what: Testy pytest na Python 3.11/3.12/3.13 równolegle z cache pip.
+          how: cache:pip przyspiesza install przez cache wheels. --cov generuje XML do Codecov.
+          tips:
+            - Dodaj ruff lub flake8 jako osobny job dla lintingu
+            - Użyj uv zamiast pip dla szybszej instalacji (actions/setup-python nie wspiera uv natywnie)
+
+      - code: |
+          steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-python@v5
+              with:
+                python-version: '3.12'
+
+            - run: pip install ruff mypy
+
+            - name: Ruff lint
+              run: ruff check .
+
+            - name: Ruff format check
+              run: ruff format --check .
+
+            - name: Mypy type check
+              run: mypy src/
+        desc: Python linting z Ruff i type checking z Mypy
+        detail:
+          what: Szybki lint (ruff replace flake8+black+isort) i static type checking.
+          how: ruff jest 100x szybszy niż flake8. --check dla format nie modyfikuje plików.
+          tips:
+            - Ruff jest Rust-based — bardzo szybki nawet na dużych projektach
+            - Mypy wymaga poprawnych type hints — zacznij od strict=false i dokręcaj stopniowo
+
+      - code: |
+          jobs:
+            test:
+              runs-on: ubuntu-latest
+
+              services:
+                postgres:
+                  image: postgres:16
+                  env:
+                    POSTGRES_PASSWORD: testpass
+                    POSTGRES_DB: testdb
+                  ports:
+                    - 5432:5432
+                  options: --health-cmd pg_isready --health-interval 10s --health-retries 5
+
+              steps:
+                - uses: actions/checkout@v4
+
+                - uses: actions/setup-python@v5
+                  with:
+                    python-version: '3.12'
+                    cache: pip
+
+                - run: pip install -r requirements.txt
+
+                - name: Migracje i testy Django
+                  run: |
+                    python manage.py migrate
+                    python manage.py test
+                  env:
+                    DATABASE_URL: "postgresql://postgres:testpass@localhost:5432/testdb"
+                    SECRET_KEY: test-secret-key-not-for-production
+                    DEBUG: "False"
+        desc: Django CI z PostgreSQL jako Docker sidecar
+        detail:
+          what: Django testy z prawdziwą bazą PostgreSQL — serwis Docker uruchamiany automatycznie.
+          how: services.postgres tworzy kontener DB dostępny przez localhost:5432 na czas joba.
+          tips:
+            - options:--health-cmd pg_isready czeka aż Postgres będzie gotowy przed testami
+            - Dodaj Redis service analogicznie jeśli Django używa Celery lub cache
+
+  - name: Docker build i push
+    icon: "🐳"
+    commands:
+      - code: |
+          on:
+            push:
+              branches: [main]
+              tags: ['v*']
+
+          jobs:
+            docker:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+
+                - name: Login do GHCR
+                  uses: docker/login-action@v3
+                  with:
+                    registry: ghcr.io
+                    username: ${{ github.actor }}
+                    password: ${{ secrets.GITHUB_TOKEN }}
+
+                - name: Docker meta
+                  id: meta
+                  uses: docker/metadata-action@v5
+                  with:
+                    images: ghcr.io/${{ github.repository }}
+
+                - name: Build i push
+                  uses: docker/build-push-action@v5
+                  with:
+                    push: true
+                    tags: ${{ steps.meta.outputs.tags }}
+                    labels: ${{ steps.meta.outputs.labels }}
+        desc: Build i push obrazu Docker do GitHub Container Registry (GHCR)
+        detail:
+          what: Automatyczny build i push do GHCR przy każdym push do main lub tagu v*.
+          how: GITHUB_TOKEN jako hasło do GHCR — bez dodatkowych sekretów. metadata-action generuje tagi automatycznie.
+          tips:
+            - "metadata-action generuje: latest dla main, v1.2.3 dla tagu — bez ręcznego tagowania"
+            - Dodaj cache-from i cache-to dla BuildKit layer cache
+
+      - code: |
+          - name: Setup Docker Buildx
+            uses: docker/setup-buildx-action@v3
+
+          - name: Build z cache
+            uses: docker/build-push-action@v5
+            with:
+              push: ${{ github.ref == 'refs/heads/main' }}
+              tags: ghcr.io/myorg/myapp:latest
+              cache-from: "type=gha"
+              cache-to: "type=gha,mode=max"
+        desc: Docker build z GitHub Actions cache (BuildKit GHA cache)
+        detail:
+          what: Layer cache Docker przechowywany w GitHub Actions cache — dramatycznie przyspiesza buildy.
+          how: type=gha używa wbudowanego cache Actions. push warunkowy — tylko dla main.
+          tips:
+            - Bez cache każdy build pobiera base images i instaluje zależności od zera
+            - mode=max cachuje każdą warstwę — więcej miejsca, szybszy build
+
+      - code: |
+          - name: Setup QEMU (emulacja arm64)
+            uses: docker/setup-qemu-action@v3
+
+          - name: Setup Docker Buildx
+            uses: docker/setup-buildx-action@v3
+
+          - name: Build multi-platform
+            uses: docker/build-push-action@v5
+            with:
+              platforms: linux/amd64,linux/arm64
+              push: true
+              tags: ghcr.io/myorg/myapp:latest
+              cache-from: "type=gha"
+              cache-to: "type=gha,mode=max"
+        desc: Multi-platform build (amd64 + arm64 / Apple Silicon)
+        detail:
+          what: Buduje obraz dla dwóch architektur jednocześnie — działa na x86 serwery i ARM (Apple M1/M2, AWS Graviton).
+          how: QEMU emuluje arm64 na x86 runnerze. Buildx używa builder z multi-platform support.
+          tips:
+            - Multi-platform build jest wolniejszy — rozważ osobne joby per platforma dla prędkości
+            - Obrazy multi-arch są automatycznie wybierane przez docker pull zależnie od hosta
+
+      - code: |
+          - name: Scan obrazu Trivy
+            uses: aquasecurity/trivy-action@master
+            with:
+              image-ref: ghcr.io/myorg/myapp:${{ github.sha }}
+              format: sarif
+              output: trivy-results.sarif
+              severity: CRITICAL,HIGH
+
+          - name: Upload wyników do GitHub Security
+            uses: github/codeql-action/upload-sarif@v3
+            with:
+              sarif_file: trivy-results.sarif
+        desc: Skanowanie obrazu Docker Trivy (vulnerability scanner)
+        detail:
+          what: Trivy skanuje obraz Docker pod kątem CVE w OS packages i zależnościach aplikacji.
+          how: Wyniki w formacie SARIF uploadowane do GitHub Security tab jako Code scanning alerts.
+          tips:
+            - severity:CRITICAL,HIGH — tylko krytyczne i wysokie podatności
+            - Dodaj exit-code:1 żeby pipeline failował gdy znajdzie krytyczną podatność
+
+  - name: Deploy
+    icon: "🌐"
+    commands:
+      - code: |
+          on:
+            push:
+              branches: [main]
+
+          jobs:
+            deploy:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+
+                - name: Deploy do Vercel
+                  uses: amondnet/vercel-action@v25
+                  with:
+                    vercel-token: ${{ secrets.VERCEL_TOKEN }}
+                    vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+                    vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+                    vercel-args: '--prod'
+        desc: Deploy do Vercel przez Vercel Action
+        detail:
+          what: Automatyczny deploy na Vercel po każdym push do main.
+          how: Wymaga VERCEL_TOKEN, ORG_ID i PROJECT_ID z Vercel Settings.
+          tips:
+            - Dla preview deployów usuń --prod i deployuj na każdy PR
+            - Alternatywa to vercel CLI bezpośrednio przez run:vercel deploy --prod
+
+      - code: |
+          jobs:
+            deploy-aws:
+              runs-on: ubuntu-latest
+              permissions:
+                id-token: write
+                contents: read
+
+              steps:
+                - uses: actions/checkout@v4
+
+                - name: Configure AWS (OIDC)
+                  uses: aws-actions/configure-aws-credentials@v4
+                  with:
+                    role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+                    aws-region: eu-west-1
+
+                - name: Deploy do ECS
+                  run: |
+                    aws ecs update-service \
+                      --cluster prod \
+                      --service my-api \
+                      --force-new-deployment
+        desc: Deploy do AWS ECS przez OIDC (bez kluczy API)
+        detail:
+          what: Bezkluczetowy deploy do AWS ECS — OIDC zamiast długoterminowych credentials.
+          how: IAM Role z Trust Policy dla GitHub OIDC provider. Bezpieczniejsze niż AWS_ACCESS_KEY.
+          tips:
+            - Trust Policy musi mieć StringEquals na token.actions.githubusercontent.com:sub
+            - OIDC działa też dla GCP (Workload Identity Federation) i Azure (Federated Credentials)
+
+      - code: |
+          jobs:
+            deploy-pages:
+              runs-on: ubuntu-latest
+              permissions:
+                contents: write
+              steps:
+                - uses: actions/checkout@v4
+
+                - uses: actions/setup-node@v4
+                  with:
+                    node-version: '20'
+                    cache: npm
+
+                - run: npm ci && npm run build
+
+                - name: Deploy do GitHub Pages
+                  uses: peaceiris/actions-gh-pages@v4
+                  with:
+                    github_token: ${{ secrets.GITHUB_TOKEN }}
+                    publish_dir: ./dist
+        desc: Deploy statycznej strony na GitHub Pages
+        detail:
+          what: Automatyczny deploy buildu na GitHub Pages — darmowy hosting dla stron statycznych.
+          how: actions-gh-pages pushuje build do brancha gh-pages. Wymaga włączonego Pages w repo Settings.
+          tips:
+            - "publish_branch: gh-pages (domyślny) lub custom np. pages"
+            - Alternatywa: oficjalny actions/upload-pages-artifact + actions/deploy-pages
+
+      - code: |
+          jobs:
+            deploy-k8s:
+              runs-on: ubuntu-latest
+              permissions:
+                id-token: write
+                contents: read
+              steps:
+                - uses: actions/checkout@v4
+
+                - name: Configure AWS (OIDC)
+                  uses: aws-actions/configure-aws-credentials@v4
+                  with:
+                    role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+                    aws-region: eu-west-1
+
+                - name: Update kubeconfig
+                  run: aws eks update-kubeconfig --name prod-cluster --region eu-west-1
+
+                - name: Deploy do Kubernetes
+                  run: |
+                    kubectl set image deployment/api \
+                      api=ghcr.io/myorg/api:${{ github.sha }}
+                    kubectl rollout status deployment/api --timeout=5m
+        desc: Deploy do Kubernetes (EKS) przez kubectl
+        detail:
+          what: Aktualizacja deployment na K8s przez kubectl set image i czekanie na rollout.
+          how: aws eks update-kubeconfig tworzy lokalny kubeconfig dla klastra. kubectl działa bez instalacji — preinstalowany na ubuntu-latest.
+          tips:
+            - kubectl rollout status z --timeout zapobiega zawieszeniu joba na zawsze
+            - Lepszy pattern to GitOps z ArgoCD — GitHub Actions commituje obraz, ArgoCD deployuje
+
+  - name: Testy i coverage
+    icon: "🧪"
+    commands:
+      - code: |
+          - name: Uruchom testy z JUnit report
+            run: npm test -- --reporters=default --reporters=jest-junit
+            env:
+              JEST_JUNIT_OUTPUT_DIR: ./test-results/
+
+          - name: Upload wyniki testów
+            uses: actions/upload-artifact@v4
+            if: always()
+            with:
+              name: test-results
+              path: test-results/
+              retention-days: 30
+        desc: Testy z JUnit XML report i upload jako artifact
+        detail:
+          what: Wyniki testów jako artifact — dostępne do pobrania nawet gdy workflow failuje.
+          how: if:always() zapewnia upload niezależnie od wyniku testów.
+          tips:
+            - GitHub Actions wyświetla JUnit XML jako annotations w PR — błędy na konkretnych liniach
+            - retention-days kontroluje jak długo artifact jest przechowywany (max 90 dni)
+
+      - code: |
+          - name: E2E testy z Playwright
+            uses: microsoft/playwright-github-action@v1
+
+          - run: npx playwright test
+
+          - name: Upload Playwright report
+            uses: actions/upload-artifact@v4
+            if: failure()
+            with:
+              name: playwright-report
+              path: playwright-report/
+              retention-days: 7
+        desc: Playwright e2e testy z reportem przy failurze
+        detail:
+          what: E2E testy Playwright z automatycznym uploadem raportu HTML gdy testy failują.
+          how: if:failure() — artifact tylko gdy coś pójdzie nie tak. Oszczędza storage.
+          tips:
+            - playwright-github-action instaluje przeglądarki i dependencje systemu
+            - Playwright ma wbudowane retry — dodaj retries:2 w playwright.config.ts
+
+      - code: |
+          - name: Uruchom Vitest z coverage
+            run: npx vitest run --coverage
+
+          - name: Upload coverage report
+            uses: codecov/codecov-action@v4
+            with:
+              token: ${{ secrets.CODECOV_TOKEN }}
+              files: ./coverage/lcov.info
+
+          - name: Komentarz coverage w PR
+            uses: davelosert/vitest-coverage-report-action@v2
+            if: github.event_name == 'pull_request'
+        desc: Vitest coverage z komentarzem w PR
+        detail:
+          what: Vitest (szybszy Vite-based test runner) z coverage i automatycznym komentarzem diff w PR.
+          how: vitest-coverage-report-action dodaje komentarz do PR z podsumowaniem coverage — similar do Codecov.
+          tips:
+            - Vitest jest szybszy niż Jest dla projektów Vite/Vue/React (Vite transform zamiast Babel)
+            - Ustaw coverage.provider:v8 lub istanbul w vitest.config.ts
+
+      - code: |
+          - name: Download artifact z poprzedniego workflow
+            uses: actions/download-artifact@v4
+            with:
+              name: build-output
+              path: ./dist
+
+          - name: Wylistuj pobrany artifact
+            run: ls -la dist/
+        desc: Download artifact z poprzedniego joba lub workflow
+        detail:
+          what: download-artifact pobiera pliki uploadowane przez upload-artifact — możliwe między jobami i workflow.
+          how: name musi pasować do nazwy użytej w upload-artifact. path to katalog docelowy.
+          tips:
+            - Artifact cross-workflow wymaga actions/download-artifact z github.run_id poprzedniego run
+            - Retencja domyślnie 90 dni — można zmienić per artifact lub w ustawieniach repo
+
+  - name: Cache dependencies
+    icon: "⚡"
+    commands:
+      - code: |
+          - uses: actions/cache@v4
+            with:
+              path: ~/.npm
+              key: npm-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+              restore-keys: |
+                npm-${{ runner.os }}-
+        desc: Cache npm manualnie przez actions/cache
+        detail:
+          what: Cache folderu ~/.npm oparty na hash package-lock.json — inwalidacja gdy zależności się zmieniają.
+          how: restore-keys to fallback — używa najnowszego cache z tym prefixem gdy exact key miss.
+          tips:
+            - actions/setup-node@v4 z cache:npm robi to samo automatycznie — preferuj to
+            - hashFiles() generuje hash z zawartości pliku — zmiana = nowy klucz = nowy cache
+
+      - code: |
+          - uses: actions/cache@v4
+            with:
+              path: |
+                ~/.cache/pip
+                ~/.local/lib/python3.12
+              key: pip-${{ runner.os }}-${{ hashFiles('**/requirements*.txt') }}
+              restore-keys: |
+                pip-${{ runner.os }}-
+        desc: Cache pip dla Pythona
+        detail:
+          what: Cache wheelsów pip — przyspiesza instalację zależności Python o 60-80%.
+          how: path to lista ścieżek. Hash z requirements.txt i requirements-dev.txt.
+          tips:
+            - actions/setup-python@v5 z cache:pip robi to automatycznie
+            - Dla Poetry użyj path:~/.cache/pypoetry i hashFiles(**/poetry.lock)
+
+      - code: |
+          - uses: actions/cache@v4
+            with:
+              path: |
+                ~/.gradle/caches
+                ~/.gradle/wrapper
+              key: "gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}"
+              restore-keys: gradle-${{ runner.os }}-
+        desc: Cache Gradle dla projektów Java/Kotlin/Android
+        detail:
+          what: Cache Gradle dependencies i wrapper — build Javy bez cache może trwać 5-10 minut.
+          how: hashFiles na *.gradle* i gradle-wrapper.properties — inwalidacja gdy zmienią się zależności.
+          tips:
+            - actions/setup-java@v4 z cache:gradle robi to automatycznie (jak setup-node)
+            - Dla Maven użyj path:~/.m2 i hashFiles(**/pom.xml)
+
+  - name: Matrix builds
+    icon: "📐"
+    commands:
+      - code: |
+          strategy:
+            matrix:
+              os: [ubuntu-latest, windows-latest, macos-latest]
+              node: ['18', '20', '22']
+              include:
+                - os: ubuntu-latest
+                  node: '20'
+                  coverage: true
+              exclude:
+                - os: macos-latest
+                  node: '18'
+            fail-fast: false
+        desc: Matrix z include/exclude i custom zmiennymi
+        detail:
+          what: Zaawansowany matrix — dodatkowe właściwości dla konkretnych kombinacji (include) i wykluczenia (exclude).
+          how: include dodaje zmienną coverage:true tylko dla ubuntu+node20. matrix.coverage dostępna w steps.
+          tips:
+            - "matrix.coverage dostępna: if: matrix.coverage — uruchom coverage upload tylko raz"
+            - fail-fast:false — wszystkie kombinacje się kończą nawet gdy jedna failuje
+
+      - code: |
+          jobs:
+            test:
+              runs-on: ubuntu-latest
+              strategy:
+                matrix:
+                  shard: [1, 2, 3, 4]
+              steps:
+                - uses: actions/checkout@v4
+
+                - uses: actions/setup-node@v4
+                  with:
+                    node-version: '20'
+                    cache: npm
+
+                - run: npm ci
+
+                - name: Testy shard ${{ matrix.shard }}/4
+                  run: npx playwright test --shard=${{ matrix.shard }}/4
+        desc: Shard testów — podziel suite na N równoległych jobów
+        detail:
+          what: Sharding dzieli zestaw testów na N części uruchamianych równolegle — skraca czas CI N-krotnie.
+          how: Playwright wbudował wsparcie dla sharding. Jest wymaga jest-circus i --shard flag.
+          tips:
+            - 4 shardy = 4x szybsze CI dla dużych suit testowych
+            - Zbierz coverage ze wszystkich shardów przez upload-artifact i merge w osobnym jobie
+
+  - name: Conditional steps
+    icon: "🔀"
+    commands:
+      - code: |
+          steps:
+            - run: npm test
+
+            - name: Deploy tylko na main
+              if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+              run: npm run deploy
+
+            - name: Notify sukces
+              if: success()
+              run: echo "Wszystko OK"
+
+            - name: Notify błąd
+              if: failure()
+              run: echo "Coś poszło nie tak"
+
+            - name: Zawsze cleanup
+              if: always()
+              run: rm -rf /tmp/build
+        desc: Warunkowe kroki — if z github context i funkcjami statusu
+        detail:
+          what: Kontrola które kroki uruchamiają się — na podstawie brancha, statusu, aktora.
+          how: "success()/failure()/always() to funkcje statusu. github.* to kontekst eventu."
+          tips:
+            - "contains(github.event.head_commit.message, '[skip ci]') — skip CI z commit message"
+            - "startsWith(github.ref, 'refs/tags/') — warunek dla tagów"
+
+      - code: |
+          - name: Sprawdź czy jest changesets
+            id: changesets
+            run: |
+              if git diff --name-only HEAD~1 | grep -q CHANGELOG; then
+                echo "has_changes=true" >> $GITHUB_OUTPUT
+              else
+                echo "has_changes=false" >> $GITHUB_OUTPUT
+              fi
+
+          - name: Publish tylko gdy są zmiany
+            if: steps.changesets.outputs.has_changes == 'true'
+            run: npm publish
+        desc: Warunkowy step na podstawie outputu poprzedniego kroku
+        detail:
+          what: Dynamiczny warunek — step sprawdza coś i ustawia output, następny step reaguje.
+          how: GITHUB_OUTPUT pozwala na komunikację między stepami. steps.id.outputs.key.
+          tips:
+            - Zawsze nadaj id: stepowi którego output chcesz czytać
+            - Output to string — porównuj przez == 'true' nie przez bool
+
+  - name: Secrets i env
+    icon: "🔐"
+    commands:
+      - code: |
+          env:
+            DATABASE_URL: ${{ secrets.DATABASE_URL }}
+            REDIS_URL: ${{ secrets.REDIS_URL }}
+            NODE_ENV: production
+
+          jobs:
+            migrate:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+                - run: npm run migrate
+                - run: npm run seed
+              env:
+                SEED_DATA: ${{ vars.SEED_ENABLED }}
+        desc: Zmienne env na poziomie workflow i job
+        detail:
+          what: env na poziomie workflow — dostępne we wszystkich jobach. Nadpisywane przez env na poziomie job/step.
+          how: Sekrety przez secrets.*, zmienne konfiguracyjne przez vars.*. Nie mieszaj wartości.
+          tips:
+            - vars.* to zwykłe zmienne (widoczne w logach) — dla niesensitywnych konfiguracji
+            - Nigdy nie loguj secrets — GitHub maskuje ale dodatkowy echo to ryzyko
+
+      - code: |
+          - name: Ustaw dynamiczne env
+            run: |
+              echo "BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+              echo "GIT_HASH=${GITHUB_SHA::8}" >> $GITHUB_ENV
+
+          - name: Użyj dynamicznych env
+            run: |
+              echo "Build: $BUILD_TIME"
+              echo "Hash: $GIT_HASH"
+        desc: Dynamiczne zmienne środowiskowe przez GITHUB_ENV
+        detail:
+          what: GITHUB_ENV to plik do którego piszesz KEY=VALUE — dostępne w następnych stepach jako env.
+          how: Inaczej niż GITHUB_OUTPUT — GITHUB_ENV to zmienne shell, nie outputy step.
+          tips:
+            - GITHUB_ENV, GITHUB_OUTPUT, GITHUB_STEP_SUMMARY to specjalne pliki komunikacji
+            - GITHUB_STEP_SUMMARY — markdown wyświetlany na stronie workflow run
+
+      - code: |
+          - name: Podsumowanie w GITHUB_STEP_SUMMARY
+            run: |
+              echo "## Wyniki buildu" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Krok | Status |" >> $GITHUB_STEP_SUMMARY
+              echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+              echo "| Testy | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+              echo "| Build | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+              echo "| Coverage | 87% |" >> $GITHUB_STEP_SUMMARY
+        desc: GITHUB_STEP_SUMMARY — markdown raport na stronie workflow run
+        detail:
+          what: GITHUB_STEP_SUMMARY pozwala na dodanie markdown do strony szczegółów workflow run w GitHub UI.
+          how: Piszesz markdown do specjalnego pliku $GITHUB_STEP_SUMMARY — GitHub renderuje go po zakończeniu.
+          tips:
+            - Idealne do raportów testów, coverage, zmian w bundlesize, changelog
+            - Działa z if:always() — raport nawet gdy job failuje
+
+  - name: Reusable workflows
+    icon: "♻️"
+    commands:
+      - code: |
+          # Wywołanie reusable z podaniem sekretów
+          jobs:
+            test:
+              uses: ./.github/workflows/reusable-test.yml
+              with:
+                node-version: '20'
+                environment: staging
+              secrets:
+                DATABASE_URL: ${{ secrets.DATABASE_URL }}
+                API_KEY: ${{ secrets.API_KEY }}
+
+            # Lub dziedzicz wszystkie sekrety automatycznie
+            deploy:
+              needs: test
+              uses: org/shared/.github/workflows/deploy.yml@v2
+              secrets: inherit
+        desc: Wywołanie reusable workflow z sekretami i dziedziczeniem
+        detail:
+          what: "uses: na poziomie joba (nie step) wywołuje reusable workflow. secrets:inherit przekazuje wszystkie."
+          how: "Reusable musi mieć on:workflow_call. with: to inputs, secrets: to sekrety."
+          tips:
+            - "secrets:inherit jest wygodne ale less explicit — jawne secrets są bezpieczniejsze"
+            - "Reusable workflow może być w innym repo — uses: org/repo/.github/workflows/name.yml@ref"
+
+      - code: |
+          # .github/workflows/auto-assign.yml
+          name: Auto Assign PR
+
+          on:
+            pull_request:
+              types: [opened, reopened]
+
+          jobs:
+            assign:
+              runs-on: ubuntu-latest
+              steps:
+                - name: Auto assign author
+                  uses: actions/github-script@v7
+                  with:
+                    script: |
+                      await github.rest.issues.addAssignees({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        issue_number: context.issue.number,
+                        assignees: [context.actor]
+                      });
+                      await github.rest.issues.addLabels({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        issue_number: context.issue.number,
+                        labels: ['needs-review']
+                      });
+        desc: Auto-assign autor PR i dodanie labela przez github-script
+        detail:
+          what: Automatyczne przypisanie autora do jego PR i dodanie etykiety — bez zewnętrznych actions.
+          how: actions/github-script uruchamia JavaScript z dostępem do Octokit API przez github object.
+          tips:
+            - github-script to najprostszy sposób na interakcję z GitHub API bez własnej action
+            - context.actor to login użytkownika który wyzwolił event (autor PR)
+
+  - name: Security scanning
+    icon: "🔒"
+    commands:
+      - code: |
+          name: Security
+
+          on:
+            push:
+              branches: [main]
+            pull_request:
+              branches: [main]
+            schedule:
+              - cron: '0 0 * * 1'  # co poniedziałek
+
+          jobs:
+            codeql:
+              runs-on: ubuntu-latest
+              permissions:
+                actions: read
+                contents: read
+                security-events: write
+
+              strategy:
+                matrix:
+                  language: [javascript, python]
+
+              steps:
+                - uses: actions/checkout@v4
+
+                - name: Initialize CodeQL
+                  uses: github/codeql-action/init@v3
+                  with:
+                    languages: ${{ matrix.language }}
+
+                - uses: github/codeql-action/autobuild@v3
+
+                - name: Perform CodeQL Analysis
+                  uses: github/codeql-action/analyze@v3
+        desc: CodeQL — statyczna analiza bezpieczeństwa (SAST)
+        detail:
+          what: CodeQL od GitHub skanuje kod pod kątem podatności bezpieczeństwa — SQL injection, XSS, path traversal.
+          how: Wyniki w Security > Code scanning alerts. PR blokowany gdy severity wysoka.
+          tips:
+            - security-events:write wymagane do zapisu wyników w GitHub Security tab
+            - Uruchamiaj też przez cron — wykrywa podatności w zależnościach między PR-ami
+
+      - code: |
+          jobs:
+            dependency-review:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+
+                - name: Dependency Review
+                  uses: actions/dependency-review-action@v4
+                  with:
+                    fail-on-severity: high
+                    deny-licenses: GPL-3.0, AGPL-3.0
+        desc: Dependency Review — sprawdzanie zależności w PR
+        detail:
+          what: Skanuje zmiany w zależnościach (package.json, requirements.txt) w PR pod kątem podatności i licencji.
+          how: fail-on-severity blokuje merge gdy nowa zależność ma wysoką podatność. deny-licenses blokuje niechciane licencje.
+          tips:
+            - Wymaga GitHub Advanced Security lub publicznego repo
+            - Działa dla npm, pip, Maven, NuGet, RubyGems, Go Modules

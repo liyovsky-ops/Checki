@@ -1,0 +1,92 @@
+title: Deno vs inne środowiska uruchomieniowe
+
+items:
+  - name: Node.js
+    icon: "🟢"
+    color: "#339933"
+    tagline: Dominujący JS runtime — stabilny, dojrzały, wszechobecny
+    pros:
+      - Największy ekosystem — 2M+ paczek npm, każdy framework go obsługuje
+      - Stabilność — w produkcji od 2009, sprawdzony przez tysiące firm
+      - V8 z doskonałą optymalizacją JIT — bardzo dobra wydajność w długich procesach
+      - Ogromna społeczność, dokumentacja i materiały w każdym języku
+      - Native addons (N-API/C++) — pełna integracja z bibliotekami systemowymi
+      - Eksperymentalne TypeScript (node --experimental-strip-types od Node 22.6+)
+    cons:
+      - Brak bezpieczeństwa domyślnego — każdy skrypt ma pełny dostęp do systemu
+      - TypeScript wymaga konfiguracji (tsc, tsx lub esbuild) dla pełnego wsparcia
+      - Brak wbudowanego formatteru, lintera, bundlera — potrzebujesz ESLint, Prettier itp.
+      - Historyczny bałagan z CommonJS vs ESM (powoli rozwiązywany)
+      - Wolniejszy install niż Bun (npm/yarn/pnpm)
+    vs: "Node.js wygrywa dojrzałością ekosystemu i kompatybilnością. Deno wygrywa bezpieczeństwem, TypeScript-first i wbudowanymi narzędziami. Migracja Node → Deno 2.0 jest prostsza niż kiedyś (npm: prefix, node_modules wsparcie), ale wciąż wymaga pracy przy dużych projektach."
+
+  - name: Bun
+    icon: "🧅"
+    color: "#FBF0DF"
+    tagline: Ultraszybki JS runtime + package manager + bundler — 3x szybszy od Node
+    pros:
+      - Najszybszy JS runtime — HTTP throughput, startup time, install speed
+      - Pełna kompatybilność z npm i Node.js API — drop-in replacement
+      - Wbudowane API: SQLite, password hashing, WebSocket bez zewnętrznych paczek
+      - Automatyczne ładowanie .env bez konfiguracji
+      - ElysiaJS — najszybszy framework webowy na rynku JS
+    cons:
+      - Brak domyślnego sandboxu — jak Node.js, pełny dostęp do systemu
+      - Napisany w Zig (mniej programistów może kontrybuować niż Rust)
+      - Młodszy — więcej edge cases i bugów niż w Deno czy Node.js
+      - Głównie macOS/Linux — wsparcie Windows wciąż dojrzewa
+      - Mniejsza społeczność od Node.js
+    vs: Bun i Deno mają podobne cele (TypeScript, Web APIs, wbudowane narzędzia), ale różne priorytety. Deno priorytetyzuje bezpieczeństwo i standardy Web. Bun priorytetyzuje szybkość i kompatybilność z npm. Wybierz Deno gdy security model ma znaczenie, Bun gdy liczy się raw performance.
+
+  - name: Cloudflare Workers
+    icon: "☁️"
+    color: "#F6821F"
+    tagline: Edge runtime — JavaScript w 300+ lokalizacjach na świecie z zerowym cold startem
+    pros:
+      - Globalny edge — kod wykonuje się blisko użytkownika (latencja <10ms)
+      - Zero cold start — Workers używają V8 Isolates, nie procesów
+      - Workers KV, D1 (SQLite), R2 (storage), Durable Objects — ekosystem danych
+      - Darmowy tier: 100k requestów/dzień
+      - Wasm support — uruchamiaj kod w dowolnym języku
+    cons:
+      - Ograniczony runtime — nie wszystkie Node.js/Deno API dostępne
+      - CPU time limit: 10ms (free), 30s (paid) — nie dla zadań CPU-intensive
+      - Brak dostępu do systemu plików (to edge compute, nie serwer)
+      - Vendor lock-in — kod pisany pod Workers trudno przenieść
+      - Wrangler (CLI) — własna warstwa abstrakcji
+    vs: Cloudflare Workers to edge deployment, Deno to runtime lokalny i Deno Deploy. Deno Deploy jest bezpośrednim konkurentem Workers — podobny model (V8 Isolates, edge). Deno wygryw swobodą i kompatybilnością z pełnym runtime, Workers wygrywają ekosystemem Cloudflare (KV, D1, R2).
+
+  - name: Edge Runtimes (Vercel/Netlify)
+    icon: "▲"
+    color: "#000000"
+    tagline: Środowiska uruchomieniowe dla Next.js/Remix na edge — ograniczone subset Node.js
+    pros:
+      - Integracja z frameworkami — Next.js Edge Runtime, Remix edge handlers
+      - Globalne deploymenty z CDN — Vercel Edge Network, Netlify Edge Functions
+      - Automatyczne skalowanie i zero DevOps
+      - Vercel KV, Blob, Postgres — zarządzane bazy danych w ekosystemie
+      - Dobra DX — podgląd na żywo, preview deployments, rollbacks
+    cons:
+      - Ograniczony Node.js API — edge runtime nie obsługuje wszystkich modułów Node
+      - Vendor lock-in — trudno migrować między Vercel a Netlify
+      - Nie masz kontroli nad runtime — dostosowania przez config, nie kod
+      - Koszty mogą rosnąć szybko przy dużym ruchu
+      - Brak local debugging parity — edge environment ≠ lokalne środowisko
+    vs: Vercel/Netlify Edge są abstrakcjami nad edge runtimes (Cloudflare, Fastly). Deno Deploy jest bardziej bezpośrednim środowiskiem — uruchamiasz pełny kod Deno, nie ograniczony subset. Dla projektów Next.js Vercel jest naturalnym wyborem; dla custom backend Deno Deploy daje więcej swobody.
+
+  - name: Bun vs Deno — kiedy co wybrać
+    icon: "⚡"
+    color: "#70FFAF"
+    tagline: "Oba dobre — zależy od priorytetu: szybkość vs bezpieczeństwo"
+    pros:
+      - Deno — gdy security model jest kluczowy (fintech, healthtech, skrypty admina)
+      - Deno — gdy piszesz biblioteki do JSR z pełnym TypeScript
+      - Deno — gdy chcesz Deno Deploy na edge z wbudowanym KV i cron
+      - Bun — gdy zależy Ci na raw speed i kompatybilności z istniejącym kodem npm
+      - Bun — gdy masz dużą aplikację Node.js do migracji bez przepisywania
+    cons:
+      - Deno — mniejsza kompatybilność npm niż Bun (choć Deno 2.0 bardzo poprawił)
+      - Bun — brak permissions model — każdy skrypt ma pełny dostęp
+      - Oba — mniejsza społeczność niż Node.js
+      - Oba — edge cases i mniejsza ilość materiałów do nauki
+    vs: Deno i Bun to nie bezpośredni konkurenci — rozwiązują różne problemy. Projekty wymagające high-performance i npm compat → Bun. Projekty wymagające security-first i standards compliance → Deno. Nowe projekty greenfield mogą wybrać dowolny — oba mają TypeScript first class.

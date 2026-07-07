@@ -1,0 +1,585 @@
+title: Komendy Nuxt
+
+groups:
+  - name: Inicjalizacja projektu
+    icon: "🏗️"
+    commands:
+      - cmd: "npx nuxi@latest init my-app"
+        desc: Utwórz nowy projekt Nuxt
+        detail:
+          what: Generuje pełny projekt Nuxt 3 z TypeScript, ESLint, Vite, strukturą katalogów.
+          how: Pobiera najnowszą wersję nuxi i inicjalizuje projekt w katalogu my-app.
+          tips:
+            - 'Po inicjalizacji uruchom: cd my-app && npm install && npm run dev'
+
+      - cmd: "npx nuxi@latest init my-app --template github:nuxt/starter"
+        desc: Utwórz projekt z oficjalnego starter template
+        detail:
+          what: Inicjalizuje projekt na podstawie template z GitHub — można użyć dowolnego repo.
+          how: 'Format: --template github:<user>/<repo>. Nuxt ma kilka oficjalnych starterów.'
+          tips:
+            - 'nuxt/starter-minimal — minimalna konfiguracja'
+            - 'nuxt/starter-content — z @nuxt/content dla blogów'
+
+      - cmd: "npx nuxi@latest add page about"
+        desc: Dodaj nową stronę
+        detail:
+          what: Tworzy plik pages/about.vue z podstawową strukturą komponentu.
+          how: 'nuxi add page "blog/[slug]" — tworzy dynamiczną stronę blog/[slug].vue'
+          tips:
+            - 'Automatycznie tworzy potrzebne katalogi'
+
+      - cmd: "npx nuxi@latest add component AppHeader"
+        desc: Dodaj nowy komponent
+        detail:
+          what: Tworzy plik components/AppHeader.vue z podstawową strukturą.
+          how: 'nuxi add component ui/Button — tworzy components/ui/Button.vue'
+          tips:
+            - 'Komponenty są auto-importowane — nazwa pliku = nazwa komponentu'
+
+      - cmd: "npx nuxi@latest add composable useAuth"
+        desc: Dodaj nowy composable
+        detail:
+          what: Tworzy plik composables/useAuth.ts z podstawową strukturą.
+          how: 'Composables są auto-importowane z katalogu composables/'
+          tips:
+            - 'Konwencja nazewnictwa: camelCase z prefiksem "use"'
+
+      - cmd: "npx nuxi@latest add plugin analytics"
+        desc: Dodaj nowy plugin
+        detail:
+          what: Tworzy plik plugins/analytics.ts. Pluginy ładowane przy starcie aplikacji.
+          how: 'plugins/analytics.client.ts — tylko po stronie przeglądarki'
+          tips:
+            - 'plugins/api.server.ts — tylko na serwerze'
+
+      - cmd: "npx nuxi@latest add middleware auth"
+        desc: Dodaj nowe middleware
+        detail:
+          what: Tworzy plik middleware/auth.ts. Middleware wykonywane przed nawigacją.
+          how: 'middleware/admin.global.ts — globalne (sufiks .global)'
+          tips:
+            - 'Użyj w definePageMeta({ middleware: "auth" })'
+
+      - cmd: "npx nuxi@latest add api posts"
+        desc: Dodaj nowy server API route
+        detail:
+          what: Tworzy plik server/api/posts.ts. Dostępny jako /api/posts.
+          how: 'nuxi add api posts/[id] — tworzy dynamiczny endpoint server/api/posts/[id].ts'
+          tips:
+            - 'Używaj konwencji: posts.get.ts, posts.post.ts dla per-method handlers'
+
+  - name: Dev & Build
+    icon: "🚀"
+    commands:
+      - cmd: "npm run dev"
+        desc: Uruchom dev server (http://localhost:3000)
+        detail:
+          what: Startuje Nuxt w trybie development z hot-reload (HMR) przez Vite.
+          how: Vite HMR dla szybkich odświeżeń. Nitro dla server routes.
+          tips:
+            - 'Domyślny port: 3000. Zmień przez --port lub HOST=0.0.0.0 dla sieci lokalnej'
+
+      - cmd: "npx nuxi dev --port 4000"
+        desc: Dev server na innym porcie
+        detail:
+          what: Uruchamia dev server na porcie 4000 zamiast domyślnego 3000.
+          how: 'Też przez: PORT=4000 npm run dev'
+          tips:
+            - 'Przydatne gdy port 3000 jest zajęty przez inny proces'
+
+      - cmd: "npm run build"
+        desc: Zbuduj aplikację do produkcji
+        detail:
+          what: Kompiluje aplikację Nuxt — Vite dla klienta, Nitro dla serwera. Output w .output/.
+          how: '.output/server/ — Node.js serwer. .output/public/ — statyczne assety.'
+          tips:
+            - 'node .output/server/index.mjs — uruchom produkcyjny serwer'
+
+      - cmd: "npm run generate"
+        desc: Generuj statyczną stronę (SSG)
+        detail:
+          what: Prerenderuje wszystkie strony do statycznego HTML. Output w .output/public/.
+          how: 'Crawluje linki automatycznie. Dodatkowe URL przez generate.routes w nuxt.config.'
+          tips:
+            - 'Idealny dla blogów, landing pages — zero serwera po deploymencie'
+            - 'npx nuxi generate — bezpośrednie wywołanie'
+
+      - cmd: "npm run preview"
+        desc: Podgląd zbudowanej aplikacji
+        detail:
+          what: Uruchamia zbudowaną aplikację z .output/ lokalnie — symuluje produkcję.
+          how: Wymaga wcześniejszego npm run build.
+          tips:
+            - 'Testuj produkcyjny build przed deploymentem'
+
+      - cmd: "npx nuxi generate --preset cloudflare-pages"
+        desc: Zbuduj pod Cloudflare Pages
+        detail:
+          what: Generuje statyczną aplikację zoptymalizowaną pod Cloudflare Pages.
+          how: 'Nitro preset cloudflare-pages — output kompatybilny z CF Pages.'
+          tips:
+            - 'Inne presety: vercel, netlify, node-server, bun, deno'
+
+  - name: Konfiguracja i moduły
+    icon: "⚙️"
+    commands:
+      - cmd: "npx nuxi@latest module add @nuxt/ui"
+        desc: Dodaj moduł @nuxt/ui
+        detail:
+          what: Instaluje i automatycznie konfiguruje @nuxt/ui w nuxt.config.ts.
+          how: 'nuxi module add automatycznie dodaje moduł do modules: [] w nuxt.config.'
+          tips:
+            - 'Alternatywnie: npm install @nuxt/ui && ręczne dodanie do nuxt.config'
+
+      - cmd: "npx nuxi@latest module add @pinia/nuxt"
+        desc: Dodaj Pinia do projektu
+        detail:
+          what: Instaluje Pinia i konfiguruje moduł — auto-import store'ów gotowy.
+          how: 'Tworzy domyślny store. Dodaje @pinia/nuxt do modules w nuxt.config.'
+          tips:
+            - 'Utwórz stores/user.ts i użyj defineStore()'
+
+      - cmd: "npx nuxi@latest module add @nuxt/image"
+        desc: Dodaj optymalizację obrazów
+        detail:
+          what: Instaluje @nuxt/image — dostępne <NuxtImg> i <NuxtPicture>.
+          how: 'Konfiguracja dostawców (Cloudinary, Imgix) w nuxt.config: image: { ... }'
+          tips:
+            - 'Automatyczna konwersja do WebP, lazy loading, srcset'
+
+      - cmd: "npx nuxi@latest module add @nuxtjs/tailwindcss"
+        desc: Dodaj Tailwind CSS
+        detail:
+          what: Instaluje Tailwind CSS i konfiguruje PostCSS. Zero dalszej konfiguracji.
+          how: 'Generuje tailwind.config.ts. Dodaje moduł do nuxt.config.'
+          tips:
+            - 'Tailwind skanuje wszystkie .vue pliki automatycznie'
+
+      - cmd: "npx nuxi@latest module add @nuxtjs/i18n"
+        desc: Dodaj internacjonalizację
+        detail:
+          what: Instaluje @nuxtjs/i18n — routing per-locale, lazy loading tłumaczeń.
+          how: 'Konfiguracja w nuxt.config: i18n: { locales: ["pl", "en"], defaultLocale: "pl" }'
+          tips:
+            - 'Pliki tłumaczeń: locales/pl.json, locales/en.json'
+
+      - cmd: "npx nuxi@latest module add nuxt-security"
+        desc: Dodaj zabezpieczenia HTTP
+        detail:
+          what: Dodaje CSRF ochronę, CSP, HSTS, XSS headers, rate limiting.
+          how: 'Zero konfiguracji — domyślne wartości są bezpieczne dla większości aplikacji.'
+          tips:
+            - 'Customizacja w nuxt.config: security: { headers: { ... } }'
+
+  - name: TypeScript i walidacja
+    icon: "🔷"
+    commands:
+      - cmd: "npx nuxi@latest add layout dashboard"
+        desc: Dodaj nowy layout
+        detail:
+          what: Tworzy plik layouts/dashboard.vue z podstawową strukturą slotu.
+          how: 'Użyj w stronie przez definePageMeta({ layout: "dashboard" })'
+          tips:
+            - 'layouts/default.vue — domyślny layout dla wszystkich stron'
+
+      - cmd: "npx nuxi@latest add server/plugin database"
+        desc: Dodaj Nitro server plugin
+        detail:
+          what: Tworzy plik server/plugins/database.ts — plugin Nitro do inicjalizacji przy starcie serwera.
+          how: 'defineNitroPlugin — wykonywany raz przy starcie Nitro, nie przy każdym request.'
+          tips:
+            - 'Idealne do połączeń z bazą danych, inicjalizacji klientów'
+
+      - cmd: "npx nuxi typecheck"
+        desc: Sprawdź typy TypeScript
+        detail:
+          what: Uruchamia vue-tsc dla całego projektu — sprawdza typy bez kompilacji.
+          how: 'Przydatne w CI/CD do weryfikacji poprawności typów.'
+          tips:
+            - 'Dodaj do pre-commit hook lub CI pipeline'
+
+      - code: |
+          // nuxt.config.ts
+          export default defineNuxtConfig({
+            typescript: {
+              strict: true,         // strict mode TypeScript
+              typeCheck: true,      // sprawdzaj typy przy build
+              shim: false,
+            }
+          })
+        desc: Włącz strict TypeScript w nuxt.config
+        detail:
+          what: Konfiguruje strict TypeScript i opcjonalne sprawdzanie typów przy build.
+          how: 'typeCheck: true — uruchamia vue-tsc przy npm run build.'
+          tips:
+            - 'strict: true zalecany dla nowych projektów'
+
+      - cmd: "npx nuxi prepare"
+        desc: Wygeneruj pliki TypeScript (.nuxt/)
+        detail:
+          what: Generuje pliki typów, auto-import deklaracje, route typy w katalogu .nuxt/.
+          how: 'Uruchamiane automatycznie przy npm run dev. Ręcznie po instalacji modułu.'
+          tips:
+            - 'Konieczne po dodaniu nowego modułu dla poprawnego IntelliSense'
+
+  - name: Server routes i API
+    icon: "🔌"
+    commands:
+      - code: |
+          // server/api/posts.get.ts
+          export default defineEventHandler(async (event) => {
+            const query = getQuery(event)
+            return await db.posts.findMany({
+              skip: Number(query.page || 0) * 10,
+              take: 10,
+            })
+          })
+        desc: Server route GET z query params
+        detail:
+          what: Tworzy endpoint GET /api/posts z obsługą paginacji przez query string.
+          how: 'getQuery(event) parsuje URL query params. Zwrócona wartość jest auto-serializowana do JSON.'
+          tips:
+            - 'server/api/posts.get.ts → tylko GET. posts.ts → wszystkie metody'
+
+      - code: |
+          // server/api/posts.post.ts
+          export default defineEventHandler(async (event) => {
+            const body = await readBody(event)
+            if (!body.title) {
+              throw createError({ statusCode: 400, statusMessage: 'Title required' })
+            }
+            return await db.posts.create({ data: body })
+          })
+        desc: Server route POST z readBody i walidacją
+        detail:
+          what: Obsługuje POST /api/posts — odczytuje body, waliduje, zwraca utworzony rekord.
+          how: 'readBody(event) parsuje JSON body. createError() zwraca HTTP error z status code.'
+          tips:
+            - 'Użyj zod do walidacji: const data = schema.parse(await readBody(event))'
+
+      - code: |
+          // server/api/posts/[id].delete.ts
+          export default defineEventHandler(async (event) => {
+            const id = getRouterParam(event, 'id')
+            await db.posts.delete({ where: { id: Number(id) } })
+            setResponseStatus(event, 204)
+            return null
+          })
+        desc: Dynamiczny server route DELETE
+        detail:
+          what: Obsługuje DELETE /api/posts/:id — usuwa rekord po ID.
+          how: 'getRouterParam(event, "id") pobiera parametr z URL. setResponseStatus ustawia kod 204.'
+          tips:
+            - 'server/api/posts/[id].put.ts — analogicznie dla PUT/PATCH'
+
+      - code: |
+          // server/middleware/auth.ts
+          export default defineEventHandler(async (event) => {
+            if (event.path.startsWith('/api/protected')) {
+              const token = getCookie(event, 'auth-token')
+              if (!token) {
+                throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+              }
+              event.context.user = await verifyJWT(token)
+            }
+          })
+        desc: Server middleware dla ochrony API
+        detail:
+          what: Globalne middleware serwera — wykonywane dla każdego requestu. Sprawdza auth dla chronionych tras.
+          how: 'event.context — kontener na dane między middleware a handlerami.'
+          tips:
+            - 'server/middleware/ — kolejność alfabetyczna wykonania'
+            - 'getCookie, getHeader, getQuery — helpersy h3'
+
+      - code: |
+          // server/plugins/database.ts
+          import { PrismaClient } from '@prisma/client'
+
+          export default defineNitroPlugin(() => {
+            const prisma = new PrismaClient()
+
+            // Dodaj do context
+            nitroApp.hooks.hook('request', (event) => {
+              event.context.prisma = prisma
+            })
+          })
+        desc: Nitro plugin — inicjalizacja bazy danych
+        detail:
+          what: Nitro plugin ładowany raz przy starcie serwera — idealny do połączenia z bazą.
+          how: 'defineNitroPlugin — plugin Nitro. Inne użycie niż pluginy Nuxt (Vue).'
+          tips:
+            - 'Dostęp w handlerze: const { prisma } = event.context'
+
+  - name: Konfiguracja nuxt.config.ts
+    icon: "📋"
+    commands:
+      - code: |
+          export default defineNuxtConfig({
+            devtools: { enabled: true },
+            modules: ['@nuxt/ui', '@pinia/nuxt', '@nuxt/image'],
+            runtimeConfig: {
+              databaseUrl: process.env.DATABASE_URL,
+              public: {
+                apiBase: process.env.NUXT_PUBLIC_API_BASE || '/api',
+              }
+            },
+            routeRules: {
+              '/': { prerender: true },
+              '/blog/**': { isr: 60 },
+              '/dashboard/**': { ssr: false },
+            }
+          })
+        desc: Podstawowa konfiguracja nuxt.config.ts
+        detail:
+          what: Typowy nuxt.config.ts z modułami, zmiennymi środowiskowymi i routeRules.
+          how: 'defineNuxtConfig zapewnia type-safe konfigurację z IntelliSense.'
+          tips:
+            - 'routeRules miksuje SSR/SSG/SPA per-route'
+            - 'NUXT_PUBLIC_ prefix w .env automatycznie mapuje na runtimeConfig.public'
+
+      - code: |
+          export default defineNuxtConfig({
+            app: {
+              head: {
+                htmlAttrs: { lang: 'pl' },
+                title: 'Moja Aplikacja',
+                meta: [
+                  { name: 'description', content: 'Opis aplikacji' },
+                  { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+                ],
+                link: [
+                  { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }
+                ]
+              }
+            }
+          })
+        desc: Globalne meta tagi i head w nuxt.config
+        detail:
+          what: Ustawia domyślne meta tagi dla całej aplikacji — nadpisywane per-strona przez useHead.
+          how: 'app.head jest mergowane z useHead() na poziomie strony.'
+          tips:
+            - 'Per-strona: useSeoMeta() nadpisuje globalne wartości'
+
+      - code: |
+          export default defineNuxtConfig({
+            css: ['~/assets/css/main.css'],
+            vite: {
+              css: {
+                preprocessorOptions: {
+                  scss: { additionalData: '@import "~/assets/scss/variables";' }
+                }
+              }
+            },
+            postcss: {
+              plugins: { tailwindcss: {}, autoprefixer: {} }
+            }
+          })
+        desc: Konfiguracja CSS i Vite w nuxt.config
+        detail:
+          what: Globalne style CSS/SCSS, konfiguracja Vite preprocessorów, PostCSS plugins.
+          how: 'css: [...] — globalne pliki CSS ładowane na każdej stronie.'
+          tips:
+            - 'assets/css/main.css — idealne miejsce na Tailwind directives'
+
+  - name: Deployment
+    icon: "🚢"
+    commands:
+      - cmd: "npm run build && node .output/server/index.mjs"
+        desc: Zbuduj i uruchom produkcyjny serwer Node.js
+        detail:
+          what: Kompiluje Nuxt do Node.js serwera i uruchamia go bezpośrednio.
+          how: '.output/server/index.mjs — entry point Nitro server. Działa na każdym Node.js hoście.'
+          tips:
+            - 'Ustaw PORT i HOST w środowisku dla custom portu'
+            - 'Użyj PM2 lub Docker dla process management'
+
+      - cmd: "npx nuxi build --preset vercel"
+        desc: Zbuduj pod Vercel
+        detail:
+          what: Generuje output zoptymalizowany dla Vercel — Edge Functions lub Node.js runtime.
+          how: 'Vercel wykrywa Nuxt automatycznie. Preset vercel — edge functions z minimalnym cold start.'
+          tips:
+            - 'vercel deploy — deploy bezpośrednio przez Vercel CLI'
+
+      - cmd: "npx nuxi build --preset cloudflare-workers"
+        desc: Zbuduj pod Cloudflare Workers
+        detail:
+          what: Kompiluje Nuxt do Worker-compatible bundle — działa globalnie na edge Cloudflare.
+          how: 'Nitro obsługuje Workers API — fetch, KV, D1, R2 dostępne bezpośrednio.'
+          tips:
+            - 'wrangler deploy — deploy przez Wrangler CLI'
+
+      - cmd: "npx nuxi build --preset netlify"
+        desc: Zbuduj pod Netlify
+        detail:
+          what: Generuje output dla Netlify — Functions + statyczne assety.
+          how: 'Netlify wykrywa Nuxt automatycznie. netlify.toml nie jest wymagany.'
+          tips:
+            - 'netlify deploy --prod — deploy przez Netlify CLI'
+
+      - cmd: "NITRO_PRESET=bun npx nuxi build"
+        desc: Zbuduj pod środowisko Bun
+        detail:
+          what: Kompiluje serwer Nitro zoptymalizowany dla Bun — szybszy start, lepsze performance.
+          how: 'NITRO_PRESET lub --preset w komendzie. bun .output/server/index.mjs — uruchomienie.'
+          tips:
+            - 'Bun jest 3x szybszy od Node.js w niektórych benchmarkach'
+
+  - name: Diagnostyka i debugowanie
+    icon: "🔍"
+    commands:
+      - cmd: "npx nuxi info"
+        desc: Pokaż informacje o projekcie i środowisku
+        detail:
+          what: Wyświetla wersje Nuxt, Vue, Nitro, Vite, Node.js, npm, system operacyjny.
+          how: 'Przydatne do diagnostyki i zgłaszania bugów na GitHub.'
+          tips:
+            - 'Dołącz output do GitHub issue'
+
+      - cmd: "npx nuxi analyze"
+        desc: Analizuj bundle — co zajmuje miejsce
+        detail:
+          what: Buduje aplikację i otwiera wizualizację bundle (Rollup visualizer) w przeglądarce.
+          how: 'Pokazuje rozmiar każdego modułu, co importuje co, gdzie jest duplikacja.'
+          tips:
+            - 'Szukaj dużych node_modules które można lazy-loadować'
+
+      - cmd: "npx nuxi cleanup"
+        desc: Wyczyść cache i pliki tymczasowe
+        detail:
+          what: Usuwa .nuxt/, .output/, node_modules/.cache — rozwiązuje większość tajemniczych bugów.
+          how: 'Nuxi cleanup + npm install — pełny reset środowiska.'
+          tips:
+            - 'Uruchamiaj gdy masz dziwne błędy typów lub build errors'
+
+      - cmd: "npx nuxi upgrade"
+        desc: Zaktualizuj Nuxt do najnowszej wersji
+        detail:
+          what: Aktualizuje nuxt i powiązane pakiety (@nuxt/kit, nitropack, vite) do najnowszych wersji.
+          how: 'nuxi upgrade --force — wymusza reinstalację nawet jeśli wersja się nie zmieniła.'
+          tips:
+            - 'Sprawdź changelog na github.com/nuxt/nuxt/releases przed aktualizacją'
+
+  - name: Testy
+    icon: "🧪"
+    commands:
+      - cmd: "npm install -D @nuxt/test-utils vitest @vue/test-utils happy-dom"
+        desc: Instalacja środowiska testowego
+        detail:
+          what: Instaluje @nuxt/test-utils z integracją Vitest, Vue Test Utils i happy-dom jako środowisko DOM.
+          how: 'Skonfiguruj vitest.config.ts z environmentOptions i setupFiles.'
+          tips:
+            - '@nuxt/test-utils dostarcza mountSuspended, renderSuspended dla komponentów Nuxt'
+
+      - code: |
+          // tests/components/AppHeader.test.ts
+          import { mountSuspended } from '@nuxt/test-utils/runtime'
+          import AppHeader from '~/components/AppHeader.vue'
+
+          describe('AppHeader', () => {
+            it('renders title', async () => {
+              const wrapper = await mountSuspended(AppHeader, {
+                props: { title: 'Test Title' }
+              })
+              expect(wrapper.text()).toContain('Test Title')
+            })
+          })
+        desc: Test komponentu z @nuxt/test-utils
+        detail:
+          what: Testuje komponent Vue w środowisku Nuxt — auto-imports działają, router dostępny.
+          how: 'mountSuspended — odpowiednik mount() z obsługą async setup i Nuxt context.'
+          tips:
+            - 'renderSuspended — dla testowania HTML output bez pełnego mount'
+
+      - code: |
+          // tests/server/api.test.ts
+          import { setup, $fetch } from '@nuxt/test-utils/e2e'
+
+          await setup({ rootDir: fileURLToPath(new URL('..', import.meta.url)) })
+
+          describe('GET /api/posts', () => {
+            it('returns posts array', async () => {
+              const posts = await $fetch('/api/posts')
+              expect(Array.isArray(posts)).toBe(true)
+            })
+          })
+        desc: Test e2e server routes z @nuxt/test-utils
+        detail:
+          what: Testuje server API routes przez prawdziwe HTTP requesty do działającej aplikacji Nuxt.
+          how: 'setup() startuje Nuxt w tle. $fetch to ofetch skonfigurowany pod lokalny serwer testowy.'
+          tips:
+            - 'Testuj kody statusów, strukturę odpowiedzi, auth middleware'
+
+      - cmd: "npx vitest --coverage"
+        desc: Uruchom testy z raportem coverage
+        detail:
+          what: Uruchamia testy Vitest i generuje raport pokrycia kodu (Istanbul/v8).
+          how: 'Wymaga @vitest/coverage-v8 lub @vitest/coverage-istanbul. Coverage w coverage/ katalogu.'
+          tips:
+            - 'Dodaj do CI/CD jako wymaganie minimalne 80%'
+
+  - name: Snippety konfiguracyjne
+    icon: "💡"
+    commands:
+      - code: |
+          // middleware/auth.ts
+          export default defineNuxtRouteMiddleware((to, from) => {
+            const token = useCookie('auth-token')
+            if (!token.value) {
+              return navigateTo({
+                path: '/login',
+                query: { redirect: to.fullPath }
+              })
+            }
+          })
+        desc: Middleware autoryzacji z redirect
+        detail:
+          what: Sprawdza token w cookie i przekierowuje do /login z parametrem redirect.
+          how: 'Użyj w definePageMeta({ middleware: "auth" }) lub jako .global.ts dla wszystkich stron.'
+          tips:
+            - 'Po logowaniu: navigateTo(route.query.redirect as string || "/")'
+
+      - code: |
+          // composables/useApi.ts
+          export const useApi = () => {
+            const config = useRuntimeConfig()
+
+            async function get<T>(path: string) {
+              return $fetch<T>(`${config.public.apiBase}${path}`)
+            }
+
+            async function post<T>(path: string, body: unknown) {
+              return $fetch<T>(`${config.public.apiBase}${path}`, {
+                method: 'POST',
+                body,
+              })
+            }
+
+            return { get, post }
+          }
+        desc: Custom composable do obsługi API
+        detail:
+          what: Wrapper nad $fetch z automatycznym baseURL z runtimeConfig — centralny klient HTTP.
+          how: 'Użyj w komponentach: const { get } = useApi(); const posts = await get("/posts")'
+          tips:
+            - 'Dodaj interceptory dla auth headers, error handling, retry logic'
+
+      - code: |
+          // plugins/error-handler.ts
+          export default defineNuxtPlugin((nuxtApp) => {
+            nuxtApp.hook('vue:error', (error, instance, info) => {
+              console.error('Vue error:', error, info)
+              // Wyślij do Sentry, Datadog, itp.
+            })
+
+            nuxtApp.hook('app:error', (error) => {
+              console.error('App error:', error)
+            })
+          })
+        desc: Plugin do globalnej obsługi błędów
+        detail:
+          what: Rejestruje globalne handlery błędów Vue i Nuxt — wysyłanie do Sentry lub logowanie.
+          how: 'defineNuxtPlugin — plugin wykonywany przy starcie. Hooki Vue dostępne przez nuxtApp.'
+          tips:
+            - '@sentry/nuxt — oficjalny moduł Sentry z zero-config integration'

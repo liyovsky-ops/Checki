@@ -1,0 +1,66 @@
+title: Mongoose vs alternatywy ODM/ORM dla MongoDB
+
+items:
+  - name: Prisma (z MongoDB)
+    icon: "◈"
+    color: "#5a67d8"
+    tagline: Type-safe schema-first ORM — MongoDB jako jeden z providerów
+    pros:
+      - Najlepsza type safety — auto-generated typy z schema.prisma
+      - Unified API — ten sam kod dla PostgreSQL, MySQL, MongoDB
+      - Prisma Studio — GUI do danych w przeglądarce
+      - Doskonały DX — auto-complete, zero runtime type errors
+    cons:
+      - MongoDB support ograniczony — brak transakcji, agregacji, $lookup przez Prisma Client
+      - Nie obsługuje MongoDB-specific features (TTL indexes, capped collections)
+      - Wolniejsze update niż Mongoose na złożonych operacjach
+      - Wymaga npx prisma generate po każdej zmianie schema
+    vs: Prisma gdy masz relacyjną bazę (PostgreSQL) lub potrzebujesz unified multi-DB API. Mongoose gdy jesteś natywnie w MongoDB i potrzebujesz pełnego dostępu do MongoDB features (aggregations, $lookup, TTL, capped collections).
+
+  - name: MongoDB Native Driver
+    icon: "🍃"
+    color: "#47a248"
+    tagline: Oficjalny driver MongoDB — maximum control, minimum abstrakcji
+    pros:
+      - Pełna kontrola — bezpośredni dostęp do wszystkich MongoDB features
+      - Żaden overhead — query to dokładnie to co wysyłasz do MongoDB
+      - Oficjalny, wspierany przez MongoDB Inc.
+      - TypeScript support przez @mongodb/mongodb-driver-node
+    cons:
+      - Brak schema validation na poziomie ODM (musisz sam)
+      - Brak middleware/hooks
+      - Brak populate — musisz ręcznie joinować
+      - Brak modeli — operujesz bezpośrednio na kolekcjach
+    vs: Native driver gdy budujesz custom ODM, piszesz performance-critical kod lub potrzebujesz absolutnej kontroli. Mongoose dla typowych aplikacji — dodaje schema, walidację i hooks przy niewielkim overhead.
+
+  - name: TypeORM (MongoDB mode)
+    icon: "🔷"
+    color: "#e83524"
+    tagline: Decorator-based ORM z eksperymentalnym wsparciem MongoDB
+    pros:
+      - Unified API dla SQL i MongoDB — zmiana bazy bez przepisania kodu
+      - Dekoratory TypeScript — Entity, Column, ObjectIdColumn
+      - Dojrzały ekosystem dla SQL (PostgreSQL, MySQL, SQLite)
+      - Repository pattern wbudowany
+    cons:
+      - MongoDB support to eksperymentalny feature — niezalecany na produkcji
+      - Wiele MongoDB features niedostępne przez TypeORM API
+      - Bugs w MongoDB mode od lat nienaprawiane
+      - Community odradza TypeORM + MongoDB
+    vs: TypeORM wyłącznie dla relacyjnych baz danych. Dla MongoDB — wybierz Mongoose lub natywny driver. Łączenie TypeORM + MongoDB to złe połączenie technologiczne.
+
+  - name: Drizzle ORM (SQL-first)
+    icon: "💧"
+    color: "#c5f74f"
+    tagline: Lekki TypeScript ORM bliski SQL — tylko dla baz relacyjnych
+    pros:
+      - SQL-like API — intuicyjne dla znających SQL
+      - Lżejszy bundle niż Prisma, szybszy cold start
+      - Type-safe bez code generation step
+      - Aktywny rozwój (2023+), rośnie szybko
+    cons:
+      - Nie wspiera MongoDB — tylko PostgreSQL, MySQL, SQLite, LibSQL
+      - Młodszy projekt — mniejszy ekosystem
+      - Brak GUI (Drizzle Studio dopiero powstaje)
+      - Mniej features niż Prisma (brak Pulse, Accelerate)
+    vs: Drizzle gdy wybierasz bazę relacyjną i zależy Ci na SQL-like API bez code gen. Mongoose gdy twoja baza to MongoDB — Drizzle po prostu nie obsługuje MongoDB.

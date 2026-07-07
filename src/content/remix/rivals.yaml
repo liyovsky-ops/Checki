@@ -1,0 +1,74 @@
+title: Remix vs alternatywy full-stack React
+
+items:
+  - name: Next.js (App Router)
+    icon: "▲"
+    color: "#000000"
+    tagline: Najpopularniejszy React framework — RSC, Server Actions, Edge Runtime
+    pros:
+      - Największa społeczność i ekosystem wśród React frameworks
+      - React Server Components (RSC) — zero client JS dla server components
+      - Server Actions jako alternatywa dla API routes
+      - Doskonała integracja z Vercel — zero-config deploy
+      - ISR (Incremental Static Regeneration) — statyczne + dynamiczne
+    cons:
+      - App Router znacznie bardziej skomplikowany niż Pages Router
+      - RSC mental model wymaga czasu — nie wszystko działa jako server component
+      - Vendor lock-in przez specyficzne optymalizacje dla Vercel
+      - Server Actions mają gorsze DX od Remix actions (brak progressive enhancement out of the box)
+      - Caching w App Router — skomplikowane i niedeterministyczne
+    vs: Next.js gdy potrzebujesz SSG/ISR, największego ekosystemu i Vercel deployment. Remix gdy ważna jest prostota, web standards i progressive enhancement.
+
+  - name: SvelteKit
+    icon: "🧡"
+    color: "#ff3e00"
+    tagline: Full-stack Svelte — podobna architektura (loaders/actions) ale bez React
+    pros:
+      - Mniejszy bundle — Svelte kompiluje do natywnego JS, brak React runtime
+      - Składnia Svelte łatwiejsza niż JSX dla wielu developerów
+      - Taka sama architektura loaders/actions jak Remix — łatwa migracja
+      - Doskonałe TypeScript typy generowane automatycznie per-route
+      - Adaptery dla wszystkich platform — node, static, Vercel, Cloudflare
+    cons:
+      - Mniejszy ekosystem komponentów niż React (shadcn/ui, Radix, Headless UI)
+      - Svelte 5 Runes — duże zmiany API między wersjami
+      - Mniejsza społeczność i mniej zasobów edukacyjnych
+      - React knowledge nie transferuje się — osobny mental model
+      - Mniej bibliotek AI SDK i tooling (NextAuth, Clerk, etc.) dla Svelte
+    vs: SvelteKit gdy chcesz podobnego DX do Remix ale z mniejszym bundle i prostszą składnią. Remix gdy inwestujesz w React ekosystem.
+
+  - name: Astro
+    icon: "🚀"
+    color: "#ff5d01"
+    tagline: Content-first framework — MPA, Islands Architecture, multi-framework
+    pros:
+      - Zero JavaScript domyślnie — najszybsze strony dla content-heavy projektów
+      - Islands Architecture — interaktywność tylko tam gdzie trzeba
+      - Multi-framework — React, Vue, Svelte, Solid w jednym projekcie
+      - Doskonały dla blogów, dokumentacji, marketing sites
+      - Content Collections z type-safe frontmatter i Zod walidacją
+    cons:
+      - Nie nadaje się do aplikacji z dużą interaktywnością (dashboardy, SaaS)
+      - Brak wbudowanego state management między islands
+      - Brak loaders/actions — każda interakcja wymaga API route
+      - Formularze bez progressive enhancement out of the box
+      - Mniejsze wsparcie dla auth, session management
+    vs: Astro dla statycznych stron, blogów i dokumentacji. Remix dla interaktywnych aplikacji z formularzami i mutacjami danych.
+
+  - name: Nuxt (Vue ecosystem)
+    icon: "💚"
+    color: "#00dc82"
+    tagline: Full-stack Vue — composables zamiast hooks, podobny file-based routing
+    pros:
+      - Vue 3 Composition API i Composition approach — wielu programistów woli od React hooks
+      - Doskonałe DevTools — Nuxt DevTools lepsze niż React DevTools
+      - Auto-imports — komponenty, composables, utils bez explicit import
+      - Nitro server — wieloplatformowy (Node, Cloudflare, Vercel, Netlify)
+      - Silna społeczność europejska, dobre wsparcie i dokumentacja po polsku
+    cons:
+      - Vue ekosystem mniejszy niż React — mniej bibliotek UI, less jobs
+      - useAsyncData/useFetch zamiast loaders — inny mental model
+      - Mniej wbudowanego progressive enhancement niż Remix
+      - TypeScript support gorszy niż w Remix (generowane typy)
+      - Server Actions (Nuxt 4) dopiero dojrzewa vs sprawdzone Remix actions
+    vs: Nuxt gdy znasz Vue i chcesz full-stack bez nauki React. Remix gdy React to twoje narzędzie i zależy ci na web standards.

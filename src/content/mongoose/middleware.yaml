@@ -1,0 +1,283 @@
+title: "Middleware & Plugins"
+
+items:
+  - name: "pre() hooks — przed operacją"
+    desc: >
+      pre() hook uruchamia się przed operacją. this wskazuje na dokument (document middleware)
+      lub query (query middleware). Musisz wywołać next() lub zwrócić Promise.
+      Najczęstsze użycia: hashowanie hasła przed save, walidacja, audit trail.
+    code: |
+      import { Schema } from 'mongoose';
+      import bcrypt from 'bcrypt';
+
+      const UserSchema = new Schema({
+        email:    String,
+        password: String,
+        updatedBy: String,
+      });
+
+      // pre save — hash hasła przed zapisem
+      UserSchema.pre('save', async function () {
+        // this = dokument
+        if (this.isModified('password')) {
+          this.password = await bcrypt.hash(this.password, 12);
+        }
+      });
+
+      // pre validate — custom walidacja przed Schema validation
+      UserSchema.pre('validate', function (next) {
+        if (this.email && !this.email.includes('@')) {
+          this.invalidate('email', 'Email musi zawierać @');
+        }
+        next();
+      });
+
+      // pre deleteOne — usuń powiązane dane przed usunięciem
+      UserSchema.pre('deleteOne', { document: true, query: false }, async function () {
+        await Post.deleteMany({ authorId: this._id });
+      });
+
+      // pre findOne — query middleware, this = Query
+      UserSchema.pre('findOne', function () {
+        this.where({ active: true }); // dorzuć warunek do każdego findOne
+      });
+
+  - name: "post() hooks — po operacji"
+    desc: >
+      post() hook uruchamia się po operacji. Pierwszy argument to wynik operacji
+      (document lub result), drugi to next(). Przydatne do logowania, triggerów,
+      wysyłania eventów po zapisie, czyszczenia cache.
+    code: |
+      import { Schema } from 'mongoose';
+
+      const OrderSchema = new Schema({
+        total:  Number,
+        status: String,
+        userId: Schema.Types.ObjectId,
+      });
+
+      // post save — po każdym zapisie
+      OrderSchema.post('save', function (doc) {
+        console.log(`Order ${doc._id} zapisany, status: ${doc.status}`);
+        // doc = zapisany dokument
+      });
+
+      // post find — po każdym find
+      OrderSchema.post('find', function (docs) {
+        console.log(`Znaleziono ${docs.length} zamówień`);
+      });
+
+      // post remove / deleteOne
+      OrderSchema.post('deleteOne', { document: true }, function (doc) {
+        console.log(`Usunięto zamówienie ${doc._id}`);
+        // wyślij event, wyczyść cache itp.
+      });
+
+      // post save z async
+      OrderSchema.post('save', async function (doc) {
+        if (doc.status === 'completed') {
+          await sendConfirmationEmail(doc.userId, doc._id);
+        }
+      });
+
+  - name: "Error handling middleware"
+    desc: >
+      Post hook z 3 argumentami (error, doc, next) przechwytuje błędy.
+      Pozwala transformować błędy MongoDB (E11000 duplicate key) na czytelne
+      wiadomości dla użytkownika. Uruchamia się gdy poprzednia operacja rzuci błąd.
+    code: |
+      import { Schema, Error as MongooseError } from 'mongoose';
+
+      const UserSchema = new Schema({
+        email: { type: String, unique: true },
+      });
+
+      // Error handling hook — przechwytuje błędy
+      UserSchema.post('save', function (error: any, _doc: any, next: Function) {
+        if (error.name === 'MongoServerError' && error.code === 11000) {
+          // E11000 duplicate key error
+          const field = Object.keys(error.keyPattern)[0];
+          next(new Error(`${field} jest już zajęty`));
+        } else {
+          next(error);
+        }
+      });
+
+      // Error hook dla findOneAndUpdate też
+      UserSchema.post('findOneAndUpdate', function (error: any, _doc: any, next: Function) {
+        if (error.name === 'ValidationError') {
+          const messages = Object.values(error.errors).map((e: any) => e.message);
+          next(new Error(`Błąd walidacji: ${messages.join(', ')}`));
+        } else {
+          next(error);
+        }
+      });
+
+  - name: "Schema plugins — wielokrotne użycie logiki"
+    desc: >
+      Plugin to funkcja przyjmująca Schema i opcje — pozwala dodać metody,
+      middleware, wirtualne pola do wielu Schemas bez duplikacji kodu.
+      Globalne pluginy (mongoose.plugin()) stosują się do wszystkich Schemas.
+    code: |
+      import mongoose, { Schema } from 'mongoose';
+
+      // Plugin — soft delete (zamiast usuwać, oznacz deletedAt)
+      function softDeletePlugin(schema: Schema) {
+        schema.add({ deletedAt: { type: Date, default: null } });
+
+        schema.methods.softDelete = async function () {
+          this.deletedAt = new Date();
+          return this.save();
+        };
+
+        schema.methods.restore = async function () {
+          this.deletedAt = null;
+          return this.save();
+        };
+
+        schema.statics.findActive = function (filter = {}) {
+          return this.find({ ...filter, deletedAt: null });
+        };
+
+        // Pre hook — wykluczaj soft-deleted z domyślnych queries
+        schema.pre(/^find/, function (this: any) {
+          if (this.getFilter().deletedAt === undefined) {
+            this.where({ deletedAt: null });
+          }
+        });
+      }
+
+      // Użyj plugin na Schema
+      UserSchema.plugin(softDeletePlugin);
+      PostSchema.plugin(softDeletePlugin);
+
+      // Globalny plugin — stosuje się do WSZYSTKICH Schemas
+      mongoose.plugin(softDeletePlugin);
+
+      // Użycie
+      const user = await User.findById(id);
+      await user.softDelete();
+      const active = await User.findActive({ role: 'admin' });
+
+  - name: "mongoose-paginate-v2"
+    desc: >
+      Najpopularniejszy plugin do paginacji. Dodaje Model.paginate() z obsługą
+      page, limit, sort, populate, lean. Zwraca gotowy obiekt z metadanymi
+      paginacji (totalDocs, totalPages, hasPrevPage, hasNextPage).
+    code: |
+      import mongoosePaginate from 'mongoose-paginate-v2';
+      import { Schema } from 'mongoose';
+
+      const PostSchema = new Schema({ title: String, published: Boolean });
+      PostSchema.plugin(mongoosePaginate);
+
+      // Użycie
+      const result = await Post.paginate(
+        { published: true },        // filtr
+        {
+          page:     1,
+          limit:    10,
+          sort:     { createdAt: -1 },
+          populate: 'author',
+          select:   'title createdAt author',
+          lean:     true,
+        }
+      );
+
+      // result zawiera:
+      console.log(result.docs);        // tablica dokumentów
+      console.log(result.totalDocs);   // 150
+      console.log(result.totalPages);  // 15
+      console.log(result.page);        // 1
+      console.log(result.hasNextPage); // true
+      console.log(result.nextPage);    // 2
+
+  - name: "Transactions — sesje MongoDB"
+    desc: >
+      Transakcje wymagają MongoDB 4.0+ z replica set lub sharded cluster.
+      mongoose.startSession() tworzy sesję, session.startTransaction() zaczyna transakcję.
+      Wszystkie operacje muszą przekazać { session } — w przeciwnym razie nie są w transakcji.
+    code: |
+      import mongoose from 'mongoose';
+
+      async function transferFunds(fromId: string, toId: string, amount: number) {
+        const session = await mongoose.startSession();
+        session.startTransaction();
+
+        try {
+          const sender = await Wallet.findById(fromId).session(session);
+          if (!sender || sender.balance < amount) {
+            throw new Error('Niewystarczające środki');
+          }
+
+          await Wallet.findByIdAndUpdate(
+            fromId,
+            { $inc: { balance: -amount } },
+            { session, runValidators: true }
+          );
+
+          await Wallet.findByIdAndUpdate(
+            toId,
+            { $inc: { balance: amount } },
+            { session }
+          );
+
+          await Transaction.create([{
+            from: fromId, to: toId, amount,
+          }], { session });
+
+          await session.commitTransaction();
+        } catch (err) {
+          await session.abortTransaction();
+          throw err;
+        } finally {
+          session.endSession();
+        }
+      }
+
+  - name: "Aggregation Pipeline"
+    desc: >
+      Model.aggregate() uruchamia MongoDB aggregation pipeline.
+      Potężniejszy niż find — JOIN ($lookup), grupowanie ($group), transformacje ($project),
+      unwind tablic ($unwind). Nie używa Mongoose middleware ani walidacji — surowy MongoDB.
+    code: |
+      // Pipeline — statystyki per rola
+      const stats = await User.aggregate([
+        { $match:   { active: true } },
+        { $group:   { _id: '$role', count: { $sum: 1 }, avgAge: { $avg: '$age' } } },
+        { $sort:    { count: -1 } },
+        { $project: { role: '$_id', count: 1, avgAge: { $round: ['$avgAge', 1] } } },
+      ]);
+
+      // $lookup — JOIN między kolekcjami
+      const postsWithAuthors = await Post.aggregate([
+        { $match: { published: true } },
+        {
+          $lookup: {
+            from:         'users',       // nazwa kolekcji MongoDB (lowercase + plural)
+            localField:   'authorId',
+            foreignField: '_id',
+            as:           'author',
+          },
+        },
+        { $unwind: '$author' },          // tablica → pojedynczy obiekt
+        {
+          $project: {
+            title:        1,
+            'author.name': 1,
+            'author.email': 1,
+          },
+        },
+      ]);
+
+      // $facet — wiele pipelines równolegle (paginacja + count)
+      const [result] = await Post.aggregate([
+        { $match: { published: true } },
+        {
+          $facet: {
+            data:  [{ $sort: { createdAt: -1 } }, { $skip: 0 }, { $limit: 10 }],
+            total: [{ $count: 'count' }],
+          },
+        },
+      ]);
+      const { data, total } = result;

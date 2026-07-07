@@ -1,0 +1,269 @@
+title: Integracje Astro
+
+items:
+  - name: React — wyspy interaktywności
+    desc: >
+      Oficjalna integracja React. Używaj komponentów React jako interaktywnych wysp.
+      Obsługuje hooks, Context, React 18 concurrent features. Dodaj client:*
+      dyrektywę żeby hydratować w przeglądarce.
+    code: |
+      // Instalacja
+      // npx astro add react
+
+      // src/components/Counter.jsx
+      import { useState } from 'react';
+
+      export default function Counter({ initialCount = 0 }) {
+        const [count, setCount] = useState(initialCount);
+        return (
+          <div>
+            <p>Licznik: {count}</p>
+            <button onClick={() => setCount(c => c + 1)}>+1</button>
+          </div>
+        );
+      }
+
+      // src/pages/index.astro
+      ---
+      import Counter from '../components/Counter.jsx';
+      ---
+      <!-- Hydruj natychmiast -->
+      <Counter client:load initialCount={10} />
+      <!-- Hydruj gdy widoczny -->
+      <Counter client:visible initialCount={0} />
+
+  - name: Vue — reaktywne wyspy
+    desc: >
+      Oficjalna integracja Vue 3. Composition API, reactive(), ref() — wszystko
+      dostępne w wyspach. Możesz mieszać React i Vue w jednym projekcie Astro.
+    code: |
+      // Instalacja
+      // npx astro add vue
+
+      // src/components/Search.vue
+      <script setup>
+      import { ref, computed } from 'vue';
+
+      const props = defineProps({ items: Array });
+      const query = ref('');
+      const filtered = computed(() =>
+        props.items.filter(i => i.toLowerCase().includes(query.value.toLowerCase()))
+      );
+      </script>
+
+      <template>
+        <input v-model="query" placeholder="Szukaj..." />
+        <ul>
+          <li v-for="item in filtered" :key="item">{{ item }}</li>
+        </ul>
+      </template>
+
+      // src/pages/index.astro
+      ---
+      import Search from '../components/Search.vue';
+      const items = ['React', 'Vue', 'Svelte', 'Astro', 'Solid'];
+      ---
+      <Search client:load :items={items} />
+
+  - name: Svelte — minimalistyczne wyspy
+    desc: >
+      Oficjalna integracja Svelte 5. Runes ($state, $derived, $effect) w pełni
+      wspierane. Svelte ma najmniejszy bundle wśród frameworków — idealny do wysp.
+    code: |
+      // Instalacja
+      // npx astro add svelte
+
+      // src/components/Tabs.svelte
+      <script>
+        let { tabs = [] } = $props();
+        let active = $state(0);
+      </script>
+
+      <div class="tabs">
+        {#each tabs as tab, i}
+          <button
+            class:active={i === active}
+            onclick={() => active = i}
+          >
+            {tab.label}
+          </button>
+        {/each}
+        <div class="panel">
+          {tabs[active]?.content}
+        </div>
+      </div>
+
+      // src/pages/index.astro
+      ---
+      import Tabs from '../components/Tabs.svelte';
+      ---
+      <Tabs client:load tabs={[
+        { label: 'Tab 1', content: 'Treść 1' },
+        { label: 'Tab 2', content: 'Treść 2' },
+      ]} />
+
+  - name: Tailwind CSS
+    desc: >
+      Oficjalna integracja Tailwind. Automatycznie konfiguruje PostCSS i
+      tailwind.config.mjs. Działa w plikach .astro, .html, React, Vue, Svelte.
+    code: |
+      // Instalacja — auto-konfiguracja
+      // npx astro add tailwind
+
+      // lub Tailwind v4 (nowy sposób):
+      // npx astro add tailwind@beta
+
+      // src/pages/index.astro
+      ---
+      ---
+      <html>
+        <body class="bg-gray-50 min-h-screen">
+          <header class="bg-white shadow-sm px-6 py-4">
+            <h1 class="text-2xl font-bold text-orange-500">Astro + Tailwind</h1>
+          </header>
+          <main class="max-w-4xl mx-auto px-6 py-12">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="bg-white rounded-xl p-6 shadow">
+                <h2 class="text-xl font-semibold mb-2">Karta 1</h2>
+                <p class="text-gray-600">Treść karty...</p>
+              </div>
+            </div>
+          </main>
+        </body>
+      </html>
+
+  - name: MDX — Markdown z komponentami
+    desc: >
+      MDX pozwala używać komponentów JSX w treści Markdown.
+      Idealne dla interaktywnej dokumentacji, blogów z demo, tutoriali z przykładami.
+    code: |
+      // Instalacja
+      // npx astro add mdx
+
+      // astro.config.mjs
+      import { defineConfig } from 'astro/config';
+      import mdx from '@astrojs/mdx';
+      import remarkGfm from 'remark-gfm';
+      import rehypePrettyCode from 'rehype-pretty-code';
+
+      export default defineConfig({
+        integrations: [mdx()],
+        markdown: {
+          remarkPlugins: [remarkGfm],
+          rehypePlugins: [rehypePrettyCode],
+          shikiConfig: {
+            theme: 'github-dark',
+          },
+        },
+      });
+
+      // src/content/blog/tutorial.mdx
+      import AlertBox from '../../components/AlertBox.astro';
+      import Demo from '../../components/LiveDemo.jsx';
+
+      # Tutorial z interaktywnym demo
+
+      <AlertBox type="info">
+        Ten tutorial wymaga Node.js 18+
+      </AlertBox>
+
+      <Demo client:visible />
+
+  - name: Sitemap — automatyczny sitemap
+    desc: >
+      Generuje sitemap.xml automatycznie przy budowaniu. Pomaga robotom
+      indeksować strony. Możesz wykluczyć trasy lub dostosować priorytety.
+    code: |
+      // Instalacja
+      // npx astro add sitemap
+
+      // astro.config.mjs
+      import { defineConfig } from 'astro/config';
+      import sitemap from '@astrojs/sitemap';
+
+      export default defineConfig({
+        site: 'https://moja-strona.pl',  // WYMAGANE dla sitemap
+        integrations: [
+          sitemap({
+            filter: (page) => !page.includes('/admin/'),
+            customPages: ['https://moja-strona.pl/custom-page'],
+            changefreq: 'weekly',
+            priority: 0.7,
+            lastmod: new Date(),
+          }),
+        ],
+      });
+
+      // Po build: dist/sitemap-index.xml + dist/sitemap-0.xml
+      // Dodaj do robots.txt:
+      // Sitemap: https://moja-strona.pl/sitemap-index.xml
+
+  - name: Image — optymalizacja obrazów
+    desc: >
+      Wbudowana optymalizacja obrazów przez astro:assets. Automatyczny format WebP/AVIF,
+      zmiana rozmiaru, lazy loading, blur placeholder. Zero konfiguracji.
+    code: |
+      ---
+      // src/pages/index.astro
+      import { Image, Picture } from 'astro:assets';
+      import heroImg from '../assets/hero.jpg';   // lokalne
+      ---
+
+      <!-- Lokalny obraz — w pełni zoptymalizowany -->
+      <Image
+        src={heroImg}
+        alt="Hero"
+        width={1200}
+        height={600}
+        quality={80}
+        format="webp"
+      />
+
+      <!-- Responsywny obraz z wieloma formatami -->
+      <Picture
+        src={heroImg}
+        formats={['avif', 'webp']}
+        widths={[400, 800, 1200]}
+        alt="Responsive hero"
+      />
+
+      <!-- Zdalny obraz (wymaga konfiguracji domains) -->
+      <Image
+        src="https://example.com/photo.jpg"
+        alt="Remote"
+        width={400}
+        height={300}
+        inferSize
+      />
+
+  - name: Partytown — skrypty third-party w Web Worker
+    desc: >
+      Partytown przenosi skrypty analityczne (Google Analytics, Facebook Pixel)
+      do Web Workera — nie blokują main thread. Poprawa Core Web Vitals.
+    code: |
+      // Instalacja
+      // npx astro add partytown
+
+      // astro.config.mjs
+      import { defineConfig } from 'astro/config';
+      import partytown from '@astrojs/partytown';
+
+      export default defineConfig({
+        integrations: [
+          partytown({
+            // Przekaż zdarzenia z main thread do workera
+            config: {
+              forward: ['dataLayer.push', 'gtag'],
+            },
+          }),
+        ],
+      });
+
+      // src/layouts/BaseLayout.astro — dodaj type="text/partytown"
+      <script type="text/partytown">
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){ dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'G-XXXXXXXXXX');
+      </script>
+      <script type="text/partytown" src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX" />

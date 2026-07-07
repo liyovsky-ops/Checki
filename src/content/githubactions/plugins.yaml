@@ -1,0 +1,39 @@
+title: Popularne GitHub Actions
+
+items:
+  - name: actions/checkout
+    desc: Podstawowa action — klonuje repozytorium na runner. Pierwsza w każdym workflow. Obsługuje submodules, LFS, sparse checkout i fetch-depth (0 = pełna historia, 1 = ostatni commit).
+    icon: "📥"
+  - name: actions/setup-node
+    desc: Instaluje Node.js w wybranej wersji z cache npm/yarn/pnpm. Obsługuje .nvmrc i .node-version. Wymagana przed każdą komendą npm/yarn w workflow.
+    icon: "🟢"
+  - name: actions/setup-python
+    desc: Instaluje Python w wybranej wersji z cache pip. Obsługuje pyproject.toml i poetry. Przydatna dla projektów Python/Django/FastAPI w CI.
+    icon: "🐍"
+  - name: actions/cache
+    desc: Cache dla node_modules, pip, Maven, Gradle itp. Klucz cache oparty na hash lockfile — automatyczna inwalidacja gdy zależności się zmieniają. Drastycznie przyspiesza workflow.
+    icon: "⚡"
+  - name: actions/upload-artifact
+    desc: Przesyła pliki (build output, test results, coverage reports) jako artifact do GitHub. Dostępne do pobrania przez 90 dni. download-artifact pobiera w kolejnym jobie.
+    icon: "📤"
+  - name: docker/build-push-action
+    desc: Buduje i pushuje obraz Docker do dowolnego rejestru (GHCR, DockerHub, ECR, GCR). Obsługuje multi-platform builds, BuildKit cache, build args. Standard w CI/CD pipeline.
+    icon: "🐳"
+  - name: docker/login-action
+    desc: Loguje do rejestru Docker (Docker Hub, GHCR, ECR, GAR, ACR). Używana przed build-push-action. Obsługuje OIDC do AWS/GCP bez kluczy API.
+    icon: "🔑"
+  - name: aws-actions/configure-aws-credentials
+    desc: Konfiguruje AWS CLI z credentials lub przez OIDC (bez kluczy). Ustawia AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION jako env. Wymagana przed komendami AWS CLI i AWS SDK.
+    icon: "☁️"
+  - name: codecov/codecov-action
+    desc: Wysyła raport pokrycia testami do Codecov.io. Integruje się z pytest-cov, Istanbul, Jacoco. Pokazuje diff coverage w PR komentarzu. Wymaga CODECOV_TOKEN.
+    icon: "📊"
+  - name: github/codeql-action
+    desc: "Statyczna analiza bezpieczeństwa kodu (SAST) od GitHub. Wykrywa SQL injection, XSS, buffer overflow i inne podatności. Obsługuje: JavaScript, Python, Java, C#, C++, Ruby, Go."
+    icon: "🔍"
+  - name: sonarsource/sonarcloud-github-action
+    desc: Analiza jakości kodu i bezpieczeństwa przez SonarCloud. Code smells, bugs, vulnerabilities, technical debt. Quality gate blokuje PR gdy jakość spada poniżej progu.
+    icon: "🏆"
+  - name: release-drafter/release-drafter
+    desc: Automatycznie generuje draft Release Notes na podstawie merged PR. Kategoryzuje zmiany (features/fixes/chores) przez labele. Aktualizuje draft przy każdym merge do main.
+    icon: "📝"

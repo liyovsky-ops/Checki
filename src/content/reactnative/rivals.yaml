@@ -1,0 +1,74 @@
+title: React Native vs alternatywy mobile
+
+items:
+  - name: Flutter
+    icon: "🐦"
+    color: "#54c5f8"
+    tagline: "Dart + własny renderer — maksymalna wydajność i pixel-perfect UI"
+    pros:
+      - Własny renderer (Skia/Impeller) — identyczny pixel-perfect UI na iOS i Android
+      - Dart kompiluje do ARM — wydajność bliska natywnej
+      - Hot Reload + statyczne typowanie Dart od początku
+      - Jeden codebase na mobile, web i desktop (experimental)
+      - Bogatszy zestaw wbudowanych widgetów niż RN
+    cons:
+      - Dart — nowy język do nauki (poza ekosystemem JS/TS)
+      - Większy rozmiar APK/IPA niż React Native
+      - Mniejsza społeczność i ekosystem niż RN/React
+      - Integracja z istniejącym native kodem trudniejsza
+      - Mniej seniorów na rynku pracy
+    vs: "Flutter gdy pixel-perfect UI i maksymalna wydajność są priorytetem. React Native gdy masz już zespół React lub chcesz współdzielić logikę z web."
+
+  - name: Expo (managed)
+    icon: "⬡"
+    color: "#000020"
+    tagline: "React Native bez bólu — SDK, EAS Build i OTA updates"
+    pros:
+      - Brak konfiguracji Xcode/Android Studio na start
+      - Expo SDK = gotowe moduły native (kamera, lokalizacja, powiadomienia)
+      - EAS Build = cloud build iOS/Android bez Mac
+      - OTA updates (expo-updates) — aktualizuj JS bez sklepu
+      - Expo Go = testuj na telefonie bez fizycznego buildu
+    cons:
+      - Managed workflow ogranicza native code
+      - Większy bundle niż czysty RN (dołącza nieużywane moduły)
+      - Zależność od roadmapy Expo
+      - EAS Build płatny dla większych zespołów
+      - Nie każda natywna biblioteka działa z Expo managed
+    vs: "Expo dla 90% projektów — szybszy start, mniej konfiguracji. Bare RN gdy potrzebujesz pełnej kontroli native code lub bibliotek niekompatybilnych z Expo."
+
+  - name: Ionic
+    icon: "⚡"
+    color: "#3880ff"
+    tagline: "WebView-based — web stack (Vue/React/Angular) na mobile"
+    pros:
+      - Używa technologii web — HTML, CSS, JavaScript
+      - Jeden codebase na web i mobile (Progressive Web App)
+      - Ogromny ekosystem web — wszystkie biblioteki npm działają
+      - Capacitor (następca Cordova) daje dostęp do native APIs
+      - Niski próg wejścia dla web developerów
+    cons:
+      - WebView = nie-natywne komponenty — wygląd różni się od OS
+      - Gorszy performance niż React Native (WebView overhead)
+      - Scrolling i animacje mniej płynne na starszych urządzeniach
+      - Użytkownicy wyczuwają brak natywnego feel
+      - Brak natywnych gestów i nawigacji
+    vs: "Ionic dla prostych aplikacji lub gdy masz team web bez znajomości RN. React Native dla lepszego UX i natywnego feel — widoczna różnica dla użytkowników."
+
+  - name: NativeScript
+    icon: "🔷"
+    color: "#65adf1"
+    tagline: "Angular/Vue z bezpośrednim dostępem do native APIs bez WebView"
+    pros:
+      - Bezpośredni dostęp do wszystkich native APIs bez bridge
+      - Vue 3 lub Angular jako framework UI
+      - Prawdziwe natywne komponenty (nie WebView jak Ionic)
+      - Mniejsza społeczność = mniej zaśmiecona dokumentacja
+      - TypeScript-first
+    cons:
+      - Znacznie mniejsza społeczność niż React Native
+      - Mniej bibliotek third-party
+      - Trudniejszy debugging niż RN
+      - Meta i społeczność React Native > NativeScript community
+      - Mniej ofert pracy na rynku
+    vs: "NativeScript dla deweloperów Angular/Vue którzy chcą native mobile bez nauki Reacta. React Native dla większego ekosystemu, wsparcia i możliwości zatrudnienia."

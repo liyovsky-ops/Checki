@@ -1,0 +1,209 @@
+title: Network & Intercepting
+
+items:
+  - name: "cy.intercept() — przechwytywanie requestów"
+    desc: >
+      Podstawowe narzędzie do kontroli sieci w Cypress. Przechwytuje requesty HTTP
+      pasujące do wzorca URL i metody. Pozwala je stubować (zwracać fake odpowiedź),
+      szpiegować (obserwować bez zmieniania) lub modyfikować. Musi być wywołane przed
+      akcją która triggeruje request.
+    code: |
+      // Spy — obserwuj bez zmian
+      cy.intercept('GET', '/api/users').as('getUsers')
+      cy.visit('/users')
+      cy.wait('@getUsers')
+
+      // Stub — zwróć fake odpowiedź
+      cy.intercept('GET', '/api/users', { fixture: 'users.json' })
+
+      // Stub z inline body
+      cy.intercept('GET', '/api/products', {
+        statusCode: 200,
+        body: [{ id: 1, name: 'Produkt testowy' }]
+      })
+
+      // Wildcard w URL
+      cy.intercept('GET', '/api/users/*').as('getUser')
+      cy.intercept('POST', '/api/**').as('anyPost')
+
+  - name: "routeHandler — modyfikacja requestów i odpowiedzi"
+    desc: >
+      Zaawansowany tryb cy.intercept() z funkcją routeHandler. Otrzymujesz obiekt
+      req (request) i możesz go modyfikować, wywołać req.reply() ze stubem
+      lub req.continue() aby request poszedł do prawdziwego serwera.
+      Pozwala na warunkowe stubowanie i modyfikację nagłówków.
+    code: |
+      // Modyfikuj odpowiedź z serwera
+      cy.intercept('GET', '/api/user', (req) => {
+        req.reply((res) => {
+          res.body.isAdmin = true   // zmień odpowiedź z serwera
+          res.body.name = 'Test User'
+        })
+      })
+
+      // Warunkowy stub
+      cy.intercept('POST', '/api/login', (req) => {
+        if (req.body.email === 'test@test.com') {
+          req.reply({ statusCode: 200, body: { token: 'fake-jwt' } })
+        } else {
+          req.reply({ statusCode: 401, body: { error: 'Unauthorized' } })
+        }
+      })
+
+      // Dodaj nagłówek do każdego requestu
+      cy.intercept('**', (req) => {
+        req.headers['X-Test-Header'] = 'cypress'
+      })
+
+  - name: "cy.wait('@alias') — asercje na requestach"
+    desc: >
+      cy.wait('@alias') czeka na request i zwraca obiekt interception z pełnymi
+      detalami requestu i odpowiedzi. Możesz asertować na statusie HTTP, ciele,
+      nagłówkach i parametrach URL. To najlepszy sposób weryfikacji czy aplikacja
+      wysyła prawidłowe dane do API.
+    code: |
+      cy.intercept('POST', '/api/register').as('registerRequest')
+
+      cy.get('[data-cy="email"]').type('new@user.com')
+      cy.get('[data-cy="submit"]').click()
+
+      cy.wait('@registerRequest').then((interception) => {
+        // Asercja na request body
+        expect(interception.request.body.email).to.eq('new@user.com')
+
+        // Asercja na response
+        expect(interception.response.statusCode).to.eq(201)
+        expect(interception.response.body).to.have.property('id')
+      })
+
+      // Skrót — asercja bez then()
+      cy.wait('@registerRequest')
+        .its('response.statusCode').should('eq', 201)
+
+  - name: "Fixture w intercept — statyczne dane"
+    desc: >
+      Pliki fixture (JSON, XML, itp.) z katalogu cypress/fixtures/ mogą być
+      użyte jako odpowiedź w cy.intercept(). Oddziela dane testowe od kodu.
+      Fixture możesz załadować przez string (nazwa pliku) lub obiekt z opcjami.
+    code: |
+      // cypress/fixtures/users.json
+      // [{ "id": 1, "name": "Jan Kowalski", "email": "jan@test.com" }]
+
+      // Użyj fixture jako odpowiedź
+      cy.intercept('GET', '/api/users', { fixture: 'users.json' })
+
+      // Fixture z opóźnieniem (symuluj wolne API)
+      cy.intercept('GET', '/api/users', {
+        fixture: 'users.json',
+        delay: 2000
+      })
+
+      // Fixture dla konkretnego użytkownika
+      cy.intercept('GET', '/api/users/1', { fixture: 'user-detail.json' })
+
+      cy.visit('/users')
+      cy.get('[data-cy="user-list"]')
+        .find('[data-cy="user-item"]')
+        .should('have.length', 1)
+
+  - name: "Stub błędów i edge case'ów"
+    desc: >
+      cy.intercept() pozwala łatwo symulować scenariusze błędów, timeouty i problemy
+      sieciowe — scenariusze trudne lub niemożliwe do odtworzenia na prawdziwym API.
+      Idealne do testowania error states i graceful degradation.
+    code: |
+      // Symuluj błąd serwera
+      cy.intercept('GET', '/api/users', {
+        statusCode: 500,
+        body: { error: 'Internal Server Error' }
+      })
+      cy.visit('/users')
+      cy.get('[data-cy="error-state"]').should('be.visible')
+
+      // Symuluj brak sieci (network error)
+      cy.intercept('GET', '/api/data', { forceNetworkError: true })
+
+      // Symuluj timeout (odpowiedź po 30s)
+      cy.intercept('GET', '/api/slow', { delay: 30000 })
+
+      // 404 Not Found
+      cy.intercept('GET', '/api/user/999', { statusCode: 404 })
+
+  - name: "cy.request() — HTTP requests bez UI"
+    desc: >
+      Wysyła HTTP request bezpośrednio z Cypress (poza przeglądarką). Używane
+      do seedowania danych w bazie przed testem, logowania przez API (szybsze niż przez UI),
+      czyszczenia po testach. Pełne wsparcie dla body, headers, auth, form data.
+    code: |
+      // GET request
+      cy.request('/api/health').its('status').should('eq', 200)
+
+      // POST z body
+      cy.request({
+        method: 'POST',
+        url: '/api/users',
+        body: { name: 'Test User', email: 'test@test.com' },
+        headers: { 'Content-Type': 'application/json' }
+      }).then((response) => {
+        expect(response.status).to.eq(201)
+        expect(response.body.id).to.exist
+      })
+
+      // Logowanie przez API (szybki setup przed testem)
+      cy.request('POST', '/api/auth/login', {
+        email: 'admin@test.com',
+        password: 'secret'
+      }).then((response) => {
+        window.localStorage.setItem('token', response.body.token)
+      })
+
+  - name: "Aliasy i spy na requesty"
+    desc: >
+      .as() nadaje alias do requestu — pozwala później na cy.wait() i asercje.
+      Możesz tworzyć wiele interceptów dla różnych requestów i czekać na nie
+      w dowolnej kolejności. Przydatne do weryfikacji że aplikacja robi
+      dokładnie te requesty których oczekujesz (nie więcej, nie mniej).
+    code: |
+      // Wiele interceptów
+      cy.intercept('GET', '/api/products').as('getProducts')
+      cy.intercept('GET', '/api/categories').as('getCategories')
+      cy.intercept('POST', '/api/cart').as('addToCart')
+
+      cy.visit('/shop')
+      cy.wait(['@getProducts', '@getCategories'])
+
+      cy.get('[data-cy="add-to-cart"]').first().click()
+      cy.wait('@addToCart').then((interception) => {
+        expect(interception.request.body.productId).to.exist
+      })
+
+      // Sprawdź że request NIE został wywołany
+      cy.get('[data-cy="read-only-btn"]').click()
+      cy.get('@addToCart.all').should('have.length', 0)
+
+  - name: "WebSockets i inne protokoły"
+    desc: >
+      Cypress nie ma wbudowanego wsparcia dla WebSocket interceptingu (stan 2024).
+      Możesz jednak obserwować WebSocket przez window.WebSocket lub używać
+      pluginów (cypress-websocket-testing). Dla SSE i long-polling — cy.intercept()
+      działa normalnie bo to HTTP.
+    code: |
+      // Obserwuj WebSocket przez window
+      cy.window().then((win) => {
+        const OrigWS = win.WebSocket
+        let wsMessages: string[] = []
+
+        win.WebSocket = class extends OrigWS {
+          constructor(url: string) {
+            super(url)
+            this.addEventListener('message', (e) => {
+              wsMessages.push(e.data)
+            })
+          }
+        }
+
+        cy.wrap(wsMessages).as('wsMessages')
+      })
+
+      // SSE / long-polling działa normalnie
+      cy.intercept('GET', '/api/events').as('sseStream')

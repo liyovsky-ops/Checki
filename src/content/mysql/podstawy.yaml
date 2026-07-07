@@ -1,0 +1,101 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać MySQL?
+  firstComponent: Pierwsze kroki
+  firstComponentLang: SQL
+
+intro:
+  title: Czym jest MySQL?
+  desc: >
+    MySQL to najpopularniejsza open-source relacyjna baza danych (RDBMS), stworzona w 1995 roku.
+    Używana przez Facebook, Twitter, YouTube, Wikipedia i miliony aplikacji na całym świecie.
+    Obsługuje ACID (z InnoDB), transakcje, klucze obce, indeksy, widoki i JSON.
+    Świetnie sprawdza się w aplikacjach webowych, e-commerce i systemach CMS (WordPress, Drupal).
+    Od wersji 8.0 wspiera window functions, CTE (WITH), JSON functions i coraz więcej zaawansowanych funkcji.
+
+concepts:
+  - title: "Silniki: InnoDB vs MyISAM"
+    desc: >
+      InnoDB — domyślny silnik od MySQL 5.5. Obsługuje ACID, transakcje, klucze obce (FOREIGN KEY),
+      row-level locking. MyISAM — starszy silnik, szybszy dla read-only, brak transakcji i FK.
+      Dla nowych projektów zawsze InnoDB.
+    icon: "⚙️"
+  - title: ACID
+    desc: >
+      Atomicity, Consistency, Isolation, Durability — transakcja albo wykonuje się w całości,
+      albo jest cofana. InnoDB gwarantuje ACID przez mechanizm undo/redo log i MVCC.
+    icon: "🔒"
+  - title: Połączenie z bazą
+    desc: >
+      MySQL nasłuchuje na porcie 3306. Połącz przez mysql CLI, GUI (TablePlus, DBeaver, Workbench)
+      lub biblioteki: mysql2 (Node.js), PyMySQL / mysql-connector-python (Python), mysqlclient (Django).
+    icon: "🔌"
+  - title: "CHARACTER SET utf8mb4"
+    desc: >
+      Zawsze używaj utf8mb4 (nie przestarzałego utf8 — obsługuje tylko 3-bajtowe UTF-8 bez emoji).
+      utf8mb4 obsługuje pełny Unicode łącznie z emoji. Ustaw na poziomie serwera, bazy i tabeli.
+    icon: "🌍"
+  - title: Baza danych vs Schemat
+    desc: >
+      W MySQL terminy "baza danych" i "schemat" są synonimami — CREATE DATABASE = CREATE SCHEMA.
+      W odróżnieniu od PostgreSQL (gdzie schemat to przestrzeń nazw wewnątrz bazy), MySQL nie ma
+      konceptu schematu wewnątrz bazy. SHOW DATABASES = lista wszystkich baz.
+    icon: "📋"
+  - title: information_schema
+    desc: >
+      Wirtualna baza danych z metadanymi — lista tabel, kolumn, indeksów, uprawnień.
+      INFORMATION_SCHEMA.TABLES, INFORMATION_SCHEMA.COLUMNS, INFORMATION_SCHEMA.STATISTICS.
+      Przydatna do inspekcji struktury bazy przez SQL zamiast poleceń SHOW.
+    icon: "🔍"
+  - title: Konfiguracja my.cnf
+    desc: >
+      Główny plik konfiguracyjny MySQL (/etc/mysql/my.cnf lub /etc/my.cnf).
+      Kluczowe opcje: innodb_buffer_pool_size (65% RAM), max_connections (50-200),
+      character-set-server=utf8mb4, slow_query_log=1, long_query_time=1.
+    icon: "⚙️"
+
+whenToUse:
+  - "Aplikacje webowe i CMS — WordPress, Drupal, Joomla (domyślna baza)"
+  - "E-commerce — WooCommerce, Magento, własne sklepy"
+  - "LAMP/LEMP stack — Linux, Apache/Nginx, MySQL, PHP"
+  - "Node.js backend z Prisma, Drizzle lub Sequelize"
+  - "SaaS z wieloma tenantami — jedna baza per tenant lub shared schema"
+  - "Kiedy potrzebujesz prostoty i szerokiego wsparcia hostingowego"
+
+firstComponent: |
+  -- Utwórz bazę z utf8mb4
+  CREATE DATABASE myapp
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+
+  USE myapp;
+
+  -- Utwórz tabelę użytkowników
+  CREATE TABLE users (
+      id         INT          NOT NULL AUTO_INCREMENT,
+      email      VARCHAR(255) NOT NULL UNIQUE,
+      name       VARCHAR(100) NOT NULL,
+      role       ENUM('user','admin','moderator') NOT NULL DEFAULT 'user',
+      created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+  -- Wstaw rekordy
+  INSERT INTO users (email, name) VALUES
+      ('alice@example.com', 'Alice Kowalski'),
+      ('bob@example.com',   'Bob Nowak'),
+      ('carol@example.com', 'Carol Wiśniewska');
+
+  -- Podstawowy SELECT
+  SELECT id, name, email FROM users ORDER BY name;
+
+  -- Filtrowanie
+  SELECT * FROM users
+  WHERE role = 'user'
+    AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY);
+
+  -- Aktualizacja
+  UPDATE users SET role = 'admin' WHERE email = 'alice@example.com';
+
+  -- Zliczanie po grupach
+  SELECT role, COUNT(*) AS total FROM users GROUP BY role;

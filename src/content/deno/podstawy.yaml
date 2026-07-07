@@ -1,0 +1,92 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Deno?
+  firstComponent: Twój pierwszy serwer HTTP
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Deno?
+  desc: >
+    Deno to bezpieczny runtime dla JavaScript i TypeScript, stworzony przez Ryana Dahla —
+    tego samego, który stworzył Node.js. Uruchomiony w 2018 jako odpowiedź na błędy projektowe Node.js:
+    brak bezpieczeństwa domyślnego, skomplikowany system modułów i brak wbudowanych narzędzi.
+    Deno 2.0 (2024) dodał pełną kompatybilność z npm i stał się gotowy na produkcję.
+    Napisany w Rust, używa silnika V8 — taki sam jak Node.js i Chrome.
+
+concepts:
+  - title: Permissions model (sandbox)
+    desc: >
+      Deno działa w piaskownicy — domyślnie skrypt nie ma dostępu do sieci, plików, zmiennych
+      środowiskowych ani procesów systemowych. Każdy rodzaj dostępu musi być jawnie przyznany flagą
+      --allow-*. To radykalna zmiana w stosunku do Node.js, gdzie kod ma pełny dostęp do systemu.
+      Możesz też zawężać uprawnienia do konkretnych hostów, ścieżek i zmiennych.
+    icon: "🔒"
+  - title: TypeScript natywnie
+    desc: >
+      Deno uruchamia pliki .ts bezpośrednio — nie potrzebujesz tsc, ts-node ani żadnego transpilera.
+      Kompilacja TypeScript jest wbudowana w runtime. Deno obsługuje też JSX/TSX natywnie.
+      W Deno 2.x dostępne są dekoratory (Stage 3), const enum i wszystkie funkcje TS.
+    icon: "📘"
+  - title: Web APIs first
+    desc: >
+      Deno implementuje standardy Web API zamiast wymyślać własne API. fetch, URL, Request, Response,
+      Headers, WebSocket, ReadableStream, FormData, Blob, crypto — wszystkie te API są dostępne
+      globalnie, tak jak w przeglądarce. Kod napisany pod Deno często działa też w przeglądarce.
+    icon: "🌐"
+  - title: URL imports + JSR
+    desc: >
+      Deno historycznie importował moduły przez URL (https://deno.land/x/...). Deno 2.x promuje JSR
+      (JavaScript Registry) — nowy rejestr wspierający TypeScript natywnie i generujący docs.
+      Obsługuje też npm: prefix dla pełnej kompatybilności z paczkami npm i node_modules.
+    icon: "📦"
+  - title: Deno 2.0 — kompatybilność z npm
+    desc: >
+      Deno 2.0 (październik 2024) to przełom: pełna kompatybilność z npm, node_modules i package.json.
+      Polecenie deno add <paczka> działa jak npm install. Możesz uruchomić aplikacje Express, Fastify
+      czy Prisma bezpośrednio w Deno. Deno stało się praktycznym wyborem dla projektów produkcyjnych.
+    icon: "🔄"
+  - title: Wbudowane narzędzia (zero config)
+    desc: >
+      Deno zawiera: formatter (deno fmt), linter (deno lint), tester (deno test), benchmark runner
+      (deno bench), generator dokumentacji (deno doc) i kompilator do wykonywalnych plików (deno compile).
+      Zero konfiguracji, zero zewnętrznych narzędzi — wszystko w jednym binarnym pliku.
+    icon: "🧰"
+
+whenToUse:
+  - Projekty wymagające bezpieczeństwa — applications obsługujące untrusted code
+  - Skrypty systemowe i CLI tools pisane w TypeScript
+  - Edge functions i serverless — Deno Deploy, Cloudflare Workers (Deno compat)
+  - API serwery gdzie liczy się security-by-default (fintech, healthcare)
+  - Projekty wymagające pełnego TypeScript bez konfiguracji
+  - Aplikacje używające Deno KV jako wbudowanej bazy danych
+  - Teams preferujące standard Web APIs zamiast Node.js-specific API
+
+firstComponent: |
+  // Instalacja Deno (Linux/macOS)
+  // curl -fsSL https://deno.land/install.sh | sh
+
+  // main.ts — uruchamiasz: deno run --allow-net main.ts
+  // TypeScript bez konfiguracji, uprawnienia jawne
+
+  Deno.serve({ port: 3000 }, (req: Request) => {
+    const url = new URL(req.url);
+
+    if (url.pathname === "/") {
+      return new Response("Cześć z Deno! 🦕", {
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
+
+    if (url.pathname === "/json") {
+      return Response.json({
+        runtime: "deno",
+        version: Deno.version.deno,
+        secure: true,
+      });
+    }
+
+    return new Response("404 Not Found", { status: 404 });
+  });
+
+  console.log("Serwer działa na http://localhost:3000");
+  // Uwaga: bez --allow-net powyższy kod rzuci PermissionDeniedError

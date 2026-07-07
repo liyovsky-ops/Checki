@@ -1,0 +1,274 @@
+title: Content Collections API
+
+items:
+  - name: Definiowanie kolekcji (config.ts)
+    desc: >
+      Content Collections to sposób na type-safe zarządzanie treścią (Markdown, MDX, YAML).
+      Definiujesz schema przez Zod w src/content/config.ts. Astro waliduje każdy plik
+      przy budowaniu — błędy schema = build error zamiast runtime bug.
+    code: |
+      // src/content/config.ts
+      import { defineCollection, z } from 'astro:content';
+
+      const blog = defineCollection({
+        type: 'content',   // 'content' dla MD/MDX, 'data' dla JSON/YAML
+        schema: ({ image }) => z.object({
+          title: z.string(),
+          description: z.string(),
+          pubDate: z.coerce.date(),
+          updatedDate: z.coerce.date().optional(),
+          author: z.string().default('Łukasz'),
+          tags: z.array(z.string()).default([]),
+          draft: z.boolean().default(false),
+          // Zoptymalizowany obraz przez astro:assets
+          cover: image().optional(),
+        }),
+      });
+
+      const authors = defineCollection({
+        type: 'data',   // dla JSON/YAML
+        schema: z.object({
+          name: z.string(),
+          email: z.string().email(),
+          bio: z.string(),
+          avatar: z.string().url(),
+        }),
+      });
+
+      export const collections = { blog, authors };
+
+  - name: Struktura pliku Markdown
+    desc: >
+      Pliki w src/content/blog/ to posty bloga. Frontmatter musi pasować do schema.
+      TypeScript zgłosi błąd jeśli brakuje wymaganego pola lub typ się nie zgadza.
+    code: |
+      ---
+      # src/content/blog/astro-basics.md
+      title: "Podstawy Astro — dlaczego warto"
+      description: "Przewodnik po architekturze Islands i zero-JS approach w Astro"
+      pubDate: 2024-01-15
+      author: "Łukasz"
+      tags: ["astro", "javascript", "performance"]
+      draft: false
+      ---
+
+      # Podstawy Astro
+
+      Astro to framework który zmienia sposób myślenia o wydajności...
+
+      ## Islands Architecture
+
+      Każda "wyspa" to niezależnie hydratowany komponent...
+
+      ```javascript
+      // Przykład kodu w poście
+      const data = await fetch('/api/posts');
+      ```
+
+  - name: getCollection() — pobieranie wszystkich wpisów
+    desc: >
+      getCollection() pobiera wszystkie wpisy z kolekcji. Zwraca tablicę
+      z pełnym typowaniem TypeScript. Możesz filtrować przez callback.
+    code: |
+      ---
+      // src/pages/blog/index.astro
+      import { getCollection } from 'astro:content';
+
+      // Pobierz wszystkie posty (bez draftów w produkcji)
+      const allPosts = await getCollection('blog', ({ data }) => {
+        return import.meta.env.PROD ? !data.draft : true;
+      });
+
+      // Posortuj od najnowszego
+      const sortedPosts = allPosts.sort(
+        (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+      );
+
+      // Grupuj po tagach
+      const postsByTag = allPosts.reduce((acc, post) => {
+        post.data.tags.forEach((tag) => {
+          if (!acc[tag]) acc[tag] = [];
+          acc[tag].push(post);
+        });
+        return acc;
+      }, {} as Record<string, typeof allPosts>);
+      ---
+
+      {sortedPosts.map((post) => (
+        <article>
+          <a href={`/blog/${post.slug}`}>{post.data.title}</a>
+          <time>{post.data.pubDate.toLocaleDateString('pl-PL')}</time>
+        </article>
+      ))}
+
+  - name: getEntry() — pobieranie jednego wpisu
+    desc: >
+      getEntry() pobiera konkretny wpis po kolekcji i slug/id. Używaj w stronach
+      które renderują pojedynczy post. Zwraca undefined jeśli nie znajdzie.
+    code: |
+      ---
+      // src/pages/blog/[slug].astro
+      import { getEntry, getCollection } from 'astro:content';
+
+      export async function getStaticPaths() {
+        const posts = await getCollection('blog');
+        return posts.map((post) => ({
+          params: { slug: post.slug },
+        }));
+      }
+
+      const { slug } = Astro.params;
+      // Pobierz konkretny wpis
+      const post = await getEntry('blog', slug);
+
+      if (!post) {
+        return Astro.redirect('/404');
+      }
+
+      // Renderuj Markdown do komponentu
+      const { Content, headings, remarkPluginFrontmatter } = await post.render();
+      ---
+
+      <article>
+        <h1>{post.data.title}</h1>
+        <p class="meta">
+          Autor: {post.data.author} ·
+          <time>{post.data.pubDate.toLocaleDateString('pl-PL')}</time>
+        </p>
+        <!-- Wyrenderowana treść Markdown -->
+        <Content />
+      </article>
+
+  - name: Referencje między kolekcjami
+    desc: >
+      reference() pozwala tworzyć relacje między kolekcjami — jak FK w SQL.
+      Astro waliduje że referencja wskazuje na istniejący wpis.
+    code: |
+      // src/content/config.ts
+      import { defineCollection, reference, z } from 'astro:content';
+
+      const authors = defineCollection({
+        type: 'data',
+        schema: z.object({
+          name: z.string(),
+          bio: z.string(),
+        }),
+      });
+
+      const blog = defineCollection({
+        type: 'content',
+        schema: z.object({
+          title: z.string(),
+          pubDate: z.coerce.date(),
+          // Referencja do kolekcji 'authors'
+          author: reference('authors'),
+          // Tablica referencji
+          relatedPosts: z.array(reference('blog')).optional(),
+        }),
+      });
+
+      // --- W frontmatter: ---
+      // author: "jan-kowalski"  ← musi istnieć src/content/authors/jan-kowalski.json
+
+      // --- W stronie: ---
+      // const { data } = await getEntry('blog', slug);
+      // const author = await getEntry(data.author);  // type-safe!
+
+  - name: Kolekcja 'data' — JSON/YAML dane
+    desc: >
+      Kolekcje typu 'data' obsługują pliki JSON i YAML — świetne dla danych
+      strukturalnych (autorzy, tagi, konfiguracja). Bez renderowania Markdown.
+    code: |
+      // src/content/authors/jan-kowalski.json
+      {
+        "name": "Jan Kowalski",
+        "bio": "Senior developer z 10-letnim doświadczeniem",
+        "avatar": "https://example.com/jan.jpg",
+        "social": {
+          "twitter": "@jankowalski",
+          "github": "jankowalski"
+        }
+      }
+
+      // src/content/authors/anna-nowak.yaml
+      name: Anna Nowak
+      bio: Frontend architect i teacher
+      avatar: https://example.com/anna.jpg
+
+      // --- Użycie w stronie: ---
+      ---
+      import { getCollection } from 'astro:content';
+
+      const authors = await getCollection('authors');
+      // Pełne typowanie — name, bio, avatar są string | undefined w zależności od schematu
+      ---
+
+      {authors.map((author) => (
+        <div>
+          <img src={author.data.avatar} alt={author.data.name} />
+          <h3>{author.data.name}</h3>
+          <p>{author.data.bio}</p>
+        </div>
+      ))}
+
+  - name: Obraz w Content Collections
+    desc: >
+      Użyj image() z Zod schema dla obrazów w kolekcjach. Astro automatycznie
+      optymalizuje, zmienia rozmiar i konwertuje do WebP. Pełne type-safety.
+    code: |
+      // src/content/config.ts
+      import { defineCollection, z } from 'astro:content';
+
+      const blog = defineCollection({
+        schema: ({ image }) => z.object({
+          title: z.string(),
+          // image() = helper który waliduje i optymalizuje obraz
+          cover: image(),
+          avatar: image().optional(),
+        }),
+      });
+
+      // --- W frontmatter .md: ---
+      // cover: ./images/hero.jpg   ← ścieżka względna do pliku MD
+
+      // --- W stronie: ---
+      ---
+      import { Image } from 'astro:assets';
+      const { post } = Astro.props;
+      ---
+
+      <!-- Astro automatycznie optymalizuje: format, rozmiar, lazy loading -->
+      <Image
+        src={post.data.cover}
+        alt={post.data.title}
+        width={800}
+        height={400}
+      />
+
+  - name: MDX w Content Collections
+    desc: >
+      MDX (Markdown + JSX) pozwala używać komponentów React/Vue/Svelte bezpośrednio
+      w treści. Idealne dla interaktywnych postów i dokumentacji z demo.
+    code: |
+      ---
+      # src/content/blog/interactive-demo.mdx
+      title: "Interaktywny przykład"
+      pubDate: 2024-01-15
+      ---
+
+      import Counter from '../../components/Counter.jsx';
+      import CodeSandbox from '../../components/CodeSandbox.astro';
+
+      # Interaktywny tutorial
+
+      Oto licznik który możesz wypróbować:
+
+      <Counter client:load initialCount={5} />
+
+      ## Przykład kodu
+
+      <CodeSandbox src="/demos/counter" />
+
+      ## Podsumowanie
+
+      MDX łączy czytelność Markdown z mocą komponentów.

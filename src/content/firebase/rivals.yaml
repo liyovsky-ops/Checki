@@ -1,0 +1,66 @@
+title: Firebase vs alternatywy BaaS
+
+items:
+  - name: Supabase
+    icon: "⚡"
+    color: "#3ecf8e"
+    tagline: Open-source Firebase — PostgreSQL, realtime, Auth, Storage
+    pros:
+      - Open-source — możesz self-hostować (nie uzależniasz się od Google)
+      - PostgreSQL pod spodem — pełna moc SQL i relacji
+      - Row Level Security zamiast Firebase Rules — bardziej elastyczne
+      - REST i GraphQL API automatycznie generowane z schematu
+    cons:
+      - Mniejszy ekosystem SDK niż Firebase
+      - Brak natywnych Cloud Functions (edge functions jako alternatywa)
+      - Firestore real-time bardziej dojrzały niż Supabase Realtime
+      - Mniejsza społeczność i mniej zasobów edukacyjnych
+    vs: Supabase gdy chcesz open-source, relacyjnej bazy (SQL) i unikasz vendor lock-in Google. Firebase gdy potrzebujesz dojrzałego ekosystemu i Google infra.
+
+  - name: AWS Amplify
+    icon: "🟠"
+    color: "#ff9900"
+    tagline: AWS BaaS — Cognito, DynamoDB, S3, Lambda, AppSync
+    pros:
+      - Pełna integracja z ekosystemem AWS — S3, Lambda, CloudFront, SQS
+      - Amplify Studio — visual builder dla backendu i UI
+      - AppSync GraphQL — zaawansowane real-time i offline sync
+      - Enterprise grade — compliance, SLA, private VPC
+    cons:
+      - Wyższa złożoność konfiguracji niż Firebase
+      - Wyższe koszty przy dużym ruchu
+      - AWS vendor lock-in — migracja trudna
+      - Amplify CLI bywa kapryśny — debug trudniejszy niż Firebase
+    vs: AWS Amplify gdy już używasz AWS i potrzebujesz enterprise features. Firebase gdy chcesz szybko wystartować i preferujesz prostszą konfigurację.
+
+  - name: PocketBase
+    icon: "🗄️"
+    color: "#b8d1e6"
+    tagline: Self-hosted BaaS w jednym binarnym pliku — Go, SQLite
+    pros:
+      - Jeden plik wykonywalny (Go binary) — deploy w minutę
+      - Self-hosted — pełna kontrola danych, zero vendor lock-in
+      - SQLite z real-time subscriptions (SSE)
+      - Dashboard admin out of the box
+    cons:
+      - Self-hosted = Ty zarządzasz serwerem i backupami
+      - Mniejszy ekosystem SDK (głównie REST + oficjalne JS/Dart)
+      - Brak Cloud Functions (piszesz własne w JS hooks lub extend Go binary)
+      - SQLite nie skaluje poziomo (vertical scaling only)
+    vs: PocketBase dla małych projektów i indie developerów którzy chcą pełnej kontroli bez kosztów Firebase. Firebase gdy potrzebujesz skalowalności Google Cloud i bogatego ekosystemu.
+
+  - name: MongoDB Atlas
+    icon: "🍃"
+    color: "#00ed64"
+    tagline: Cloud MongoDB — Atlas App Services, Data API, Realm Sync
+    pros:
+      - Elastyczny schemat dokumentów — jak Firestore ale z pełnym MongoDB query
+      - Atlas Search — wbudowany full-text search (Lucene)
+      - Atlas Device Sync — sync z offline support dla mobile
+      - Agregacje MongoDB — potężniejsze niż zapytania Firestore
+    cons:
+      - Atlas App Services (dawniej Realm) mniej dojrzałe niż Firebase ecosystem
+      - Brak wbudowanego Auth tak potężnego jak Firebase Auth (OAuth, phone, etc.)
+      - Zimny start Functions (serverless) dłuższy niż Cloud Functions
+      - Wyższy próg wejścia dla junior developerów
+    vs: MongoDB Atlas gdy potrzebujesz mocnych zapytań i agregacji na dokumentach, lub gdy już masz MongoDB. Firebase gdy priorytetem jest szybkość developmentu i prosty Auth.

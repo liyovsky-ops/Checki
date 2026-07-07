@@ -1,0 +1,367 @@
+title: Serializacja i deserializacja
+
+labels:
+  items: Metody serializacji
+
+intro: >
+  Pydantic v2 oferuje bogate API serializacji: model_dump() do dict Pythona,
+  model_dump_json() do JSON string (przez Rust — bardzo szybkie), model_validate()
+  i model_validate_json() do parsowania. Kontrolujesz co wychodzi (include/exclude),
+  jak wychodzi (by_alias, mode) i jak wygląda (field_serializer, model_serializer).
+
+items:
+  - name: model_dump() — podstawy
+    desc: >
+      model_dump() zwraca dict z wartościami Pythona. Domyślnie wszystkie pola,
+      zagnieżdżone modele też jako dict. Kluczowe parametry: include, exclude,
+      exclude_none, exclude_defaults, by_alias, mode.
+    code: |
+      from pydantic import BaseModel
+      from typing import Optional
+      from datetime import datetime
+
+      class Address(BaseModel):
+          city: str
+          country: str = "PL"
+
+      class User(BaseModel):
+          id: int
+          name: str
+          email: Optional[str] = None
+          address: Optional[Address] = None
+          created_at: datetime = None
+
+      u = User(id=1, name="Łukasz", address=Address(city="Kraków"),
+               created_at=datetime(2024, 1, 15, 10, 0))
+
+      # Pełny dump
+      print(u.model_dump())
+      # {'id': 1, 'name': 'Łukasz', 'email': None, 'address': {'city': 'Kraków', 'country': 'PL'}, ...}
+
+      # Bez pól None
+      print(u.model_dump(exclude_none=True))
+      # {'id': 1, 'name': 'Łukasz', 'address': {'city': 'Kraków', ...}, ...}
+
+      # Tylko wybrane pola
+      print(u.model_dump(include={"id", "name"}))
+      # {'id': 1, 'name': 'Łukasz'}
+
+  - name: model_dump() — include, exclude, exclude_defaults
+    desc: >
+      include i exclude przyjmują zestaw nazw pól lub zagnieżdżony dict dla
+      kontroli pól zagnieżdżonych modeli. exclude_defaults usuwa pola z wartością
+      domyślną. Można wykluczać na poziomie zagnieżdżonym.
+    code: |
+      from pydantic import BaseModel
+
+      class Address(BaseModel):
+          street: str
+          city: str
+          country: str = "PL"
+          zip_code: str = ""
+
+      class User(BaseModel):
+          id: int
+          name: str
+          email: str
+          address: Address
+          is_active: bool = True
+
+      u = User(
+          id=1, name="Łukasz", email="l@ex.com",
+          address=Address(street="Krakowska 1", city="Kraków")
+      )
+
+      # Wyklucz defaults (country="PL", zip_code="", is_active=True)
+      print(u.model_dump(exclude_defaults=True))
+      # {'id': 1, 'name': 'Łukasz', 'email': 'l@ex.com',
+      #  'address': {'street': 'Krakowska 1', 'city': 'Kraków'}}
+
+      # Zagnieżdżone exclude — tylko city z address
+      print(u.model_dump(include={"id": True, "address": {"city"}}))
+      # {'id': 1, 'address': {'city': 'Kraków'}}
+
+  - name: model_dump_json() — szybki JSON (Rust)
+    desc: >
+      model_dump_json() to najszybsza ścieżka do JSON — Pydantic używa pydantic-core
+      (Rust) bez pośrednictwa json.dumps(). datetime → ISO string, UUID → string,
+      Decimal → string. Te same parametry co model_dump().
+    code: |
+      from pydantic import BaseModel
+      from datetime import datetime
+      import uuid
+      from decimal import Decimal
+
+      class Invoice(BaseModel):
+          invoice_id: uuid.UUID
+          amount: Decimal
+          issued_at: datetime
+          client: str
+
+      inv = Invoice(
+          invoice_id=uuid.uuid4(),
+          amount=Decimal("1234.56"),
+          issued_at=datetime(2024, 1, 15, 10, 30),
+          client="Firma XYZ",
+      )
+
+      json_str = inv.model_dump_json()
+      print(json_str)
+      # {"invoice_id":"...","amount":"1234.56","issued_at":"2024-01-15T10:30:00","client":"Firma XYZ"}
+
+      # Z parametrami (jak model_dump)
+      partial = inv.model_dump_json(include={"amount", "client"}, indent=2)
+      print(partial)
+      # {
+      #   "amount": "1234.56",
+      #   "client": "Firma XYZ"
+      # }
+
+  - name: model_validate_json() — parsowanie JSON
+    desc: >
+      model_validate_json() parsuje JSON string i waliduje w jednym kroku — szybsze
+      niż json.loads() + model_validate(). Konwertuje ISO string na datetime/date,
+      string na UUID, string na Decimal.
+    code: |
+      from pydantic import BaseModel
+      from datetime import date
+      import uuid
+
+      class OrderItem(BaseModel):
+          product_id: uuid.UUID
+          name: str
+          quantity: int
+          price: float
+
+      class Order(BaseModel):
+          order_id: str
+          date: date
+          items: list[OrderItem]
+          total: float
+
+      json_str = '''
+      {
+        "order_id": "ORD-001",
+        "date": "2024-01-15",
+        "items": [
+          {"product_id": "550e8400-e29b-41d4-a716-446655440000",
+           "name": "Laptop", "quantity": 1, "price": 4999.99}
+        ],
+        "total": 4999.99
+      }
+      '''
+
+      order = Order.model_validate_json(json_str)
+      print(order.date)              # 2024-01-15 (date obiekt)
+      print(type(order.items[0].product_id))  # uuid.UUID
+
+  - name: model_validate() i from_attributes
+    desc: >
+      model_validate() waliduje dict lub obiekt z atrybutami. from_attributes=True
+      pozwala czytać atrybuty obiektu (ORM). Obsługuje strict mode — bez koercji typów.
+    code: |
+      from pydantic import BaseModel, ConfigDict
+
+      class UserSchema(BaseModel):
+          model_config = ConfigDict(from_attributes=True)
+          id: int
+          name: str
+          email: str
+
+      # Z dict
+      u1 = UserSchema.model_validate({"id": 1, "name": "Łukasz", "email": "l@ex.com"})
+
+      # Z ORM obiektu (SQLAlchemy, Django, dataclass...)
+      class ORMUser:
+          id = 42
+          name = "Jan"
+          email = "j@ex.com"
+          # dodatkowe atrybuty ORM są ignorowane
+
+      u2 = UserSchema.model_validate(ORMUser())
+      print(u2.name)  # Jan
+
+      # strict=True — brak koercji typów
+      u3 = UserSchema.model_validate({"id": 1, "name": "Anna", "email": "a@ex.com"}, strict=True)
+      # strict=True: "1" → int BŁĄD (bez koercji), 1 → int OK
+
+  - name: "@field_serializer — niestandardowa serializacja pola"
+    desc: >
+      @field_serializer dekorator kontroluje jak konkretne pole jest serializowane.
+      when_used='json' — tylko w model_dump_json(). when_used='python' — tylko w model_dump().
+      Domyślnie zawsze. Może zwrócić dowolny JSON-serializowalny typ.
+    code: |
+      from pydantic import BaseModel, field_serializer
+      from datetime import datetime
+      from decimal import Decimal
+
+      class Transaction(BaseModel):
+          amount: Decimal
+          created_at: datetime
+          tags: list[str]
+
+          @field_serializer("amount")
+          def serialize_amount(self, v: Decimal, _info) -> str:
+              return f"{v:.2f} PLN"
+
+          @field_serializer("created_at")
+          def serialize_dt(self, v: datetime, _info) -> str:
+              return v.strftime("%d.%m.%Y %H:%M")
+
+          @field_serializer("tags", when_used="json")
+          def serialize_tags_for_json(self, v: list[str], _info) -> str:
+              return "|".join(v)  # tylko w JSON
+
+      t = Transaction(
+          amount=Decimal("99.99"),
+          created_at=datetime(2024, 1, 15, 10, 30),
+          tags=["promo", "vip"],
+      )
+      print(t.model_dump())
+      # {'amount': '99.99 PLN', 'created_at': '15.01.2024 10:30', 'tags': ['promo', 'vip']}
+      print(t.model_dump_json())
+      # {"amount":"99.99 PLN","created_at":"15.01.2024 10:30","tags":"promo|vip"}
+
+  - name: model_dump(mode='json') vs mode='python'
+    desc: >
+      mode='json' w model_dump() konwertuje typy do JSON-serializowalnych wartości
+      (datetime → str, UUID → str, Decimal → str) ale zwraca dict Pythona.
+      mode='python' (domyślne) zachowuje oryginalne typy Pythona.
+    code: |
+      from pydantic import BaseModel
+      from datetime import datetime
+      import uuid
+
+      class Event(BaseModel):
+          event_id: uuid.UUID
+          name: str
+          timestamp: datetime
+
+      e = Event(event_id=uuid.uuid4(), name="Deploy", timestamp=datetime.now())
+
+      # mode='python' (domyślne) — typy Pythona
+      d_python = e.model_dump(mode="python")
+      print(type(d_python["event_id"]))   # uuid.UUID
+      print(type(d_python["timestamp"]))  # datetime
+
+      # mode='json' — JSON-compatible types
+      d_json = e.model_dump(mode="json")
+      print(type(d_json["event_id"]))     # str
+      print(type(d_json["timestamp"]))    # str
+      print(d_json["timestamp"])          # "2024-01-15T10:30:00"
+
+      # mode='json' → można od razu json.dumps()
+      import json
+      json_str = json.dumps(d_json)  # działa bez custom encoder!
+
+  - name: by_alias — serializacja z aliasami
+    desc: >
+      by_alias=True w model_dump() lub model_dump_json() używa alias (lub serialization_alias)
+      jako klucze zamiast nazw atrybutów Pythona. Przydatne dla API które oczekuje camelCase.
+    code: |
+      from pydantic import BaseModel, Field, ConfigDict
+
+      class UserResponse(BaseModel):
+          model_config = ConfigDict(populate_by_name=True)
+
+          user_id: int = Field(serialization_alias="userId")
+          full_name: str = Field(serialization_alias="fullName")
+          is_active: bool = Field(serialization_alias="isActive")
+          created_at: str = Field(serialization_alias="createdAt")
+
+      u = UserResponse(
+          user_id=1, full_name="Łukasz K",
+          is_active=True, created_at="2024-01-15"
+      )
+
+      # Bez alias — snake_case
+      print(u.model_dump())
+      # {'user_id': 1, 'full_name': 'Łukasz K', ...}
+
+      # Z alias — camelCase dla API
+      print(u.model_dump(by_alias=True))
+      # {'userId': 1, 'fullName': 'Łukasz K', 'isActive': True, 'createdAt': '2024-01-15'}
+
+      # JSON dla frontend
+      print(u.model_dump_json(by_alias=True))
+      # {"userId":1,"fullName":"Łukasz K","isActive":true,"createdAt":"2024-01-15"}
+
+  - name: model_serializer — serializacja całego modelu
+    desc: >
+      @model_serializer dekorator zastępuje domyślną serializację całego modelu.
+      Zwraca dict lub inną strukturę. Używaj gdy chcesz radykalnie zmienić output
+      — np. dodać pole obliczane lub zmienić całą strukturę.
+    code: |
+      from pydantic import BaseModel, model_serializer
+      from datetime import datetime
+
+      class Money(BaseModel):
+          amount: float
+          currency: str = "PLN"
+
+          @model_serializer
+          def serialize_as_string(self) -> str:
+              return f"{self.amount:.2f} {self.currency}"
+
+      class Receipt(BaseModel):
+          items: list[str]
+          subtotal: Money
+          tax: Money
+          total: Money
+
+          @model_serializer(mode="wrap")
+          def serialize_with_meta(self, handler) -> dict:
+              data = handler(self)  # standardowa serializacja
+              data["_version"] = "1.0"
+              data["_generated_at"] = datetime.now().isoformat()
+              return data
+
+      m = Money(amount=99.50, currency="PLN")
+      print(m.model_dump())   # '99.50 PLN' (string, nie dict!)
+
+      r = Receipt(
+          items=["Laptop", "Myszka"],
+          subtotal=Money(amount=100.0),
+          tax=Money(amount=23.0),
+          total=Money(amount=123.0),
+      )
+      result = r.model_dump()
+      print(result["_version"])   # "1.0"
+
+  - name: Roundtrip i walidacja po deserializacji
+    desc: >
+      Kompletny wzorzec roundtrip — model → JSON → model z gwarancją że dane są
+      identyczne. Przydatne do testów i cache. model_validate_json + model_dump_json
+      = bezstratny roundtrip dla typów obsługiwanych przez Pydantic.
+    code: |
+      from pydantic import BaseModel
+      from datetime import datetime
+      from decimal import Decimal
+      import uuid
+
+      class Order(BaseModel):
+          order_id: uuid.UUID
+          amount: Decimal
+          created_at: datetime
+          items: list[str]
+
+      original = Order(
+          order_id=uuid.uuid4(),
+          amount=Decimal("1234.56"),
+          created_at=datetime.now(),
+          items=["Laptop", "Mysz"],
+      )
+
+      # Serializuj do JSON
+      json_str = original.model_dump_json()
+
+      # Deserializuj z JSON
+      restored = Order.model_validate_json(json_str)
+
+      # Porównanie — Pydantic implementuje __eq__
+      assert original == restored
+      assert original.order_id == restored.order_id
+      assert type(restored.amount) == Decimal     # nie string!
+      assert type(restored.created_at) == datetime # nie string!
+
+      print("Roundtrip OK — dane identyczne")

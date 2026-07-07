@@ -1,0 +1,103 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Helm?
+  firstComponent: Pierwsze kroki z Helm
+  firstComponentLang: bash
+
+intro:
+  title: Czym jest Helm?
+  desc: >
+    Helm to package manager dla Kubernetes — tak jak apt dla Ubuntu czy npm dla Node.js.
+    Zamiast pisać dziesiątki plików YAML dla każdej aplikacji, używasz gotowych chartów
+    (paczek) które ktoś już przygotował. Helm śledzi historię wszystkich deploymentów,
+    umożliwia rollback jedną komendą i parametryzuje konfigurację przez prosty plik values.yaml.
+    Standard w każdym produkcyjnym klastrze K8s: instalujesz nginx-ingress, cert-manager,
+    Prometheus — wszystko przez helm install. Helm 3 (od 2019) nie wymaga Tillera —
+    działa bezpośrednio przez kubeconfig, tak samo jak kubectl.
+
+concepts:
+  - title: Chart
+    desc: >
+      Chart to paczka Helm — zestaw plików YAML z szablonami Go templates opisującymi
+      zasoby Kubernetes. Chart zawiera Chart.yaml (metadane), values.yaml (domyślne wartości)
+      i katalog templates/ z manifestami. Możesz tworzyć własne charty lub używać
+      gotowych z Artifact Hub (bitnami, argo, ingress-nginx, prometheus-community).
+    icon: "📦"
+  - title: Release
+    desc: >
+      Release to konkretna instancja zainstalowanego charta w klastrze. Jeden chart
+      możesz zainstalować wielokrotnie pod różnymi nazwami (np. postgres-dev, postgres-prod)
+      — każda instalacja to osobny release z własną historią i możliwością niezależnego
+      rollbacku. Helm przechowuje stan release jako Kubernetes Secret.
+    icon: "🚀"
+  - title: Values
+    desc: >
+      Values to mechanizm parametryzacji charta. Plik values.yaml zawiera domyślne wartości
+      które możesz nadpisać przez helm install -f my-values.yaml lub --set key=value.
+      Dzięki values jeden chart obsługuje wiele środowisk (dev/staging/prod) przez
+      różne pliki konfiguracyjne — bez duplikowania szablonów.
+    icon: "⚙️"
+  - title: Repository
+    desc: >
+      Repozytorium Helm to serwer HTTP z plikiem index.yaml listującym dostępne charty
+      i ich wersje. Dodajesz repo przez helm repo add, odświeżasz helm repo update,
+      szukasz helm search repo. Artifact Hub (artifact.hub.io) to centralny katalog
+      z tysiącami chartów. Od Helm 3.8 charty mogą być też przechowywane w OCI registry.
+    icon: "🏛️"
+  - title: Template Engine
+    desc: >
+      Helm używa Go templates do renderowania manifestów YAML. Szablony mają dostęp
+      do .Values (twoje wartości), .Release (metadane release), .Chart (metadane charta),
+      .Capabilities (możliwości K8s API). Funkcje pomocnicze: toYaml, indent, nindent,
+      default, required, quote, upper, lower. Named templates definiuje się w _helpers.tpl.
+    icon: "🧩"
+  - title: Hooks
+    desc: >
+      Hooki to manifesty K8s z specjalną annotacją helm.sh/hook uruchamiane w
+      określonych momentach cyklu życia release. Przykłady: pre-install (migracja bazy
+      przed deploymentem), post-install (seed danych), pre-upgrade (backup), post-delete
+      (czyszczenie). Hooki umożliwiają operacje które muszą się wykonać dokładnie
+      we właściwej kolejności.
+    icon: "🔗"
+
+whenToUse:
+  - Instalacja popularnych narzędzi K8s (nginx-ingress, cert-manager, Prometheus) — gotowe charty zamiast ręcznego YAML
+  - Zarządzanie wieloma środowiskami przez różne pliki values.yaml bez duplikacji szablonów
+  - Potrzebujesz rollback do poprzedniej wersji jedną komendą (helm rollback)
+  - CI/CD pipeline z atomic deployments i automatycznym rollbackiem przy błędzie (--atomic)
+  - Dystrybucja własnych aplikacji jako chart — łatwa instalacja przez zespoły i klientów
+  - Dependency management — chart zależy od innych chartów (np. aplikacja + PostgreSQL + Redis)
+
+firstComponent: |
+  # Instalacja Helm
+  brew install helm                          # macOS/Linux
+  winget install Helm.Helm                   # Windows
+  curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+  # Dodaj popularne repozytorium
+  helm repo add bitnami https://charts.bitnami.com/bitnami
+  helm repo update
+
+  # Zainstaluj aplikację (np. nginx)
+  helm install mynginx bitnami/nginx \
+    --namespace demo \
+    --create-namespace
+
+  # Sprawdź zainstalowane releases
+  helm list -n demo
+  helm status mynginx -n demo
+
+  # Pokaż domyślne wartości do konfiguracji
+  helm show values bitnami/nginx | head -50
+
+  # Zainstaluj z własną konfiguracją
+  helm install mynginx bitnami/nginx \
+    -n demo \
+    --set replicaCount=2 \
+    --set service.type=ClusterIP
+
+  # Rollback do poprzedniej wersji
+  helm rollback mynginx 1 -n demo
+
+  # Usuń release
+  helm uninstall mynginx -n demo

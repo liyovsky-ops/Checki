@@ -1,0 +1,375 @@
+title: "Style i Layout"
+
+items:
+  - name: StyleSheet.create()
+    desc: >
+      StyleSheet.create() to zalecany sposób tworzenia stylów — waliduje właściwości
+      w dev, wysyła style raz przez bridge (stara arch) zamiast co render. Zwraca
+      obiekt z kluczami które przekazujesz do prop style. Nie ma kaskady CSS —
+      każdy komponent stylizuje się niezależnie.
+    code: |
+      import { View, Text, StyleSheet } from 'react-native';
+
+      function StyledCard() {
+        return (
+          <View style={styles.card}>
+            <Text style={[styles.text, styles.bold]}>Tytuł</Text>
+            <Text style={styles.text}>Opis karty</Text>
+          </View>
+        );
+      }
+
+      // StyleSheet.create — najlepsze praktyki
+      const styles = StyleSheet.create({
+        card: {
+          backgroundColor: '#ffffff',
+          borderRadius: 12,
+          padding: 16,
+          marginHorizontal: 16,
+          marginVertical: 8,
+        },
+        text: {
+          fontSize: 14,
+          color: '#333333',
+          lineHeight: 20,
+        },
+        bold: {
+          fontWeight: '700',
+          fontSize: 16,
+          marginBottom: 4,
+        },
+      });
+
+      // Inline style — unikaj (re-tworzone co render)
+      // <View style={{ flex: 1, padding: 16 }}>
+
+      // Tablicowy styl — łączenie stylów
+      // <Text style={[styles.text, isActive && styles.bold]}>
+
+  - name: Flexbox Layout
+    desc: >
+      React Native używa Flexbox domyślnie dla KAŻDEGO View — nie możesz go wyłączyć.
+      Kluczowa różnica od web: flexDirection domyślnie to 'column' (nie 'row').
+      flex: 1 oznacza "zajmij całe dostępne miejsce". Wszystkie wymiary są w dp
+      (density-independent pixels) — nie pikselach ani procentach.
+    code: |
+      import { View, Text, StyleSheet } from 'react-native';
+
+      function LayoutExamples() {
+        return (
+          <View style={styles.screen}>
+            {/* Wiersz z elementami */}
+            <View style={styles.row}>
+              <View style={[styles.box, { backgroundColor: '#61dafb' }]} />
+              <View style={[styles.box, { backgroundColor: '#ff6b6b' }]} />
+              <View style={[styles.box, { backgroundColor: '#51cf66' }]} />
+            </View>
+
+            {/* Wypełnij resztę ekranu */}
+            <View style={styles.fill}>
+              <Text style={styles.center}>Treść</Text>
+            </View>
+          </View>
+        );
+      }
+
+      const styles = StyleSheet.create({
+        screen: { flex: 1, padding: 16 },
+
+        // flexDirection: 'column' (default) — elementy jeden pod drugim
+        // flexDirection: 'row' — elementy obok siebie
+        row: {
+          flexDirection: 'row',
+          justifyContent: 'space-between', // oś główna
+          alignItems: 'center',            // oś poprzeczna
+          marginBottom: 16,
+        },
+
+        box: { width: 64, height: 64, borderRadius: 8 },
+
+        // flex: 1 wypełnia dostępną przestrzeń
+        fill: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 8 },
+
+        center: {
+          textAlign: 'center',
+          // centowanie przez flexbox
+          // alignSelf: 'center' dla elementu
+        },
+      });
+
+      // Najważniejsze właściwości Flexbox
+      // justifyContent: 'flex-start' | 'center' | 'flex-end' | 'space-between' | 'space-around'
+      // alignItems:     'flex-start' | 'center' | 'flex-end' | 'stretch'
+      // alignSelf:      jak alignItems ale dla pojedynczego dziecka
+      // flexWrap:       'nowrap' | 'wrap'
+      // gap:            (RN 0.71+) odpowiednik CSS gap
+
+  - name: Responsywność
+    desc: >
+      React Native nie ma media queries — responsywność osiągasz przez Dimensions API
+      lub hook useWindowDimensions(). Hook odświeża się automatycznie przy rotacji ekranu.
+      PixelRatio pozwala przeliczać piksele na dp. Percentage w width/height działa
+      w ograniczonym zakresie.
+    code: |
+      import {
+        View,
+        Text,
+        StyleSheet,
+        useWindowDimensions,
+        Dimensions,
+        PixelRatio,
+      } from 'react-native';
+
+      function ResponsiveLayout() {
+        const { width, height } = useWindowDimensions(); // re-renders on rotate
+        const isLandscape = width > height;
+        const isTablet = width >= 768;
+
+        return (
+          <View
+            style={[
+              styles.container,
+              isLandscape && styles.landscapeContainer,
+            ]}
+          >
+            <Text style={styles.info}>
+              {width.toFixed(0)} × {height.toFixed(0)} dp
+              {isTablet ? ' (tablet)' : ' (phone)'}
+            </Text>
+            <View
+              style={{
+                width: width * 0.8, // 80% szerokości ekranu
+                height: isLandscape ? 80 : 120,
+                backgroundColor: '#61dafb',
+                borderRadius: 12,
+              }}
+            />
+          </View>
+        );
+      }
+
+      const styles = StyleSheet.create({
+        container: { flex: 1, flexDirection: 'column', padding: 16 },
+        landscapeContainer: { flexDirection: 'row' },
+        info: { fontSize: 12, color: '#666', marginBottom: 8 },
+      });
+
+      // Jednorazowy odczyt (nie aktualizuje się przy rotacji)
+      const { width: SCREEN_W } = Dimensions.get('window');
+      const CARD_WIDTH = SCREEN_W - 32;
+
+      // PixelRatio — przeliczanie
+      const hairlineWidth = StyleSheet.hairlineWidth; // 1px w fizycznych pikselach
+
+  - name: Platform-specific styles
+    desc: >
+      Platform.select() pozwala zdefiniować wartości dla każdej platformy w jednym
+      miejscu. Możesz też tworzyć pliki .ios.tsx i .android.tsx — Metro automatycznie
+      wybierze właściwy plik na każdej platformie. Przydatne dla shadow, font families
+      i specyficznych zachowań UI.
+    code: |
+      import { Platform, StyleSheet } from 'react-native';
+
+      const styles = StyleSheet.create({
+        card: {
+          borderRadius: 12,
+          padding: 16,
+          backgroundColor: '#fff',
+
+          // Shadow — iOS używa shadow*, Android używa elevation
+          ...Platform.select({
+            ios: {
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.12,
+              shadowRadius: 8,
+            },
+            android: {
+              elevation: 6,
+            },
+          }),
+        },
+
+        text: {
+          // Natywne czcionki per platforma
+          fontFamily: Platform.select({
+            ios: 'San Francisco',
+            android: 'Roboto',
+            default: 'System',
+          }),
+          fontSize: Platform.OS === 'ios' ? 17 : 16,
+        },
+      });
+
+      // Warunkowy kod
+      function PlatformComponent() {
+        return Platform.OS === 'ios' ? <IOSComponent /> : <AndroidComponent />;
+      }
+
+      // Platform.Version — wersja systemu
+      if (Platform.OS === 'android' && Platform.Version < 23) {
+        // Android < 6.0 nie ma runtime permissions
+      }
+
+  - name: Shadow i cienie
+    desc: >
+      iOS i Android obsługują cienie inaczej. iOS: cztery właściwości shadow*.
+      Android: elevation (Material Design) — wbudowane cienie z materiałowego systemu.
+      Na iOS elevation nie działa, na Androidzie shadow* nie działa. Zawsze
+      definiuj obie wersje lub użyj Platform.select().
+    code: |
+      import { View, StyleSheet, Platform } from 'react-native';
+
+      function ShadowCard({ children }: { children: React.ReactNode }) {
+        return <View style={styles.card}>{children}</View>;
+      }
+
+      const styles = StyleSheet.create({
+        card: {
+          backgroundColor: '#ffffff',
+          borderRadius: 16,
+          padding: 20,
+          margin: 12,
+
+          // iOS cień
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.08,
+          shadowRadius: 6,
+
+          // Android cień (Material elevation)
+          elevation: 4,
+        },
+
+        // Głęboki cień
+        deepShadow: {
+          shadowColor: '#61dafb',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.3,
+          shadowRadius: 16,
+          elevation: 12,
+        },
+      });
+
+  - name: Absolute positioning
+    desc: >
+      position: 'absolute' działa jak w CSS — element jest wyjęty z flow i
+      pozycjonowany względem rodzica. Używaj do overlayów, badge na ikonach,
+      FAB (Floating Action Button) w rogu ekranu, lub warstw animowanych.
+    code: |
+      import { View, Text, StyleSheet, Pressable } from 'react-native';
+
+      function ScreenWithFAB() {
+        return (
+          <View style={styles.screen}>
+            {/* Treść ekranu */}
+            <Text>Treść ekranu</Text>
+
+            {/* Overlay — pełny ekran nad treścią */}
+            {false && <View style={styles.overlay} />}
+
+            {/* FAB — Floating Action Button */}
+            <Pressable style={styles.fab}>
+              <Text style={styles.fabIcon}>+</Text>
+            </Pressable>
+
+            {/* Badge na ikonie */}
+            <View style={styles.iconWrapper}>
+              <Text style={styles.icon}>🔔</Text>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>3</Text>
+              </View>
+            </View>
+          </View>
+        );
+      }
+
+      const styles = StyleSheet.create({
+        screen: { flex: 1, backgroundColor: '#f5f5f5' },
+        overlay: {
+          ...StyleSheet.absoluteFillObject, // top:0, left:0, right:0, bottom:0
+          backgroundColor: 'rgba(0,0,0,0.5)',
+        },
+        fab: {
+          position: 'absolute',
+          bottom: 24,
+          right: 24,
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: '#61dafb',
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        fabIcon: { fontSize: 28, color: '#fff', fontWeight: '300' },
+        iconWrapper: { position: 'relative', margin: 16 },
+        icon: { fontSize: 32 },
+        badge: {
+          position: 'absolute',
+          top: -4,
+          right: -4,
+          backgroundColor: '#ff3b30',
+          borderRadius: 10,
+          minWidth: 20,
+          height: 20,
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingHorizontal: 4,
+        },
+        badgeText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+      });
+
+  - name: SafeAreaInsets
+    desc: >
+      useSafeAreaInsets() z react-native-safe-area-context zwraca dokładne wartości
+      wciecia (top, bottom, left, right) dla notcha, status bara i home indicatora.
+      Przydatne gdy SafeAreaView jest zbyt restrykcyjny lub potrzebujesz ręcznie
+      dodać padding do konkretnych elementów.
+    code: |
+      import { useSafeAreaInsets } from 'react-native-safe-area-context';
+      import { View, StyleSheet } from 'react-native';
+
+      function CustomHeader() {
+        const insets = useSafeAreaInsets();
+
+        return (
+          <View
+            style={[
+              styles.header,
+              { paddingTop: insets.top + 12 }, // status bar + własny padding
+            ]}
+          >
+            {/* nagłówek */}
+          </View>
+        );
+      }
+
+      function BottomBar() {
+        const insets = useSafeAreaInsets();
+
+        return (
+          <View
+            style={[
+              styles.bar,
+              { paddingBottom: insets.bottom }, // home indicator
+            ]}
+          >
+            {/* przyciski */}
+          </View>
+        );
+      }
+
+      const styles = StyleSheet.create({
+        header: {
+          backgroundColor: '#001a2e',
+          paddingHorizontal: 16,
+          paddingBottom: 12,
+        },
+        bar: {
+          flexDirection: 'row',
+          backgroundColor: '#fff',
+          borderTopWidth: 1,
+          borderTopColor: '#eee',
+          paddingTop: 8,
+        },
+      });

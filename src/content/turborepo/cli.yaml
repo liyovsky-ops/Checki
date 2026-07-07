@@ -1,0 +1,315 @@
+title: Komendy Turborepo
+
+groups:
+  - name: Instalacja i setup
+    icon: "🚀"
+    commands:
+      - cmd: npx create-turbo@latest
+        desc: Utwórz nowe monorepo — interaktywny kreator
+        detail:
+          what: Kreator projektu — pyta o nazwę i package manager (pnpm/npm/yarn). Tworzy monorepo z apps/web, apps/docs, packages/ui, packages/typescript-config, packages/eslint-config i turbo.json.
+          how: Domyślnie używa pnpm workspaces. Możesz wybrać npm workspaces lub yarn workspaces. Turbo.json jest już skonfigurowany z podstawowym pipeline.
+          tips:
+            - 'npx create-turbo@latest my-monorepo — z nazwą katalogu od razu'
+            - 'npx create-turbo@latest --example with-tailwind — z szablonem Tailwind'
+            - 'npx create-turbo@latest --example with-docker — z Dockerfile i docker-compose'
+      - cmd: npm install turbo --save-dev
+        desc: Dodaj Turborepo do istniejącego projektu
+        detail:
+          what: Instaluje turbo jako devDependency w root package.json. Następnie tworzysz turbo.json ręcznie i dodajesz scripts do package.json.
+          how: Turborepo jest binary — po instalacji dostępne przez npx turbo lub przez scripts w package.json. Zalecane zainstalowanie w root monorepo, nie w podprojektach.
+          tips:
+            - 'pnpm add turbo --save-dev --workspace-root — dla pnpm (root monorepo)'
+            - 'Po instalacji uruchom: npx turbo init — inicjalizuje turbo.json'
+      - cmd: npx turbo@latest init
+        desc: Zainicjalizuj turbo.json w istniejącym projekcie
+        detail:
+          what: Tworzy podstawowy turbo.json z domyślną konfiguracją tasks — build, test, lint, dev. Wykrywa istniejące skrypty z package.json workspace.
+          how: Uruchom z root katalogu monorepo po instalacji package managera i zdefiniowaniu workspaces. Następnie dostosuj turbo.json do swoich potrzeb.
+          tips:
+            - 'Sprawdź i edytuj wygenerowany turbo.json — dostosuj dependsOn i outputs'
+            - 'Dodaj scripts do root package.json — "build": "turbo run build"'
+      - cmd: npx turbo telemetry disable
+        desc: Wyłącz zbieranie danych telemetrycznych
+        detail:
+          what: Turborepo domyślnie zbiera anonimowe dane użytkowania. Ta komenda wyłącza telemetrię na poziomie globalnym (poza projektem).
+          how: Ustawienie jest zapisywane globalnie w profilu użytkownika. Możesz też ustawić zmienną TURBO_TELEMETRY_DISABLED=1 w CI.
+          tips:
+            - 'TURBO_TELEMETRY_DISABLED=1 — wyłącz przez zmienną środowiskową'
+            - 'npx turbo telemetry enable — włącz z powrotem'
+
+  - name: Uruchamianie tasków
+    icon: "▶️"
+    commands:
+      - cmd: turbo build
+        desc: Zbuduj wszystkie workspace równolegle (z cache)
+        detail:
+          what: Uruchamia zadanie "build" we wszystkich workspace zgodnie z grafem zależności z turbo.json. Zadania bez zależności uruchamiane równolegle, zadania z dependsOn czekają na poprzednie.
+          how: Turbo automatycznie wykrywa ile rdzeni ma maszyna i uruchamia tyle zadań równolegle. Cache jest sprawdzany przed każdym zadaniem — jeśli hash wejść się nie zmienił, wynik z cache.
+          tips:
+            - '"turbo build" = skrót dla "turbo run build"'
+            - 'Pierwsza budowa jest wolna, kolejne korzystają z cache'
+      - cmd: turbo run build
+        desc: Pełna składnia uruchamiania zadania
+        detail:
+          what: Pełna forma komendy turbo. "turbo build" jest aliasem. Możesz uruchomić dowolne zadanie zdefiniowane w turbo.json tasks.
+          how: Turborepo przeszukuje package.json wszystkich workspace i uruchamia skrypt o podanej nazwie tam gdzie istnieje. Nieistniejące skrypty w workspace są pomijane.
+          tips:
+            - 'turbo run lint test — wiele zadań naraz (paralelizm między nimi też)'
+            - 'turbo run build --filter=web -- --no-lint — przekaż args do skryptu po "--"'
+      - cmd: turbo run build test lint
+        desc: Uruchom wiele zadań jednym poleceniem
+        detail:
+          what: Uruchamia build, test i lint w optymalnej kolejności — Turborepo uwzględnia zależności między wszystkimi zadaniami jednocześnie i maksymalizuje równoległość.
+          how: Turbo buduje globalny graf wszystkich trzech zadań we wszystkich workspace i uruchamia je inteligentnie — nie sekwencyjnie jedno po drugim.
+          tips:
+            - 'Bardziej wydajne niż "turbo build && turbo test && turbo lint"'
+            - 'Turbo widzi że lint nie zależy od build i może je uruchomić równolegle'
+      - cmd: turbo run build --parallel
+        desc: Wymuś równoległe wykonanie ignorując dependsOn
+        detail:
+          what: "--parallel ignoruje zależności i uruchamia zadanie we wszystkich workspace jednocześnie. Użyteczne dla long-running tasks (dev servers) gdzie kolejność nie ma znaczenia."
+          how: Domyślnie turbo respektuje dependsOn. Z --parallel uruchamia wszystko równolegle bez względu na zależności. Używaj ostrożnie — może powodować błędy gdy zadania naprawdę zależą od siebie.
+          tips:
+            - 'turbo dev --parallel — uruchom dev server we wszystkich workspace naraz'
+            - 'Dla dev serverów lepiej użyć persistent: true w turbo.json'
+      - cmd: turbo run build --concurrency=4
+        desc: Ogranicz liczbę równoległych zadań
+        detail:
+          what: Ogranicza maksymalną liczbę zadań uruchamianych jednocześnie do 4. Domyślnie Turborepo używa liczby rdzeni CPU × 1.5.
+          how: Przydatne gdy maszyna jest przeciążona lub buildy są pamięciochłonne. Możesz też ustawić --concurrency=50% — procent dostępnych rdzeni.
+          tips:
+            - '--concurrency=1 — sekwencyjne wykonanie (debug, niski RAM)'
+            - '--concurrency=50% — połowa dostępnych rdzeni'
+            - 'TURBO_CONCURRENCY=4 — przez zmienną środowiskową'
+      - cmd: turbo run build --dry-run
+        desc: Pokaż co zostanie uruchomione bez wykonywania
+        detail:
+          what: Wyświetla plan wykonania — które zadania zostaną uruchomione, które będą cache hit, kolejność wykonania. Nie wykonuje żadnych zadań.
+          how: Przydatne do debugowania filtrów, sprawdzania grafu zależności i weryfikacji czy turbo.json jest poprawnie skonfigurowany.
+          tips:
+            - 'turbo run build --dry-run=json — output jako JSON (do parsowania w CI)'
+            - 'Pokazuje "cache hit" / "cache miss" dla każdego zadania'
+      - cmd: turbo run build --summarize
+        desc: Zapisz podsumowanie przebiegu do pliku
+        detail:
+          what: Po wykonaniu generuje plik .turbo/runs/<hash>.json z pełnym podsumowaniem — czasy, cache hits, logi, hash wejść dla każdego zadania.
+          how: Przydatne do analizy wydajności i debugowania problemów z cache. Plik JSON można parsować automatycznie w CI.
+          tips:
+            - 'Pliki podsumowania nie są automatycznie czyszczone — usuń stare .turbo/runs/'
+
+  - name: Filtrowanie workspace — --filter
+    icon: "🔍"
+    commands:
+      - cmd: "turbo run build --filter=web"
+        desc: Uruchom zadanie tylko w workspace "web"
+        detail:
+          what: Filtruje wykonanie do konkretnego workspace o nazwie "web" (wartość pola "name" w package.json workspace). Inne workspace są pomijane.
+          how: Nazwa workspace to wartość z package.json — "web" lub "@acme/ui". Możesz podać wiele filtrów po przecinku lub wiele --filter.
+          tips:
+            - 'turbo run build --filter=@acme/ui — workspace z scope npm'
+            - 'turbo run build --filter=web --filter=docs — wiele workspace'
+      - cmd: "turbo run build --filter=...web"
+        desc: Uruchom web i WSZYSTKIE workspace które od niego zależą
+        detail:
+          what: "Prefix \"...\" (przed nazwą) = workspace i jego dependenci (downstream). Jeśli web eksportuje bibliotekę używaną przez docs i admin — uruchamia web, docs i admin."
+          how: Przydatne gdy zmienisz shared package i chcesz przebudować tylko to co jest dotknięte. "...web" = "web i wszystko co importuje web".
+          tips:
+            - 'Odwrotność: "web..." = web i wszystkie jego zależności (upstream)'
+      - cmd: "turbo run build --filter=web..."
+        desc: Uruchom web i WSZYSTKIE jego zależności
+        detail:
+          what: "Suffix \"...\" (po nazwie) = workspace i jego dependencies (upstream). Uruchamia web plus wszystkie packages/libs od których web zależy."
+          how: Przydatne do izolowanego buildu jednej aplikacji z całym jej drzewem zależności — bez pozostałych aplikacji w monorepo.
+          tips:
+            - '"turbo run build --filter=web..." — zbuduj web z pełnym drzewem zależności'
+            - 'Kombinuj: --filter=...web... — web + upstream + downstream'
+      - cmd: "turbo run build --filter=[origin/main]"
+        desc: Uruchom tylko workspace zmienione od origin/main
+        detail:
+          what: Uruchamia zadania tylko w workspace które zmieniły się względem origin/main. Turborepo używa git diff do wykrycia zmian. Idealne do CI na PR.
+          how: Turborepo analizuje git diff między HEAD a podanym ref. Workspace bez zmian są pomijane. Uwzględnia zmiany w zależnościach — zmiana packages/ui triggeruje apps/web.
+          tips:
+            - 'turbo run build --filter=[HEAD^1] — zmiany w ostatnim commicie'
+            - 'turbo run test --filter=[origin/main]... — testy dla zmienionych + dependenci'
+      - cmd: "turbo run build --filter=./apps/*"
+        desc: Uruchom zadanie w workspace pasujących do glob
+        detail:
+          what: Filtruje przez glob na ścieżkę katalogów workspace. "./apps/*" pasuje do wszystkich workspace w katalogu apps/ — ignoruje packages/.
+          how: Ścieżka jest relatywna do root monorepo. Możesz łączyć filtr nazwy i filtr ścieżki.
+          tips:
+            - '"./packages/*" — tylko pakiety (bez aplikacji)'
+            - '"./apps/{web,docs}" — konkretne aplikacje z listy'
+
+  - name: Cache management
+    icon: "💾"
+    commands:
+      - cmd: turbo run build --force
+        desc: Wymuś rebuild — ignoruj cache i zapisz nowy
+        detail:
+          what: Ignoruje lokalny i zdalny cache. Uruchamia wszystkie zadania od nowa i zapisuje nowe wyniki do cache. Przydatne gdy podejrzewasz że cache jest nieprawidłowy.
+          how: "--force nie usuwa starego cache — nadpisuje go nowym wynikiem. Po uruchomieniu z --force cache jest aktualny."
+          tips:
+            - 'turbo run build --force --filter=web — force rebuild tylko web'
+            - 'Rzadko potrzebne — użyj gdy masz podejrzenie o stale cache'
+      - cmd: turbo run build --no-cache
+        desc: Uruchom bez cache — nie czytaj i nie zapisuj
+        detail:
+          what: Wyłącza cache całkowicie — nie sprawdza cache przed wykonaniem i nie zapisuje wyników. Przydatne do benchmarkowania "cold" czasu buildu.
+          how: "Różnica od --force: --no-cache nie zapisuje wyników, --force zapisuje nowe. Użyj --no-cache do testowania szybkości bez cache."
+          tips:
+            - 'Użyj do pomiaru baseline czasu buildu bez optymalizacji cache'
+            - 'TURBO_CACHE=0 — wyłącz cache przez zmienną środowiskową'
+      - cmd: turbo daemon start
+        desc: Uruchom Turborepo daemon (przyspiesza cold start)
+        detail:
+          what: Turborepo daemon to proces tła który przyspiesza pierwsze uruchomienie turbo przez utrzymywanie stanu w pamięci między wywołaniami. Automatycznie zarządzany od Turborepo v1.8.
+          how: Daemon startuje automatycznie gdy uruchomisz turbo. Ręczne zarządzanie rzadko potrzebne — przydatne gdy daemon się zawiesza.
+          tips:
+            - 'Daemon restartuje się automatycznie gdy jest potrzebny'
+            - 'turbo daemon status — sprawdź czy daemon działa'
+      - cmd: turbo daemon stop
+        desc: Zatrzymaj Turborepo daemon
+        detail:
+          what: Zatrzymuje proces daemona Turborepo. Kolejne wywołanie turbo uruchomi go ponownie automatycznie.
+          how: Przydatne gdy daemon zużywa za dużo RAM lub masz podejrzenie że powoduje problemy. Po zatrzymaniu pierwsze uruchomienie turbo będzie nieco wolniejsze.
+          tips:
+            - 'Po turbo daemon stop — następne "turbo run" automatycznie go wznowi'
+            - 'turbo daemon clean — wyczyść socket i pliki tymczasowe daemona'
+
+  - name: Remote Cache — Vercel
+    icon: "☁️"
+    commands:
+      - cmd: turbo login
+        desc: Zaloguj się do Vercel (Remote Cache)
+        detail:
+          what: Otwiera przeglądarkę i inicjuje OAuth flow do Vercel. Po zalogowaniu token jest zapisywany lokalnie. Wymagane do konfiguracji Vercel Remote Cache.
+          how: Jeśli jesteś w środowisku bez przeglądarki (SSH, CI), użyj TURBO_TOKEN zamiast logowania interaktywnego. Token generujesz w Vercel Dashboard — Access Tokens.
+          tips:
+            - 'Wymagane tylko raz na maszynę — token jest zapisywany w ~/.turbo/config.json'
+            - 'W CI nigdy nie używaj turbo login — użyj TURBO_TOKEN env variable'
+      - cmd: turbo link
+        desc: Powiąż projekt z Vercel Remote Cache
+        detail:
+          what: Interaktywnie pyta o team i projekt Vercel. Po wybraniu konfiguruje Remote Cache dla tego monorepo — zapisuje konfigurację w .turbo/config.json.
+          how: .turbo/config.json zawiera teamId i apiUrl. Dodaj .turbo/config.json do .gitignore — nie commituj tokenów. Konfiguracja jest per-projekt (per katalog).
+          tips:
+            - 'turbo link --no-gitignore — nie dodawaj automatycznie do .gitignore'
+            - 'Sprawdź wynik: turbo run build — powinno pokazać "Remote caching enabled"'
+      - cmd: turbo logout
+        desc: Wyloguj się z Vercel Remote Cache
+        detail:
+          what: Usuwa lokalny token Vercel i rozłącza Remote Cache. Buduje nadal działają lokalnie — tylko Remote Cache przestaje działać.
+          how: Przydatne przy zmianie konta Vercel lub debugowaniu problemów z Remote Cache. Po wylogowaniu — turbo login + turbo link żeby połączyć ponownie.
+          tips:
+            - 'Nie wpływa na CI — tam Remote Cache jest konfigurowany przez TURBO_TOKEN'
+      - cmd: "TURBO_TOKEN=xxx TURBO_TEAM=acme turbo run build"
+        desc: Remote Cache przez zmienne środowiskowe (CI/CD)
+        detail:
+          what: Konfiguracja Remote Cache bez interaktywnego logowania — przez zmienne środowiskowe. TURBO_TOKEN to Personal Access Token z Vercel. TURBO_TEAM to slug Twojego team.
+          how: Ustaw TURBO_TOKEN i TURBO_TEAM jako secrets w CI (GitHub Actions, GitLab CI, CircleCI). Turborepo automatycznie używa Remote Cache gdy oba są ustawione.
+          tips:
+            - 'TURBO_TOKEN generujesz w Vercel Dashboard → Settings → Tokens'
+            - 'TURBO_TEAM to slug team (np. "acme") — znajdziesz w URL vercel.com/acme'
+            - 'TURBO_REMOTE_ONLY=true — używaj tylko remote cache, ignoruj lokalny'
+
+  - name: Generators — turbo gen
+    icon: "⚙️"
+    commands:
+      - cmd: turbo gen
+        desc: Interaktywny generator — uruchom dostępne generatory
+        detail:
+          what: Wyświetla listę dostępnych generatorów (workspace i własnych z turbo.generators/). Pozwala wybrać i uruchomić generator interaktywnie.
+          how: Generator bazuje na Plop.js. Własne generatory definiujesz w turbo.generators/config.ts w root monorepo. Turborepo ma wbudowany generator workspace.
+          tips:
+            - 'Własne generatory pisz w turbo.generators/config.ts — pełna dokumentacja Plop.js'
+      - cmd: turbo gen workspace
+        desc: Utwórz nowy workspace przez generator
+        detail:
+          what: Interaktywnie pyta o nazwę, typ (app/package) i kopiuje strukturę z istniejącego workspace jako szablonu. Automatycznie aktualizuje workspace dependencies.
+          how: Generator kopiuje wybrany workspace, podmienia nazwy i tworzy nowy katalog. Nie musisz ręcznie tworzyć package.json, tsconfig.json ani src/.
+          tips:
+            - 'turbo gen workspace --name=@acme/ui --type=package — bez interaktywnego'
+            - 'Domyślnie pyta o typ: "app" (do apps/) lub "package" (do packages/)'
+      - cmd: "turbo gen workspace --name=@acme/analytics --type=package"
+        desc: Utwórz nowy package bez interaktywnego kreatora
+        detail:
+          what: Tworzy nowy workspace @acme/analytics w packages/analytics/ na podstawie istniejącego package jako szablonu. Gotowa struktura bez ręcznego kopiowania.
+          how: "--name to wartość pola name w package.json. --type to app lub package — decyduje o katalogu (apps/ vs packages/)."
+          tips:
+            - 'turbo gen workspace --name=admin --type=app — nowa aplikacja w apps/admin'
+            - 'Po wygenerowaniu dodaj zależność do aplikacji która go potrzebuje'
+      - cmd: turbo gen copy
+        desc: Skopiuj istniejący workspace jako szablon nowego
+        detail:
+          what: Tworzy nowy workspace jako kopię wybranego istniejącego workspace. Pyta o nazwę źródła i nazwę nowego workspace. Podmieniasz nazwy, reszta struktury zostaje.
+          how: Przydatne gdy masz wzorcowy workspace (np. idealnie skonfigurowaną aplikację) i chcesz tworzyć kolejne na jego bazie.
+          tips:
+            - 'Odpowiednik "kopiuj-wklej" katalogu ale bezpieczniejszy — podmienia nazwy'
+
+  - name: Konfiguracja JSON — snippety turbo.json
+    icon: "📄"
+    commands:
+      - cmd: |
+          {
+            "$schema": "https://turbo.build/schema.json",
+            "tasks": { "build": { "dependsOn": ["^build"], "outputs": ["dist/**"] } }
+          }
+        desc: Minimalna konfiguracja turbo.json
+        detail:
+          what: Minimalne turbo.json z jednym zadaniem build. dependsOn ["^build"] — buduj zależności upstream przed tym workspace. outputs ["dist/**"] — cache'uj katalog dist/.
+          how: Umieść turbo.json w root monorepo. Turborepo automatycznie go znajdzie. "$schema" daje autouzupełnianie w VS Code.
+          tips:
+            - 'Każdy workspace musi mieć skrypt "build" w package.json żeby turbo go uruchomił'
+            - 'Workspace bez skryptu "build" są automatycznie pomijane'
+      - cmd: |
+          "tasks": {
+            "build": { "dependsOn": ["^build"], "outputs": [".next/**", "!.next/cache/**"] },
+            "dev": { "cache": false, "persistent": true },
+            "lint": { "outputs": [] },
+            "test": { "dependsOn": ["build"], "outputs": ["coverage/**"] }
+          }
+        desc: Typowy pipeline — Next.js monorepo
+        detail:
+          what: Kompletny pipeline dla monorepo z Next.js. build zależy od upstream builds, dev jest persistent (serwer deweloperski), lint jest niezależny i równoległy, test wymaga build w tym samym workspace.
+          how: '"!.next/cache/**" wyklucza wewnętrzny cache Next.js z Turborepo cache — jest za duży i zawiera artefakty specyficzne dla maszyny.'
+          tips:
+            - 'Ten pattern pokrywa ~90% potrzeb Next.js monorepo'
+            - 'Dodaj "type-check" jako osobne zadanie jeśli chcesz oddzielnego type checking'
+      - cmd: |
+          "globalEnv": ["NODE_ENV", "CI"],
+          "globalDependencies": [".env", "turbo.json"]
+        desc: Globalne zmienne env i zależności
+        detail:
+          what: globalEnv — zmienne env które invalidują cache WSZYSTKICH zadań gdy się zmienią. globalDependencies — pliki które invalidują cały cache przy zmianie.
+          how: Umieść w root turbo.json obok "tasks". Zmiany w .env lub turbo.json wymuszają pełny rebuild — bo mogą wpłynąć na każde zadanie.
+          tips:
+            - 'Nie dodawaj zbyt wielu globalEnv — każda zmiana invaliduje CAŁY cache'
+            - '"turbo.json" w globalDependencies gwarantuje rebuild po zmianie konfiguracji'
+
+  - name: CI/CD integracja
+    icon: "🔄"
+    commands:
+      - cmd: turbo prune --scope=web --docker
+        desc: Przytnij monorepo do minimum dla Docker multi-stage build
+        detail:
+          what: Tworzy katalog out/ z wyciętym monorepo zawierającym tylko to co potrzebuje workspace "web" — jego zależności workspace i pliki. Bez pozostałych aplikacji.
+          how: "Flaga --docker generuje dwie struktury: out/json/ (tylko package.json — dla instalacji deps) i out/full/ (wszystkie pliki — dla buildu). Optymalizuje Docker cache layers."
+          tips:
+            - 'Bez --docker: out/ zawiera pełne pliki (bez podziału na warstwy)'
+            - 'Użyj w Dockerfile: COPY --from=pruner /app/out/json . && RUN pnpm install'
+            - 'Drastycznie zmniejsza rozmiar Docker image — tylko potrzebne paczki'
+      - cmd: |
+          # .github/workflows/ci.yml
+          - name: Build
+            run: turbo run build test lint
+            env:
+              TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+              TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+        desc: GitHub Actions z Remote Cache
+        detail:
+          what: Podstawowa konfiguracja GitHub Actions z Turborepo Remote Cache. TURBO_TOKEN i TURBO_TEAM umożliwiają dostęp do Vercel Remote Cache — pierwsze CI buduje, kolejne korzystają z cache.
+          how: Dodaj TURBO_TOKEN jako Repository Secret w GitHub. TURBO_TEAM ustaw jako Repository Variable. Pierwszy job buduje cold, wszystkie kolejne są błyskawiczne dla niezmienionego kodu.
+          tips:
+            - 'Dodaj też "cache" dla node_modules przez actions/cache'
+            - 'turbo run build --filter=[origin/main] — buduj tylko zmienione workspace w CI'

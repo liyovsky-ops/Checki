@@ -1,0 +1,259 @@
+title: Komponenty Vue w Nuxt
+
+items:
+  - name: Auto-import komponentów
+    desc: >
+      Nuxt automatycznie importuje komponenty z katalogu components/. Nie piszesz import MyCard from '~/components/MyCard.vue'.
+      Zagnieżdżone komponenty: components/ui/Button.vue dostępny jako <UiButton />.
+      Podkatalogi stają się prefiksem nazwy komponentu.
+    code: |
+      // components/AppHeader.vue — dostępny globalnie jako <AppHeader />
+      <script setup lang="ts">
+      defineProps<{
+        title: string
+        showNav?: boolean
+      }>()
+      </script>
+
+      <template>
+        <header class="app-header">
+          <h1>{{ title }}</h1>
+          <nav v-if="showNav">
+            <NuxtLink to="/">Home</NuxtLink>
+            <NuxtLink to="/about">About</NuxtLink>
+          </nav>
+        </header>
+      </template>
+
+      // pages/index.vue — bez żadnych importów
+      <template>
+        <AppHeader title="Moja Strona" :show-nav="true" />
+      </template>
+
+  - name: "<NuxtLink> — nawigacja"
+    desc: >
+      <NuxtLink> zastępuje <a href> w Nuxt. Automatycznie prefetchuje stronę przy hover,
+      dodaje klasę router-link-active dla aktywnych linków. Obsługuje external URL (otwiera
+      jako zwykły <a>) i internal routing (Vue Router push).
+    code: |
+      <template>
+        <nav>
+          <!-- Wewnętrzny link — Vue Router push -->
+          <NuxtLink to="/">Home</NuxtLink>
+          <NuxtLink to="/blog">Blog</NuxtLink>
+
+          <!-- Dynamiczny link -->
+          <NuxtLink :to="`/posts/${post.slug}`">{{ post.title }}</NuxtLink>
+
+          <!-- Z obiektem route -->
+          <NuxtLink :to="{ name: 'users-id', params: { id: 42 } }">
+            Użytkownik #42
+          </NuxtLink>
+
+          <!-- Zewnętrzny link — otwiera w nowej karcie -->
+          <NuxtLink to="https://nuxt.com" external target="_blank">
+            Dokumentacja Nuxt
+          </NuxtLink>
+
+          <!-- Prefetch wyłączony -->
+          <NuxtLink to="/heavy-page" :prefetch="false">
+            Ciężka strona
+          </NuxtLink>
+        </nav>
+      </template>
+
+  - name: "<NuxtPage> i <NuxtLayout>"
+    desc: >
+      <NuxtPage> renderuje aktualną stronę z katalogu pages/. <NuxtLayout> opakowuje
+      stronę w layout. W app.vue umieszczasz <NuxtPage /> aby włączyć routing.
+      <NuxtLayout> pozwala na named slots i przejścia między layoutami.
+    code: |
+      // app.vue — root aplikacji
+      <template>
+        <div>
+          <NuxtRouteAnnouncer />
+          <NuxtLayout>
+            <NuxtPage />
+          </NuxtLayout>
+        </div>
+      </template>
+
+      // layouts/default.vue — domyślny layout
+      <template>
+        <div>
+          <AppHeader />
+          <main>
+            <slot />
+          </main>
+          <AppFooter />
+        </div>
+      </template>
+
+      // layouts/blank.vue — dla stron logowania
+      <template>
+        <div class="blank-layout">
+          <slot />
+        </div>
+      </template>
+
+      // pages/login.vue — wybór layoutu
+      <script setup lang="ts">
+      definePageMeta({
+        layout: 'blank'
+      })
+      </script>
+
+  - name: "defineProps i defineEmits (Composition API)"
+    desc: >
+      Nuxt używa Vue 3 Composition API z <script setup>. defineProps definiuje
+      właściwości komponentu, defineEmits definiuje eventy. Wszystko type-safe
+      z TypeScript. Brak potrzeby import defineProps — kompilator Vue to obsługuje.
+    code: |
+      // components/PostCard.vue
+      <script setup lang="ts">
+      interface Post {
+        id: number
+        title: string
+        excerpt: string
+        publishedAt: string
+      }
+
+      const props = defineProps<{
+        post: Post
+        featured?: boolean
+      }>()
+
+      const emit = defineEmits<{
+        (e: 'click', id: number): void
+        (e: 'bookmark', post: Post): void
+      }>()
+
+      function handleClick() {
+        emit('click', props.post.id)
+      }
+      </script>
+
+      <template>
+        <article
+          :class="['post-card', { featured: featured }]"
+          @click="handleClick"
+        >
+          <h2>{{ post.title }}</h2>
+          <p>{{ post.excerpt }}</p>
+          <time>{{ post.publishedAt }}</time>
+          <button @click.stop="emit('bookmark', post)">Zapisz</button>
+        </article>
+      </template>
+
+  - name: "useHead i useSeoMeta — SEO"
+    desc: >
+      useHead ustawia meta tagi, tytuł, skrypty i style w head dokumentu.
+      useSeoMeta to wygodny wrapper dla typowych SEO meta tagów (Open Graph,
+      Twitter Cards, description). Działają zarówno w SSR jak i client-side.
+    code: |
+      <script setup lang="ts">
+      // Pełne SEO jedną funkcją
+      useSeoMeta({
+        title: 'Mój Post — Blog',
+        description: 'Opis strony do Google i social media',
+        ogTitle: 'Mój Post',
+        ogDescription: 'Opis dla Facebook/LinkedIn',
+        ogImage: 'https://example.com/og-image.jpg',
+        ogUrl: 'https://example.com/blog/moj-post',
+        twitterCard: 'summary_large_image',
+        twitterTitle: 'Mój Post',
+        twitterImage: 'https://example.com/og-image.jpg',
+      })
+
+      // Alternatywnie — pełna kontrola przez useHead
+      useHead({
+        title: 'Strona główna',
+        meta: [
+          { name: 'description', content: 'Opis strony' },
+          { property: 'og:type', content: 'website' },
+        ],
+        link: [
+          { rel: 'canonical', href: 'https://example.com' }
+        ],
+        script: [
+          { src: 'https://analytics.example.com/script.js', defer: true }
+        ]
+      })
+      </script>
+
+  - name: "<NuxtImg> — zoptymalizowane obrazy"
+    desc: >
+      <NuxtImg> to wrapper nad HTML img z automatyczną optymalizacją przez @nuxt/image.
+      Zmienia rozmiar, konwertuje do WebP/AVIF, lazy loads, obsługuje srcset i responsive.
+      Wymaga instalacji modułu @nuxt/image.
+    code: |
+      // nuxt.config.ts
+      export default defineNuxtConfig({
+        modules: ['@nuxt/image']
+      })
+
+      // Użycie w komponencie
+      <template>
+        <!-- Podstawowe użycie -->
+        <NuxtImg
+          src="/images/hero.jpg"
+          alt="Hero image"
+          width="800"
+          height="600"
+        />
+
+        <!-- Responsive z srcset -->
+        <NuxtImg
+          src="/images/hero.jpg"
+          sizes="100vw sm:50vw md:400px"
+          alt="Responsive image"
+        />
+
+        <!-- Zewnętrzne źródło (wymaga konfiguracji domeny) -->
+        <NuxtImg
+          src="https://picsum.photos/800/600"
+          provider="ipx"
+          format="webp"
+          quality="80"
+          alt="External image"
+        />
+
+        <!-- NuxtPicture — art direction z wieloma source -->
+        <NuxtPicture
+          src="/images/hero.jpg"
+          :imgAttrs="{ alt: 'Hero', class: 'hero-img' }"
+        />
+      </template>
+
+  - name: "Komponenty lazy i ClientOnly"
+    desc: >
+      Lazy prefix opóźnia ładowanie komponentu (code splitting). <ClientOnly> renderuje
+      komponent tylko po stronie klienta — przydatne dla elementów wymagających window,
+      localStorage lub zewnętrznych bibliotek niekompatybilnych z SSR.
+    code: |
+      <template>
+        <!-- LazyModal — załadowany tylko gdy potrzebny -->
+        <LazyModal v-if="showModal" @close="showModal = false" />
+
+        <!-- ClientOnly — chart.js nie działa na serwerze -->
+        <ClientOnly>
+          <ChartComponent :data="chartData" />
+          <!-- Slot fallback podczas SSR -->
+          <template #fallback>
+            <div class="chart-skeleton">Ładowanie wykresu...</div>
+          </template>
+        </ClientOnly>
+
+        <!-- Lazy + suspense dla async komponentów -->
+        <Suspense>
+          <LazyHeavyComponent />
+          <template #fallback>
+            <LoadingSpinner />
+          </template>
+        </Suspense>
+      </template>
+
+      <script setup lang="ts">
+      const showModal = ref(false)
+      const chartData = ref([10, 20, 30, 40])
+      </script>

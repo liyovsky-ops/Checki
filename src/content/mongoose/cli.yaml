@@ -1,0 +1,444 @@
+title: Mongoose — API snippets
+
+groups:
+  - name: Połączenie i konfiguracja
+    icon: "🔌"
+    commands:
+      - cmd: mongoose.connect(uri)
+        desc: Połącz z MongoDB
+        detail:
+          what: "Nawiązuje połączenie z MongoDB. Od wersji 6+ zwraca Promise. Buforuje query do nawiązania połączenia."
+          how: "Wywołaj raz przy starcie aplikacji. URI może być lokalny (mongodb://localhost:27017/db) lub Atlas."
+          tips:
+            - "await mongoose.connect(process.env.MONGO_URI)"
+            - "Opcje: { serverSelectionTimeoutMS: 5000, maxPoolSize: 10 }"
+      - cmd: "mongoose.connect(uri, { maxPoolSize: 10 })"
+        desc: "Połącz z custom pool size"
+        detail:
+          what: "maxPoolSize kontroluje ile równoległych połączeń TCP do MongoDB. Domyślnie 5."
+          how: "Dla aplikacji z wysokim ruchem zwiększ do 20-50. Serverless — trzymaj nisko (5-10)."
+          tips:
+            - "serverSelectionTimeoutMS — timeout na selekcję serwera"
+            - "socketTimeoutMS — timeout na operację socketu"
+      - cmd: mongoose.disconnect()
+        desc: Zamknij połączenie
+        detail:
+          what: "Zamyka wszystkie połączenia z MongoDB gracefully. Przydatne przy shutdown aplikacji."
+          how: "process.on('SIGTERM', () => mongoose.disconnect())"
+          tips:
+            - "mongoose.connection.close() — alternatywa"
+      - cmd: "mongoose.connection.on('connected', cb)"
+        desc: "Event — połączono z MongoDB"
+        detail:
+          what: "Emitowany gdy Mongoose nawiąże połączenie. connection.readyState === 1."
+          how: "Użyj do logowania stanu połączenia w startup."
+          tips:
+            - "readyState: 0=disconnected, 1=connected, 2=connecting, 3=disconnecting"
+      - cmd: "mongoose.connection.on('error', cb)"
+        desc: "Event — błąd połączenia"
+        detail:
+          what: "Emitowany przy każdym błędzie połączenia. Mongoose próbuje reconnect automatycznie."
+          how: "console.error('MongoDB error:', err) — przynajmniej loguj błędy."
+          tips:
+            - "Mongoose automatycznie reconnectuje — event to sygnał, nie koniec"
+      - cmd: "mongoose.set('debug', true)"
+        desc: Włącz logowanie queries
+        detail:
+          what: "Mongoose loguje każde query do konsoli — przydatne do debugowania."
+          how: "Tylko w development! Wyłącz na produkcji."
+          tips:
+            - "mongoose.set('debug', (coll, method, query) => logger.debug(...))"
+            - "Niestandardowy logger zamiast console.log"
+      - cmd: "mongoose.set('strictQuery', true)"
+        desc: "Strict mode — filtruj nieznane pola"
+        detail:
+          what: "strictQuery: true usuwa z query pola nieistniejące w Schema. Domyślnie true od v7."
+          how: "Chroni przed literówkami w nazwach pól przy query."
+          tips:
+            - "strict: true (domyślnie) — usuwa nieznane pola przy save/create"
+
+  - name: Schema definition
+    icon: "📋"
+    commands:
+      - cmd: "new Schema({ field: Type })"
+        desc: Utwórz Schema
+        detail:
+          what: "Definiuje kształt dokumentów w kolekcji. Typy to JS constructors lub obiekty konfiguracyjne."
+          how: "const UserSchema = new Schema({ name: String, age: Number })"
+          tips:
+            - "Schema to blueprint — nie kolekcja. Model kompiluje Schema."
+      - cmd: "{ type: String, required: true }"
+        desc: "Pole wymagane"
+        detail:
+          what: "required: true lub [true, 'Wiadomość błędu'] — pole obowiązkowe."
+          how: "Walidacja przy save() i create(). Rzuca ValidationError jeśli brak."
+          tips:
+            - "[true, 'Email jest wymagany'] — custom wiadomość błędu"
+      - cmd: "{ type: String, default: 'user' }"
+        desc: Wartość domyślna
+        detail:
+          what: "Ustawia wartość gdy pole nie jest podane przy tworzeniu dokumentu."
+          how: "default może być wartością lub funkcją: default: Date.now (bez ()!)"
+          tips:
+            - "default: () => [] — tablica jako default (zawsze nowa instancja)"
+      - cmd: "{ type: String, enum: ['a', 'b'] }"
+        desc: Enum — dozwolone wartości
+        detail:
+          what: "Walidacja że wartość należy do zbioru. Rzuca ValidationError dla innych wartości."
+          how: "enum: { values: ['a', 'b'], message: 'Nieprawidłowa wartość' }"
+          tips:
+            - "Działa tylko dla String i Number"
+      - cmd: "{ type: String, unique: true }"
+        desc: "Unique index"
+        detail:
+          what: "Tworzy unique index w MongoDB. Nie jest walidacją Mongoose — błąd to MongoServerError E11000."
+          how: "Użyj mongoose-unique-validator dla lepszego error handling."
+          tips:
+            - "unique działa przez MongoDB index — nie przez Mongoose validation"
+      - cmd: "{ type: Number, min: 0, max: 100 }"
+        desc: "Min/max dla Number"
+        detail:
+          what: "Walidacja zakresu dla pól numerycznych."
+          how: "[0, 'Cena nie może być ujemna'] — custom wiadomość."
+          tips:
+            - "minlength/maxlength — dla String"
+            - "min/max — dla Number i Date"
+      - cmd: "schema.add({ newField: String })"
+        desc: Dodaj pole do istniejącej Schema
+        detail:
+          what: "Pozwala dodać pola po stworzeniu Schema — przydatne w pluginach."
+          how: "Pluginy używają schema.add() żeby wzbogacić Schema bez modyfikacji oryginału."
+          tips:
+            - "schema.remove('fieldName') — usuń pole"
+      - cmd: "new Schema({}, { timestamps: true })"
+        desc: "Auto createdAt i updatedAt"
+        detail:
+          what: "Automatycznie dodaje createdAt i updatedAt do każdego dokumentu."
+          how: "Nie musisz ręcznie zarządzać datami. Mongoose aktualizuje updatedAt przy każdym save()."
+          tips:
+            - "timestamps: { createdAt: 'created', updatedAt: 'updated' } — custom nazwy pól"
+      - cmd: "new Schema({}, { versionKey: false })"
+        desc: "Wyłącz __v (version key)"
+        detail:
+          what: "__v to wewnętrzne pole Mongoose do śledzenia wersji dokumentu. Możesz je wyłączyć."
+          how: "Czyste dokumenty bez __v w API response."
+          tips:
+            - "Jeśli używasz embedded arrays i update by index — zostaw __v"
+
+  - name: "Model CRUD"
+    icon: "📝"
+    commands:
+      - cmd: "Model.create(data)"
+        desc: Utwórz dokument
+        detail:
+          what: "Tworzy i zapisuje nowy dokument. Uruchamia walidację i middleware pre/post save."
+          how: "const user = await User.create({ name: 'Jan', email: 'jan@test.pl' })"
+          tips:
+            - "Model.create([...]) — bulk create"
+            - "Zwraca nowy dokument z _id"
+      - cmd: "Model.find(filter)"
+        desc: Pobierz wszystkie pasujące
+        detail:
+          what: "Zwraca tablicę dokumentów. Bez filtra zwraca wszystkie dokumenty kolekcji."
+          how: "User.find({ role: 'admin', active: true })"
+          tips:
+            - "Zawsze limituj wyniki — .limit(100) żeby nie ładować całej kolekcji"
+      - cmd: "Model.findById(id)"
+        desc: "Pobierz po _id"
+        detail:
+          what: "Shortcut dla findOne({ _id: id }). Automatycznie castuje string na ObjectId."
+          how: "const user = await User.findById(req.params.id)"
+          tips:
+            - "Zwraca null jeśli nie znaleziono — zawsze sprawdzaj"
+            - ".orFail() — rzuca błąd zamiast null"
+      - cmd: "Model.findOne(filter)"
+        desc: Pobierz pierwszy pasujący
+        detail:
+          what: "Zwraca pierwszy dokument pasujący do filtra lub null."
+          how: "await User.findOne({ email: req.body.email })"
+          tips:
+            - "Dla pól z unique index — findById lub findOne po tym polu"
+      - cmd: "Model.findByIdAndUpdate(id, update, opts)"
+        desc: Znajdź i zaktualizuj po id
+        detail:
+          what: "Atomowo aktualizuje dokument. Domyślnie zwraca stary dokument."
+          how: "{ new: true } — zwróć nowy. { runValidators: true } — uruchom walidację."
+          tips:
+            - "findOneAndUpdate(filter, update, opts) — wersja z filtrem"
+      - cmd: "Model.findByIdAndDelete(id)"
+        desc: Znajdź i usuń po id
+        detail:
+          what: "Usuwa dokument i zwraca go. Przydatne gdy chcesz potwierdzenie co usunięto."
+          how: "const removed = await User.findByIdAndDelete(id)"
+          tips:
+            - "findOneAndDelete(filter) — wersja z filtrem"
+      - cmd: "Model.updateMany(filter, update)"
+        desc: Zaktualizuj wiele dokumentów
+        detail:
+          what: "Aktualizuje wszystkie pasujące dokumenty. Nie uruchamia document middleware."
+          how: "{ matchedCount, modifiedCount } w wyniku."
+          tips:
+            - "runValidators: true w opcjach — uruchom walidację przy bulk update"
+      - cmd: "Model.deleteMany(filter)"
+        desc: Usuń wiele dokumentów
+        detail:
+          what: "Usuwa wszystkie pasujące dokumenty. Nie uruchamia document middleware."
+          how: "const { deletedCount } = await User.deleteMany({ role: 'banned' })"
+          tips:
+            - "Nie uruchamia pre/post deleteOne hooks na poszczególnych dokumentach"
+      - cmd: "Model.countDocuments(filter)"
+        desc: Policz dokumenty
+        detail:
+          what: "COUNT z filtrem. Wolniejszy ale dokładny. Dla całej kolekcji — estimatedDocumentCount()."
+          how: "const total = await User.countDocuments({ active: true })"
+          tips:
+            - "estimatedDocumentCount() — szybki ale przybliżony"
+      - cmd: "Model.exists(filter)"
+        desc: Sprawdź czy dokument istnieje
+        detail:
+          what: "Zwraca { _id } lub null. Szybszy niż findOne — minimalny payload."
+          how: "const exists = await User.exists({ email: 'jan@test.pl' })"
+          tips:
+            - "if (await User.exists({ email })) throw new Error('Email zajęty')"
+      - cmd: "Model.distinct('field', filter)"
+        desc: Unikalne wartości pola
+        detail:
+          what: "Zwraca tablicę unikalnych wartości danego pola. Odpowiednik SQL DISTINCT."
+          how: "const roles = await User.distinct('role')"
+          tips:
+            - "await Post.distinct('tags', { authorId: userId }) — unikalne tagi autora"
+      - cmd: "doc.save()"
+        desc: Zapisz dokument (instancyjne)
+        detail:
+          what: "Zapisuje zmiany na dokumencie do MongoDB. Uruchamia walidację i middleware."
+          how: "user.name = 'Nowe imię'; await user.save()"
+          tips:
+            - "isModified('field') — sprawdź czy pole zostało zmienione"
+      - cmd: "doc.isModified('field')"
+        desc: Sprawdź czy pole zostało zmienione
+        detail:
+          what: "Zwraca true jeśli pole zostało zmienione od ostatniego save() lub load."
+          how: "W pre save hook — if (this.isModified('password')) hashuj."
+          tips:
+            - "isNew — true jeśli dokument nie był jeszcze zapisany"
+
+  - name: Query builder
+    icon: "🔍"
+    commands:
+      - cmd: ".select('field1 field2 -field3')"
+        desc: Wybierz pola (projection)
+        detail:
+          what: "Zwraca tylko wybrane pola. Prefix - wyklucza pole. Domyślnie zwraca wszystko."
+          how: "User.find().select('name email -_id')"
+          tips:
+            - "-_id — wyklucz _id"
+            - "select: { name: 1, email: 1 } — alternatywna składnia obiektu"
+      - cmd: ".sort({ field: -1 })"
+        desc: Sortuj wyniki
+        detail:
+          what: "1 = ASC, -1 = DESC. Można sortować po wielu polach."
+          how: ".sort({ createdAt: -1, name: 1 })"
+          tips:
+            - ".sort('-createdAt name') — string shorthand"
+      - cmd: ".limit(n)"
+        desc: Ogranicz liczbę wyników
+        detail:
+          what: "LIMIT n. Zawsze używaj limit żeby nie zwracać całej kolekcji."
+          how: ".limit(100)"
+          tips:
+            - "Kombinuj z skip() dla offset pagination"
+      - cmd: ".skip(n)"
+        desc: Pomiń n dokumentów
+        detail:
+          what: "OFFSET n. Działa z limit() dla paginacji. Wolny dla dużych skip — użyj cursor pagination."
+          how: ".skip((page - 1) * pageSize).limit(pageSize)"
+          tips:
+            - "Cursor pagination szybsza dla dużych zbiorów"
+      - cmd: ".lean()"
+        desc: "Zwróć plain objects zamiast Documents"
+        detail:
+          what: "Pomija tworzenie Mongoose Document — szybszy (~30%) bo brak overhead. Brak metod (save, populate)."
+          how: "const users = await User.find().lean()"
+          tips:
+            - "Używaj do GET endpoints — read-only"
+            - "mongoose-lean-virtuals — virtuale w lean()"
+      - cmd: ".populate('field')"
+        desc: Załaduj powiązany dokument
+        detail:
+          what: "Zastępuje ObjectId pełnym dokumentem z referenced kolekcji. Osobne query do MongoDB."
+          how: "Post.find().populate('author').populate('tags')"
+          tips:
+            - ".populate({ path: 'author', select: 'name email' }) — z selekcją pól"
+      - cmd: ".where('field').equals(val)"
+        desc: Query builder — where
+        detail:
+          what: "Fluent API do budowania queries. Czytelniejszy niż plain obiekty dla złożonych warunków."
+          how: "User.find().where('age').gte(18).where('role').equals('admin')"
+          tips:
+            - ".gte(n) .lte(n) .gt(n) .lt(n) — operatory porównania"
+            - ".in([...]) .nin([...]) — in / not in"
+      - cmd: ".exec()"
+        desc: "Wykonaj query jawnie"
+        detail:
+          what: "Query Mongoose jest lazy. exec() lub await wysyła query do MongoDB."
+          how: "const users = await User.find({ active: true }).exec()"
+          tips:
+            - "await q i q.exec() są równoważne"
+
+  - name: Population
+    icon: "🔗"
+    commands:
+      - cmd: "type: Schema.Types.ObjectId, ref: 'Model'"
+        desc: Definiuj referencję
+        detail:
+          what: "Pole ObjectId z ref wskazuje na inny Model. ref to metadane dla populate()."
+          how: "author: { type: Schema.Types.ObjectId, ref: 'User', required: true }"
+          tips:
+            - "ref to string z nazwą Modelu (dokładnie jak w mongoose.model('Nazwa', ...))"
+      - cmd: ".populate({ path, select, match })"
+        desc: "Populate z pełną konfiguracją"
+        detail:
+          what: "path — pole do populacji, select — pola dokumentu powiązanego, match — filtr."
+          how: ".populate({ path: 'author', select: 'name', match: { active: true } })"
+          tips:
+            - "match: null gdy dokument nie pasuje — autor będzie null"
+      - cmd: "virtual('name', { ref, localField, foreignField })"
+        desc: Virtual populate — referencje odwrotne
+        detail:
+          what: "Populate bez trzymania tablicy ID. localField na tym modelu, foreignField na powiązanym."
+          how: "schema.virtual('posts', { ref: 'Post', localField: '_id', foreignField: 'authorId' })"
+          tips:
+            - "count: true — zwróć liczbę zamiast dokumentów"
+            - "justOne: true — zwróć jeden dokument zamiast tablicy"
+
+  - name: Aggregation
+    icon: "📊"
+    commands:
+      - cmd: "Model.aggregate([pipeline])"
+        desc: Uruchom aggregation pipeline
+        detail:
+          what: "Potężniejszy niż find — grupowanie, transformacje, JOIN ($lookup). Bez middleware Mongoose."
+          how: "await Post.aggregate([{ $match: { published: true } }, { $group: ... }])"
+          tips:
+            - "Nie używa Mongoose Schema validation — surowy MongoDB driver"
+      - cmd: "{ $match: filter }"
+        desc: "Filtruj dokumenty w pipeline"
+        detail:
+          what: "Odpowiednik WHERE w SQL. Umieść $match jak najwcześniej — używa indeksów."
+          how: "{ $match: { status: 'active', createdAt: { $gte: startDate } } }"
+          tips:
+            - "Pierwszy $match może używać indeksów — reszta pipeline nie"
+      - cmd: "{ $group: { _id: '$field', count: { $sum: 1 } } }"
+        desc: "Grupuj i agreguj"
+        detail:
+          what: "GROUP BY z agregacjami. _id definiuje klucz grupowania."
+          how: "{ $group: { _id: '$role', total: { $sum: 1 }, avgAge: { $avg: '$age' } } }"
+          tips:
+            - "$sum, $avg, $min, $max, $push, $addToSet, $first, $last"
+      - cmd: "{ $lookup: { from, localField, foreignField, as } }"
+        desc: "JOIN między kolekcjami"
+        detail:
+          what: "LEFT OUTER JOIN. from to nazwa kolekcji MongoDB (lowercase plural)."
+          how: "{ $lookup: { from: 'users', localField: 'authorId', foreignField: '_id', as: 'author' } }"
+          tips:
+            - "$unwind: '$author' — rozwiń tablicę wynikową do pojedynczych dokumentów"
+      - cmd: "{ $project: { field: 1, alias: '$other' } }"
+        desc: Wybierz i transformuj pola
+        detail:
+          what: "SELECT odpowiednik w pipeline. Można tworzyć aliasy i obliczone pola."
+          how: "{ $project: { title: 1, authorName: '$author.name', total: { $multiply: ['$price', '$qty'] } } }"
+          tips:
+            - "$addFields zamiast $project — dodaj pola bez usuwania istniejących"
+      - cmd: "{ $facet: { results: [...], total: [...] } }"
+        desc: "Wiele sub-pipelines równolegle"
+        detail:
+          what: "Uruchamia wiele pipelines na tym samym zbiorze wejściowym. Jedno query — wiele wyników."
+          how: "{ $facet: { data: [{ $skip: 0 }, { $limit: 10 }], count: [{ $count: 'total' }] } }"
+          tips:
+            - "Paginacja z total count jednym query"
+
+  - name: Middleware i Transactions
+    icon: "⚙️"
+    commands:
+      - cmd: "schema.pre('save', function() {})"
+        desc: "Hook przed save"
+        detail:
+          what: "Uruchamia się przed save(). this = dokument. Można async — Mongoose czeka na Promise."
+          how: "UserSchema.pre('save', async function() { if (this.isModified('password')) { ... } })"
+          tips:
+            - "next() lub return Promise — nie obie naraz"
+      - cmd: "schema.post('save', function(doc) {})"
+        desc: "Hook po save"
+        detail:
+          what: "Uruchamia się po save(). doc = zapisany dokument. Przydatne do triggerów i eventów."
+          how: "PostSchema.post('save', async function(doc) { await updateSearchIndex(doc) })"
+          tips:
+            - "Błąd w post hook nie cofa save"
+      - cmd: "schema.pre(/^find/, function() {})"
+        desc: "Hook na wszystkie find query"
+        detail:
+          what: "Regex jako event — pasuje do find, findOne, findById, findOneAndUpdate itd."
+          how: "schema.pre(/^find/, function() { this.where({ deletedAt: null }) })"
+          tips:
+            - "this w query middleware to Query, nie Document"
+      - cmd: "schema.post('save', function(error, doc, next) {})"
+        desc: Error handling hook
+        detail:
+          what: "3 argumenty = error handler. Przechwytuje błędy i może je transformować."
+          how: "if (error.code === 11000) next(new Error('Pole już istnieje'))"
+          tips:
+            - "Tylko dla document middleware (save, remove, validate)"
+      - cmd: "schema.plugin(pluginFn, options)"
+        desc: "Dodaj plugin do Schema"
+        detail:
+          what: "Plugin to funkcja (schema, opts) — reużywalna logika dla wielu Schemas."
+          how: "UserSchema.plugin(softDeletePlugin, { field: 'deletedAt' })"
+          tips:
+            - "mongoose.plugin(fn) — globalny plugin dla wszystkich Schemas"
+      - cmd: "mongoose.startSession()"
+        desc: Stwórz sesję dla transakcji
+        detail:
+          what: "Wymagane dla transakcji MongoDB 4.0+. Potrzebuje replica set lub sharded cluster."
+          how: "const session = await mongoose.startSession(); session.startTransaction()"
+          tips:
+            - "Zawsze session.endSession() w finally"
+      - cmd: "session.commitTransaction()"
+        desc: Zatwierdź transakcję
+        detail:
+          what: "Zatwierdza wszystkie operacje w transakcji atomowo."
+          how: "try { await session.commitTransaction() } catch { await session.abortTransaction() }"
+          tips:
+            - "abortTransaction() — rollback przy błędzie"
+
+  - name: TypeScript
+    icon: "🏷️"
+    commands:
+      - cmd: "new Schema<IUser>()"
+        desc: "Typowana Schema (generyk)"
+        detail:
+          what: "Generyk <IDoc, IModel> daje type checking na Schema fields i metodach."
+          how: "const UserSchema = new Schema<IUser, Model<IUser>>({ name: String })"
+          tips:
+            - "IUser extends Document — interfejs dokumentu"
+      - cmd: "interface IUser extends Document {}"
+        desc: "Interfejs dokumentu Mongoose"
+        detail:
+          what: "Rozszerza Document żeby mieć typy Mongoose (_id, save, isModified) i własne pola."
+          how: "interface IUser extends Document { name: string; email: string }"
+          tips:
+            - "mongoose.model<IUser>('User', UserSchema) — typowany Model"
+      - cmd: "InferSchemaType<typeof Schema>"
+        desc: "Inferuj typy ze Schema (Mongoose 7+)"
+        detail:
+          what: "Automatycznie generuje TypeScript typy z definicji Schema — bez ręcznego interfejsu."
+          how: "type User = InferSchemaType<typeof UserSchema>"
+          tips:
+            - "Mongoose 7+ feature — eliminuje duplikację Schema i interface"
+      - cmd: "@typegoose/typegoose"
+        desc: "Klasy TS zamiast Schema"
+        detail:
+          what: "Definiuj modele jako klasy TypeScript z dekoratorami. Typegoose generuje Schema automatycznie."
+          how: "@prop({ required: true }) name!: string — pole w klasie"
+          tips:
+            - "@modelOptions({ schemaOptions: { timestamps: true } })"
+            - "getModelForClass(UserClass) — pobierz Model"

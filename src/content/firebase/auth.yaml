@@ -1,0 +1,191 @@
+title: Firebase Authentication
+
+sections:
+  - title: Rejestracja i logowanie emailem
+    icon: "✉️"
+    desc: >
+      createUserWithEmailAndPassword tworzy nowe konto. signInWithEmailAndPassword loguje
+      istniejącego użytkownika. Oba zwracają UserCredential z obiektem user.
+      Możliwe błędy to auth/email-already-in-use, auth/wrong-password, auth/user-not-found.
+    code: |
+      import {
+        createUserWithEmailAndPassword,
+        signInWithEmailAndPassword,
+        signOut,
+        getAuth
+      } from 'firebase/auth';
+      import { auth } from './firebase';
+
+      // Rejestracja
+      try {
+        const credential = await createUserWithEmailAndPassword(
+          auth, 'jan@example.com', 'haslo123'
+        );
+        console.log('Nowy użytkownik:', credential.user.uid);
+      } catch (err: any) {
+        if (err.code === 'auth/email-already-in-use') {
+          console.error('Email zajęty');
+        }
+      }
+
+      // Logowanie
+      const { user } = await signInWithEmailAndPassword(
+        auth, 'jan@example.com', 'haslo123'
+      );
+      console.log('Zalogowany:', user.email);
+
+      // Wylogowanie
+      await signOut(auth);
+
+  - title: Stan autoryzacji — onAuthStateChanged
+    icon: "👁️"
+    desc: >
+      onAuthStateChanged nasłuchuje zmiany stanu logowania — wywołany przy załadowaniu
+      strony (z zapisanym tokenem) i przy logowaniu/wylogowaniu. Używaj go do globalnego
+      zarządzania sesją. Zwraca unsubscribe — wywołaj przy cleanup.
+    code: |
+      import { onAuthStateChanged } from 'firebase/auth';
+      import { auth } from './firebase';
+
+      // Nasłuchuj stan autoryzacji
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user) {
+          console.log('Zalogowany jako:', user.email, user.uid);
+          // user.emailVerified — czy email potwierdzony
+          // user.displayName — imię
+          // user.photoURL — avatar
+        } else {
+          console.log('Wylogowany');
+          // redirect do /login
+        }
+      });
+
+      // React context — autoryzacja globalna
+      export function AuthProvider({ children }: { children: React.ReactNode }) {
+        const [user, setUser] = useState(null);
+        const [loading, setLoading] = useState(true);
+
+        useEffect(() => {
+          const unsub = onAuthStateChanged(auth, (u) => {
+            setUser(u);
+            setLoading(false);
+          });
+          return unsub;
+        }, []);
+
+        return (
+          <AuthContext.Provider value={{ user, loading }}>
+            {!loading && children}
+          </AuthContext.Provider>
+        );
+      }
+
+  - title: OAuth — Google i GitHub
+    icon: "🔑"
+    desc: >
+      signInWithPopup otwiera popup z dostawcą OAuth. signInWithRedirect jest alternatywą
+      dla mobile (redirect zamiast popup). Google i GitHub to najpopularniejsze providery.
+      GoogleAuthProvider.credentialFromResult pozwala dostać access token do Google API.
+    code: |
+      import {
+        GoogleAuthProvider,
+        GithubAuthProvider,
+        signInWithPopup,
+        signInWithRedirect,
+        getRedirectResult
+      } from 'firebase/auth';
+      import { auth } from './firebase';
+
+      // Logowanie przez Google
+      const googleProvider = new GoogleAuthProvider();
+      googleProvider.addScope('https://www.googleapis.com/auth/calendar.readonly');
+
+      const signInWithGoogle = async () => {
+        try {
+          const result = await signInWithPopup(auth, googleProvider);
+          const credential = GoogleAuthProvider.credentialFromResult(result);
+          const token = credential?.accessToken; // token Google API
+          console.log('Google user:', result.user.email);
+        } catch (err: any) {
+          if (err.code === 'auth/popup-closed-by-user') {
+            console.log('Użytkownik zamknął popup');
+          }
+        }
+      };
+
+      // Logowanie przez GitHub
+      const githubProvider = new GithubAuthProvider();
+      const signInWithGitHub = async () => {
+        const result = await signInWithPopup(auth, githubProvider);
+        const credential = GithubAuthProvider.credentialFromResult(result);
+        console.log('GitHub token:', credential?.accessToken);
+      };
+
+  - title: Profil użytkownika
+    icon: "👤"
+    desc: >
+      updateProfile aktualizuje displayName i photoURL użytkownika. updateEmail i
+      updatePassword wymagają niedawnego logowania (może wymagać reAuthentication).
+      sendEmailVerification wysyła link weryfikacyjny na email.
+    code: |
+      import {
+        updateProfile,
+        updateEmail,
+        updatePassword,
+        sendEmailVerification,
+        sendPasswordResetEmail,
+        reauthenticateWithCredential,
+        EmailAuthProvider
+      } from 'firebase/auth';
+      import { auth } from './firebase';
+
+      const user = auth.currentUser!;
+
+      // Zaktualizuj profil
+      await updateProfile(user, {
+        displayName: 'Jan Kowalski',
+        photoURL: 'https://example.com/avatar.jpg'
+      });
+
+      // Wyślij email weryfikacyjny
+      await sendEmailVerification(user);
+
+      // Reset hasła przez email
+      await sendPasswordResetEmail(auth, 'jan@example.com');
+
+      // Zmiana hasła (wymaga reauth jeśli dawno zalogowany)
+      const credential = EmailAuthProvider.credential(
+        user.email!, 'stare-haslo'
+      );
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, 'nowe-haslo');
+
+  - title: currentUser i token
+    icon: "🎟️"
+    desc: >
+      auth.currentUser zwraca aktualnego użytkownika synchronicznie (null jeśli wylogowany).
+      getIdToken() pobiera JWT token — używaj go w nagłówkach do własnego backendu.
+      getIdTokenResult() zawiera claims i expiration.
+    code: |
+      import { getIdToken, getIdTokenResult } from 'firebase/auth';
+      import { auth } from './firebase';
+
+      // Aktualny użytkownik (synchronicznie)
+      const user = auth.currentUser;
+      if (user) {
+        console.log('UID:', user.uid);
+        console.log('Email:', user.email);
+        console.log('Email verified:', user.emailVerified);
+        console.log('Provider:', user.providerData[0]?.providerId);
+      }
+
+      // JWT token do własnego API
+      const token = await getIdToken(user!);
+      const response = await fetch('/api/protected', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Token z claims (custom claims ustawiane przez Admin SDK)
+      const result = await getIdTokenResult(user!);
+      const isAdmin = result.claims['admin'] === true;
+      console.log('Wygasa:', result.expirationTime);

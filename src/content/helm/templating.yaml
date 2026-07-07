@@ -1,0 +1,290 @@
+labels:
+  title: Go Templates w Helm
+  subtitle: Silnik szablonów Helm
+
+intro:
+  title: Go Templates — silnik szablonów Helm
+  desc: >
+    Helm używa Go templates (text/template) rozszerzonych o bibliotekę Sprig z ponad 70
+    funkcjami pomocniczymi. Szablony pozwalają generować dynamiczny YAML z wartości,
+    warunków i pętli. Kluczowe obiekty: .Values (twoje wartości), .Release (info o release),
+    .Chart (metadane charta), .Capabilities (możliwości K8s). Dobre opanowanie Go templates
+    to podstawa pisania profesjonalnych chartów Helm.
+
+items:
+  - name: "{{ .Values.* }} — dostęp do wartości"
+    desc: >
+      Podstawowy mechanizm — odwołanie do wartości z values.yaml przez .Values.*.
+      Notacja z kropką umożliwia dostęp do zagnieżdżonych pól. Pipeline (|) przekazuje
+      wartość do funkcji. Spacja przed }} ({{- i -}}) trymuje whitespace z lewej/prawej.
+    code: |
+      # values.yaml
+      image:
+        repository: myregistry.pl/myapp
+        tag: "2.1.0"
+      replicaCount: 3
+
+      # template:
+      image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+      replicas: {{ .Values.replicaCount }}
+
+      # Pipeline — przekaż przez funkcje:
+      name: {{ .Values.image.repository | lower | quote }}
+      # → name: "myregistry.pl/myapp"
+
+      # Trymowanie białych znaków ({{- i -}}):
+      {{- if .Values.enabled }}
+      enabled: true
+      {{- end }}
+      # Bez myślników byłyby puste linie w output
+
+  - name: "{{ .Release.* }} — wbudowane obiekty Release"
+    desc: >
+      .Release zawiera metadane o aktualnym release — nazwę, namespace, rewizję.
+      Używaj .Release.Name do tworzenia unikalnych nazw zasobów (jeden chart wiele razy
+      w tym samym namespace). .Release.Namespace to namespace target.
+    code: |
+      # Dostępne pola .Release:
+      .Release.Name       # nazwa release: helm install TUTAJ ./chart
+      .Release.Namespace  # namespace w którym instalujesz
+      .Release.Revision   # numer rewizji (1 = pierwsze install, 2 = upgrade)
+      .Release.IsInstall  # true jeśli to pierwsze install (false przy upgrade)
+      .Release.IsUpgrade  # true jeśli to upgrade (false przy install)
+      .Release.Service    # zawsze "Helm"
+
+      # Przykład użycia — unikalna nazwa zasobu:
+      metadata:
+        name: {{ .Release.Name }}-postgresql
+        namespace: {{ .Release.Namespace }}
+
+      # Warunkowa logika install vs upgrade:
+      {{- if .Release.IsInstall }}
+      # seed danych tylko przy pierwszej instalacji
+      {{- end }}
+
+  - name: "{{ if }}/{{ else }}/{{ end }} — warunki"
+    desc: >
+      Warunki if/else umożliwiają renderowanie bloków YAML tylko gdy warunek jest spełniony.
+      Helm traktuje jako false: false, 0, pusty string, nil, pusta lista. Operatory logiczne:
+      and, or, not, eq, ne, lt, gt, le, ge.
+    code: |
+      # Prosty warunek:
+      {{- if .Values.ingress.enabled }}
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      # ... cały Ingress renderowany tylko gdy enabled=true
+      {{- end }}
+
+      # If-else:
+      {{- if eq .Values.service.type "LoadBalancer" }}
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: nlb
+      {{- else if eq .Values.service.type "NodePort" }}
+      # inne annotacje
+      {{- else }}
+      # ClusterIP — bez annotacji
+      {{- end }}
+
+      # Operatory porównania:
+      {{- if and .Values.ingress.enabled .Values.ingress.tls }}
+      # włącz TLS tylko gdy oba są true
+      {{- end }}
+
+      {{- if not .Values.serviceAccount.create }}
+      # jeśli NIE tworzymy SA
+      {{- end }}
+
+  - name: "{{ range }} — iteracja po listach i mapach"
+    desc: >
+      range iteruje po tablicach (listach) i mapach (słownikach). W pętli . zmienia
+      kontekst na aktualny element. Dostęp do klucza/wartości mapy przez $key, $val.
+      Przydatne dla dynamicznych list portów, zmiennych env, reguł ingress.
+    code: |
+      # values.yaml:
+      env:
+        - name: DATABASE_URL
+          value: postgres://user:pass@db:5432/app
+        - name: REDIS_URL
+          value: redis://redis:6379
+
+      ports:
+        - 8080
+        - 9090
+
+      # Iteracja po liście obiektów:
+      env:
+        {{- range .Values.env }}
+        - name: {{ .name }}
+          value: {{ .value | quote }}
+        {{- end }}
+
+      # Iteracja po liście prostych wartości:
+      ports:
+        {{- range .Values.ports }}
+        - containerPort: {{ . }}
+        {{- end }}
+
+      # Iteracja po mapie (klucz-wartość):
+      labels:
+        {{- range $key, $value := .Values.extraLabels }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
+
+  - name: "{{ include }} i {{ template }} — named templates"
+    desc: >
+      include i template pozwalają reużywać fragmenty szablonów zdefiniowane przez define
+      w _helpers.tpl. Różnica: include zwraca string i można go przekazać przez pipeline
+      (np. do nindent). template renderuje w miejscu bez możliwości pipeline.
+      W praktyce używaj zawsze include zamiast template.
+    code: |
+      # _helpers.tpl — definicja named template:
+      {{- define "myapp.labels" -}}
+      app.kubernetes.io/name: {{ .Chart.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+      {{- end }}
+
+      # Użycie w deployment.yaml:
+      metadata:
+        labels:
+          {{- include "myapp.labels" . | nindent 4 }}
+
+      # Przekazanie innego kontekstu (nie .):
+      {{- include "myapp.labels" (dict "Chart" .Chart "Release" .Release) | nindent 4 }}
+
+      # template (starsze, bez pipeline — unikaj):
+      {{- template "myapp.labels" . }}
+
+      # tpl — renderuj string z values jako template:
+      annotations:
+        description: {{ tpl .Values.description . }}
+        # values.yaml: description: "Release {{ .Release.Name }} version {{ .Chart.AppVersion }}"
+
+  - name: "toYaml, indent, nindent — serializacja YAML"
+    desc: >
+      toYaml serializes Go struct do YAML string. indent i nindent dodają wcięcia.
+      nindent = nowa linia + indent (najczęściej używany z toYaml dla bloków). Kluczowe
+      combo: {{- toYaml .Values.resources | nindent 12 }} dla zasobów, nodeSelector itp.
+    code: |
+      # values.yaml:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values: [amd64]
+
+      # template — toYaml + nindent:
+      resources:
+        {{- toYaml .Values.resources | nindent 8 }}
+      # →  resources:
+      #      requests:
+      #        cpu: 100m
+      #        memory: 128Mi
+
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+
+      # indent (bez nowej linii przed):
+      {{ toYaml .Values.resources | indent 6 }}
+
+  - name: "required, default, quote — walidacja i bezpieczeństwo"
+    desc: >
+      required wymusza podanie wartości przez użytkownika — brak = błąd przy install.
+      default ustawia wartość fallback gdy klucz nie istnieje lub jest nil/empty.
+      quote opakowuje string w cudzysłowy (bezpieczne dla wartości które mogą wyglądać jak liczby).
+    code: |
+      # required — wymuś wartość (helm install zwróci błąd jeśli brak):
+      host: {{ required "Musisz podać ingress.host w values.yaml!" .Values.ingress.host }}
+
+      # default — wartość fallback:
+      replicas: {{ default 1 .Values.replicaCount }}
+      image: {{ default "nginx" .Values.image.name }}:{{ default "latest" .Values.image.tag }}
+
+      # quote — bezpieczne string dla wartości które mogą być liczbami:
+      version: {{ .Values.appVersion | quote }}
+      # bez quote: version: 1.0 może być parsowane jako liczba przez K8s
+      # z quote:    version: "1.0" — bezpieczny string
+
+      # upper, lower, trim — transformacje stringów:
+      name: {{ .Values.name | lower | trim }}
+      ENV_VAR: {{ .Values.key | upper | replace "-" "_" }}
+
+      # toString — konwertuj liczbę do stringa:
+      annotation: {{ .Values.port | toString | quote }}
+
+  - name: "with — zmiana kontekstu"
+    desc: >
+      with zmienia kontekst (.) na podaną wartość. Przydatne gdy odwołujesz się wiele
+      razy do tego samego zagnieżdżonego klucza. Jeśli wartość jest falsy — blok jest
+      pomijany (jak if). $ daje dostęp do globalnego kontekstu wewnątrz with.
+    code: |
+      # Bez with — powtarzające się .Values.ingress.*:
+      {{- if .Values.ingress.enabled }}
+      host: {{ .Values.ingress.host }}
+      tls: {{ .Values.ingress.tls }}
+      className: {{ .Values.ingress.className }}
+      {{- end }}
+
+      # Z with — czystszy kod:
+      {{- with .Values.ingress }}
+      # Tu . = .Values.ingress
+      {{- if .enabled }}
+      host: {{ .host }}
+      tls: {{ .tls }}
+      className: {{ .className }}
+      # $ — globalny kontekst (Release, Values, Chart):
+      release: {{ $.Release.Name }}
+      {{- end }}
+      {{- end }}
+
+      # with z annotations (pomiń jeśli pusta mapa):
+      {{- with .Values.annotations }}
+      annotations:
+        {{- toYaml . | nindent 4 }}
+      {{- end }}
+
+  - name: Funkcje Sprig — rozszerzenia biblioteki
+    desc: >
+      Helm rozszerza Go templates o bibliotekę Sprig z ponad 70 funkcjami. Przydatne:
+      date (daty), randAlphaNum (random strings), b64enc/b64dec (base64), sha256sum,
+      trimPrefix/trimSuffix, contains, hasKey, merge, mustToJson, fromJson.
+    code: |
+      # Generowanie losowego sekretu (tylko raz — przy install):
+      {{- $secret := randAlphaNum 32 -}}
+      password: {{ $secret | b64enc | quote }}
+
+      # Base64 — często w Secrets:
+      apiVersion: v1
+      kind: Secret
+      data:
+        password: {{ .Values.password | b64enc | quote }}
+        config.json: {{ .Values.config | toJson | b64enc | quote }}
+
+      # Operacje na stringach:
+      name: {{ .Values.name | trimPrefix "my-" | trimSuffix "-app" }}
+
+      # Sprawdzanie kluczy w mapie:
+      {{- if hasKey .Values "extraEnv" }}
+      env:
+        {{- toYaml .Values.extraEnv | nindent 8 }}
+      {{- end }}
+
+      # Merge dwóch map:
+      {{- $merged := merge .Values.extraLabels (include "myapp.labels" . | fromYaml) }}
+      labels:
+        {{- toYaml $merged | nindent 4 }}
+
+      # Checksuma configmapy (wymusza restart Podów po zmianie config):
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}

@@ -1,0 +1,235 @@
+title: Cloud Functions i Realtime Database
+
+sections:
+  - title: HTTP Functions — onRequest i onCall
+    icon: "🌐"
+    desc: >
+      onRequest tworzy funkcję dostępną przez HTTP (jak Express handler) — dla webhooków
+      i REST API. onCall to callable function — wywoływana z Firebase SDK klienta,
+      automatycznie obsługuje autoryzację i serialization.
+    code: |
+      // functions/src/index.ts
+      import { onRequest, onCall, HttpsError } from 'firebase-functions/v2/https';
+      import { getFirestore } from 'firebase-admin/firestore';
+      import { initializeApp } from 'firebase-admin/app';
+
+      initializeApp();
+      const db = getFirestore();
+
+      // HTTP function (webhook, REST endpoint)
+      export const api = onRequest({ region: 'europe-west1' }, async (req, res) => {
+        if (req.method !== 'POST') {
+          res.status(405).send('Method Not Allowed');
+          return;
+        }
+        const { name } = req.body;
+        res.json({ message: `Hello, ${name}!` });
+      });
+
+      // Callable function (wywoływana z klienta Firebase SDK)
+      export const createOrder = onCall(
+        { region: 'europe-west1' },
+        async (request) => {
+          // Automatyczne sprawdzenie autoryzacji
+          if (!request.auth) {
+            throw new HttpsError('unauthenticated', 'Musisz być zalogowany');
+          }
+          const { items } = request.data;
+          const uid = request.auth.uid;
+
+          const orderRef = await db.collection('orders').add({
+            uid, items, status: 'pending', createdAt: new Date()
+          });
+          return { orderId: orderRef.id };
+        }
+      );
+
+  - title: Wywołanie onCall z klienta
+    icon: "📲"
+    desc: >
+      httpsCallable z Firebase SDK klienta wywołuje callable function bezpiecznie —
+      automatycznie dołącza token auth i obsługuje błędy. Nie trzeba manualnie
+      wysyłać nagłówków.
+    code: |
+      import { getFunctions, httpsCallable } from 'firebase/functions';
+
+      const functions = getFunctions(app, 'europe-west1');
+
+      // Wywołaj funkcję z klienta
+      const createOrder = httpsCallable<
+        { items: string[] },
+        { orderId: string }
+      >(functions, 'createOrder');
+
+      try {
+        const result = await createOrder({ items: ['item1', 'item2'] });
+        console.log('Order ID:', result.data.orderId);
+      } catch (err: any) {
+        // err.code, err.message — z HttpsError rzuconego w funkcji
+        console.error(err.code, err.message);
+      }
+
+  - title: Firestore triggers
+    icon: "🗄️"
+    desc: >
+      Cloud Functions mogą reagować na zmiany w Firestore — onCreate, onUpdate,
+      onDelete, onWrite. Idealne do denormalizacji danych, wysyłania powiadomień,
+      aktualizacji liczników, walidacji server-side.
+    code: |
+      import {
+        onDocumentCreated,
+        onDocumentUpdated,
+        onDocumentDeleted
+      } from 'firebase-functions/v2/firestore';
+
+      // Gdy nowy użytkownik się rejestruje
+      export const onUserCreated = onDocumentCreated(
+        'users/{userId}',
+        async (event) => {
+          const snap = event.data;
+          const userId = event.params.userId;
+          const userData = snap?.data();
+
+          // Wyślij email powitalny, utwórz profil etc.
+          await db.collection('profiles').doc(userId).set({
+            uid: userId,
+            bio: '',
+            followers: 0,
+            createdAt: new Date()
+          });
+        }
+      );
+
+      // Gdy dokument jest aktualizowany
+      export const onOrderUpdated = onDocumentUpdated(
+        'orders/{orderId}',
+        async (event) => {
+          const before = event.data?.before.data();
+          const after = event.data?.after.data();
+
+          if (before?.status !== 'completed' && after?.status === 'completed') {
+            // Zamówienie właśnie ukończone — wyślij powiadomienie
+            console.log('Order completed:', event.params.orderId);
+          }
+        }
+      );
+
+      // Przy usunięciu — cleanup
+      export const onUserDeleted = onDocumentDeleted(
+        'users/{userId}',
+        async (event) => {
+          const userId = event.params.userId;
+          await db.collection('profiles').doc(userId).delete();
+        }
+      );
+
+  - title: Auth triggers
+    icon: "🔐"
+    desc: >
+      Funkcje mogą reagować na zdarzenia Auth — rejestrację użytkownika (onCreate)
+      i usunięcie konta (onDelete). Używaj do tworzenia rekordów w Firestore
+      lub czyszczenia danych po usunięciu konta.
+    code: |
+      import { beforeUserCreated, beforeUserSignedIn } from 'firebase-functions/v2/identity';
+      import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+      import * as admin from 'firebase-admin';
+
+      // Przy rejestracji nowego użytkownika (Auth trigger)
+      export const onNewUser = admin.auth().beforeUserCreated(async (event) => {
+        // Zablokuj adresy z określonej domeny
+        if (event.data.email?.endsWith('@blocked.com')) {
+          throw new HttpsError('permission-denied', 'Domena zablokowana');
+        }
+      });
+
+      // Ustaw custom claims po weryfikacji
+      export const setAdminClaim = onCall(async (request) => {
+        if (!request.auth?.token.superAdmin) {
+          throw new HttpsError('permission-denied', 'Brak uprawnień');
+        }
+        const { uid } = request.data;
+        await admin.auth().setCustomUserClaims(uid, { admin: true });
+        return { success: true };
+      });
+
+  - title: Scheduled Functions (Cron)
+    icon: "⏰"
+    desc: >
+      onSchedule uruchamia funkcję według harmonogramu cron lub w interwałach czasowych.
+      Idealne do czyszczenia starych danych, generowania raportów, aktualizacji kursów.
+    code: |
+      import { onSchedule } from 'firebase-functions/v2/scheduler';
+      import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+
+      // Co godzinę
+      export const cleanupExpiredSessions = onSchedule(
+        'every 1 hours',
+        async (event) => {
+          const db = getFirestore();
+          const cutoff = Timestamp.fromDate(
+            new Date(Date.now() - 24 * 60 * 60 * 1000) // 24h temu
+          );
+
+          const expiredSessions = await db.collection('sessions')
+            .where('lastActive', '<', cutoff)
+            .get();
+
+          const batch = db.batch();
+          expiredSessions.docs.forEach(doc => batch.delete(doc.ref));
+          await batch.commit();
+
+          console.log(`Usunięto ${expiredSessions.size} wygasłych sesji`);
+        }
+      );
+
+      // Konkretny czas cron (UTC)
+      export const dailyReport = onSchedule(
+        { schedule: '0 8 * * *', timeZone: 'Europe/Warsaw' },
+        async () => {
+          // Generuj raport każdego dnia o 8:00 czasu polskiego
+        }
+      );
+
+  - title: Realtime Database
+    icon: "⚡"
+    desc: >
+      Firebase Realtime Database to JSON tree synchronizowany w czasie rzeczywistym.
+      Starszy niż Firestore — prostszy model danych, ale mniej możliwości zapytań.
+      Idealny dla prostego real-time (czat, obecność użytkowników, live tracking).
+    code: |
+      import {
+        getDatabase, ref, set, get, push, onValue, off,
+        serverTimestamp, onDisconnect
+      } from 'firebase/database';
+
+      const rtdb = getDatabase(app);
+
+      // Zapis danych
+      await set(ref(rtdb, `users/${userId}`), {
+        name: 'Jan',
+        online: true,
+        lastSeen: serverTimestamp()
+      });
+
+      // Odczyt jednorazowy
+      const snap = await get(ref(rtdb, `users/${userId}`));
+      if (snap.exists()) console.log(snap.val());
+
+      // Push — dodaj z auto-ID (jak addDoc w Firestore)
+      const newPostRef = push(ref(rtdb, 'messages'));
+      await set(newPostRef, { text: 'Hello!', uid: userId });
+
+      // Real-time listener
+      const messagesRef = ref(rtdb, 'messages');
+      onValue(messagesRef, (snap) => {
+        const data = snap.val(); // { -Nabc: {...}, -Ndef: {...} }
+        const messages = Object.entries(data ?? {}).map(([id, val]) => ({
+          id, ...(val as object)
+        }));
+        setMessages(messages);
+      });
+
+      // Presence — wykryj rozłączenie
+      const userStatusRef = ref(rtdb, `status/${userId}`);
+      await set(userStatusRef, { online: true });
+      onDisconnect(userStatusRef).set({ online: false, lastSeen: serverTimestamp() });

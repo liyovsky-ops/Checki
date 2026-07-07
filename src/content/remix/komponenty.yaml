@@ -1,0 +1,392 @@
+title: Komponenty i Hooks Remix
+
+groups:
+  - name: Komponenty nawigacji
+    commands:
+      - code: |
+          // Link — nawigacja bez full reload
+          import { Link } from "@remix-run/react";
+
+          export default function Nav() {
+            return (
+              <nav>
+                <Link to="/">Strona główna</Link>
+                <Link to="/about">O nas</Link>
+                <Link to="/blog" prefetch="intent">Blog</Link>
+                {/* prefetch="intent" — preload przy hover */}
+                <Link to="/contact" prefetch="render">Kontakt</Link>
+                {/* prefetch="render" — preload natychmiastowy */}
+                <Link to="/docs" reloadDocument>Docs</Link>
+                {/* reloadDocument — pełny reload jak <a> */}
+              </nav>
+            );
+          }
+        desc: Link — nawigacja kliencka z prefetch
+        detail:
+          what: Link to Remix-owy odpowiednik <a> — nawiguje bez pełnego page reload. prefetch kontroluje wczytywanie trasy z wyprzedzeniem.
+          how: "prefetch: none (domyślnie), intent (hover/focus), render (natychmiastowo), viewport (gdy wchodzi do widoku)."
+          tips:
+            - 'prefetch="intent" na linkach nav — błyskawiczne przejścia'
+            - 'reloadDocument gdy potrzebujesz pełnego reload (np. pobieranie pliku)'
+
+      - code: |
+          // NavLink — aktywny link z klasą CSS
+          import { NavLink } from "@remix-run/react";
+
+          export default function Sidebar() {
+            return (
+              <nav>
+                <NavLink
+                  to="/dashboard"
+                  className={({ isActive, isPending }) =>
+                    isActive ? "active" : isPending ? "pending" : ""
+                  }
+                >
+                  Dashboard
+                </NavLink>
+
+                <NavLink
+                  to="/settings"
+                  style={({ isActive }) => ({
+                    fontWeight: isActive ? "bold" : "normal",
+                    color: isActive ? "#0070f3" : "inherit",
+                  })}
+                >
+                  Ustawienia
+                </NavLink>
+              </nav>
+            );
+          }
+        desc: NavLink — link z dynamiczną klasą dla aktywnej trasy
+        detail:
+          what: NavLink automatycznie wykrywa czy link prowadzi do aktualnej trasy. className/style jako funkcja z { isActive, isPending }.
+          how: isPending = true gdy nawigacja do tej trasy jest w toku. Idealne do skeleton/loading state w nawigacji.
+          tips:
+            - 'end prop — active tylko dla dokładnego dopasowania (np. "/" nie aktywuje "/about")'
+            - 'isPending do spinnerów w sidebar podczas ładowania strony'
+
+      - code: |
+          // Form — progresywny formularz HTML
+          import { Form } from "@remix-run/react";
+
+          export default function SearchForm() {
+            return (
+              // GET form — wyszukiwanie przez URL params
+              <Form method="get" action="/search">
+                <input name="q" type="search" placeholder="Szukaj..." />
+                <button type="submit">Szukaj</button>
+              </Form>
+            );
+          }
+
+          export function DeleteForm({ id }: { id: string }) {
+            return (
+              // POST form — mutacja przez action()
+              <Form method="post" action={`/items/${id}/delete`}>
+                <button type="submit" name="intent" value="delete">
+                  Usuń
+                </button>
+              </Form>
+            );
+          }
+        desc: Form — HTML form z progressive enhancement
+        detail:
+          what: Form to ulepszony <form> — z JS działa jako fetch, bez JS jako natywny HTML form. method="get" zmienia URL, method="post" wywołuje action.
+          how: action prop określa docelową trasę. Domyślnie submits do aktualnej trasy.
+          tips:
+            - 'navigate={false} — submit bez nawigacji (np. AJAX-style update)'
+            - 'Zawsze działa bez JS — progressive enhancement out of the box'
+
+      - code: |
+          // Outlet — miejsce renderowania child route
+          import { Outlet } from "@remix-run/react";
+
+          // app/routes/dashboard.tsx — layout
+          export default function DashboardLayout() {
+            return (
+              <div className="dashboard">
+                <aside>
+                  <nav>
+                    <a href="/dashboard/users">Użytkownicy</a>
+                    <a href="/dashboard/settings">Ustawienia</a>
+                  </nav>
+                </aside>
+                <main>
+                  {/* Child routes renderują się tutaj */}
+                  <Outlet />
+                </main>
+              </div>
+            );
+          }
+
+          // app/routes/dashboard.users.tsx — child route
+          export default function DashboardUsers() {
+            return <h1>Lista użytkowników</h1>;
+          }
+        desc: Outlet — renderowanie zagnieżdżonych tras
+        detail:
+          what: Outlet to placeholder gdzie Remix renderuje child route. Layout plik (dashboard.tsx) opakowuje wszystkie dashboard.* trasy.
+          how: Zagnieżdżanie przez konwencję nazw — dashboard.users.tsx jest child route dla dashboard.tsx.
+          tips:
+            - '<Outlet context={value} /> — przekaż dane do child bez prop drilling'
+            - 'useOutletContext() w child — pobierz dane z parent Outlet'
+
+      - code: |
+          // ScrollRestoration i Scripts
+          import {
+            ScrollRestoration,
+            Scripts,
+            Links,
+            Meta,
+          } from "@remix-run/react";
+
+          // app/root.tsx — root layout
+          export default function Root() {
+            return (
+              <html lang="pl">
+                <head>
+                  <meta charSet="utf-8" />
+                  <meta name="viewport" content="width=device-width, initial-scale=1" />
+                  <Meta />    {/* meta() ze wszystkich tras */}
+                  <Links />   {/* links() ze wszystkich tras (CSS) */}
+                </head>
+                <body>
+                  <Outlet />
+                  <ScrollRestoration />  {/* przywróć scroll po nawigacji */}
+                  <Scripts />            {/* hydration JS */}
+                </body>
+              </html>
+            );
+          }
+        desc: Root layout — Meta, Links, Scripts, ScrollRestoration
+        detail:
+          what: Root layout w app/root.tsx to wrapper całej aplikacji. Meta/Links agreguje meta i CSS ze wszystkich aktywnych tras. Scripts dodaje bundle JS.
+          how: Wszystkie 4 komponenty są wymagane dla prawidłowego działania Remix. Kolejność ma znaczenie.
+          tips:
+            - 'ScrollRestoration zapamiętuję scroll position i przywraca przy back/forward'
+            - 'Scripts pominięty = app działa bez JS (pure HTML)'
+
+  - name: Hooki danych
+    commands:
+      - code: |
+          // useLoaderData — dane z loader()
+          import { json } from "@remix-run/node";
+          import { useLoaderData } from "@remix-run/react";
+          import type { LoaderFunctionArgs } from "@remix-run/node";
+
+          export async function loader({ params }: LoaderFunctionArgs) {
+            const user = await getUserById(params.id);
+            if (!user) throw new Response("Not Found", { status: 404 });
+            return json({ user, timestamp: Date.now() });
+          }
+
+          export default function UserProfile() {
+            // Pełne typy dzięki typeof loader
+            const { user, timestamp } = useLoaderData<typeof loader>();
+
+            return (
+              <div>
+                <h1>{user.name}</h1>
+                <p>{user.email}</p>
+                <small>Pobrano: {new Date(timestamp).toLocaleString("pl-PL")}</small>
+              </div>
+            );
+          }
+        desc: useLoaderData — dane z serwera z pełnym type safety
+        detail:
+          what: useLoaderData() zwraca dane z funkcji loader() tej samej trasy. useLoaderData<typeof loader>() zapewnia pełne typy TypeScript.
+          how: Dane są serializowane jako JSON — tylko primitive types, tablice, proste obiekty. Bez klas, Date jako string/number.
+          tips:
+            - '<typeof loader> — inferuj typy automatycznie, nie pisz ich ręcznie'
+            - 'loader() uruchamia się na serwerze — bezpieczny dostęp do DB i secrets'
+
+      - code: |
+          // useActionData — wynik z action()
+          import { json } from "@remix-run/node";
+          import { Form, useActionData } from "@remix-run/react";
+          import type { ActionFunctionArgs } from "@remix-run/node";
+
+          export async function action({ request }: ActionFunctionArgs) {
+            const formData = await request.formData();
+            const email = formData.get("email") as string;
+
+            if (!email.includes("@")) {
+              return json({ error: "Nieprawidłowy email", email }, { status: 400 });
+            }
+
+            await subscribeEmail(email);
+            return json({ success: true });
+          }
+
+          export default function NewsletterForm() {
+            const data = useActionData<typeof action>();
+
+            return (
+              <Form method="post">
+                <input
+                  name="email"
+                  type="email"
+                  defaultValue={data?.email ?? ""}
+                />
+                {data?.error && <p className="error">{data.error}</p>}
+                {data?.success && <p className="success">Zapisano!</p>}
+                <button type="submit">Zapisz się</button>
+              </Form>
+            );
+          }
+        desc: useActionData — wynik z action() po submit formularza
+        detail:
+          what: useActionData() zwraca dane zwrócone przez action() po submicie formularza. undefined jeśli action nie był wywołany lub zwrócił redirect.
+          how: Używaj do wyświetlania błędów walidacji, przywracania wartości pól, success messages po akcji.
+          tips:
+            - 'data?.email — przywróć pole po błędzie (user nie traci wpisanego tekstu)'
+            - 'action redirect → useActionData() zwraca undefined (bo inny URL)'
+
+      - code: |
+          // useFetcher — fetch bez nawigacji
+          import { useFetcher } from "@remix-run/react";
+
+          export function LikeButton({ postId, liked }: { postId: string; liked: boolean }) {
+            const fetcher = useFetcher<{ liked: boolean }>();
+
+            // Optimistic UI — zaktualizuj UI przed odpowiedzią serwera
+            const optimisticLiked = fetcher.formData
+              ? fetcher.formData.get("liked") === "true"
+              : liked;
+
+            return (
+              <fetcher.Form method="post" action="/api/likes">
+                <input type="hidden" name="postId" value={postId} />
+                <input type="hidden" name="liked" value={String(!optimisticLiked)} />
+                <button type="submit">
+                  {optimisticLiked ? "❤️ Polubiono" : "🤍 Polub"}
+                </button>
+              </fetcher.Form>
+            );
+          }
+        desc: useFetcher — submit i fetch bez zmiany trasy
+        detail:
+          what: useFetcher() to useLoaderData + Form bez nawigacji. Idealne do partial updates, like buttons, inline edycji, autocomplete.
+          how: fetcher.Form, fetcher.submit(), fetcher.load() — wszystko bez zmiany URL. fetcher.data = wynik, fetcher.state = stanu.
+          tips:
+            - 'fetcher.formData — dane w trakcie submit (do optimistic UI)'
+            - 'fetcher.state: "idle" | "loading" | "submitting"'
+
+      - code: |
+          // useNavigation — stan nawigacji
+          import { useNavigation } from "@remix-run/react";
+
+          export function GlobalLoadingBar() {
+            const navigation = useNavigation();
+
+            const isLoading = navigation.state !== "idle";
+
+            return (
+              <div
+                className={`loading-bar ${isLoading ? "active" : ""}`}
+                style={{
+                  opacity: isLoading ? 1 : 0,
+                  transition: "opacity 0.2s",
+                }}
+              />
+            );
+          }
+
+          export function SubmitButton() {
+            const navigation = useNavigation();
+            const isSubmitting = navigation.state === "submitting";
+
+            return (
+              <button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Zapisywanie..." : "Zapisz"}
+              </button>
+            );
+          }
+        desc: useNavigation — globalny stan nawigacji i formularzy
+        detail:
+          what: useNavigation() zwraca aktualny stan nawigacji. state może być idle, loading (GET), lub submitting (POST/mutation).
+          how: Użyj do globalnego loading baru, disabled stanów przycisków, skeleton screens podczas nawigacji.
+          tips:
+            - 'navigation.location — docelowy URL podczas nawigacji'
+            - 'navigation.formData — dane formularza podczas submitting'
+
+      - code: |
+          // useSubmit — programatyczny submit formularza
+          import { useSubmit, Form } from "@remix-run/react";
+          import { useEffect } from "react";
+
+          export function AutoSaveForm() {
+            const submit = useSubmit();
+
+            function handleChange(event: React.FormEvent<HTMLFormElement>) {
+              // Autosubmit z debounce
+              submit(event.currentTarget, { replace: true });
+            }
+
+            return (
+              <Form method="post" onChange={handleChange}>
+                <input name="title" defaultValue="Tytuł dokumentu" />
+                <textarea name="content" defaultValue="Treść..." />
+              </Form>
+            );
+          }
+
+          // Programatyczny submit z custom danymi
+          export function SortControl() {
+            const submit = useSubmit();
+
+            return (
+              <select onChange={(e) => submit({ sort: e.target.value }, { method: "get" })}>
+                <option value="date">Data</option>
+                <option value="name">Nazwa</option>
+              </select>
+            );
+          }
+        desc: useSubmit — programatyczny submit formularza
+        detail:
+          what: useSubmit() zwraca funkcję do programatycznego submitowania formularzy lub custom danych. Odpowiednik JavaScript dla <Form>.
+          how: Przyjmuje FormData, HTMLFormElement, lub obiekt + opcje (method, action, replace, encType).
+          tips:
+            - 'replace: true — nie dodawaj wpisu do history'
+            - 'Użyj dla autocomplete, auto-save, filtrowania list'
+
+      - code: |
+          // useParams i useSearchParams
+          import { useParams, useSearchParams } from "@remix-run/react";
+
+          // app/routes/blog.$slug.tsx
+          export function BlogPost() {
+            const { slug } = useParams();
+            return <h1>Post: {slug}</h1>;
+          }
+
+          // Zarządzanie URL query params
+          export function FilterPanel() {
+            const [searchParams, setSearchParams] = useSearchParams();
+
+            const category = searchParams.get("category") ?? "all";
+            const page = Number(searchParams.get("page") ?? "1");
+
+            function setCategory(cat: string) {
+              setSearchParams((prev) => {
+                prev.set("category", cat);
+                prev.set("page", "1"); // reset strony przy zmianie kategorii
+                return prev;
+              });
+            }
+
+            return (
+              <div>
+                <p>Kategoria: {category}, Strona: {page}</p>
+                <button onClick={() => setCategory("tech")}>Tech</button>
+                <button onClick={() => setCategory("design")}>Design</button>
+              </div>
+            );
+          }
+        desc: useParams i useSearchParams — parametry URL
+        detail:
+          what: useParams() zwraca dynamic route params (np. $slug). useSearchParams() to React-hook dla URL query params — odczyt i zapis.
+          how: setSearchParams aktualizuje URL bez nawigacji. Parametry są reaktywne — zmiana URL = re-render.
+          tips:
+            - 'useSearchParams() zachowuje się jak useState() ale synchronizuje z URL'
+            - 'setSearchParams(prev => ...) — modyfikuj bez tracenia innych params'

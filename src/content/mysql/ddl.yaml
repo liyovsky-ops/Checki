@@ -1,0 +1,287 @@
+title: "DDL i Typy danych"
+
+items:
+  - name: Typy liczbowe
+    icon: "🔢"
+    desc: "INT, BIGINT, DECIMAL, FLOAT — typy dla liczb całkowitych, dziesiętnych i przybliżonych."
+    code: |
+      CREATE TABLE liczby (
+          -- Liczby całkowite
+          maly       TINYINT,         -- 1 bajt, -128 do 127
+          normalny   INT,             -- 4 bajty, -2.1B do 2.1B (najczęstszy)
+          duzy       BIGINT,          -- 8 bajtów, -9.2E18 do 9.2E18
+
+          -- Auto-inkrementacja
+          id         INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+
+          -- Precyzyjne (pieniądze, wagi)
+          cena       DECIMAL(10, 2),  -- 10 cyfr total, 2 po przecinku
+          waga       DECIMAL(8, 3),
+
+          -- Przybliżone (naukowe)
+          prog       FLOAT,           -- 4 bajty, ~7 cyfr znaczących
+          dokladny   DOUBLE           -- 8 bajtów, ~15 cyfr
+      );
+
+      -- UNSIGNED — tylko nieujemne (podwaja zakres max)
+      CREATE TABLE produkty (
+          id       INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          ilosc    INT UNSIGNED NOT NULL DEFAULT 0,
+          cena     DECIMAL(10,2) UNSIGNED NOT NULL
+      );
+
+  - name: Typy tekstowe
+    icon: "📝"
+    desc: "VARCHAR, TEXT, CHAR, ENUM, SET — przechowywanie tekstu o różnej długości i typach."
+    code: |
+      CREATE TABLE teksty (
+          -- VARCHAR(n) — zmienna długość do n znaków (max 65535)
+          email      VARCHAR(255) NOT NULL,
+          imie       VARCHAR(100) NOT NULL,
+
+          -- CHAR(n) — stała długość, dopełniana spacjami
+          kod_kraju  CHAR(2),
+
+          -- TEXT — duże teksty (do 65535 bajtów)
+          opis       TEXT,
+
+          -- MEDIUMTEXT, LONGTEXT — dla bardzo dużych treści
+          artykul    MEDIUMTEXT,  -- do 16MB
+          backup     LONGTEXT,    -- do 4GB
+
+          -- ENUM — jedna wartość z listy (storage: 1-2 bajty)
+          status     ENUM('active','inactive','banned') NOT NULL DEFAULT 'active',
+
+          -- SET — zero lub więcej wartości z listy
+          uprawnienia SET('read','write','delete','admin')
+      );
+
+      -- Funkcje tekstowe
+      SELECT
+          UPPER(imie)                  AS wielkie,
+          LOWER(email)                 AS male,
+          LENGTH(imie)                 AS dlugosc,
+          SUBSTRING(email, 1, 5)       AS pierwsze_5,
+          TRIM(' tekst ')              AS bez_spacji,
+          REPLACE(email, '@', '_AT_')  AS zamieniony,
+          CONCAT(imie, ' <', email, '>') AS pelny
+      FROM teksty;
+
+  - name: Typy dat i czasu
+    icon: "📅"
+    desc: "DATE, TIME, DATETIME, TIMESTAMP, YEAR — obsługa dat, czasu i automatyczne timestampy."
+    code: |
+      CREATE TABLE zdarzenia (
+          id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          nazwa       VARCHAR(200) NOT NULL,
+
+          -- DATE: 'YYYY-MM-DD'
+          data        DATE,
+
+          -- TIME: 'HH:MM:SS'
+          czas        TIME,
+
+          -- DATETIME: 'YYYY-MM-DD HH:MM:SS' (bez strefy, 1000-9999)
+          termin      DATETIME,
+
+          -- TIMESTAMP: auto UTC, konwertuje do lokalnej strefy (1970-2038)
+          created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        ON UPDATE CURRENT_TIMESTAMP,
+
+          -- YEAR: 1901-2155
+          rok         YEAR
+      );
+
+      -- Funkcje dat
+      SELECT
+          NOW()                                   AS teraz,
+          CURDATE()                               AS dzisiaj,
+          DATE_ADD(NOW(), INTERVAL 7 DAY)         AS za_tydzien,
+          DATE_SUB(NOW(), INTERVAL 1 MONTH)       AS miesiac_temu,
+          DATEDIFF(NOW(), created_at)             AS dni_od_utworzenia,
+          DATE_FORMAT(created_at, '%d.%m.%Y')    AS sformatowana,
+          YEAR(created_at)                        AS rok,
+          MONTH(created_at)                       AS miesiac,
+          DAYOFWEEK(created_at)                   AS dzien_tyg
+      FROM zdarzenia;
+
+  - name: BOOLEAN i JSON
+    icon: "📦"
+    desc: "BOOLEAN (alias TINYINT), JSON — typ logiczny i natywna obsługa JSON od MySQL 5.7."
+    code: |
+      CREATE TABLE uzytkownicy (
+          id        INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+
+          -- BOOLEAN = alias TINYINT(1): 0 = FALSE, 1 = TRUE
+          aktywny   BOOLEAN NOT NULL DEFAULT TRUE,
+          premium   BOOLEAN NOT NULL DEFAULT FALSE,
+
+          -- JSON — walidowany, binarnie przechowywany (MySQL 5.7+)
+          meta      JSON,
+          ustawienia JSON
+      );
+
+      -- Wstaw JSON
+      INSERT INTO uzytkownicy (aktywny, meta) VALUES
+      (TRUE, '{"city":"Warszawa","tags":["vip","early_adopter"],"score":95}');
+
+      -- Odczyt pól JSON (operator ->)
+      SELECT
+          meta->>'$.city'           AS miasto,
+          meta->>'$.score'          AS wynik,
+          JSON_EXTRACT(meta, '$.tags[0]') AS pierwszy_tag
+      FROM uzytkownicy;
+
+      -- Filtrowanie po JSON
+      SELECT * FROM uzytkownicy
+      WHERE JSON_EXTRACT(meta, '$.score') > 80;
+
+      -- Aktualizacja JSON
+      UPDATE uzytkownicy
+      SET meta = JSON_SET(meta, '$.score', 100)
+      WHERE id = 1;
+
+      -- Sprawdź czy klucz istnieje
+      SELECT * FROM uzytkownicy
+      WHERE JSON_CONTAINS_PATH(meta, 'one', '$.city');
+
+  - name: PRIMARY KEY i AUTO_INCREMENT
+    icon: "🔑"
+    desc: "Klucz główny, AUTO_INCREMENT, klucze złożone — fundament każdej tabeli MySQL."
+    code: |
+      -- Prosty PRIMARY KEY z AUTO_INCREMENT
+      CREATE TABLE orders (
+          id         INT NOT NULL AUTO_INCREMENT,
+          user_id    INT NOT NULL,
+          total      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (id)
+      ) ENGINE=InnoDB;
+
+      -- Złożony PRIMARY KEY (composite)
+      CREATE TABLE order_items (
+          order_id   INT NOT NULL,
+          product_id INT NOT NULL,
+          quantity   INT NOT NULL DEFAULT 1,
+          price      DECIMAL(10,2) NOT NULL,
+          PRIMARY KEY (order_id, product_id)
+      ) ENGINE=InnoDB;
+
+      -- Sprawdź ostatnie AUTO_INCREMENT
+      SELECT LAST_INSERT_ID();
+
+      -- Zresetuj licznik AUTO_INCREMENT
+      ALTER TABLE orders AUTO_INCREMENT = 1;
+
+  - name: FOREIGN KEY i Constrainty
+    icon: "🛡️"
+    desc: "NOT NULL, UNIQUE, DEFAULT, CHECK, FOREIGN KEY — integralność referencyjna w InnoDB."
+    code: |
+      CREATE TABLE orders (
+          id         INT NOT NULL AUTO_INCREMENT,
+          user_id    INT NOT NULL,
+          status     ENUM('pending','paid','shipped','cancelled') NOT NULL DEFAULT 'pending',
+          total      DECIMAL(10,2) NOT NULL CHECK (total >= 0),
+          note       VARCHAR(500),
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (id),
+
+          -- FOREIGN KEY — wymaga InnoDB
+          CONSTRAINT fk_orders_user
+              FOREIGN KEY (user_id)
+              REFERENCES users(id)
+              ON DELETE RESTRICT
+              ON UPDATE CASCADE,
+
+          -- UNIQUE
+          UNIQUE KEY uq_order_ref (id, user_id)
+      ) ENGINE=InnoDB;
+
+      -- Sprawdź klucze obce
+      SELECT
+          TABLE_NAME, COLUMN_NAME, CONSTRAINT_NAME,
+          REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+      FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND REFERENCED_TABLE_NAME IS NOT NULL;
+
+  - name: ALTER TABLE
+    icon: "🔧"
+    desc: "Dodawanie, modyfikowanie i usuwanie kolumn i constraintów bez przebudowy tabeli."
+    code: |
+      -- Dodaj kolumnę
+      ALTER TABLE users
+          ADD COLUMN phone VARCHAR(20) AFTER email;
+
+      -- Dodaj z pozycją
+      ALTER TABLE users
+          ADD COLUMN avatar_url VARCHAR(500) NULL;
+
+      -- Zmień typ kolumny
+      ALTER TABLE users
+          MODIFY COLUMN name VARCHAR(200) NOT NULL;
+
+      -- Zmień nazwę i typ (MySQL 8.0+)
+      ALTER TABLE users
+          RENAME COLUMN name TO full_name;
+
+      -- Usuń kolumnę
+      ALTER TABLE users
+          DROP COLUMN phone;
+
+      -- Dodaj indeks
+      ALTER TABLE users
+          ADD INDEX idx_email (email);
+
+      -- Dodaj FOREIGN KEY
+      ALTER TABLE orders
+          ADD CONSTRAINT fk_orders_user
+          FOREIGN KEY (user_id) REFERENCES users(id);
+
+      -- Usuń FOREIGN KEY
+      ALTER TABLE orders
+          DROP FOREIGN KEY fk_orders_user;
+
+      -- Zmień silnik tabeli
+      ALTER TABLE stara_tabela ENGINE=InnoDB;
+
+      -- Zmień charset
+      ALTER TABLE users
+          CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+  - name: "CREATE VIEW i DROP"
+    icon: "👁️"
+    desc: "Widoki jako zapisane zapytania, DROP TABLE, TRUNCATE — zarządzanie strukturą bazy."
+    code: |
+      -- Utwórz widok
+      CREATE OR REPLACE VIEW active_users AS
+          SELECT id, email, name, created_at
+          FROM users
+          WHERE status = 'active';
+
+      -- Użyj widoku jak tabeli
+      SELECT * FROM active_users WHERE name LIKE 'Jan%';
+
+      -- Widok z JOIN
+      CREATE VIEW order_summary AS
+          SELECT
+              o.id        AS order_id,
+              u.name      AS customer,
+              o.total,
+              o.status,
+              o.created_at
+          FROM orders o
+          JOIN users u ON o.user_id = u.id;
+
+      -- Usuń widok
+      DROP VIEW IF EXISTS active_users;
+
+      -- Usuń tabelę
+      DROP TABLE IF EXISTS stara_tabela;
+
+      -- TRUNCATE — usuń wszystkie dane, zresetuj AUTO_INCREMENT (szybszy niż DELETE)
+      TRUNCATE TABLE logs;
+
+      -- Pokaż definicję widoku
+      SHOW CREATE VIEW active_users;

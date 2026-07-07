@@ -1,0 +1,353 @@
+title: Loaders i Actions
+
+groups:
+  - name: Loader — pobieranie danych
+    commands:
+      - code: |
+          // app/routes/users.$id.tsx — loader z params
+          import { json } from "@remix-run/node";
+          import type { LoaderFunctionArgs } from "@remix-run/node";
+          import { useLoaderData } from "@remix-run/react";
+
+          export async function loader({ params, request }: LoaderFunctionArgs) {
+            // params.id z URL /users/:id
+            const user = await db.users.findUnique({
+              where: { id: params.id },
+            });
+
+            if (!user) {
+              throw new Response("Użytkownik nie znaleziony", { status: 404 });
+            }
+
+            // Cookies z request
+            const session = await getSession(request.headers.get("Cookie"));
+            const currentUser = session.get("user");
+
+            return json({ user, currentUser });
+          }
+
+          export default function UserPage() {
+            const { user } = useLoaderData<typeof loader>();
+            return <h1>{user.name}</h1>;
+          }
+        desc: Loader z params i request — DB, cookies, auth
+        detail:
+          what: loader() uruchamia się wyłącznie na serwerze. Dostęp do params (URL), request (headers, cookies), context (deployment env).
+          how: json() serializuje dane do Response. Rzuć new Response() z odpowiednim statusem dla błędów i 404.
+          tips:
+            - 'Rzucaj Response, nie Error — daje kontrolę nad HTTP status'
+            - 'request.url, request.headers — pełny Request API'
+
+      - code: |
+          // Loader z TypeScript — pełne typy
+          import { json } from "@remix-run/node";
+          import type { LoaderFunctionArgs } from "@remix-run/node";
+          import { useLoaderData } from "@remix-run/react";
+
+          type Post = {
+            id: string;
+            title: string;
+            content: string;
+            createdAt: string;
+          };
+
+          export async function loader({ params }: LoaderFunctionArgs) {
+            const [post, comments] = await Promise.all([
+              getPost(params.slug!),
+              getComments(params.slug!),
+            ]);
+
+            if (!post) throw new Response(null, { status: 404 });
+
+            return json({
+              post,
+              comments,
+              meta: {
+                readTime: Math.ceil(post.content.split(" ").length / 200),
+              },
+            });
+          }
+
+          export default function BlogPost() {
+            // Inferowane typy z loader — brak ręcznego typowania
+            const { post, comments, meta } = useLoaderData<typeof loader>();
+
+            return (
+              <article>
+                <h1>{post.title}</h1>
+                <p>Czas czytania: {meta.readTime} min</p>
+              </article>
+            );
+          }
+        desc: "Loader TypeScript — Promise.all, inferred types"
+        detail:
+          what: Promise.all() ładuje dane równolegle — post i komentarze jednocześnie. typeof loader inferuje typy automatycznie.
+          how: Zagnieżdżone trasy uruchamiają loadery dla wszystkich aktywnych tras równolegle — nie sekwencyjnie.
+          tips:
+            - 'Zawsze używaj Promise.all() gdy dane są niezależne'
+            - 'typeof loader — unikaj ręcznego pisania typów zwracanych'
+
+      - code: |
+          // Loader z cache headers i redirect
+          import { json, redirect } from "@remix-run/node";
+          import type { LoaderFunctionArgs } from "@remix-run/node";
+
+          export async function loader({ request, params }: LoaderFunctionArgs) {
+            const session = await getSession(request.headers.get("Cookie"));
+
+            // Redirect niezalogowanych
+            if (!session.get("userId")) {
+              const url = new URL(request.url);
+              throw redirect(`/login?next=${url.pathname}`);
+            }
+
+            const data = await getPublicData(params.id);
+
+            return json(data, {
+              headers: {
+                "Cache-Control": "public, max-age=300, s-maxage=3600",
+                "Vary": "Accept",
+              },
+            });
+          }
+        desc: "Loader z redirect() i Cache-Control headers"
+        detail:
+          what: redirect() tworzy Response z Location header. json() przyjmuje drugi argument z opcjami Response — status, headers.
+          how: Cache-Control w loaderze cache'uje odpowiedź na CDN. Remix respektuje wszystkie HTTP semantyki.
+          tips:
+            - 'redirect() to skrót — sam robi new Response("", { status: 302, headers: { Location } })'
+            - '"s-maxage" — cache na CDN, "max-age" — cache w przeglądarce'
+
+      - code: |
+          // defer() + Await — streaming danych
+          import { defer } from "@remix-run/node";
+          import { Await, useLoaderData } from "@remix-run/react";
+          import { Suspense } from "react";
+          import type { LoaderFunctionArgs } from "@remix-run/node";
+
+          export async function loader({ params }: LoaderFunctionArgs) {
+            // Krytyczne dane — await (blokuje render)
+            const user = await getUser(params.id);
+
+            return defer({
+              user,
+              // Wolne dane — nie await (streaming)
+              stats: getHeavyStats(params.id),
+              recommendations: getRecommendations(params.id),
+            });
+          }
+
+          export default function Dashboard() {
+            const { user, stats, recommendations } = useLoaderData<typeof loader>();
+
+            return (
+              <div>
+                {/* Natychmiastowe */}
+                <h1>Witaj, {user.name}</h1>
+
+                {/* Streaming — skeleton podczas ładowania */}
+                <Suspense fallback={<div>Ładowanie statystyk...</div>}>
+                  <Await resolve={stats}>
+                    {(data) => <StatsWidget stats={data} />}
+                  </Await>
+                </Suspense>
+
+                <Suspense fallback={<div>Ładowanie rekomendacji...</div>}>
+                  <Await resolve={recommendations} errorElement={<p>Błąd ładowania</p>}>
+                    {(data) => <RecommendationsList items={data} />}
+                  </Await>
+                </Suspense>
+              </div>
+            );
+          }
+        desc: defer() + Await — streaming z Suspense
+        detail:
+          what: defer() pozwala na streaming — szybkie dane renderują się natychmiast, wolne (AI, ciężkie queries) stream-ują do klienta przez Suspense.
+          how: Await to Remix-owy komponent dla streamed promises. errorElement obsługuje błędy. Wymaga adaptera obsługującego streaming.
+          tips:
+            - 'defer() dla danych które mogą poczekać — nigdy nie blokuj pierwszego renderowania'
+            - '<Await errorElement> — zawsze obsłuż błędy streamed danych'
+
+  - name: Action — mutacje danych
+    commands:
+      - code: |
+          // Podstawowy action — create
+          import { json, redirect } from "@remix-run/node";
+          import type { ActionFunctionArgs } from "@remix-run/node";
+          import { Form, useActionData } from "@remix-run/react";
+
+          export async function action({ request }: ActionFunctionArgs) {
+            const formData = await request.formData();
+
+            const title = formData.get("title") as string;
+            const content = formData.get("content") as string;
+
+            // Walidacja
+            const errors: Record<string, string> = {};
+            if (!title || title.length < 3) errors.title = "Tytuł min. 3 znaki";
+            if (!content || content.length < 10) errors.content = "Treść min. 10 znaków";
+
+            if (Object.keys(errors).length > 0) {
+              return json({ errors, values: { title, content } }, { status: 400 });
+            }
+
+            const post = await db.posts.create({ data: { title, content } });
+            return redirect(`/posts/${post.id}`);
+          }
+
+          export default function NewPost() {
+            const data = useActionData<typeof action>();
+
+            return (
+              <Form method="post">
+                <div>
+                  <input name="title" defaultValue={data?.values?.title} />
+                  {data?.errors?.title && <p>{data.errors.title}</p>}
+                </div>
+                <div>
+                  <textarea name="content" defaultValue={data?.values?.content} />
+                  {data?.errors?.content && <p>{data.errors.content}</p>}
+                </div>
+                <button type="submit">Utwórz post</button>
+              </Form>
+            );
+          }
+        desc: Action — walidacja, błędy, redirect po sukcesie
+        detail:
+          what: action() obsługuje POST z formularza. Waliduj dane, zwróć json z błędami lub redirect po sukcesie. Po action Remix automatycznie odświeża loadery.
+          how: request.formData() parsuje body. Zachowaj wartości pól (values) żeby user nie tracił wpisanych danych.
+          tips:
+            - 'Zawsze redirect po sukcesie — zapobiega podwójnemu submitowi (PRG pattern)'
+            - 'defaultValue={data?.values?.title} — przywróć pole po błędzie walidacji'
+
+      - code: |
+          // Intent pattern — wiele akcji na jednej trasie
+          import { json, redirect } from "@remix-run/node";
+          import type { ActionFunctionArgs } from "@remix-run/node";
+
+          export async function action({ request, params }: ActionFunctionArgs) {
+            const formData = await request.formData();
+            const intent = formData.get("intent") as string;
+
+            switch (intent) {
+              case "update": {
+                const title = formData.get("title") as string;
+                await db.posts.update({
+                  where: { id: params.id },
+                  data: { title },
+                });
+                return json({ success: true });
+              }
+
+              case "delete": {
+                await db.posts.delete({ where: { id: params.id } });
+                return redirect("/posts");
+              }
+
+              case "publish": {
+                await db.posts.update({
+                  where: { id: params.id },
+                  data: { publishedAt: new Date() },
+                });
+                return redirect(`/posts/${params.id}`);
+              }
+
+              default:
+                throw new Response("Nieznana akcja", { status: 400 });
+            }
+          }
+
+          // W komponencie:
+          // <button name="intent" value="update">Zapisz</button>
+          // <button name="intent" value="delete">Usuń</button>
+          // <button name="intent" value="publish">Opublikuj</button>
+        desc: Intent pattern — wiele akcji przez hidden input
+        detail:
+          what: Jeden action() z switch na intent pozwala na wiele akcji (update/delete/publish) z jednej strony przez różne przyciski submit.
+          how: name="intent" value="delete" — każdy przycisk submit wysyła inną wartość. Switch w action obsługuje każdy przypadek.
+          tips:
+            - 'Prosta i czysta alternatywa dla wielu tras tylko dla akcji'
+            - 'Działa bez JS — każdy button submit działa jako niezależna akcja'
+
+      - code: |
+          // Walidacja z Zod w action
+          import { json, redirect } from "@remix-run/node";
+          import { z } from "zod";
+          import type { ActionFunctionArgs } from "@remix-run/node";
+
+          const RegisterSchema = z.object({
+            email: z.string().email("Nieprawidłowy email"),
+            password: z.string().min(8, "Minimum 8 znaków"),
+            name: z.string().min(2, "Minimum 2 znaki"),
+          });
+
+          export async function action({ request }: ActionFunctionArgs) {
+            const formData = await request.formData();
+            const raw = Object.fromEntries(formData);
+
+            const result = RegisterSchema.safeParse(raw);
+
+            if (!result.success) {
+              return json(
+                {
+                  errors: result.error.flatten().fieldErrors,
+                  values: raw,
+                },
+                { status: 400 }
+              );
+            }
+
+            // result.data jest poprawnie otypowany
+            const { email, password, name } = result.data;
+            const user = await createUser({ email, password, name });
+
+            const session = await createSession(user.id);
+            return redirect("/dashboard", {
+              headers: { "Set-Cookie": await commitSession(session) },
+            });
+          }
+        desc: Walidacja z Zod — safeParse, fieldErrors, Set-Cookie
+        detail:
+          what: z.safeParse() nie rzuca — zwraca { success, data } lub { success, error }. flatten().fieldErrors = błędy per pole.
+          how: Object.fromEntries(formData) konwertuje FormData na plain object do Zod. Set-Cookie w headers ustawia session cookie.
+          tips:
+            - 'safeParse() zamiast parse() — obsłuż błędy bez try/catch'
+            - 'result.data jest w pełni otypowany przez Zod schema'
+
+      - code: |
+          // Action z metodą DELETE (resource routes)
+          // app/routes/api.posts.$id.tsx
+          import { json } from "@remix-run/node";
+          import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+
+          export async function loader({ params }: LoaderFunctionArgs) {
+            const post = await getPost(params.id!);
+            return json(post);
+          }
+
+          export async function action({ request, params }: ActionFunctionArgs) {
+            const method = request.method;
+
+            if (method === "DELETE") {
+              await db.posts.delete({ where: { id: params.id } });
+              return json({ deleted: true });
+            }
+
+            if (method === "PUT") {
+              const body = await request.json();
+              const updated = await db.posts.update({
+                where: { id: params.id },
+                data: body,
+              });
+              return json(updated);
+            }
+
+            throw new Response("Method not allowed", { status: 405 });
+          }
+        desc: Resource route — REST API z loader i action
+        detail:
+          what: Trasy bez default export to resource routes — czyste REST API. request.method rozróżnia GET/POST/PUT/DELETE.
+          how: Dostęp przez fetch() z frontendu lub innych serwisów. Idealne do API endpoints, webhooks.
+          tips:
+            - 'Brak default export = resource route (brak renderowania HTML)'
+            - 'request.json() dla JSON body, request.formData() dla form body'

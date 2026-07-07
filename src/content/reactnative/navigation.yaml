@@ -1,0 +1,302 @@
+title: Nawigacja — React Navigation v6+
+
+items:
+  - name: Instalacja i setup
+    desc: >
+      React Navigation to standardowa biblioteka nawigacji dla React Native.
+      Instalacja wymaga kilku pakietów: core, native adapters i wybrane navigatory.
+      Stack Navigator emuluje stos ekranów, Tab Navigator buduje dolne lub górne
+      zakładki, Drawer Navigator tworzy boczne menu.
+    code: |
+      // Instalacja
+      npm install @react-navigation/native
+      npm install react-native-screens react-native-safe-area-context
+      npm install @react-navigation/native-stack
+      npm install @react-navigation/bottom-tabs
+      npm install @react-navigation/drawer
+
+      // Expo
+      npx expo install react-native-screens react-native-safe-area-context
+
+      // App.tsx — root setup
+      import { NavigationContainer } from '@react-navigation/native';
+      import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
+      type RootStackParamList = {
+        Home: undefined;
+        Profile: { userId: string };
+        Settings: undefined;
+      };
+
+      const Stack = createNativeStackNavigator<RootStackParamList>();
+
+      export default function App() {
+        return (
+          <NavigationContainer>
+            <Stack.Navigator initialRouteName="Home">
+              <Stack.Screen name="Home" component={HomeScreen} />
+              <Stack.Screen name="Profile" component={ProfileScreen} />
+              <Stack.Screen name="Settings" component={SettingsScreen} />
+            </Stack.Navigator>
+          </NavigationContainer>
+        );
+      }
+
+  - name: "useNavigation i useRoute"
+    desc: >
+      useNavigation() zwraca obiekt navigation z metodami navigate, push, goBack,
+      reset i replace. useRoute() daje dostęp do aktualnej trasy i parametrów.
+      Oba hooki działają tylko wewnątrz NavigationContainer — nie na poziomie root.
+    code: |
+      import { useNavigation, useRoute } from '@react-navigation/native';
+      import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+      import type { RouteProp } from '@react-navigation/native';
+
+      type RootStackParamList = {
+        Home: undefined;
+        Profile: { userId: string; username: string };
+      };
+
+      type HomeNavProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
+
+      function HomeScreen() {
+        const navigation = useNavigation<HomeNavProp>();
+
+        return (
+          <Pressable
+            onPress={() =>
+              navigation.navigate('Profile', {
+                userId: '42',
+                username: 'lukasz',
+              })
+            }
+          >
+            <Text>Idź do profilu</Text>
+          </Pressable>
+        );
+      }
+
+      type ProfileRouteProp = RouteProp<RootStackParamList, 'Profile'>;
+
+      function ProfileScreen() {
+        const route = useRoute<ProfileRouteProp>();
+        const { userId, username } = route.params;
+
+        return <Text>Profil: {username} (ID: {userId})</Text>;
+      }
+
+  - name: Stack Navigator
+    desc: >
+      Emuluje stos ekranów — nowy ekran nakłada się na poprzedni. navigate()
+      idzie do ekranu (jeśli jest na stosie, wraca do niego), push() zawsze
+      dodaje nowy ekran na stos, goBack() wraca o jeden poziom, pop(n) zdejmuje
+      n ekranów. Animacje natywne — slide na iOS, fade/slide na Android.
+    code: |
+      import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
+      const Stack = createNativeStackNavigator();
+
+      function StackNavigator() {
+        return (
+          <Stack.Navigator
+            screenOptions={{
+              headerStyle: { backgroundColor: '#61dafb' },
+              headerTintColor: '#fff',
+              headerTitleStyle: { fontWeight: 'bold' },
+              animation: 'slide_from_right',
+            }}
+          >
+            <Stack.Screen
+              name="List"
+              component={ListScreen}
+              options={{ title: 'Lista' }}
+            />
+            <Stack.Screen
+              name="Detail"
+              component={DetailScreen}
+              options={({ route }) => ({ title: route.params.title })}
+            />
+          </Stack.Navigator>
+        );
+      }
+
+      // Nawigacja w komponencie
+      navigation.navigate('Detail', { id: 1, title: 'Szczegóły' });
+      navigation.push('Detail', { id: 2, title: 'Nowy stos' });
+      navigation.goBack();
+      navigation.popToTop(); // wróć do pierwszego ekranu
+
+  - name: Bottom Tab Navigator
+    desc: >
+      Dolny pasek zakładek — standardowy wzorzec UI dla aplikacji mobilnych.
+      tabBarIcon przyjmuje funkcję renderującą ikonę. Badge przez tabBarBadge.
+      Każda zakładka ma własny navigator (stack wewnątrz tab) dla zagnieżdżonej
+      nawigacji.
+    code: |
+      import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+
+      const Tab = createBottomTabNavigator();
+
+      function TabNavigator() {
+        return (
+          <Tab.Navigator
+            screenOptions={({ route }) => ({
+              tabBarIcon: ({ focused, color, size }) => {
+                const icons: Record<string, string> = {
+                  Home: '🏠',
+                  Search: '🔍',
+                  Profile: '👤',
+                };
+                return (
+                  <Text style={{ fontSize: size }}>
+                    {icons[route.name]}
+                  </Text>
+                );
+              },
+              tabBarActiveTintColor: '#61dafb',
+              tabBarInactiveTintColor: '#999',
+            })}
+          >
+            <Tab.Screen name="Home" component={HomeStack} />
+            <Tab.Screen
+              name="Search"
+              component={SearchScreen}
+              options={{ tabBarBadge: 3 }}
+            />
+            <Tab.Screen name="Profile" component={ProfileScreen} />
+          </Tab.Navigator>
+        );
+      }
+
+  - name: Drawer Navigator
+    desc: >
+      Boczne menu wysuwane gestem lub przyciskiem — typowe dla aplikacji z wieloma
+      sekcjami. drawerContent pozwala na custom sidebar. openDrawer(), closeDrawer()
+      i toggleDrawer() sterują widocznością z kodu.
+    code: |
+      import { createDrawerNavigator } from '@react-navigation/drawer';
+      import { useNavigation } from '@react-navigation/native';
+
+      const Drawer = createDrawerNavigator();
+
+      function DrawerNavigator() {
+        return (
+          <Drawer.Navigator
+            screenOptions={{
+              drawerStyle: { backgroundColor: '#001a2e', width: 280 },
+              drawerActiveTintColor: '#61dafb',
+              drawerInactiveTintColor: '#aaa',
+            }}
+          >
+            <Drawer.Screen name="Dashboard" component={DashboardScreen} />
+            <Drawer.Screen name="Settings" component={SettingsScreen} />
+            <Drawer.Screen name="About" component={AboutScreen} />
+          </Drawer.Navigator>
+        );
+      }
+
+      // Otwieranie drawera z przycisku w headerze
+      function MenuButton() {
+        const navigation = useNavigation<any>();
+        return (
+          <Pressable onPress={() => navigation.openDrawer()}>
+            <Text>☰</Text>
+          </Pressable>
+        );
+      }
+
+  - name: Zagnieżdżone nawigatory
+    desc: >
+      Prawdziwe aplikacje łączą navigatory — Stack wewnątrz Tab, Tab wewnątrz
+      Drawer. Każdy navigator ma własny stan. Nawigacja do zagnieżdżonego ekranu
+      wymaga podania nazwy navigatora i ekranu docelowego.
+    code: |
+      // Struktura: Drawer > Tab > Stack
+      function RootNavigator() {
+        return (
+          <NavigationContainer>
+            <Drawer.Navigator>
+              <Drawer.Screen name="Main" component={TabNavigator} />
+              <Drawer.Screen name="Settings" component={SettingsScreen} />
+            </Drawer.Navigator>
+          </NavigationContainer>
+        );
+      }
+
+      // Nawigacja do zagnieżdżonego ekranu
+      navigation.navigate('Main', {
+        screen: 'Home',
+        params: {
+          screen: 'Detail',
+          params: { id: '123' },
+        },
+      });
+
+  - name: Deep Linking
+    desc: >
+      Deep links pozwalają otwierać konkretne ekrany z URL lub powiadomień.
+      linking prop w NavigationContainer mapuje URL na ekrany. Prefixes definiują
+      scheme aplikacji (myapp://) i universal links (https://myapp.com).
+    code: |
+      import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
+
+      const linking: LinkingOptions<RootStackParamList> = {
+        prefixes: ['myapp://', 'https://myapp.com'],
+        config: {
+          screens: {
+            Home: '',
+            Profile: 'user/:userId',
+            Settings: 'settings',
+          },
+        },
+      };
+
+      // myapp://user/42 → ProfileScreen z params { userId: '42' }
+
+      export default function App() {
+        return (
+          <NavigationContainer linking={linking}>
+            <Stack.Navigator>
+              <Stack.Screen name="Home" component={HomeScreen} />
+              <Stack.Screen name="Profile" component={ProfileScreen} />
+              <Stack.Screen name="Settings" component={SettingsScreen} />
+            </Stack.Navigator>
+          </NavigationContainer>
+        );
+      }
+
+  - name: navigationRef
+    desc: >
+      navigationRef pozwala nawigować poza komponentami — z serwisów, utils,
+      context lub po otrzymaniu powiadomienia push. Utwórz ref, przekaż do
+      NavigationContainer, wywołuj navigate() z dowolnego miejsca w app.
+    code: |
+      // navigation/index.ts
+      import { createNavigationContainerRef } from '@react-navigation/native';
+      import type { RootStackParamList } from './types';
+
+      export const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
+      export function navigate(name: keyof RootStackParamList, params?: any) {
+        if (navigationRef.isReady()) {
+          navigationRef.navigate(name, params);
+        }
+      }
+
+      // App.tsx
+      import { navigationRef } from './navigation';
+
+      export default function App() {
+        return (
+          <NavigationContainer ref={navigationRef}>
+            {/* ... */}
+          </NavigationContainer>
+        );
+      }
+
+      // Użycie poza komponentem (np. po push notification)
+      import { navigate } from './navigation';
+
+      messaging().onMessage(async (message) => {
+        navigate('Notifications', { id: message.data?.id });
+      });

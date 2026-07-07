@@ -1,0 +1,173 @@
+title: Scena & Kamera
+
+items:
+  - name: scene.add() — dodawanie obiektów
+    desc: Każdy obiekt 3D musi być dodany do sceny (lub do innego Object3D w scenie) żeby był renderowany. scene.remove() usuwa obiekt. Obiekt może mieć tylko jednego rodzica.
+    icon: "➕"
+    code: |
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x1a1a2e);
+
+      // Dodaj mesh do sceny
+      const cube = new THREE.Mesh(
+        new THREE.BoxGeometry(1, 1, 1),
+        new THREE.MeshStandardMaterial({ color: 0x049ef4 })
+      );
+      scene.add(cube);
+
+      // Usuń z sceny
+      scene.remove(cube);
+
+      // Sprawdź wszystkie dzieci sceny
+      console.log(scene.children);
+
+  - name: Position, Rotation, Scale
+    desc: Każdy Object3D ma position (Vector3), rotation (Euler) i scale (Vector3). Możesz ustawiać oś po osi lub używać metod set().
+    icon: "📏"
+    code: |
+      const mesh = new THREE.Mesh(geometry, material);
+
+      // Position — Vector3
+      mesh.position.set(2, 1, -3);
+      mesh.position.x = 5;
+
+      // Rotation — Euler (radiany!)
+      mesh.rotation.y = Math.PI / 4;   // 45°
+      mesh.rotation.set(0, Math.PI, 0); // 180° wokół Y
+
+      // Scale
+      mesh.scale.set(2, 2, 2);  // 2× większy
+      mesh.scale.x = 0.5;
+
+      // lookAt — obiekt "patrzy" w punkt
+      mesh.lookAt(new THREE.Vector3(0, 0, 0));
+
+  - name: Groups — grupowanie obiektów
+    desc: Group to pusty Object3D — kontener dla wielu obiektów. Transformacje na Group wpływają na wszystkie dzieci jednocześnie. Idealne do złożonych obiektów (np. samochód = body + wheels).
+    icon: "📦"
+    code: |
+      const carGroup = new THREE.Group();
+
+      const body = new THREE.Mesh(
+        new THREE.BoxGeometry(2, 0.5, 1),
+        new THREE.MeshStandardMaterial({ color: 0xff0000 })
+      );
+      const wheel1 = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.3, 0.3, 0.2, 16),
+        new THREE.MeshStandardMaterial({ color: 0x333333 })
+      );
+      wheel1.position.set(-0.8, -0.3, 0.6);
+      wheel1.rotation.x = Math.PI / 2;
+
+      carGroup.add(body);
+      carGroup.add(wheel1);
+      scene.add(carGroup);
+
+      // Cały samochód się obraca
+      carGroup.rotation.y += 0.01;
+
+  - name: Object3D.traverse()
+    desc: Przechodzi przez cały graf sceny (obiekt + wszystkie dzieci rekurencyjnie). Przydatne do znajdowania obiektów, ustawiania cieni, zmiany materiałów na załadowanym modelu.
+    icon: "🔍"
+    code: |
+      // Włącz cienie na wszystkich meshach załadowanego modelu
+      gltf.scene.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+          // Zamień material
+          child.material = new THREE.MeshStandardMaterial({
+            color: child.material.color,
+            roughness: 0.5,
+          });
+        }
+      });
+
+      // Znajdź konkretny obiekt po nazwie
+      const targetMesh = scene.getObjectByName('Wheel_FL');
+
+  - name: PerspectiveCamera vs OrthographicCamera
+    desc: PerspectiveCamera daje naturalną perspektywę (dalsze obiekty mniejsze). OrthographicCamera brak perspektywy — używana w grach izometrycznych, mapach, CAD. Oba typy mają near/far clipping.
+    icon: "📷"
+    code: |
+      // Perspektywna (najczęstsza)
+      const perspCam = new THREE.PerspectiveCamera(
+        75,    // FOV — pole widzenia w stopniach (60-90 typowo)
+        window.innerWidth / window.innerHeight, // aspect ratio
+        0.1,   // near — obiekty bliżej nie są renderowane
+        1000   // far — obiekty dalej nie są renderowane
+      );
+      perspCam.position.set(0, 5, 10);
+      perspCam.lookAt(0, 0, 0);
+
+      // Ortograficzna (2D/izometryczna)
+      const w = window.innerWidth / 100;
+      const h = window.innerHeight / 100;
+      const orthoCam = new THREE.OrthographicCamera(
+        -w, w, h, -h, 0.1, 1000
+      );
+
+  - name: Near/Far Clipping i Frustum
+    desc: Frustum to ostrosłup widzenia kamery. Obiekty poza near/far nie są renderowane (clipping). Zbyt mała różnica near/far powoduje Z-fighting — artefakty nakładających się powierzchni.
+    icon: "🔺"
+    code: |
+      // Z-fighting fix — nie ustawiaj near zbyt małego
+      // ZŁE: near = 0.001, far = 100000
+      // DOBRE:
+      const camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
+
+      // Logarithmic depth buffer — eliminuje Z-fighting
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        logarithmicDepthBuffer: true,
+      });
+
+      // Frustum culling — automatyczne (obiekty poza frustum nie renderowane)
+      mesh.frustumCulled = true; // domyślnie true
+      // Wyłącz dla obiektów które zawsze muszą być renderowane
+      mesh.frustumCulled = false;
+
+  - name: Resize Handler — responsywny canvas
+    desc: Three.js nie skaluje się automatycznie przy zmianie rozmiaru okna. Musisz zaktualizować renderer.setSize() i camera.aspect, a potem camera.updateProjectionMatrix().
+    icon: "📐"
+    code: |
+      function onWindowResize() {
+        // Zaktualizuj proporcje kamery
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix(); // WYMAGANE po zmianie parametrów kamery
+
+        // Zaktualizuj rozmiar renderera
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      }
+
+      window.addEventListener('resize', onWindowResize);
+
+      // Przy React/komponentach — pamiętaj o cleanup
+      // return () => window.removeEventListener('resize', onWindowResize);
+
+  - name: Stats.js — performance monitor
+    desc: Stats.js wyświetla FPS, ms per frame i MB pamięci. Niezastąpione narzędzie do profilowania wydajności sceny 3D. Nie wchodzi do bundla produkcyjnego.
+    icon: "📊"
+    code: |
+      import Stats from 'three/addons/libs/stats.module.js';
+
+      const stats = new Stats();
+      stats.showPanel(0); // 0=FPS, 1=MS, 2=MB
+      document.body.appendChild(stats.dom);
+
+      function animate() {
+        stats.begin(); // Zawsze na początku klatki
+
+        // ... aktualizacje sceny ...
+        renderer.render(scene, camera);
+
+        stats.end(); // Zawsze na końcu klatki
+        requestAnimationFrame(animate);
+      }
+      animate();
+
+      // Pozycja panelu
+      stats.dom.style.position = 'fixed';
+      stats.dom.style.top = '0px';
+      stats.dom.style.left = '0px';

@@ -1,0 +1,376 @@
+title: Native APIs
+
+items:
+  - name: AsyncStorage
+    desc: >
+      Prosty key-value store do trwałego przechowywania danych — odpowiednik
+      localStorage w web, ale asynchroniczny. Przechowuje stringi — dane obiektowe
+      serializuj przez JSON.stringify/parse. Dla większych danych użyj react-native-mmkv
+      (synchroniczny, 30× szybszy) lub SQLite.
+    code: |
+      import AsyncStorage from '@react-native-async-storage/async-storage';
+
+      // Instalacja
+      // npx expo install @react-native-async-storage/async-storage
+
+      // Zapis
+      async function saveUser(user: { id: string; name: string }) {
+        await AsyncStorage.setItem('user', JSON.stringify(user));
+      }
+
+      // Odczyt
+      async function loadUser() {
+        const raw = await AsyncStorage.getItem('user');
+        return raw ? JSON.parse(raw) : null;
+      }
+
+      // Usuwanie
+      await AsyncStorage.removeItem('user');
+
+      // Wiele kluczy jednocześnie
+      await AsyncStorage.multiSet([
+        ['token', 'eyJhbGc...'],
+        ['theme', 'dark'],
+      ]);
+
+      const values = await AsyncStorage.multiGet(['token', 'theme']);
+      // values: [['token', 'eyJhbGc...'], ['theme', 'dark']]
+
+      // Hook do AsyncStorage
+      function useStoredValue<T>(key: string, defaultValue: T) {
+        const [value, setValue] = React.useState<T>(defaultValue);
+
+        React.useEffect(() => {
+          AsyncStorage.getItem(key).then((raw) => {
+            if (raw) setValue(JSON.parse(raw));
+          });
+        }, [key]);
+
+        const set = async (newValue: T) => {
+          setValue(newValue);
+          await AsyncStorage.setItem(key, JSON.stringify(newValue));
+        };
+
+        return [value, set] as const;
+      }
+
+  - name: Camera (expo-camera)
+    desc: >
+      Expo Camera daje dostęp do aparatu — podgląd na żywo, zdjęcia i nagrywanie wideo.
+      Zawsze proś o uprawnienie przed użyciem. CameraView component to najnowszy API
+      (Expo SDK 50+). Skanowanie kodów QR/barcode wbudowane.
+    code: |
+      // npx expo install expo-camera
+
+      import { CameraView, useCameraPermissions } from 'expo-camera';
+      import { useState } from 'react';
+      import { View, Text, Pressable, StyleSheet } from 'react-native';
+
+      export default function CameraScreen() {
+        const [permission, requestPermission] = useCameraPermissions();
+        const [cameraRef, setCameraRef] = useState<CameraView | null>(null);
+
+        if (!permission) return <View />;
+
+        if (!permission.granted) {
+          return (
+            <View style={styles.center}>
+              <Text>Brak dostępu do kamery</Text>
+              <Pressable onPress={requestPermission}>
+                <Text>Zezwól</Text>
+              </Pressable>
+            </View>
+          );
+        }
+
+        const takePicture = async () => {
+          if (!cameraRef) return;
+          const photo = await cameraRef.takePictureAsync({ quality: 0.8 });
+          console.log('Zdjęcie:', photo?.uri);
+        };
+
+        return (
+          <View style={styles.container}>
+            <CameraView
+              style={styles.camera}
+              facing="back"
+              ref={(ref) => setCameraRef(ref)}
+            />
+            <Pressable style={styles.button} onPress={takePicture}>
+              <Text>📸</Text>
+            </Pressable>
+          </View>
+        );
+      }
+
+      const styles = StyleSheet.create({
+        container: { flex: 1 },
+        camera: { flex: 1 },
+        center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+        button: { position: 'absolute', bottom: 40, alignSelf: 'center' },
+      });
+
+  - name: Location (expo-location)
+    desc: >
+      expo-location zapewnia dostęp do GPS — aktualną pozycję, ciągłe śledzenie
+      i geokodowanie. Uprawnienie foreground (podczas użycia) lub background
+      (zawsze). Na iOS wymagane oba poziomy osobno.
+    code: |
+      // npx expo install expo-location
+
+      import * as Location from 'expo-location';
+      import { useEffect, useState } from 'react';
+
+      type Coords = { latitude: number; longitude: number } | null;
+
+      function useLocation() {
+        const [location, setLocation] = useState<Coords>(null);
+        const [error, setError] = useState<string | null>(null);
+
+        useEffect(() => {
+          (async () => {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+              setError('Brak uprawnień do lokalizacji');
+              return;
+            }
+
+            const loc = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.High,
+            });
+            setLocation(loc.coords);
+          })();
+        }, []);
+
+        return { location, error };
+      }
+
+      // Ciągłe śledzenie
+      async function watchLocation(callback: (coords: Coords) => void) {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+
+        const subscription = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 10 },
+          (loc) => callback(loc.coords)
+        );
+
+        return () => subscription.remove(); // cleanup
+      }
+
+  - name: Notifications (expo-notifications)
+    desc: >
+      expo-notifications obsługuje lokalne i push notyfikacje. Lokalne — zaplanowane
+      przez urządzenie bez serwera. Push — wysyłane przez Expo Push Service lub
+      FCM/APNs bezpośrednio. Wymagana rejestracja tokenu push dla zdalnych powiadomień.
+    code: |
+      // npx expo install expo-notifications
+
+      import * as Notifications from 'expo-notifications';
+      import { useEffect } from 'react';
+
+      // Konfiguracja zachowania powiadomień
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+        }),
+      });
+
+      // Rejestracja push tokenu
+      async function registerForPushNotifications() {
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status !== 'granted') return null;
+
+        const token = await Notifications.getExpoPushTokenAsync({
+          projectId: 'twoj-project-id', // z app.json
+        });
+        return token.data; // wysyłasz na serwer
+      }
+
+      // Lokalne powiadomienie
+      async function scheduleNotification() {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Przypomnienie',
+            body: 'Czas na przerwę!',
+            data: { screen: 'Home' },
+          },
+          trigger: { seconds: 60 }, // za minutę
+        });
+      }
+
+      // Nasłuchiwanie powiadomień
+      function NotificationListener() {
+        useEffect(() => {
+          const sub = Notifications.addNotificationReceivedListener((n) => {
+            console.log('Otrzymano:', n.request.content);
+          });
+          return () => sub.remove();
+        }, []);
+        return null;
+      }
+
+  - name: Haptics i Vibration
+    desc: >
+      Haptyczne sprzężenie zwrotne poprawia UX — użytkownicy czują interakcje.
+      expo-haptics daje dostęp do natywnych silników haptycznych (Taptic Engine
+      na iPhone). Vibration API to prosty odpowiednik bez subtylnych wzorców.
+    code: |
+      // npx expo install expo-haptics
+
+      import * as Haptics from 'expo-haptics';
+      import { Vibration } from 'react-native';
+
+      // Typy haptyki (iOS + Android)
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+
+      // Sukces / błąd / ostrzeżenie (iOS)
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+
+      // Selekcja (subtelny feedback przy przewijaniu)
+      await Haptics.selectionAsync();
+
+      // Prosta wibracja (cross-platform)
+      Vibration.vibrate(); // jednorazowa
+      Vibration.vibrate([0, 500, 200, 500]); // wzorzec: czekaj-wibruj-czekaj-wibruj
+      Vibration.cancel();
+
+  - name: "Linking, Share i Clipboard"
+    desc: >
+      Linking otwiera URL, numery telefonu, email lub inne aplikacje przez deep link.
+      Share wywołuje natywny dialog udostępniania. Clipboard pozwala kopiować
+      i wklejać tekst z/do schowka systemowego.
+    code: |
+      import { Linking, Share } from 'react-native';
+      import * as Clipboard from 'expo-clipboard';
+
+      // Linking — otwieranie URL
+      await Linking.openURL('https://reaktnative.dev');
+      await Linking.openURL('tel:+48123456789');
+      await Linking.openURL('mailto:info@example.com?subject=Kontakt');
+
+      // Sprawdź czy URL jest obsługiwany
+      const canOpen = await Linking.canOpenURL('myapp://profile/123');
+      if (canOpen) await Linking.openURL('myapp://profile/123');
+
+      // Reaguj na deep link gdy app jest otwarta
+      useEffect(() => {
+        const sub = Linking.addEventListener('url', ({ url }) => {
+          console.log('Otrzymano deep link:', url);
+        });
+        return () => sub.remove();
+      }, []);
+
+      // Share — natywny dialog
+      const result = await Share.share({
+        title: 'Sprawdź to!',
+        message: 'Hej, polecam tę aplikację: https://example.com',
+        url: 'https://example.com', // tylko iOS
+      });
+
+      if (result.action === Share.sharedAction) {
+        console.log('Udostępniono przez:', result.activityType);
+      }
+
+      // Clipboard
+      // npx expo install expo-clipboard
+      await Clipboard.setStringAsync('tekst do skopiowania');
+      const text = await Clipboard.getStringAsync();
+
+  - name: AppState i NetInfo
+    desc: >
+      AppState śledzi czy aplikacja jest na pierwszym planie (active), w tle
+      (background) lub nieaktywna (inactive — iOS). NetInfo z @react-native-community
+      daje informacje o połączeniu sieciowym — typ (wifi/cellular) i dostępność.
+    code: |
+      import { AppState, AppStateStatus } from 'react-native';
+      import NetInfo from '@react-native-community/netinfo';
+      import { useEffect, useRef } from 'react';
+
+      // AppState — foreground/background
+      function useAppState(onForeground: () => void) {
+        const appState = useRef<AppStateStatus>(AppState.currentState);
+
+        useEffect(() => {
+          const sub = AppState.addEventListener('change', (nextState) => {
+            if (
+              appState.current.match(/inactive|background/) &&
+              nextState === 'active'
+            ) {
+              onForeground(); // app wróciła na pierwszy plan
+            }
+            appState.current = nextState;
+          });
+          return () => sub.remove();
+        }, [onForeground]);
+      }
+
+      // NetInfo — stan sieci
+      // npm install @react-native-community/netinfo
+      function useNetworkStatus() {
+        const [isConnected, setIsConnected] = useState(true);
+
+        useEffect(() => {
+          const unsubscribe = NetInfo.addEventListener((state) => {
+            setIsConnected(!!state.isConnected);
+          });
+          return unsubscribe;
+        }, []);
+
+        return isConnected;
+      }
+
+      // Jednorazowe sprawdzenie
+      const state = await NetInfo.fetch();
+      console.log('Typ sieci:', state.type); // 'wifi' | 'cellular' | 'none'
+      console.log('Połączony:', state.isConnected);
+
+  - name: Permissions
+    desc: >
+      React Native wymaga jawnego proszenia o uprawnienia w runtime (od Android 6+
+      i zawsze na iOS). expo-permissions jest zdeprecjonowany — każdy moduł Expo
+      eksportuje własne requestPermissionsAsync(). Sprawdzaj status przed użyciem.
+    code: |
+      import * as Location from 'expo-location';
+      import * as Notifications from 'expo-notifications';
+      import { useCameraPermissions } from 'expo-camera';
+
+      // Wzorzec: check → request → handle
+      async function ensureLocationPermission(): Promise<boolean> {
+        const { status } = await Location.getForegroundPermissionsAsync();
+
+        if (status === 'granted') return true;
+
+        if (status === 'undetermined') {
+          const { status: newStatus } =
+            await Location.requestForegroundPermissionsAsync();
+          return newStatus === 'granted';
+        }
+
+        // 'denied' — użytkownik odmówił, przekieruj do ustawień
+        await Linking.openSettings();
+        return false;
+      }
+
+      // Hak dla uprawnień do kamery
+      function CameraButton() {
+        const [permission, requestPermission] = useCameraPermissions();
+
+        const handlePress = async () => {
+          if (!permission?.granted) {
+            const result = await requestPermission();
+            if (!result.granted) return; // odmówiono
+          }
+          // kamera dostępna
+        };
+
+        return <Pressable onPress={handlePress}><Text>Aparat</Text></Pressable>;
+      }

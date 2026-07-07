@@ -1,0 +1,902 @@
+title: Komendy Astro
+
+groups:
+  - name: Instalacja i inicjalizacja
+    icon: "🚀"
+    commands:
+      - cmd: npm create astro@latest
+        desc: Utwórz nowy projekt Astro (interaktywny wizard)
+        detail:
+          what: Uruchamia kreator projektu Astro — pyta o template, TypeScript, Git init, install dependencies.
+          how: Używa pakietu create-astro. Możesz podać nazwę katalogu jako argument.
+          tips:
+            - 'npm create astro@latest my-blog — utwórz w katalogu my-blog'
+            - 'pnpm create astro@latest — jeśli używasz pnpm'
+
+      - cmd: npm create astro@latest -- --template minimal
+        desc: Projekt Astro — minimal template (czysta kartka)
+        detail:
+          what: Tworzy projekt bez żadnych stron startowych. Tylko astro.config.mjs i src/pages/index.astro.
+          how: Flaga --template minimal pomija interaktywny wybór template.
+          tips:
+            - 'Najlepsza opcja gdy chcesz zacząć od zera bez zbędnego boilerplate'
+            - 'npm create astro@latest -- --template blog — starter z pełnym blogiem'
+
+      - cmd: npm create astro@latest -- --template starlight
+        desc: Projekt dokumentacji (Starlight template)
+        detail:
+          what: Tworzy projekt z Starlight — oficjalnym theme dokumentacji Astro z nawigacją, wyszukiwarką, dark mode.
+          how: Gotowy do użycia — dodaj pliki .md do src/content/docs/ i masz dokumentację.
+          tips:
+            - 'Idealny dla dokumentacji bibliotek, frameworków, produktów'
+            - 'Zawiera Pagefind — wyszukiwarkę działającą offline, zero backendu'
+
+      - cmd: npm create astro@latest -- --template portfolio
+        desc: Projekt portfolio z animacjami i dark mode
+        detail:
+          what: Template portfolio z responsywnym designem, animacjami CSS i przełącznikiem dark/light mode.
+          how: Modyfikuj src/content/work/ i src/pages/ aby dostosować do swoich projektów.
+          tips:
+            - 'Świetny punkt startowy dla developerów budujących portfolio'
+            - 'Zawiera przykłady View Transitions API'
+
+      - cmd: npx astro add react
+        desc: Dodaj integrację React do istniejącego projektu
+        detail:
+          what: Instaluje @astrojs/react i aktualizuje astro.config.mjs automatycznie. Bez ręcznej edycji konfiguracji.
+          how: Możesz uruchomić w istniejącym projekcie — astro add wykryje brakujące zależności.
+          tips:
+            - 'npx astro add vue — alternatywa z Vue 3'
+            - 'npx astro add svelte — Svelte 5 z runes'
+            - 'Możesz dodać wiele naraz: npx astro add react vue svelte'
+
+      - cmd: npx astro add tailwind
+        desc: Dodaj Tailwind CSS do projektu
+        detail:
+          what: Instaluje @astrojs/tailwind, tailwindcss, postcss. Tworzy tailwind.config.mjs i aktualizuje astro.config.mjs.
+          how: Po dodaniu Tailwind klasy są dostępne we wszystkich plikach .astro, .jsx, .vue, .svelte.
+          tips:
+            - 'npx astro add tailwind@beta — Tailwind v4 (CSS-first, bez config JS)'
+            - 'npx astro add mdx — dodaj MDX (Markdown + komponenty JSX)'
+
+  - name: Dev server i build
+    icon: "🔧"
+    commands:
+      - cmd: npm run dev
+        desc: Uruchom dev server (http://localhost:4321)
+        detail:
+          what: Startuje Astro dev server z HMR (Hot Module Replacement). Zmiany w plikach = natychmiastowy reload.
+          how: Domyślny port to 4321. Zmień w astro.config.mjs przez server.port.
+          flags:
+            - flag: '--port 3000'
+              desc: Zmień port serwera
+            - flag: '--host'
+              desc: Udostępnij w sieci lokalnej (0.0.0.0)
+            - flag: '--open'
+              desc: Otwórz przeglądarkę automatycznie
+          tips:
+            - 'npx astro dev -- --host — dostęp z innych urządzeń w sieci'
+            - 'npx astro dev -- --port 3000 --open — custom port i auto-open'
+
+      - cmd: npm run build
+        desc: Zbuduj produkcyjną wersję (do katalogu dist/)
+        detail:
+          what: Kompiluje wszystkie strony do statycznych plików HTML w dist/. Optymalizuje CSS, JS i obrazy.
+          how: Output trafia do dist/ domyślnie. Zmień przez outDir w astro.config.mjs.
+          tips:
+            - 'Zawsze buduj przed deploy — sprawdź czy build przechodzi bez błędów'
+            - 'W trybie SSR generuje serwer Node/Deno zamiast statycznych plików'
+
+      - cmd: npm run preview
+        desc: Podgląd produkcyjnego buildu lokalnie
+        detail:
+          what: Serwuje pliki z dist/ lokalnie. Sprawdź czy wszystko działa po build przed deploym.
+          how: Uruchamia po npm run build. Podgląd na http://localhost:4321.
+          tips:
+            - 'Zawsze testuj preview — niektóre błędy pojawiają się tylko w production build'
+            - 'npm run build && npm run preview — build + podgląd jedną komendą'
+
+      - cmd: npx astro check
+        desc: Sprawdź TypeScript w plikach .astro
+        detail:
+          what: Uruchamia diagnostykę TypeScript dla wszystkich plików .astro. Wykrywa type errors, nieznane props, brakujące importy.
+          how: Odpowiednik tsc --noEmit ale rozumie składnię .astro. Dodaj do CI pipeline.
+          tips:
+            - 'npx astro check --watch — watch mode dla continuous type checking'
+            - 'Dodaj do package.json: "type-check": "astro check"'
+
+      - cmd: npx astro sync
+        desc: Generuj typy TypeScript dla Content Collections
+        detail:
+          what: Generuje plik .astro/types.d.ts z typami dla Content Collections, env vars i routingu. Automatycznie odpalany przez dev.
+          how: Ręcznie gdy typy się rozjadą lub po dodaniu nowej kolekcji w src/content/config.ts.
+          tips:
+            - 'Uruchamia się automatycznie przy dev i build'
+            - 'Uruchom ręcznie jeśli IDE nie widzi typów dla getCollection()'
+
+      - cmd: npx astro info
+        desc: Wyświetl informacje o środowisku Astro
+        detail:
+          what: Pokazuje wersje Astro, Node, system operacyjny, zainstalowane integracje. Przydatne przy raportowaniu bugów.
+          how: Uruchom gdy coś nie działa — podaj output przy zgłaszaniu issue na GitHub.
+          tips:
+            - 'Kopiuj output do issue na github.com/withastro/astro'
+            - 'Sprawdź czy wersja Astro jest aktualna'
+
+  - name: Komponenty .astro
+    icon: "🧩"
+    commands:
+      - code: |
+          ---
+          // src/components/Card.astro
+          interface Props {
+            title: string;
+            description: string;
+            href: string;
+            tag?: string;
+          }
+          const { title, description, href, tag = 'Artykuł' } = Astro.props;
+          ---
+          <article>
+            <span class="tag">{tag}</span>
+            <h2><a href={href}>{title}</a></h2>
+            <p>{description}</p>
+          </article>
+          <style>
+            article { padding: 1.5rem; border: 1px solid #eee; border-radius: 8px; }
+            .tag { font-size: 0.75rem; color: #FF5D01; font-weight: bold; }
+          </style>
+        desc: Podstawowy komponent .astro z props i scoped CSS
+
+      - code: |
+          ---
+          // src/components/BaseLayout.astro — layout z named slots
+          interface Props {
+            title: string;
+            description?: string;
+          }
+          const { title, description = 'Opis domyślny' } = Astro.props;
+          ---
+          <html lang="pl">
+            <head>
+              <meta charset="UTF-8" />
+              <meta name="description" content={description} />
+              <title>{title} | Moja Strona</title>
+              <slot name="head" />
+            </head>
+            <body>
+              <nav><slot name="nav"><a href="/">Home</a></slot></nav>
+              <main><slot /></main>
+              <footer><slot name="footer">© 2024</slot></footer>
+            </body>
+          </html>
+        desc: Layout z named slots (head, nav, footer)
+
+      - code: |
+          ---
+          // src/pages/index.astro — użycie client:load
+          import Counter from '../components/Counter.jsx';
+          import Map from '../components/Map.jsx';
+          import Newsletter from '../components/Newsletter.svelte';
+          import HeavyChart from '../components/Chart.vue';
+          ---
+          <!-- Hydruj od razu (krytyczne UI) -->
+          <Counter client:load />
+          <!-- Hydruj gdy idle (niekrytyczne, poniżej fold) -->
+          <Newsletter client:idle />
+          <!-- Hydruj gdy w viewport (lazy, lazy loading) -->
+          <HeavyChart client:visible />
+          <!-- Tylko klient — pomija SSR (używa window/localStorage) -->
+          <Map client:only="react" />
+        desc: "Dyrektywy hydratacji: client:load / idle / visible / only"
+
+      - code: |
+          ---
+          // src/components/Conditional.astro
+          const { user, items = [], showHeader = true } = Astro.props;
+          ---
+          {showHeader && <header><h1>Witaj, {user.name}!</h1></header>}
+          {user.isAdmin ? (
+            <p>Masz uprawnienia admina</p>
+          ) : (
+            <p>Standardowe konto</p>
+          )}
+          <ul>
+            {items.map((item, i) => (
+              <li key={item.id}>
+                {i + 1}. {item.title}
+              </li>
+            ))}
+          </ul>
+          {items.length === 0 && <p class="empty">Brak elementów</p>}
+        desc: Warunkowe renderowanie i listy w template
+
+      - code: |
+          ---
+          // src/components/FetchData.astro
+          // fetch() w frontmatter = tylko na serwerze, nie wychodzi do przeglądarki
+          const response = await fetch('https://api.github.com/repos/withastro/astro');
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const repo = await response.json();
+          ---
+          <div class="repo-card">
+            <h2>{repo.full_name}</h2>
+            <p>{repo.description}</p>
+            <p>⭐ {repo.stargazers_count.toLocaleString()} gwiazdek</p>
+            <a href={repo.html_url}>Zobacz na GitHub →</a>
+          </div>
+        desc: Pobieranie danych w frontmatter (server-side fetch)
+
+      - code: |
+          ---
+          // src/components/OptimizedImage.astro
+          import { Image, Picture } from 'astro:assets';
+          import heroImg from '../assets/hero.jpg';
+
+          interface Props {
+            src?: ImageMetadata;
+            alt: string;
+            priority?: boolean;
+          }
+          const { src = heroImg, alt, priority = false } = Astro.props;
+          ---
+          <Picture
+            src={src}
+            formats={['avif', 'webp']}
+            widths={[400, 800, 1200]}
+            sizes="(max-width: 400px) 400px, (max-width: 800px) 800px, 1200px"
+            alt={alt}
+            loading={priority ? 'eager' : 'lazy'}
+          />
+        desc: Zoptymalizowany responsywny obraz (astro:assets)
+
+      - code: |
+          ---
+          // src/components/ThemeToggle.astro
+          // Skrypt inline — działa w przeglądarce
+          ---
+          <button id="theme-toggle" aria-label="Przełącz motyw">
+            <span class="icon-sun">☀️</span>
+            <span class="icon-moon">🌙</span>
+          </button>
+          <script>
+            // Ten skrypt trafia DO przeglądarki (nie frontmatter!)
+            const btn = document.getElementById('theme-toggle');
+            const html = document.documentElement;
+            btn?.addEventListener('click', () => {
+              html.dataset.theme = html.dataset.theme === 'dark' ? 'light' : 'dark';
+              localStorage.setItem('theme', html.dataset.theme);
+            });
+            // Przywróć motyw
+            const saved = localStorage.getItem('theme');
+            if (saved) html.dataset.theme = saved;
+          </script>
+        desc: Skrypt inline w przeglądarce (tag script bez frontmatter)
+
+      - code: |
+          ---
+          // src/components/DynamicComponent.astro
+          // Dynamiczny import oparty na propsach
+          import ComponentA from './ComponentA.astro';
+          import ComponentB from './ComponentB.astro';
+
+          const { type } = Astro.props;
+          const Component = type === 'a' ? ComponentA : ComponentB;
+          ---
+          <Component {...Astro.props} />
+
+          <!-- Albo używając is:raw i set:html: -->
+          <div set:html={someHtmlString} />
+
+          <!-- Renderuj Markdown z komponentów: -->
+          <!-- const { Content } = await entry.render(); -->
+          <!-- <Content /> -->
+        desc: Dynamiczny wybór komponentu i renderowanie HTML
+
+  - name: Routing i strony
+    icon: "🗺️"
+    commands:
+      - code: |
+          src/pages/
+          ├── index.astro          → /
+          ├── about.astro          → /about
+          ├── 404.astro            → /404
+          ├── blog/
+          │   ├── index.astro      → /blog
+          │   ├── [slug].astro     → /blog/dowolny-slug
+          │   └── [...path].astro  → /blog/a/b/c
+          └── api/
+              └── posts.ts         → /api/posts (JSON endpoint)
+        desc: Struktura plików = struktura URL w Astro
+
+      - code: |
+          ---
+          // src/pages/blog/[slug].astro — dynamiczna trasa
+          import { getCollection } from 'astro:content';
+
+          export async function getStaticPaths() {
+            const posts = await getCollection('blog');
+            return posts.map((post) => ({
+              params: { slug: post.slug },
+              props: { post },
+            }));
+          }
+
+          const { post } = Astro.props;
+          const { Content } = await post.render();
+          ---
+          <h1>{post.data.title}</h1>
+          <Content />
+        desc: "Dynamiczna trasa [slug] + getStaticPaths()"
+
+      - code: |
+          ---
+          // src/pages/docs/[...slug].astro — catch-all trasa
+          import { getCollection } from 'astro:content';
+
+          export async function getStaticPaths() {
+            const docs = await getCollection('docs');
+            return docs.map((doc) => ({
+              params: { slug: doc.slug === 'index' ? undefined : doc.slug },
+              props: { doc },
+            }));
+          }
+
+          const { doc } = Astro.props;
+          const { Content } = await doc.render();
+          ---
+          <article>
+            <h1>{doc.data.title}</h1>
+            <Content />
+          </article>
+        desc: "Catch-all trasa [...slug] dla zagnieżdżonej dokumentacji"
+
+      - code: |
+          // src/pages/api/users.ts — REST API endpoint
+          import type { APIRoute } from 'astro';
+
+          export const GET: APIRoute = async ({ url, request }) => {
+            const id = url.searchParams.get('id');
+            const users = await fetchUsers(id);
+            return new Response(JSON.stringify(users), {
+              headers: { 'Content-Type': 'application/json' },
+            });
+          };
+
+          export const POST: APIRoute = async ({ request }) => {
+            const body = await request.json();
+            const user = await createUser(body);
+            return new Response(JSON.stringify(user), { status: 201 });
+          };
+
+          // Fetch z komponentu:
+          // const res = await fetch('/api/users?id=1');
+          // const data = await res.json();
+        desc: API endpoint — GET i POST z TypeScript
+
+      - code: |
+          ---
+          // src/pages/blog/[page].astro — paginacja
+          import { getCollection } from 'astro:content';
+
+          export async function getStaticPaths({ paginate }) {
+            const posts = await getCollection('blog');
+            const sorted = posts.sort(
+              (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+            );
+            return paginate(sorted, { pageSize: 10 });
+          }
+
+          const { page } = Astro.props;
+          ---
+          {page.data.map((post) => <article>{post.data.title}</article>)}
+          <nav>
+            {page.url.prev && <a href={page.url.prev}>← Nowsze</a>}
+            <span>{page.currentPage} / {page.lastPage}</span>
+            {page.url.next && <a href={page.url.next}>Starsze →</a>}
+          </nav>
+        desc: Paginacja z paginate() helper
+
+      - code: |
+          // src/middleware.ts — middleware dla autoryzacji
+          import { defineMiddleware } from 'astro:middleware';
+
+          export const onRequest = defineMiddleware(async (ctx, next) => {
+            // Chroń trasy /dashboard/*
+            if (ctx.url.pathname.startsWith('/dashboard')) {
+              const session = ctx.cookies.get('session')?.value;
+              if (!session) return ctx.redirect('/login');
+              ctx.locals.user = await getUser(session);
+            }
+            const response = await next();
+            response.headers.set('X-Frame-Options', 'DENY');
+            return response;
+          });
+
+          // src/env.d.ts — typy dla locals
+          declare namespace App {
+            interface Locals { user?: { id: string; name: string } }
+          }
+        desc: Middleware — autoryzacja i modyfikacja response
+
+      - code: |
+          ---
+          // src/pages/old-page.astro — przekierowanie 301
+          return Astro.redirect('/new-page', 301);
+          ---
+
+          <!-- lub w getStaticPaths: -->
+          export async function getStaticPaths() {
+            return [
+              {
+                params: { slug: 'stary-post' },
+                redirect: { destination: '/blog/nowy-post', status: 301 },
+              },
+            ];
+          }
+
+          <!-- 404.astro — custom strona błędu -->
+          ---
+          const { pathname } = Astro.url;
+          ---
+          <h1>404 — Nie znaleziono</h1>
+          <p>Szukana strona: <code>{pathname}</code></p>
+          <a href="/">Strona główna</a>
+        desc: "Redirect i custom 404"
+
+  - name: Content Collections
+    icon: "📚"
+    commands:
+      - code: |
+          // src/content/config.ts — schema kolekcji
+          import { defineCollection, z } from 'astro:content';
+
+          const blog = defineCollection({
+            type: 'content',
+            schema: ({ image }) => z.object({
+              title: z.string().min(1).max(100),
+              description: z.string().max(300),
+              pubDate: z.coerce.date(),
+              draft: z.boolean().default(false),
+              tags: z.array(z.string()).default([]),
+              cover: image().optional(),
+            }),
+          });
+
+          export const collections = { blog };
+        desc: Definiowanie kolekcji z Zod schema (config.ts)
+
+      - code: |
+          ---
+          // Pobierz wszystkie posty (z filtrem draftów)
+          import { getCollection } from 'astro:content';
+
+          const posts = await getCollection('blog', ({ data }) => {
+            return import.meta.env.PROD ? !data.draft : true;
+          });
+
+          // Sortuj od najnowszego
+          const sorted = posts.sort(
+            (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+          );
+
+          // Zbierz unikalne tagi
+          const allTags = [...new Set(posts.flatMap((p) => p.data.tags))];
+          ---
+          {sorted.map((post) => (
+            <article>
+              <a href={`/blog/${post.slug}`}>{post.data.title}</a>
+              <time>{post.data.pubDate.toLocaleDateString('pl-PL')}</time>
+            </article>
+          ))}
+        desc: getCollection() — pobieranie i filtrowanie wpisów
+
+      - code: |
+          ---
+          // src/pages/blog/[slug].astro
+          import { getEntry, getCollection } from 'astro:content';
+
+          export async function getStaticPaths() {
+            const posts = await getCollection('blog');
+            return posts.map((p) => ({ params: { slug: p.slug } }));
+          }
+
+          const post = await getEntry('blog', Astro.params.slug);
+          if (!post) return Astro.redirect('/404');
+
+          // render() zwraca Content (komponent), headings, remarkPluginFrontmatter
+          const { Content, headings } = await post.render();
+          ---
+          <article>
+            <nav class="toc">
+              {headings.map(h => (
+                <a href={`#${h.slug}`} style={`padding-left: ${(h.depth-1)*1}rem`}>
+                  {h.text}
+                </a>
+              ))}
+            </nav>
+            <Content />
+          </article>
+        desc: getEntry() + render() — jeden post z table of contents
+
+      - code: |
+          ---
+          # src/content/blog/hello-world.md
+          title: "Mój pierwszy post"
+          description: "Wprowadzenie do Astro Content Collections"
+          pubDate: 2024-01-15
+          tags: ["astro", "blog"]
+          draft: false
+          ---
+
+          # Witaj, Astro!
+
+          To jest mój pierwszy post napisany w **Markdown**.
+
+          ## Sekcja z kodem
+
+          ```typescript
+          const greeting = await fetch('/api/hello');
+          const { message } = await greeting.json();
+          console.log(message);
+          ```
+
+          ## Lista
+
+          - Islands Architecture
+          - Zero JS domyślnie
+          - Content Collections
+        desc: Struktura pliku Markdown w kolekcji
+
+      - code: |
+          // src/content/config.ts — referencje między kolekcjami
+          import { defineCollection, reference, z } from 'astro:content';
+
+          const authors = defineCollection({
+            type: 'data',
+            schema: z.object({ name: z.string(), bio: z.string() }),
+          });
+
+          const blog = defineCollection({
+            schema: z.object({
+              title: z.string(),
+              author: reference('authors'),  // relacja do authors
+              relatedPosts: z.array(reference('blog')).default([]),
+            }),
+          });
+
+          // W stronie:
+          // const post = await getEntry('blog', slug);
+          // const author = await getEntry(post.data.author);
+          // const related = await getEntries(post.data.relatedPosts);
+        desc: "reference() — relacje między kolekcjami"
+
+      - code: |
+          // src/content/config.ts — kolekcja 'data' (JSON/YAML)
+          import { defineCollection, z } from 'astro:content';
+
+          const team = defineCollection({
+            type: 'data',
+            schema: z.object({
+              name: z.string(),
+              role: z.string(),
+              avatar: z.string().url(),
+              github: z.string().optional(),
+            }),
+          });
+
+          export const collections = { team };
+
+          // src/content/team/jan-kowalski.json
+          // { "name": "Jan", "role": "Frontend", "avatar": "https://..." }
+
+          // src/pages/about.astro
+          // const members = await getCollection('team');
+        desc: "Kolekcja 'data' dla plików JSON/YAML"
+
+      - code: |
+          // Zaawansowane: generuj OG images dynamicznie
+          // src/pages/og/[slug].ts
+          import type { APIRoute } from 'astro';
+          import { getCollection } from 'astro:content';
+
+          export const GET: APIRoute = async ({ params }) => {
+            // Generuj obraz OG dla posta (np. przez @vercel/og)
+            const post = await getEntry('blog', params.slug!);
+            if (!post) return new Response('Not found', { status: 404 });
+
+            // Użyj biblioteki satori lub sharp do generowania PNG
+            const imageBuffer = await generateOgImage({
+              title: post.data.title,
+              description: post.data.description,
+            });
+
+            return new Response(imageBuffer, {
+              headers: { 'Content-Type': 'image/png' },
+            });
+          };
+        desc: Dynamiczne OG images z danych kolekcji
+
+  - name: Integracje
+    icon: "🔌"
+    commands:
+      - cmd: npx astro add react vue svelte
+        desc: Dodaj React, Vue i Svelte jednocześnie
+        detail:
+          what: Możesz używać wielu frameworków w jednym projekcie Astro. Każdy renderuje jako osobna wyspa.
+          how: astro add instaluje paczki i aktualizuje astro.config.mjs. Możesz podać wiele naraz.
+          tips:
+            - 'Każdy framework to osobna wyspa — React i Vue mogą być na tej samej stronie'
+            - 'npx astro add solid — alternatywa dla React z fine-grained reactivity'
+
+      - cmd: npx astro add mdx
+        desc: Dodaj wsparcie MDX (Markdown + JSX komponenty)
+        detail:
+          what: MDX pozwala używać komponentów React/Vue/Svelte w plikach Markdown. Idealne dla dokumentacji z live examples.
+          how: Po instalacji pliki .mdx w src/content/ obsługują import komponentów i JSX.
+          tips:
+            - 'npx astro add mdx sitemap — dodaj mdx i sitemap jedną komendą'
+            - 'Skonfiguruj remark-gfm dla GitHub Flavored Markdown (tabele, strikethrough)'
+
+      - cmd: npx astro add sitemap
+        desc: Generuj sitemap.xml automatycznie
+        detail:
+          what: Generuje sitemap.xml przy każdym buildzie. Pomaga wyszukiwarkom indeksować wszystkie strony.
+          how: Wymaga ustawienia site w astro.config.mjs. Plik pojawi się w dist/sitemap-index.xml.
+          tips:
+            - 'site: "https://moja-strona.pl" jest WYMAGANE w astro.config.mjs'
+            - 'Dodaj Sitemap: URL do robots.txt'
+
+      - cmd: npx astro add db
+        desc: Dodaj Astro DB (SQLite lokalnie, LibSQL w produkcji)
+        detail:
+          what: Integracja z bazą danych SQLite w dev, LibSQL/Turso w produkcji. Definiujesz tabele w TypeScript z pełnym typowaniem.
+          how: Tworzy db/config.ts. Używaj astro:db w endpointach i stronach. W trybie SSR wymagany.
+          tips:
+            - 'Używaj z output: server lub output: hybrid w astro.config.mjs'
+            - 'npx astro db push — wypchnij schema do produkcji'
+
+      - cmd: npx astro add node
+        desc: Dodaj adapter Node.js (tryb SSR)
+        detail:
+          what: Włącza SSR (Server-Side Rendering) z Node.js. Zamiast statycznych plików generuje serwer Node.
+          how: Po instalacji zmień output na "server" lub "hybrid" w astro.config.mjs.
+          tips:
+            - '"server" — wszystkie strony SSR. "hybrid" — SSR domyślnie, możesz prerender wybrane'
+            - 'npx astro add vercel — deploy na Vercel z SSR'
+
+      - cmd: npx astro add vercel
+        desc: Dodaj adapter Vercel (SSR + edge functions)
+        detail:
+          what: Optymalizowany output dla Vercel. Wspiera edge functions, serverless, ISR (Incremental Static Regeneration).
+          how: Po instalacji git push → auto deploy. Zero konfiguracji na Vercel.
+          tips:
+            - 'Vercel auto-wykrywa Astro — zero konfiguracji deploymentu'
+            - 'npx astro add cloudflare — deploy na Cloudflare Pages/Workers'
+
+  - name: "Astro DB i SSR"
+    icon: "🗄️"
+    commands:
+      - cmd: npx astro db push
+        desc: Wypchnij schema bazy danych do produkcji (Turso/LibSQL)
+        detail:
+          what: Synchronizuje schema zdefiniowaną w db/config.ts z produkcyjną bazą danych Turso.
+          how: Wymaga zmiennych środowiskowych ASTRO_DB_REMOTE_URL i ASTRO_DB_APP_TOKEN.
+          tips:
+            - 'npx astro db verify — weryfikuj schema przed pushowaniem'
+            - 'Turso: turso db create my-db && turso db tokens create my-db'
+
+      - code: |
+          // db/config.ts — definicja tabel
+          import { defineDb, defineTable, column, NOW } from 'astro:db';
+
+          const Comment = defineTable({
+            columns: {
+              id: column.number({ primaryKey: true }),
+              postSlug: column.text(),
+              author: column.text(),
+              body: column.text(),
+              createdAt: column.date({ default: NOW }),
+              approved: column.boolean({ default: false }),
+            },
+            indexes: [
+              { on: ['postSlug'] },
+            ],
+          });
+
+          const User = defineTable({
+            columns: {
+              id: column.number({ primaryKey: true }),
+              email: column.text({ unique: true }),
+              name: column.text(),
+            },
+          });
+
+          export default defineDb({ tables: { Comment, User } });
+        desc: Definicja tabel Astro DB z typami i indeksami
+
+      - code: |
+          // src/pages/api/comments.ts — CRUD z Astro DB
+          import type { APIRoute } from 'astro';
+          import { db, Comment, eq, desc } from 'astro:db';
+
+          export const GET: APIRoute = async ({ url }) => {
+            const slug = url.searchParams.get('slug');
+            const comments = await db
+              .select()
+              .from(Comment)
+              .where(eq(Comment.postSlug, slug!))
+              .orderBy(desc(Comment.createdAt))
+              .all();
+            return new Response(JSON.stringify(comments));
+          };
+
+          export const POST: APIRoute = async ({ request }) => {
+            const { postSlug, author, body } = await request.json();
+            const result = await db.insert(Comment).values({
+              postSlug, author, body
+            }).returning();
+            return new Response(JSON.stringify(result[0]), { status: 201 });
+          };
+        desc: "CRUD z Astro DB — select, insert, where, orderBy"
+
+      - code: |
+          // astro.config.mjs — tryb SSR
+          import { defineConfig } from 'astro/config';
+          import node from '@astrojs/node';
+
+          export default defineConfig({
+            output: 'server',     // 'static' | 'hybrid' | 'server'
+            adapter: node({ mode: 'standalone' }),
+          });
+
+          // W trybie 'hybrid' możesz prerender wybrane strony:
+          // src/pages/about.astro
+          // export const prerender = true;  ← ta strona = statyczna
+
+          // W trybie 'server' możesz wyłączyć prerender per-strona:
+          // export const prerender = false;  ← domyślnie false w 'server'
+        desc: "Konfiguracja SSR — output: server / hybrid"
+
+      - code: |
+          ---
+          // src/pages/dashboard.astro — SSR ze zmiennymi i cookies
+          // Tylko w trybie output: 'server' lub 'hybrid' + prerender: false
+
+          const { cookies, redirect, locals } = Astro;
+
+          // Odczytaj cookie
+          const sessionId = cookies.get('session')?.value;
+          if (!sessionId) return redirect('/login');
+
+          // Pobierz dane per-request (nie są cache'owane)
+          const user = await fetch(`/api/users/${sessionId}`).then(r => r.json());
+          const dashboardData = await fetchDashboard(user.id);
+          ---
+          <h1>Witaj, {user.name}!</h1>
+          <p>Zalogowany jako: {user.email}</p>
+          <!-- dashboardData to AKTUALNE dane — nie cache z buildtime -->
+        desc: SSR — dane per-request, cookies, redirect
+
+      - code: |
+          // astro.config.mjs — zmienne środowiskowe z typowaniem
+          import { defineConfig, envField } from 'astro/config';
+
+          export default defineConfig({
+            env: {
+              schema: {
+                // Publiczne (dostępne w przeglądarce)
+                PUBLIC_API_URL: envField.string({
+                  context: 'client',
+                  access: 'public',
+                }),
+                // Prywatne (tylko serwer)
+                DATABASE_URL: envField.string({
+                  context: 'server',
+                  access: 'secret',
+                }),
+                // Opcjonalne z wartością domyślną
+                MAX_ITEMS: envField.number({
+                  context: 'server',
+                  access: 'public',
+                  default: 10,
+                }),
+              },
+            },
+          });
+
+          // Użycie z typowaniem:
+          // import { PUBLIC_API_URL, DATABASE_URL } from 'astro:env/client';
+        desc: "Zmienne środowiskowe z typowaniem (astro:env)"
+
+  - name: Deploy i optymalizacja
+    icon: "🚢"
+    commands:
+      - cmd: npx astro add cloudflare
+        desc: Deploy na Cloudflare Pages (edge runtime)
+        detail:
+          what: Adapter Cloudflare Pages z edge functions. Globalna CDN, zero cold start, Workers AI dostępne.
+          how: Po instalacji wygeneruj projekt na pages.cloudflare.com lub przez Wrangler CLI.
+          tips:
+            - 'wrangler pages deploy dist/ — deploy przez CLI'
+            - 'Cloudflare D1 (SQLite) dostępne przez platform.env w trybie edge'
+
+      - cmd: npx astro add netlify
+        desc: Deploy na Netlify (SSR + edge functions)
+        detail:
+          what: Adapter Netlify z SSR i edge functions. Auto-deploy po git push.
+          how: Połącz repozytorium na netlify.com lub użyj netlify deploy --build.
+          tips:
+            - 'netlify deploy --build --prod — deploy przez Netlify CLI'
+            - 'Netlify auto-detects Astro — build command: npm run build, publish: dist'
+
+      - code: |
+          // astro.config.mjs — optymalizacja obrazów + kompresja
+          import { defineConfig } from 'astro/config';
+
+          export default defineConfig({
+            image: {
+              // Domyślny format wyjściowy
+              defaultFormat: 'webp',
+              // Jakość domyślna (1-100)
+              quality: 80,
+              // Dozwolone domeny dla zdalnych obrazów
+              domains: ['images.unsplash.com', 'avatars.githubusercontent.com'],
+              remotePatterns: [{
+                protocol: 'https',
+                hostname: '**.cloudinary.com',
+              }],
+            },
+            compressHTML: true,  // Minifikuj HTML w production
+            build: {
+              inlineStylesheets: 'auto',  // Inline małe CSS pliki
+            },
+            vite: {
+              build: {
+                cssMinify: true,
+                rollupOptions: {
+                  output: { manualChunks: { 'vendor': ['react', 'react-dom'] } },
+                },
+              },
+            },
+          });
+        desc: Konfiguracja optymalizacji obrazów i build
+
+      - cmd: npx pagefind --site dist
+        desc: Wygeneruj indeks wyszukiwarki Pagefind
+        detail:
+          what: Pagefind to wyszukiwarka statycznych stron działająca w przeglądarce bez backendu. Idealny dla blogów i dokumentacji.
+          how: Uruchom po npm run build. Generuje indeks w dist/pagefind/. Dodaj skrypt i komponent wyszukiwarki.
+          tips:
+            - 'Starlight ma Pagefind wbudowany out-of-the-box — zero konfiguracji'
+            - 'npx pagefind --site dist --output-subdir search — custom output directory'
+
+      - code: |
+          <!-- View Transitions — płynne przejścia między stronami -->
+          ---
+          // src/layouts/BaseLayout.astro
+          import { ViewTransitions } from 'astro:transitions';
+          ---
+          <html>
+            <head>
+              <ViewTransitions />
+            </head>
+            <body>
+              <slot />
+            </body>
+          </html>
+
+          <!-- Na stronach — oznacz elementy które mają animację -->
+          <!-- src/pages/blog/[slug].astro -->
+          <img
+            src={post.data.cover}
+            transition:name={`cover-${post.slug}`}
+          />
+
+          <!-- src/pages/blog/index.astro — lista postów -->
+          <img
+            src={post.data.cover}
+            transition:name={`cover-${post.slug}`}
+          />
+          <!-- Astro automatycznie animuje ten element między stronami -->
+        desc: View Transitions — animowane przejścia między stronami

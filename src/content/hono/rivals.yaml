@@ -1,0 +1,66 @@
+title: Hono vs alternatywy
+
+items:
+  - name: Express.js
+    icon: "🟨"
+    color: "#f7df1e"
+    tagline: Klasyk Node.js — dojrzały ekosystem, ogromna społeczność
+    pros:
+      - Największy ekosystem middleware (tysiące pakietów)
+      - Ogromna baza wiedzy — SO, tutoriale, kursy
+      - Sprawdzony w produkcji od 2010 roku
+      - Każdy Node.js developer zna Express
+    cons:
+      - 3-5× wolniejszy od Hono w benchmarkach
+      - Tylko Node.js — brak edge/multi-runtime
+      - req/res mutacja zamiast Web Standards API
+      - Brak wbudowanego TypeScript i RPC
+    vs: Hono dla nowych projektów multi-runtime i edge. Express gdy potrzebujesz dojrzałego ekosystemu middleware lub team zna tylko Express.
+
+  - name: Fastify
+    icon: "⚡"
+    color: "#ffffff"
+    tagline: Szybki Node.js framework — JSON Schema, plugin system
+    pros:
+      - 2-3× szybszy niż Express (ale wolniejszy niż Hono na edge)
+      - Wbudowana walidacja JSON Schema
+      - Pluginowy system z enkapsulacją
+      - TypeScript first-class support
+    cons:
+      - Tylko Node.js — brak edge/multi-runtime
+      - Własne API — nie Web Standards
+      - Plugin system ma learning curve
+      - Mniejszy ekosystem od Express
+    vs: Hono gdy potrzebujesz edge lub multi-runtime. Fastify dla Node.js-only projektów gdzie walidacja JSON Schema jest istotna.
+
+  - name: Elysia
+    icon: "🦊"
+    color: "#a855f7"
+    tagline: Ultra-szybki TypeScript framework — Bun native, Eden treaty
+    pros:
+      - Porównywalny performance z Hono (oba ultraszybkie)
+      - Eden Treaty — typowany klient jak Hono RPC
+      - Dekoratory i guard system
+      - Bardzo ergonomiczne TypeScript API
+    cons:
+      - Prawie wyłącznie Bun — ograniczony multi-runtime
+      - Młodszy projekt — mniej stabilne API
+      - Mniejsza społeczność od Hono
+      - Eksperymentalne funkcje mogą się zmieniać
+    vs: Hono dla multi-runtime i edge. Elysia gdy budujesz wyłącznie na Bun i cenisz bardziej ergonomiczne TypeScript API.
+
+  - name: tRPC
+    icon: "🔷"
+    color: "#2596be"
+    tagline: End-to-end TypeScript RPC — bez REST, bez JSON Schema
+    pros:
+      - Najlepszy DX dla full-stack TypeScript
+      - Automatyczna type inference bez generowania kodu
+      - React Query integracja out-of-box
+      - Subscriptions przez WebSocket
+    cons:
+      - Nie jest HTTP framework — tylko warstwa RPC
+      - Wymaga adaptera (Express, Fastify, Next.js) jako transport
+      - Trudniejszy dla non-TypeScript klientów (mobile, zewnętrzne API)
+      - Brak REST — utrudnia integrację z zewnętrznymi systemami
+    vs: Hono gdy chcesz standardowe REST API + opcjonalne RPC. tRPC gdy budujesz zamknięty full-stack TypeScript monorepo i REST nie jest wymagany.

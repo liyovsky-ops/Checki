@@ -1,0 +1,145 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: "Kiedy używać React Native?"
+  firstComponent: Pierwsza aplikacja RN
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest React Native?
+  desc: >
+    React Native to framework Mety do budowy natywnych aplikacji mobilnych na iOS i Android
+    przy użyciu JavaScript/TypeScript i komponentów React. Zamiast WebView, komponenty
+    kompilują się do natywnych widoków — Text staje się UILabel (iOS) lub TextView (Android).
+    Od 2022 roku nowa architektura (JSI, Fabric, TurboModules) zastąpiła stary bridge,
+    znacznie poprawiając wydajność i eliminując asynchorniczne bottlenecki.
+
+concepts:
+  - title: "Bridge vs JSI (nowa architektura)"
+    desc: >
+      Stara architektura używała asynchronicznego mostu JSON między JS a native code —
+      każda operacja UI czekała w kolejce. Nowa architektura (RN 0.71+) zastępuje bridge
+      przez JSI (JavaScript Interface) — bezpośrednie wywołania C++ bez serializacji JSON.
+      Fabric = nowy renderer, TurboModules = leniwie ładowane natywne moduły.
+    icon: "⚡"
+  - title: Metro Bundler
+    desc: >
+      Metro to JavaScript bundler React Native — odpowiednik Vite/webpack dla mobile.
+      Śledzi zmiany w plikach i dostarcza zaktualizowane moduły przez Fast Refresh
+      (HMR dla mobile). Obsługuje transformacje Babel, aliasy modułów i bundle splitting.
+    icon: "📦"
+  - title: "Expo vs Bare React Native"
+    desc: >
+      Expo to oficjalnie wspierany zestaw narzędzi nad React Native. Expo Go = aplikacja
+      testowa bez kompilacji Xcode/Android Studio. Expo SDK daje gotowe natywne moduły
+      (kamera, lokalizacja, powiadomienia). Bare workflow = czysty RN z pełną kontrolą
+      native code. Managed workflow = Expo zarządza konfiguracją.
+    icon: "🛠️"
+  - title: AppRegistry
+    desc: >
+      AppRegistry to punkt wejścia każdej aplikacji RN. AppRegistry.registerComponent()
+      rejestruje root component — analogia do ReactDOM.render() w web. Wywołuje się raz
+      w index.js, reszta aplikacji to drzewo komponentów React.
+    icon: "🎯"
+  - title: Platform.OS
+    desc: >
+      Platform.OS zwraca 'ios' lub 'android' — używasz do warunkowej logiki
+      lub stylów. Platform.select() pozwala elegancko rozgałęziać kod.
+      Pliki z sufiksem .ios.tsx i .android.tsx są automatycznie ładowane
+      na odpowiedniej platformie przez Metro.
+    icon: "📱"
+  - title: StyleSheet
+    desc: >
+      StyleSheet.create() to odpowiednik CSS-in-JS zoptymalizowany dla mobile.
+      Style przekazywane jako obiekty JS, kompilowane do natywnych właściwości.
+      Nie ma kaskady CSS — każdy komponent ma własne style. Flexbox domyślnie
+      z flexDirection column (odwrotnie niż web gdzie default to row).
+    icon: "🎨"
+  - title: Dimensions i SafeAreaView
+    desc: >
+      Dimensions.get('window') zwraca szerokość i wysokość ekranu w punktach (dp/pt).
+      SafeAreaView chroni treść przed notchami, status barem i home indicatorem.
+      useWindowDimensions() to hook z automatycznym odświeżaniem przy rotacji.
+    icon: "📐"
+  - title: StatusBar
+    desc: >
+      StatusBar to komponent kontrolujący pasek statusu systemu — kolor tła, styl tekstu
+      (light/dark). Na Androidzie można ukryć lub zmienić kolor. Zachowanie różni
+      się między iOS i Android — używaj Platform.select() dla różnych wartości.
+    icon: "📊"
+
+whenToUse:
+  - Aplikacja mobilna na iOS i Android z jednej bazy kodu
+  - Zespół z doświadczeniem React/JavaScript — bez nauki Swift/Kotlin
+  - Aplikacja oparta na UI — listy, formularze, nawigacja, mapy
+  - Szybkie prototypowanie z Expo Go bez potrzeby fizycznego buildu
+  - Współdzielenie logiki biznesowej między web (React) i mobile
+  - Startupy gdzie czas to priorytet — jeden team zamiast dwóch
+
+firstComponent: |
+  // Inicjalizacja z Expo (zalecane)
+  npx create-expo-app@latest MyApp --template blank-typescript
+  cd MyApp
+  npx expo start
+
+  // App.tsx — pierwsza aplikacja
+  import React, { useState } from 'react';
+  import {
+    View,
+    Text,
+    TextInput,
+    Pressable,
+    StyleSheet,
+    SafeAreaView,
+    Platform,
+  } from 'react-native';
+
+  export default function App() {
+    const [name, setName] = useState('');
+    const [greeting, setGreeting] = useState('');
+
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text style={styles.title}>React Native</Text>
+        <Text style={styles.platform}>
+          Platforma: {Platform.OS.toUpperCase()}
+        </Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Wpisz imię..."
+          value={name}
+          onChangeText={setName}
+        />
+        <Pressable
+          style={styles.button}
+          onPress={() => setGreeting(`Cześć, ${name}!`)}
+        >
+          <Text style={styles.buttonText}>Przywitaj się</Text>
+        </Pressable>
+        {greeting ? (
+          <Text style={styles.greeting}>{greeting}</Text>
+        ) : null}
+      </SafeAreaView>
+    );
+  }
+
+  const styles = StyleSheet.create({
+    container: { flex: 1, padding: 24, backgroundColor: '#fff' },
+    title: { fontSize: 28, fontWeight: 'bold', marginBottom: 8 },
+    platform: { fontSize: 14, color: '#666', marginBottom: 24 },
+    input: {
+      borderWidth: 1,
+      borderColor: '#ccc',
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      marginBottom: 16,
+    },
+    button: {
+      backgroundColor: '#61dafb',
+      padding: 14,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    buttonText: { fontWeight: '600', fontSize: 16 },
+    greeting: { marginTop: 20, fontSize: 22, textAlign: 'center' },
+  });

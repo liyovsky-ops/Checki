@@ -1,0 +1,268 @@
+title: Routing w Hono
+
+items:
+  - name: Podstawowe metody HTTP
+    desc: >
+      app.get(), app.post(), app.put(), app.patch(), app.delete() definiują handlery
+      per ścieżka i metoda HTTP. Handler otrzymuje Context (c) i zwraca Response.
+      app.all() obsługuje wszystkie metody naraz.
+    code: |
+      import { Hono } from 'hono'
+
+      const app = new Hono()
+
+      app.get('/users', (c) => {
+        return c.json({ users: [] })
+      })
+
+      app.post('/users', async (c) => {
+        const body = await c.req.json()
+        return c.json({ created: body }, 201)
+      })
+
+      app.put('/users/:id', async (c) => {
+        const id = c.req.param('id')
+        const body = await c.req.json()
+        return c.json({ id, updated: body })
+      })
+
+      app.patch('/users/:id', async (c) => {
+        const body = await c.req.json()
+        return c.json({ patched: true })
+      })
+
+      app.delete('/users/:id', (c) => {
+        return c.body(null, 204)
+      })
+
+      app.all('/health', (c) => c.json({ ok: true }))
+    lang: typescript
+
+  - name: Parametry URL — c.req.param()
+    desc: >
+      :param w ścieżce to dynamiczny parametr. c.req.param('name') zwraca wartość.
+      c.req.param() bez argumentu zwraca obiekt ze wszystkimi parametrami.
+      Parametry są zawsze stringiem.
+    code: |
+      import { Hono } from 'hono'
+
+      const app = new Hono()
+
+      // Jeden parametr
+      app.get('/users/:id', (c) => {
+        const id = c.req.param('id')
+        return c.json({ id })
+      })
+
+      // Wiele parametrów
+      app.get('/users/:userId/posts/:postId', (c) => {
+        const { userId, postId } = c.req.param()
+        return c.json({ userId, postId })
+      })
+
+      // Wildcard — dopasowanie wszystkiego
+      app.get('/files/*', (c) => {
+        const path = c.req.param('*')
+        return c.text(`File: ${path}`)
+      })
+
+      // Optional segment z regex
+      app.get('/api/v:version{[0-9]+}/users', (c) => {
+        const version = c.req.param('version')
+        return c.json({ version })
+      })
+    lang: typescript
+
+  - name: Query params — c.req.query()
+    desc: >
+      c.req.query('key') zwraca wartość query param. c.req.query() bez argumentu
+      zwraca obiekt ze wszystkimi. c.req.queries('key') zwraca tablicę (gdy ?key=a&key=b).
+    code: |
+      import { Hono } from 'hono'
+
+      const app = new Hono()
+
+      // GET /search?q=hono&limit=10&page=2
+      app.get('/search', (c) => {
+        const q = c.req.query('q')          // 'hono'
+        const limit = c.req.query('limit')  // '10' (zawsze string)
+        const page = Number(c.req.query('page') ?? '1')
+
+        return c.json({
+          query: q,
+          limit: Number(limit) || 20,
+          page,
+        })
+      })
+
+      // Wszystkie query params naraz
+      app.get('/items', (c) => {
+        const params = c.req.query()
+        // { q: 'hono', limit: '10', page: '2' }
+        return c.json({ params })
+      })
+
+      // Wiele wartości: ?tag=ts&tag=js
+      app.get('/filter', (c) => {
+        const tags = c.req.queries('tag') // ['ts', 'js']
+        return c.json({ tags })
+      })
+    lang: typescript
+
+  - name: Grupowanie tras — app.route()
+    desc: >
+      app.route(prefix, subApp) montuje sub-aplikację Hono z prefixem.
+      Idealne do modularyzacji — osobny plik per zasób API.
+      Sub-aplikacja to pełnoprawna instancja Hono z własnym middleware.
+    code: |
+      import { Hono } from 'hono'
+
+      // routes/users.ts
+      const users = new Hono()
+
+      users.get('/', (c) => c.json({ users: [] }))
+      users.get('/:id', (c) => c.json({ id: c.req.param('id') }))
+      users.post('/', async (c) => {
+        const body = await c.req.json()
+        return c.json(body, 201)
+      })
+
+      export default users
+
+      // routes/posts.ts
+      const posts = new Hono()
+      posts.get('/', (c) => c.json({ posts: [] }))
+      export default posts
+
+      // index.ts — montowanie sub-apps
+      import { Hono } from 'hono'
+      import users from './routes/users'
+      import posts from './routes/posts'
+
+      const app = new Hono()
+      app.route('/api/users', users)  // GET /api/users, GET /api/users/:id
+      app.route('/api/posts', posts)  // GET /api/posts
+
+      export default app
+    lang: typescript
+
+  - name: Chaining metod na tej samej ścieżce
+    desc: >
+      Hono pozwala chainować .get().post().put() na tej samej instancji —
+      jak Express app.route(). Czytelniejsze dla CRUD endpointów gdzie
+      path jest taki sam, a różni się tylko metoda HTTP.
+    code: |
+      import { Hono } from 'hono'
+
+      const app = new Hono()
+
+      app
+        .get('/articles', (c) => c.json({ articles: [] }))
+        .post('/articles', async (c) => {
+          const body = await c.req.json()
+          return c.json(body, 201)
+        })
+
+      app
+        .get('/articles/:id', (c) => c.json({ id: c.req.param('id') }))
+        .put('/articles/:id', async (c) => {
+          const body = await c.req.json()
+          return c.json({ updated: true, body })
+        })
+        .delete('/articles/:id', (c) => c.body(null, 204))
+    lang: typescript
+
+  - name: Wildcards i regex routes
+    desc: >
+      Hono obsługuje wzorce * (wildcard) i wyrażenia regularne w nawiasach {}.
+      Przydatne do catch-all routes i walidacji parametrów na poziomie routingu.
+    code: |
+      import { Hono } from 'hono'
+
+      const app = new Hono()
+
+      // Wildcard — wszystko po /static/
+      app.get('/static/*', (c) => {
+        return c.text('Static: ' + c.req.param('*'))
+      })
+
+      // Regex w parametrze — tylko liczby
+      app.get('/posts/:id{[0-9]+}', (c) => {
+        return c.json({ id: Number(c.req.param('id')) })
+      })
+
+      // Regex — tylko slugi (litery, cyfry, myślnik)
+      app.get('/blog/:slug{[a-z0-9-]+}', (c) => {
+        return c.json({ slug: c.req.param('slug') })
+      })
+
+      // Catch-all — fallback 404
+      app.get('*', (c) => c.json({ error: 'Not Found' }, 404))
+    lang: typescript
+
+  - name: Nested routing z kontekstem
+    desc: >
+      Sub-aplikacje mogą mieć własny middleware, a parent middleware jest
+      też dostępny. Hono przekazuje zmienne kontekstu (c.set/c.get)
+      przez cały łańcuch — nawet do sub-apps.
+    code: |
+      import { Hono } from 'hono'
+
+      type Variables = { userId: string }
+
+      const app = new Hono<{ Variables: Variables }>()
+
+      // Middleware na parent — ustawia userId
+      app.use('/api/*', async (c, next) => {
+        c.set('userId', 'user-123')
+        await next()
+      })
+
+      // Sub-app — ma dostęp do userId z parent middleware
+      const api = new Hono<{ Variables: Variables }>()
+
+      api.get('/profile', (c) => {
+        const userId = c.get('userId')  // 'user-123'
+        return c.json({ userId })
+      })
+
+      app.route('/api', api)
+      export default app
+    lang: typescript
+
+  - name: Czytanie body requestu — metody
+    desc: >
+      c.req.json() — parsuje JSON body. c.req.formData() — FormData.
+      c.req.text() — surowy tekst. c.req.arrayBuffer() — binary.
+      c.req.blob() — Blob. Wszystkie są async.
+    code: |
+      import { Hono } from 'hono'
+
+      const app = new Hono()
+
+      // JSON body
+      app.post('/json', async (c) => {
+        const data = await c.req.json<{ name: string; age: number }>()
+        return c.json({ received: data })
+      })
+
+      // Form data
+      app.post('/form', async (c) => {
+        const form = await c.req.formData()
+        const name = form.get('name')
+        return c.json({ name })
+      })
+
+      // Raw text
+      app.post('/text', async (c) => {
+        const text = await c.req.text()
+        return c.text(`Echo: ${text}`)
+      })
+
+      // Headers
+      app.get('/headers', (c) => {
+        const auth = c.req.header('Authorization')
+        const ua = c.req.header('User-Agent')
+        return c.json({ auth, ua })
+      })
+    lang: typescript

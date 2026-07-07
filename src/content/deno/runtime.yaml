@@ -1,0 +1,316 @@
+labels:
+  main: Deno namespace APIs
+  mainLang: typescript
+
+intro:
+  title: Deno — wbudowane API systemu
+  desc: >
+    Przestrzeń nazw Deno (globalny obiekt Deno.*) udostępnia niskopoziomowe API do operacji
+    na plikach, procesach, sieci i systemie. W odróżnieniu od Node.js, wszystkie operacje
+    wymagają jawnych uprawnień. Deno implementuje też wszystkie standard Web APIs (fetch, URL,
+    WebSocket) dostępne globalnie bez importów. Deno 2.x dodał Deno.cron, rozbudowane KV
+    i stabilizował Deno.serve jako oficjalny HTTP server.
+
+items:
+  - title: Deno.readFile / Deno.writeFile
+    desc: >
+      Operacje na plikach przez Deno namespace. readFile zwraca Uint8Array (lub string gdy
+      opcja encoding podana), writeFile zapisuje dane. Wymagają --allow-read i --allow-write.
+      Alternatywnie: Deno.readTextFile / Deno.writeTextFile dla konwencji UTF-8.
+    code: |
+      // Odczyt pliku jako tekst (wymaga --allow-read)
+      const tekst = await Deno.readTextFile("./dane.txt");
+      console.log(tekst);
+
+      // Odczyt pliku jako bajty
+      const bajty = await Deno.readFile("./obraz.png");
+      console.log(`Rozmiar: ${bajty.byteLength} bajtów`);
+
+      // Zapis pliku (wymaga --allow-write)
+      await Deno.writeTextFile("./wynik.txt", "Dane do zapisania\n");
+
+      // Zapis bajtów
+      const dane = new TextEncoder().encode("Hello Deno!");
+      await Deno.writeFile("./output.bin", dane);
+
+      // Dołączanie do pliku (append)
+      await Deno.writeTextFile("./log.txt", "Nowa linia\n", { append: true });
+
+      // Odczyt katalogu (wymaga --allow-read)
+      for await (const wpis of Deno.readDir("./src")) {
+        console.log(wpis.name, wpis.isFile ? "plik" : "katalog");
+      }
+    lang: typescript
+
+  - title: Deno.env — zmienne środowiskowe
+    desc: >
+      Deno.env to interfejs do zmiennych środowiskowych. Wymaga --allow-env lub --allow-env=NAZWA
+      dla dostępu do konkretnych zmiennych. Deno NIE ładuje automatycznie pliku .env —
+      potrzebujesz @std/dotenv lub flagi --env-file (Deno 1.38+).
+    code: |
+      // Odczyt zmiennej (wymaga --allow-env=PORT lub --allow-env)
+      const port = Deno.env.get("PORT") ?? "3000";
+      const dbUrl = Deno.env.get("DATABASE_URL");
+
+      if (!dbUrl) {
+        throw new Error("DATABASE_URL jest wymagany");
+      }
+
+      // Ustawienie zmiennej (wymaga --allow-env)
+      Deno.env.set("TRYB", "produkcja");
+
+      // Usunięcie zmiennej
+      Deno.env.delete("TEMP_TOKEN");
+
+      // Wszystkie zmienne jako obiekt
+      const wszystkie = Deno.env.toObject();
+      console.log(Object.keys(wszystkie));
+
+      // Ładowanie .env — przez flagę
+      // deno run --allow-env --env-file=.env main.ts
+      // lub przez @std/dotenv:
+      // import "jsr:@std/dotenv/load";
+    lang: typescript
+
+  - title: Deno.serve — HTTP server
+    desc: >
+      Deno.serve to wbudowany, wydajny serwer HTTP oparty na Web APIs. Przyjmuje obiekt
+      Request i zwraca Response — te same interfejsy co w przeglądarce. Wymaga --allow-net.
+      Obsługuje HTTP/1.1 i HTTP/2, TLS i WebSocket upgrade.
+    code: |
+      // Prosty serwer HTTP (wymaga --allow-net)
+      const server = Deno.serve({ port: 8080 }, async (req: Request) => {
+        const url = new URL(req.url);
+
+        // Routing
+        if (req.method === "GET" && url.pathname === "/") {
+          return new Response("Witaj z Deno! 🦕");
+        }
+
+        if (req.method === "POST" && url.pathname === "/echo") {
+          const body = await req.json();
+          return Response.json({ echo: body });
+        }
+
+        return new Response("Not Found", { status: 404 });
+      });
+
+      // Serwer z TLS (wymaga --allow-net --allow-read)
+      const tlsServer = Deno.serve({
+        port: 443,
+        cert: await Deno.readTextFile("./cert.pem"),
+        key: await Deno.readTextFile("./key.pem"),
+      }, (req) => new Response("HTTPS działa!"));
+
+      console.log(`Serwer: ${server.addr.hostname}:${server.addr.port}`);
+    lang: typescript
+
+  - title: Deno.Command — procesy potomne
+    desc: >
+      Deno.Command służy do uruchamiania procesów zewnętrznych. Wymaga --allow-run lub
+      --allow-run=git,ls dla wybranych komend. Zastępuje starsze Deno.run (usunięte w Deno 2.0).
+    code: |
+      // Uruchomienie polecenia i odczyt wyjścia
+      const cmd = new Deno.Command("git", {
+        args: ["rev-parse", "HEAD"],
+        stdout: "piped",
+        stderr: "piped",
+      });
+
+      const { code, stdout, stderr } = await cmd.output();
+      const sha = new TextDecoder().decode(stdout).trim();
+      console.log(`Aktualny commit: ${sha}`);
+      console.log(`Kod wyjścia: ${code}`);
+
+      // Strumień wyjścia w czasie rzeczywistym
+      const child = new Deno.Command("ping", {
+        args: ["-c", "3", "deno.land"],
+        stdout: "piped",
+      }).spawn();
+
+      for await (const chunk of child.stdout) {
+        const linia = new TextDecoder().decode(chunk);
+        process.stdout.write(linia);
+      }
+
+      const status = await child.status;
+      console.log(`Zakończono: ${status.success}`);
+    lang: typescript
+
+  - title: Deno.cron — zaplanowane zadania
+    desc: >
+      Deno.cron pozwala na uruchamianie zadań według harmonogramu cron — wbudowane, bez
+      external schedulerów. Na Deno Deploy cron zadania są zarządzane przez infrastrukturę.
+      Wymaga flagi --unstable-cron w środowisku lokalnym.
+    code: |
+      // Uruchamiasz: deno run --allow-net --unstable-cron main.ts
+
+      // Zadanie co minutę
+      Deno.cron("backup-co-minute", "* * * * *", async () => {
+        console.log("Backup: ", new Date().toISOString());
+        await wykonajBackup();
+      });
+
+      // Zadanie o północy każdego dnia
+      Deno.cron("raport-dzienny", "0 0 * * *", async () => {
+        const dane = await pobierzStatystyki();
+        await wyslijEmail("admin@firma.pl", "Raport dzienny", dane);
+      });
+
+      // Zadanie co godzinę (z obsługą błędów)
+      Deno.cron("odswiezanie-cache", "0 * * * *", {
+        backoffSchedule: [1000, 5000, 10000], // retry po błędzie
+      }, async () => {
+        await odswiezCache();
+      });
+
+      async function wykonajBackup() { /* ... */ }
+      async function pobierzStatystyki() { return {}; }
+      async function wyslijEmail(...args: unknown[]) { /* ... */ }
+      async function odswiezCache() { /* ... */ }
+    lang: typescript
+
+  - title: Deno.openKv — wbudowana baza KV
+    desc: >
+      Deno KV to transakcyjna baza klucz-wartość wbudowana w Deno. Lokalnie używa SQLite,
+      na Deno Deploy — globalnie rozproszona baza z replikacją. Wymaga --unstable-kv lokalnie.
+    code: |
+      // Uruchamiasz: deno run --allow-read --allow-write --unstable-kv main.ts
+
+      const kv = await Deno.openKv(); // lokalnie: SQLite, Deploy: distributed
+
+      // Zapis wartości
+      await kv.set(["uzytkownicy", "u001"], {
+        imie: "Łukasz",
+        email: "lukasz@example.com",
+        stworzony: new Date().toISOString(),
+      });
+
+      // Odczyt wartości
+      const wynik = await kv.get(["uzytkownicy", "u001"]);
+      console.log(wynik.value); // { imie: "Łukasz", ... }
+      console.log(wynik.versionstamp); // wersja do optymistycznych blokad
+
+      // Listowanie kluczy z prefiksem
+      const lista = kv.list({ prefix: ["uzytkownicy"] });
+      for await (const wpis of lista) {
+        console.log(wpis.key, wpis.value);
+      }
+
+      // Operacja atomowa (transakcja)
+      const res = await kv.atomic()
+        .check({ key: ["licznik"], versionstamp: null }) // sprawdź czy nie istnieje
+        .set(["licznik"], 0)
+        .commit();
+
+      console.log(res.ok); // true jeśli transakcja powiodła się
+
+      // Licznik z inkrementacją (suma atomowa)
+      await kv.atomic()
+        .sum(["licznik"], 1n)
+        .commit();
+
+      kv.close();
+    lang: typescript
+
+  - title: Deno.watchFs — obserwator systemu plików
+    desc: >
+      Deno.watchFs obserwuje zmiany w systemie plików i zwraca async iterable zdarzeń.
+      Wymaga --allow-read. Przydatne do hot reload, build tools i narzędzi deweloperskich.
+    code: |
+      // Obserwuj katalog src (wymaga --allow-read)
+      const watcher = Deno.watchFs("./src", { recursive: true });
+
+      console.log("Obserwuję zmiany w ./src...");
+
+      for await (const zdarzenie of watcher) {
+        console.log(`Zdarzenie: ${zdarzenie.kind}`);
+        console.log(`Pliki: ${zdarzenie.paths.join(", ")}`);
+
+        if (zdarzenie.kind === "modify") {
+          // Plik zmieniony — przebuduj
+          await przebuduj(zdarzenie.paths);
+        }
+
+        if (zdarzenie.kind === "create") {
+          console.log("Nowy plik:", zdarzenie.paths[0]);
+        }
+
+        if (zdarzenie.kind === "remove") {
+          console.log("Usunięto:", zdarzenie.paths[0]);
+        }
+      }
+
+      // Zatrzymaj obserwatora
+      watcher.close();
+
+      async function przebuduj(paths: string[]) {
+        console.log("Przebudowuję po zmianie:", paths);
+      }
+    lang: typescript
+
+  - title: Deno.test + assert
+    desc: >
+      Deno ma wbudowany test runner — bez Jest, Mocha ani Vitest. deno test uruchamia
+      wszystkie pliki *_test.ts. Asercje dostępne przez jsr:@std/assert. Działa synchronicznie
+      i asynchronicznie, obsługuje subtests i BDD-style describe/it.
+    code: |
+      // kalkulator_test.ts
+      import { assertEquals, assertThrows, assertRejects } from "jsr:@std/assert";
+      import { dodaj, podziel, pobierzDane } from "./kalkulator.ts";
+
+      // Prosty test
+      Deno.test("dodaj dwie liczby", () => {
+        assertEquals(dodaj(2, 3), 5);
+        assertEquals(dodaj(-1, 1), 0);
+      });
+
+      // Test asynchroniczny
+      Deno.test("pobierz dane z API", async () => {
+        const dane = await pobierzDane("https://jsonplaceholder.typicode.com/todos/1");
+        assertEquals(dane.id, 1);
+      });
+
+      // Test rzucającego wyjątki
+      Deno.test("dzielenie przez zero", () => {
+        assertThrows(() => podziel(10, 0), Error, "Dzielenie przez zero");
+      });
+
+      // Subtesty (groupowanie)
+      Deno.test("kalkulator", async (t) => {
+        await t.step("dodawanie", () => assertEquals(dodaj(1, 2), 3));
+        await t.step("ujemne liczby", () => assertEquals(dodaj(-5, 3), -2));
+      });
+
+      // Uruchomienie: deno test
+      // Pokrycie:    deno test --coverage=./cov && deno coverage ./cov
+    lang: typescript
+
+  - title: Deno.version i informacje runtime
+    desc: >
+      Globalny obiekt Deno dostarcza informacje o bieżącej wersji runtime i systemu.
+      Przydatne do logowania, feature detection i warunkowego kodu dla różnych wersji.
+    code: |
+      // Wersje komponentów Deno
+      console.log(Deno.version.deno);    // "2.1.4"
+      console.log(Deno.version.v8);      // "13.0.245.12"
+      console.log(Deno.version.typescript); // "5.6.2"
+
+      // Informacje o systemie
+      console.log(Deno.build.os);     // "linux" | "darwin" | "windows"
+      console.log(Deno.build.arch);   // "x86_64" | "aarch64"
+      console.log(Deno.build.target); // "x86_64-unknown-linux-gnu"
+
+      // Argumenty wywołania (bez flagi --allow-env)
+      console.log(Deno.args); // ["--port", "3000"] jeśli: deno run main.ts --port 3000
+
+      // Bieżący katalog roboczy (wymaga --allow-read)
+      console.log(Deno.cwd()); // "/home/lukasz/projekty"
+
+      // PID procesu
+      console.log(Deno.pid); // np. 12345
+
+      // Zakończenie procesu z kodem wyjścia
+      // Deno.exit(1); // zakończ z błędem
+      // Deno.exit(0); // zakończ bez błędu
+    lang: typescript

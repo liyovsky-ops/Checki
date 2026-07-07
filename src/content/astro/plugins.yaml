@@ -1,0 +1,146 @@
+title: Ekosystem Astro
+
+items:
+  - name: "@astrojs/react"
+    desc: >
+      Oficjalna integracja React — hydratuj komponenty React jako wyspy.
+      Obsługuje hooks, Context, React 18 concurrent features, Suspense.
+      Możesz używać całego ekosystemu React (shadcn/ui, Recharts, Framer Motion).
+    icon: "⚛️"
+    code: |
+      npx astro add react
+      # lub ręcznie:
+      npm install @astrojs/react react react-dom
+
+      # astro.config.mjs
+      import react from '@astrojs/react';
+      export default defineConfig({ integrations: [react()] });
+
+      # Użycie w .astro
+      # <ReactComponent client:load />
+
+  - name: "@astrojs/tailwind"
+    desc: >
+      Oficjalna integracja Tailwind CSS. Auto-konfiguruje PostCSS i tailwind.config.
+      Działa we wszystkich plikach — .astro, .jsx, .vue, .svelte.
+      Tailwind v4 wspierany od Astro 5.
+    icon: "🌊"
+    code: |
+      npx astro add tailwind
+
+      # Tailwind v4 (nowszy):
+      npx astro add tailwind@beta
+
+      # astro.config.mjs
+      import tailwind from '@astrojs/tailwind';
+      export default defineConfig({
+        integrations: [tailwind({ applyBaseStyles: false })],
+      });
+
+      # Użycie: class="bg-orange-500 text-white px-4 py-2 rounded"
+
+  - name: "@astrojs/mdx"
+    desc: >
+      Oficjalna integracja MDX — Markdown z komponentami JSX. Używaj React,
+      Vue, Svelte komponentów w treści bloga. Wspiera remark/rehype plugins
+      dla syntax highlighting, GFM (GitHub Flavored Markdown) i innych.
+    icon: "📝"
+    code: |
+      npx astro add mdx
+
+      # astro.config.mjs
+      import mdx from '@astrojs/mdx';
+      import remarkGfm from 'remark-gfm';
+
+      export default defineConfig({
+        integrations: [mdx()],
+        markdown: {
+          remarkPlugins: [remarkGfm],
+          shikiConfig: { theme: 'github-dark' },
+        },
+      });
+
+      # W pliku .mdx:
+      # import MyComponent from '../../components/MyComponent.astro';
+      # <MyComponent title="Hello" />
+
+  - name: Starlight
+    desc: >
+      Oficjalny theme dokumentacji od zespołu Astro. Zbudowany na Astro, zawiera
+      nawigację boczną, wyszukiwarkę (Pagefind), dark mode, i18n, responsywność.
+      Najszybszy sposób na stworzenie profesjonalnej dokumentacji.
+    icon: "⭐"
+    code: |
+      npm create astro@latest -- --template starlight
+
+      # Lub dodaj do istniejącego projektu:
+      npx astro add starlight
+
+      # astro.config.mjs
+      import starlight from '@astrojs/starlight';
+      export default defineConfig({
+        integrations: [
+          starlight({
+            title: 'Moja Dokumentacja',
+            social: { github: 'https://github.com/user/repo' },
+            sidebar: [
+              { label: 'Przewodniki', items: [
+                { label: 'Podstawy', link: '/guides/basics/' },
+              ]},
+            ],
+          }),
+        ],
+      });
+
+  - name: "@astrojs/db"
+    desc: >
+      Oficjalna integracja z Astro DB — SQLite w dev, LibSQL/Turso w produkcji.
+      Definiujesz tabele w TypeScript, pełne typowanie zapytań przez Drizzle ORM.
+      Działa z SSR i API endpoints.
+    icon: "🗄️"
+    code: |
+      npx astro add db
+
+      # db/config.ts — definicja tabel
+      import { defineDb, defineTable, column } from 'astro:db';
+
+      const Comment = defineTable({
+        columns: {
+          id: column.number({ primaryKey: true }),
+          postSlug: column.text(),
+          author: column.text(),
+          body: column.text(),
+          createdAt: column.date({ default: NOW }),
+        },
+      });
+
+      export default defineDb({ tables: { Comment } });
+
+      # Użycie w endpointach:
+      import { db, Comment } from 'astro:db';
+      const comments = await db.select().from(Comment).all();
+
+  - name: astro-icon
+    desc: >
+      Wygodna biblioteka ikon dla Astro. Obsługuje Iconify (100,000+ ikon z
+      Material Design, Heroicons, Lucide, Tabler itd.) i własne SVG.
+      Zero runtime — ikony są inline SVG wbudowane w HTML.
+    icon: "🎨"
+    code: |
+      npm install astro-icon @iconify-json/heroicons
+
+      # astro.config.mjs
+      import icon from 'astro-icon';
+      export default defineConfig({
+        integrations: [icon()],
+      });
+
+      # Użycie w .astro:
+      ---
+      import { Icon } from 'astro-icon/components';
+      ---
+      <Icon name="heroicons:home" class="w-6 h-6" />
+      <Icon name="heroicons:user-circle" size={24} />
+
+      # Pakiety ikon: @iconify-json/heroicons, @iconify-json/lucide,
+      # @iconify-json/mdi, @iconify-json/tabler

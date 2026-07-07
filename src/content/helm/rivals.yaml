@@ -1,0 +1,82 @@
+title: Helm vs alternatywy zarządzania K8s
+
+items:
+  - name: Kustomize
+    icon: "🩹"
+    color: "#326CE5"
+    tagline: Patche i overlays bez templatowania — wbudowany w kubectl
+    pros:
+      - Wbudowany w kubectl (kubectl apply -k) — zero dodatkowych narzędzi
+      - Bez szablonów — plain YAML + strategiczne patche (łatwiej debugować)
+      - Wzorzec base + overlays idealny dla multi-environment bez duplikacji
+      - "Brak zewnętrznych zależności: charts, renders, releases"
+      - Nie wymaga nauki składni (Go templates, Sprig) — czysty YAML
+    cons:
+      - Brak package managementu — nie instalujesz bitnami/postgresql jedną komendą
+      - Ograniczona logika — brak if/else, range, funkcji jak w Helm
+      - Brak wersjonowania releases i rollbacku (musisz sam zarządzać)
+      - Zarządzanie sekretami trudniejsze bez pluginów
+      - Słabszy dla dystrybucji aplikacji — Helm chart to gotowa paczka
+    vs: Kustomize gdy chcesz zarządzać własnymi manifestami K8s bez dodatkowych narzędzi — typowy GitOps z ArgoCD/Flux. Helm gdy instalujesz zewnętrzne narzędzia (Prometheus, nginx-ingress) lub dystrybuujesz własną aplikację jako wielokrotnie instalowalna paczka. W praktyce Helm i Kustomize się uzupełniają — Helm instaluje narzędzia, Kustomize nakłada patche.
+
+  - name: Argo CD (GitOps)
+    icon: "🐙"
+    color: "#EF7B4D"
+    tagline: Continuous Delivery GitOps — synchronizacja klastra z Git
+    pros:
+      - Declarative GitOps — stan klastra = stan w Git, automatyczny sync
+      - Drift detection — alarmuje gdy klaster odbiega od Git
+      - Przejrzyste UI do śledzenia deploymentów i historii zmian
+      - Obsługuje Helm natywnie (jako source) i Kustomize — nie konkuruje
+      - Rollback = git revert + sync (pełna historia w Git)
+    cons:
+      - "To narzędzie CD, nie package manager — potrzebujesz Helm RAZEM z ArgoCD"
+      - Wymaga instalacji w klastrze (kolejna aplikacja do zarządzania)
+      - Krzywa uczenia wyższa niż samo helm install
+      - Synchronizacja może być wolna dla dużych klas manifestów
+      - ArgoCD Application CR to dodatkowy layer konfiguracji
+    vs: >-
+      ArgoCD i Helm nie są rywalami — to różne warstwy. Helm pakuje i templatuje,
+      ArgoCD deployuje i synchronizuje z Git. Typowy stack produkcyjny —
+      ArgoCD Application wskazuje na Helm chart w repo, ArgoCD instaluje przez Helm,
+      drift detection pilnuje stanu. Jeśli chcesz tylko helm install bez GitOps — samo Helm wystarczy.
+
+  - name: Operator Framework / Kubernetes Operators
+    icon: "🤖"
+    color: "#E00"
+    tagline: Custom controllers zarządzające złożonymi aplikacjami stanowymi
+    pros:
+      - Pełna automatyzacja operacyjna — backup, restore, failover, scaling
+      - Rozumie domenę aplikacji (np. PostgreSQL Operator wie jak zrobić failover)
+      - CRD (Custom Resource Definitions) — naturalny K8s API dla Twoich zasobów
+      - Zamknięta logika operacyjna — raz napisany Operator zarządza wieloma instancjami
+      - Aktywna reakcja na zdarzenia (nie tylko deklaratywny stan jak Helm)
+    cons:
+      - "Wymaga pisania kodu (Go/Python) — bardzo wysoki próg wejścia"
+      - Każdy Operator to osobna aplikacja do zainstalowania i aktualizowania
+      - Debugowanie operatorów jest trudne (logi kontrolera, reconcile loops)
+      - Brak standardu — każdy Operator działa inaczej
+      - Nadmiernie skomplikowane dla prostych bezstanowych aplikacji
+    vs: >-
+      Helm dla typowych aplikacji bezstanowych i instalacji narzędzi. Operator dla złożonych aplikacji
+      stanowych (bazy danych, brokerzy) gdzie potrzebna jest inteligentna automatyzacja operacyjna.
+      Wiele Operatorów jest INSTALOWANYCH przez Helm chart — to nie rywalizacja, to współpraca.
+      Używaj Operatorów (np. Postgres Operator, Kafka Strimzi) tam gdzie bitnami chart nie daje potrzebnego zarządzania.
+
+  - name: Plain kubectl apply
+    icon: "📄"
+    color: "#326CE5"
+    tagline: Bez package managementu — bezpośrednie manifesty YAML
+    pros:
+      - Zero dodatkowych narzędzi — tylko kubectl
+      - Pełna kontrola nad każdym bajtem YAML — zero "magii"
+      - Brak ukrytej logiki templatowania — to co widzisz to co dostajesz
+      - Łatwy do zrozumienia przez każdego kto zna kubectl
+      - Wystarczający dla prostych, jednorazowych deploymentów
+    cons:
+      - Brak parametryzacji — każde środowisko = osobna kopia YAML
+      - Brak wersjonowania releases i rollbacku jedną komendą
+      - Brak dependency management (musisz ręcznie zarządzać kolejnością)
+      - Instalacja zewnętrznych narzędzi (Prometheus) = setki plików YAML
+      - Trudne do reużycia — nie możesz dystrybuować aplikacji jako paczki
+    vs: Plain kubectl apply dla prostych przypadków, jednorazowych testów i nauki K8s. Helm od razu gdy masz więcej niż jedno środowisko, chcesz instalować zewnętrzne narzędzia, lub planujesz dystrybuować aplikację. Czas inwestycji w naukę Helm zwraca się szybko — już przy trzecim deploymencie.

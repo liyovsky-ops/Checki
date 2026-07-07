@@ -1,0 +1,212 @@
+title: Cloud Storage i Firebase Hosting
+
+sections:
+  - title: Referencje i upload pliku
+    icon: "📤"
+    desc: >
+      ref() tworzy referencję do ścieżki w Storage. uploadBytes() uploaduje plik
+      (Buffer lub Blob) jednoetapowo. Idealne dla małych plików. Referencja
+      jest jak ścieżka w systemie plików — /images/avatars/user123.jpg.
+    code: |
+      import {
+        ref, uploadBytes, getDownloadURL,
+        uploadString, deleteObject
+      } from 'firebase/storage';
+      import { storage } from './firebase';
+
+      // Utwórz referencję
+      const avatarRef = ref(storage, `avatars/${userId}.jpg`);
+      const fileRef = ref(storage, 'documents/report.pdf');
+
+      // Upload pliku (z input[type=file])
+      const file = event.target.files[0];
+      const snapshot = await uploadBytes(avatarRef, file, {
+        contentType: 'image/jpeg',
+        customMetadata: { uploadedBy: userId }
+      });
+      console.log('Uploaded:', snapshot.metadata.fullPath);
+
+      // Pobierz URL do pobrania
+      const url = await getDownloadURL(avatarRef);
+      console.log('Download URL:', url);
+
+      // Upload stringa (base64 lub data URL)
+      await uploadString(ref(storage, 'text/note.txt'), 'Hello Firebase!', 'raw');
+      await uploadString(ref(storage, 'img/photo.jpg'), dataUrl, 'data_url');
+
+  - title: Upload z postępem — uploadBytesResumable
+    icon: "📊"
+    desc: >
+      uploadBytesResumable umożliwia śledzenie postępu uploadu, pauzowanie i wznawianie.
+      Idealne dla dużych plików. Nasłuchuj eventów 'state_changed', 'error', 'complete'.
+    code: |
+      import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+      import { storage } from './firebase';
+
+      const uploadFile = (file: File, path: string) => {
+        const fileRef = ref(storage, path);
+        const uploadTask = uploadBytesResumable(fileRef, file);
+
+        return new Promise<string>((resolve, reject) => {
+          uploadTask.on(
+            'state_changed',
+            (snapshot) => {
+              // Postęp uploadu
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              setUploadProgress(Math.round(progress));
+              console.log(`Upload: ${progress.toFixed(1)}%`);
+
+              if (snapshot.state === 'paused') console.log('Spauzowany');
+              if (snapshot.state === 'running') console.log('Uploading...');
+            },
+            (error) => {
+              console.error('Upload error:', error.code);
+              reject(error);
+            },
+            async () => {
+              // Upload zakończony
+              const url = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve(url);
+            }
+          );
+        });
+      };
+
+      // Pauza i wznowienie
+      uploadTask.pause();
+      uploadTask.resume();
+      uploadTask.cancel();
+
+  - title: Listowanie i usuwanie plików
+    icon: "📋"
+    desc: >
+      listAll() pobiera wszystkie pliki i podkatalogi w danej ścieżce.
+      list() z maxResults umożliwia stronicowanie. deleteObject() usuwa plik.
+    code: |
+      import { ref, listAll, list, deleteObject, getMetadata } from 'firebase/storage';
+      import { storage } from './firebase';
+
+      // Listuj wszystkie pliki
+      const listRef = ref(storage, `users/${userId}/uploads`);
+      const result = await listAll(listRef);
+
+      // Pliki (items) i podkatalogi (prefixes)
+      for (const itemRef of result.items) {
+        const url = await getDownloadURL(itemRef);
+        const meta = await getMetadata(itemRef);
+        console.log(itemRef.name, url, meta.size);
+      }
+
+      // Stronicowanie (dla dużych kolekcji)
+      const firstPage = await list(listRef, { maxResults: 20 });
+      if (firstPage.nextPageToken) {
+        const nextPage = await list(listRef, {
+          maxResults: 20,
+          pageToken: firstPage.nextPageToken
+        });
+      }
+
+      // Usuń plik
+      await deleteObject(ref(storage, `avatars/${userId}.jpg`));
+
+  - title: Firebase Hosting — konfiguracja
+    icon: "🌐"
+    desc: >
+      Firebase Hosting to statyczny hosting z CDN, SSL i custom domain. Konfiguruje się
+      przez firebase.json. Obsługuje rewrites do Cloud Functions i SPA routing.
+      Deploy jedną komendą — firebase deploy.
+    code: |
+      // firebase.json — konfiguracja hostingu
+      {
+        "hosting": {
+          "public": "dist",
+          "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+          "rewrites": [
+            {
+              "source": "/api/**",
+              "function": "api"
+            },
+            {
+              "source": "**",
+              "destination": "/index.html"
+            }
+          ],
+          "headers": [
+            {
+              "source": "**/*.@(js|css)",
+              "headers": [
+                {
+                  "key": "Cache-Control",
+                  "value": "max-age=31536000"
+                }
+              ]
+            }
+          ],
+          "cleanUrls": true,
+          "trailingSlash": false
+        }
+      }
+
+  - title: Firebase Hosting — deploy
+    icon: "🚀"
+    desc: >
+      firebase serve uruchamia lokalny serwer hostingu. firebase deploy publikuje
+      cały projekt. Możesz deployować tylko hosting lub tylko functions
+      używając flag --only.
+    code: |
+      # Inicjalizacja (jednorazowo)
+      firebase init hosting
+
+      # Lokalny podgląd
+      firebase serve --only hosting
+
+      # Deploy tylko hostingu
+      firebase deploy --only hosting
+
+      # Deploy z wiadomością (widoczna w konsoli)
+      firebase deploy --only hosting -m "v2.1.0 — nowy dashboard"
+
+      # Deploy hosting + functions
+      firebase deploy --only hosting,functions
+
+      # Podgląd kanałów (preview channels)
+      firebase hosting:channel:deploy feature-branch
+      firebase hosting:channel:list
+      firebase hosting:channel:delete feature-branch
+
+      # Rollback do poprzedniej wersji
+      firebase hosting:releases:list
+      firebase hosting:rollback
+
+  - title: Reguły Storage
+    icon: "🔒"
+    desc: >
+      Storage Security Rules kontrolują kto może odczytywać i zapisywać pliki.
+      Możesz sprawdzać rozmiar pliku, typ MIME i stan autoryzacji użytkownika.
+    code: |
+      // storage.rules
+      rules_version = '2';
+      service firebase.storage {
+        match /b/{bucket}/o {
+          // Avatar użytkownika — tylko właściciel może zapisywać
+          match /avatars/{userId}.jpg {
+            allow read: if true;
+            allow write: if request.auth != null
+              && request.auth.uid == userId
+              && request.resource.size < 2 * 1024 * 1024
+              && request.resource.contentType.matches('image/.*');
+          }
+
+          // Dokumenty — tylko zalogowani
+          match /documents/{userId}/{file} {
+            allow read, write: if request.auth != null
+              && request.auth.uid == userId;
+          }
+
+          // Publiczne pliki — odczyt dla wszystkich
+          match /public/{file} {
+            allow read: if true;
+            allow write: if request.auth.token.admin == true;
+          }
+        }
+      }

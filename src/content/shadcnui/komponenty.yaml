@@ -1,0 +1,223 @@
+title: Komponenty UI
+
+items:
+  - name: Button — wszystkie warianty
+    desc: >
+      Button to fundament UI. Warianty pokrywają wszystkie przypadki użycia —
+      default (primary action), destructive (danger), outline (secondary),
+      ghost (subtle), link (inline). Rozmiary sm/default/lg/icon. Każdy wariant
+      używa cva() — TypeScript pilnuje poprawnych wartości.
+    code: |
+      import { Button } from "@/components/ui/button"
+
+      // Warianty
+      <Button variant="default">Zapisz</Button>
+      <Button variant="destructive">Usuń konto</Button>
+      <Button variant="outline">Anuluj</Button>
+      <Button variant="secondary">Drugorzędny</Button>
+      <Button variant="ghost">Subtelny</Button>
+      <Button variant="link">Wygląda jak link</Button>
+
+      // Rozmiary
+      <Button size="sm">Mały</Button>
+      <Button size="default">Domyślny</Button>
+      <Button size="lg">Duży</Button>
+      <Button size="icon"><PlusIcon /></Button>
+
+      // Loading state z disabled
+      <Button disabled>
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        Ładowanie...
+      </Button>
+
+      // asChild — renderuj jako inny element (link)
+      import { Link } from "next/link"
+      <Button asChild>
+        <Link href="/dashboard">Dashboard</Link>
+      </Button>
+
+  - name: Card — kontener treści
+    desc: >
+      Card grupuje powiązane informacje. Składa się z Card, CardHeader, CardTitle,
+      CardDescription, CardContent, CardFooter. Każda część to osobny komponent
+      — można używać selektywnie. Idealne do dashboardów, list produktów, profili.
+    code: |
+      import {
+        Card, CardContent, CardDescription,
+        CardFooter, CardHeader, CardTitle
+      } from "@/components/ui/card"
+
+      <Card className="w-[350px]">
+        <CardHeader>
+          <CardTitle>Konto Pro</CardTitle>
+          <CardDescription>Zmień plan subskrypcji</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-2xl font-bold">49 zł/mies</p>
+          <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+            <li>✓ Nieograniczone projekty</li>
+            <li>✓ 100 GB storage</li>
+            <li>✓ Priorytetowe wsparcie</li>
+          </ul>
+        </CardContent>
+        <CardFooter>
+          <Button className="w-full">Przejdź na Pro</Button>
+        </CardFooter>
+      </Card>
+
+  - name: "Badge — etykiety i statusy"
+    desc: >
+      Badge wyświetla krótką etykietę — status, kategoria, licznik. Warianty
+      default/secondary/destructive/outline. Mały, inline, używany obok tekstu
+      lub jako chip w formularzach filtrowania.
+    code: |
+      import { Badge } from "@/components/ui/badge"
+
+      <Badge>Nowy</Badge>
+      <Badge variant="secondary">W trakcie</Badge>
+      <Badge variant="destructive">Błąd</Badge>
+      <Badge variant="outline">Draft</Badge>
+
+      // Badge z ikoną
+      <Badge className="gap-1">
+        <CheckCircle className="h-3 w-3" />
+        Aktywny
+      </Badge>
+
+      // Badge jako link
+      <Badge asChild variant="secondary">
+        <Link href="/category/react">React</Link>
+      </Badge>
+
+  - name: Avatar — zdjęcie użytkownika
+    desc: >
+      Avatar wyświetla zdjęcie z fallbackiem na inicjały. AvatarImage ładuje
+      zdjęcie, AvatarFallback pojawia się gdy brak zdjęcia lub błąd ładowania.
+      Radix UI obsługuje stan ładowania i błędy.
+    code: |
+      import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+
+      <Avatar>
+        <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
+        <AvatarFallback>SC</AvatarFallback>
+      </Avatar>
+
+      // Grupy avatarów (overlapping)
+      <div className="flex -space-x-2">
+        {users.map((user) => (
+          <Avatar key={user.id} className="border-2 border-background">
+            <AvatarImage src={user.avatar} />
+            <AvatarFallback>{user.initials}</AvatarFallback>
+          </Avatar>
+        ))}
+        <Avatar className="border-2 border-background">
+          <AvatarFallback>+{remaining}</AvatarFallback>
+        </Avatar>
+      </div>
+
+  - name: Alert — komunikaty systemowe
+    desc: >
+      Alert wyświetla ważny komunikat — informacja, ostrzeżenie, błąd, sukces.
+      Warianty default/destructive. AlertTitle i AlertDescription dla struktury.
+      Nie znika automatycznie (to nie toast) — na trwałe komunikaty inline.
+    code: |
+      import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+      import { AlertCircle, Info, CheckCircle } from "lucide-react"
+
+      // Informacyjny
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>Informacja</AlertTitle>
+        <AlertDescription>
+          Zmiany zostaną zastosowane w ciągu 24 godzin.
+        </AlertDescription>
+      </Alert>
+
+      // Błąd
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Błąd</AlertTitle>
+        <AlertDescription>
+          Nie można połączyć z serwerem. Sprawdź połączenie.
+        </AlertDescription>
+      </Alert>
+
+      // Sukces (własna klasa)
+      <Alert className="border-green-500 text-green-700">
+        <CheckCircle className="h-4 w-4 text-green-600" />
+        <AlertTitle>Sukces!</AlertTitle>
+        <AlertDescription>Dane zostały zapisane.</AlertDescription>
+      </Alert>
+
+  - name: Skeleton — stan ładowania
+    desc: >
+      Skeleton to placeholder wyświetlany podczas ładowania danych. Animowany
+      puls (animate-pulse) sygnalizuje aktywność. Lepsze UX niż spinner dla
+      treści z określonym layoutem — użytkownik widzi gdzie pojawi się content.
+    code: |
+      import { Skeleton } from "@/components/ui/skeleton"
+
+      // Loader karty użytkownika
+      function UserCardSkeleton() {
+        return (
+          <div className="flex items-center space-x-4">
+            <Skeleton className="h-12 w-12 rounded-full" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[250px]" />
+              <Skeleton className="h-4 w-[200px]" />
+            </div>
+          </div>
+        )
+      }
+
+      // Loader tabeli
+      function TableSkeleton() {
+        return (
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex gap-4">
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+  - name: Progress — pasek postępu
+    desc: >
+      Progress wizualizuje postęp operacji — upload, krok w wizard, ładowanie.
+      Przyjmuje wartość 0-100. Dostępny (aria-valuenow, aria-valuemax wbudowane
+      przez Radix). Możesz animować zmianę wartości przez transition.
+    code: |
+      import { Progress } from "@/components/ui/progress"
+      import { useState, useEffect } from "react"
+
+      // Podstawowy
+      <Progress value={60} className="w-full" />
+
+      // Animowany przy montowaniu
+      function AnimatedProgress() {
+        const [progress, setProgress] = useState(0)
+
+        useEffect(() => {
+          const timer = setTimeout(() => setProgress(66), 500)
+          return () => clearTimeout(timer)
+        }, [])
+
+        return <Progress value={progress} className="w-[60%] transition-all duration-700" />
+      }
+
+      // Upload progress
+      function UploadProgress({ percent }: { percent: number }) {
+        return (
+          <div className="space-y-1">
+            <div className="flex justify-between text-sm">
+              <span>Uploading...</span>
+              <span>{percent}%</span>
+            </div>
+            <Progress value={percent} />
+          </div>
+        )
+      }

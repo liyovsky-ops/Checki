@@ -1,0 +1,228 @@
+labels:
+  title: Zarządzanie releases
+  subtitle: Lifecycle, upgrade, rollback, multi-env
+
+intro:
+  title: Zarządzanie releases Helm
+  desc: >
+    Helm śledzi pełną historię wszystkich operacji na release — install, upgrade, rollback.
+    Stan przechowywany jest jako Kubernetes Secret (helm.sh/release.v1) co oznacza że
+    historia przeżywa restart Helm CLI ale nie reset klastra. Kluczowe wzorce produkcyjne:
+    atomic deployments z automatycznym rollbackiem, multi-environment przez różne pliki values,
+    helm test do weryfikacji po instalacji. Release lifecycle jest deterministyczny
+    i audytowalny — każda zmiana to nowa rewizja.
+
+items:
+  - name: Lifecycle release — install, upgrade, rollback
+    desc: >
+      Każdy release przechodzi przez stany: pending-install → deployed (lub failed).
+      Upgrade tworzy nową rewizję: superseded (poprzednia) → deployed (nowa).
+      Rollback cofa do wybranej rewizji tworząc kolejną rewizję — nie modyfikuje historii.
+      Uninstall usuwa wszystko (opcjonalnie zachowując historię przez --keep-history).
+    code: |
+      # Sprawdź historię rewizji:
+      helm history myapp -n production
+      # REVISION  UPDATED                  STATUS      CHART           APP VERSION  DESCRIPTION
+      # 1         Mon Jan 15 10:00:00 2024 deployed    nginx-15.0.0    1.21.0       Install complete
+      # 2         Mon Jan 15 11:00:00 2024 deployed    nginx-15.1.0    1.21.1       Upgrade complete
+      # 3         Mon Jan 15 11:30:00 2024 failed      nginx-15.2.0    1.22.0       Upgrade "myapp" failed
+
+      # Rollback do rewizji 2 (tworzy rewizję 4):
+      helm rollback myapp 2 -n production
+      # Nowa historia: 1, 2, 3(failed), 4(deployed) ← kopia rewizji 2
+
+      # Rollback do poprzedniej (REVISION 0 = cofnij ostatnią):
+      helm rollback myapp 0 -n production
+
+  - name: Atomic deployments — automatyczny rollback przy błędzie
+    desc: >
+      --atomic to flaga dla helm install/upgrade która automatycznie rollbackuje do poprzedniej
+      wersji jeśli deployment nie zakończy się sukcesem w ciągu --timeout.
+      Standard w CI/CD — zero ręcznego rollbacku, zero half-broken deploymentów w klastrze.
+    code: |
+      # Atomic upgrade — rollback automatyczny przy błędzie:
+      helm upgrade --install myapp bitnami/nginx \
+        -n production \
+        -f values-prod.yaml \
+        --atomic \
+        --timeout 10m \
+        --cleanup-on-fail
+
+      # Co robi --atomic:
+      # 1. Wykonuje upgrade
+      # 2. Czeka aż Pody są Ready (--wait jest domyślny przy --atomic)
+      # 3. Jeśli timeout lub Pody crashują → automatyczny rollback
+      # 4. Exitcode 1 → CI/CD wie że deployment się nie powiódł
+
+      # --cleanup-on-fail — usuwa nowe zasoby jeśli upgrade się nie powiódł
+      # (zapobiega "śmieci" w klastrze po nieudanym upgrade)
+
+      # Monitoring w CI:
+      helm upgrade --install myapp ./mychart \
+        --atomic --timeout 5m \
+        && echo "DEPLOY SUCCESS" \
+        || (echo "DEPLOY FAILED — rollback done"; exit 1)
+
+  - name: Multi-environment — dev, staging, production
+    desc: >
+      Wzorzec wielośrodowiskowy w Helm: jeden chart, wiele plików values per środowisko.
+      Zalecana struktura: values.yaml (base) + values-staging.yaml (override) + values-prod.yaml.
+      W CI/CD przekazuj plik values odpowiedni dla środowiska — zero duplikacji szablonów.
+    code: |
+      # Struktura plików values:
+      # values.yaml           ← bazowe defaults
+      # values-staging.yaml   ← nadpisania dla staging
+      # values-production.yaml ← nadpisania dla production
+
+      # values.yaml (base):
+      replicaCount: 1
+      image:
+        tag: latest
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+
+      # values-production.yaml (tylko co się różni):
+      replicaCount: 5
+      image:
+        tag: "2.1.0"   # pinuj wersję na prod
+      resources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+        limits:
+          cpu: 2
+          memory: 2Gi
+      ingress:
+        enabled: true
+        host: myapp.firma.pl
+        tls: true
+
+      # Deployment per środowisko:
+      helm upgrade --install myapp ./mychart \
+        -f values.yaml \
+        -f values-production.yaml \          # prawy nadpisuje lewy
+        -n production \
+        --atomic
+
+  - name: helm test — testowanie po instalacji
+    desc: >
+      helm test uruchamia hooki z annotacją helm.sh/hook: test — specjalne Pody testowe
+      uruchamiane jednorazowo po instalacji. Typowe testy: health check HTTP, ping do bazy,
+      weryfikacja połączenia Redis. Wyniki w statusie Poda. Idealne do post-deploy smoke tests w CI.
+    code: |
+      # Uruchom testy release (po helm install):
+      helm test myapp -n production
+
+      # Z czyszczeniem Podów testowych po zakończeniu:
+      helm test myapp -n production --logs
+
+      # Definicja hooka testowego w templates/tests/test-connection.yaml:
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        name: "{{ include "myapp.fullname" . }}-test-connection"
+        labels:
+          {{- include "myapp.labels" . | nindent 4 }}
+        annotations:
+          "helm.sh/hook": test
+          "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+      spec:
+        containers:
+          - name: wget
+            image: busybox
+            command: ['wget']
+            args:
+              - '--spider'
+              - '--timeout=5'
+              - 'http://{{ include "myapp.fullname" . }}:{{ .Values.service.port }}/health'
+        restartPolicy: Never
+
+  - name: Zarządzanie sekretami — bezpieczne wartości
+    desc: >
+      Helm przechowuje values (włącznie z --set password=secret) jako K8s Secret.
+      Bezpieczne wzorce: ExternalSecrets/Vault z operatorem (bez sekretów w values),
+      helm-secrets z SOPS (szyfrowane values.yaml w Git), sealed-secrets.
+      NIGDY nie commituj wartości sekretów do Git w values-prod.yaml.
+    code: |
+      # ZŁE (sekret w values.yaml w Git!):
+      postgresql:
+        auth:
+          postgresPassword: "moje-tajne-haslo"
+
+      # DOBRE — wartości ze zmiennych środowiskowych w CI/CD:
+      helm upgrade --install myapp ./mychart \
+        -f values-prod.yaml \
+        --set postgresql.auth.postgresPassword="${DB_PASSWORD}" \
+        -n production --atomic
+
+      # LEPSZE — External Secrets Operator (pobiera z Vault/AWS SSM):
+      # 1. Zainstaluj ESO:
+      helm install external-secrets external-secrets/external-secrets -n external-secrets
+
+      # 2. ExternalSecret pobiera secrety z Vault automatycznie:
+      # apiVersion: external-secrets.io/v1beta1
+      # kind: ExternalSecret → SecretStore (Vault) → K8s Secret
+
+      # helm-secrets (SOPS) — szyfruj values.yaml:
+      helm plugin install https://github.com/jkroepke/helm-secrets
+      sops -e values-prod.yaml > values-prod.enc.yaml
+      helm secrets upgrade --install myapp ./mychart \
+        -f values-prod.enc.yaml -n production
+
+  - name: Historia i limity — etcd nie jest bazą danych
+    desc: >
+      Każda rewizja Helm to K8s Secret zawierający skompresowane manifesty i wartości (~50-100kB).
+      Bez limitu historia rośnie i obciąża etcd. Ustaw --history-max globalnie lub per upgrade.
+      kubectl get secrets pokazuje ile miejsca zajmuje historia danego release.
+    code: |
+      # Sprawdź historię i zajmowaną przestrzeń:
+      kubectl get secrets -n production | grep helm.sh
+      # sh.helm.release.v1.myapp.v1    helm.sh/release.v1  1      30d
+      # sh.helm.release.v1.myapp.v2    helm.sh/release.v1  1      15d
+      # sh.helm.release.v1.myapp.v3    helm.sh/release.v1  1      1d
+
+      # Ogranicz historię przy upgrade:
+      helm upgrade myapp bitnami/nginx --history-max 5 -n production
+
+      # Ustaw globalnie przez zmienną środowiskową:
+      export HELM_MAX_HISTORY=5
+
+      # Sprawdź ile sekretów (rewizji) ma release:
+      kubectl get secrets -n production -l owner=helm,name=myapp
+
+      # Usuń stare rewizje ręcznie (ostrożnie!):
+      # Tylko przez kubectl delete secret — nie ma komendy helm do czyszczenia historii
+
+      # Rekomendacja produkcyjna:
+      # --history-max 10 = ostatnie 10 rewizji (wystarczy do rollbacku)
+
+  - name: Diff przed upgrade — bezpieczny workflow
+    desc: >
+      Przed każdym upgrade na produkcji sprawdź co się zmieni przez helm-diff.
+      helm diff upgrade pokazuje dokładnie które manifesty i wartości ulegną zmianie —
+      jak git diff dla K8s. Integruje w CI żeby review team widział zmiany przed merge.
+    code: |
+      # Zainstaluj helm-diff:
+      helm plugin install https://github.com/databus23/helm-diff
+
+      # Podgląd zmian przed upgrade:
+      helm diff upgrade myapp bitnami/nginx \
+        -n production \
+        -f values-prod.yaml \
+        --version 15.2.0
+
+      # Przykład output (podobny do git diff):
+      # default, myapp, Deployment (apps) has changed:
+      # -  replicas: 3
+      # +  replicas: 5
+      # -  image: nginx:1.21.0
+      # +  image: nginx:1.22.0
+
+      # W CI — diff jako komentarz do PR (GitHub Actions):
+      # helm diff upgrade myapp ./mychart -f values-prod.yaml > diff.txt
+      # gh pr comment $PR_NUMBER --body "$(cat diff.txt)"
+
+      # Revision diff (porównaj dwie rewizje):
+      helm diff revision myapp 2 3 -n production

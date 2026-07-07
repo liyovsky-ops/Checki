@@ -1,0 +1,1686 @@
+title: Komendy Fastify
+
+groups:
+  - name: Instalacja i setup
+    icon: "📦"
+    commands:
+      - cmd: npm install fastify
+        desc: Zainstaluj Fastify core
+        detail:
+          what: Instaluje Fastify — zero peer dependencies. Wszystkie pluginy oficjalne (@fastify/*) instalujesz osobno.
+          how: Fastify core jest kompletny — ma routing, walidację JSON Schema, logger Pino, lifecycle hooks. Pluginy rozszerzają go opcjonalnie.
+          tips:
+            - 'npm install fastify@latest — zawsze pobiera najnowszą stabilną wersję (aktualnie v5)'
+            - 'Fastify v5 wymaga Node.js 20+ — sprawdź node --version przed instalacją'
+
+      - cmd: npm install fastify @sinclair/typebox @fastify/type-provider-typebox
+        desc: Fastify + TypeBox dla pełnego TypeScript
+        detail:
+          what: TypeBox generuje JSON Schema i TypeScript types jednocześnie. Type provider łączy je z Fastify — pełna type safety bez powtarzania definicji.
+          how: "withTypeProvider<TypeBoxTypeProvider>() — wszystkie trasy mają automatyczne typy z Type.Object()."
+          tips:
+            - 'TypeBox to preferowany sposób walidacji w TypeScript projektach Fastify'
+            - 'Alternatywa: fastify-type-provider-zod jeśli preferujesz Zod API'
+
+      - cmd: npm install fastify-cli
+        desc: Zainstaluj Fastify CLI globalnie
+        detail:
+          what: Fastify CLI (fastify) pozwala uruchamiać aplikacje Fastify z linii komend, generować szablony i konfigurować środowisko.
+          how: "fastify start src/app.js — uruchamia plik eksportujący Fastify instance. fastify generate my-app — tworzy nowy projekt."
+          tips:
+            - 'npm install -g fastify-cli — instalacja globalna dla komendy fastify w PATH'
+            - 'npx fastify-cli generate my-app — bez globalnej instalacji'
+
+      - cmd: npx fastify-cli generate my-app
+        desc: Utwórz nowy projekt Fastify
+        detail:
+          what: Generator tworzy strukturę projektu z autoload, standardową organizacją plugins/ i routes/, ESM modules, config.
+          how: Tworzy package.json, app.js, plugins/, routes/root.js, routes/example/index.js, test/. Gotowy do uruchomienia od razu.
+          tips:
+            - 'Dodaj --lang=ts dla TypeScript projektu'
+            - 'Struktura z autoload jest oficjalnie zalecaną przez Fastify team'
+
+      - cmd: npm install @fastify/autoload @fastify/sensible @fastify/env
+        desc: Podstawowy zestaw pluginów Fastify
+        detail:
+          what: "autoload — automatyczne ładowanie pluginów, sensible — utility helpers (httpErrors, assert), env — walidacja zmiennych środowiskowych."
+          how: "@fastify/sensible dodaje reply.notFound(), reply.forbidden(), reply.internalServerError() — standardowe HTTP errors."
+          tips:
+            - '@fastify/sensible to must-have — usuwa konieczność pisania boilerplate dla błędów HTTP'
+            - '@fastify/env z JSON Schema waliduje .env przy starcie — fail fast zamiast runtime crash'
+
+  - name: Inicjalizacja serwera
+    icon: "🚀"
+    commands:
+      - code: |
+          import Fastify from 'fastify'
+
+          const fastify = Fastify({
+            logger: {
+              level: 'info',
+              transport: {
+                target: 'pino-pretty',  // dev only
+                options: { colorize: true }
+              }
+            }
+          })
+
+          fastify.get('/', async (request, reply) => {
+            return { hello: 'world' }
+          })
+
+          const start = async () => {
+            try {
+              await fastify.listen({ port: 3000, host: '0.0.0.0' })
+            } catch (err) {
+              fastify.log.error(err)
+              process.exit(1)
+            }
+          }
+
+          start()
+        desc: Minimalna aplikacja Fastify z loggingiem
+        detail:
+          what: Fastify() tworzy instancję. logger true włącza Pino. pino-pretty formatuje logi czytelnie w dev. host 0.0.0.0 słucha na wszystkich interfejsach.
+          how: await fastify.listen() jest async — czeka na gotowość serwera. Pino logger jest wbudowany — nie potrzebujesz Winston/Morgan.
+          tips:
+            - 'npm install pino-pretty --save-dev — tylko dla developmentu'
+            - 'W produkcji: logger true lub logger z level: "warn" — pino-pretty spowalnia'
+
+      - code: |
+          import Fastify from 'fastify'
+          import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
+
+          const fastify = Fastify({
+            logger: true,
+            disableRequestLogging: false,
+            requestIdHeader: 'x-request-id',
+            requestIdLogLabel: 'reqId',
+            genReqId: () => crypto.randomUUID()
+          })
+            .withTypeProvider<TypeBoxTypeProvider>()
+
+          export type FastifyApp = typeof fastify
+
+          export default fastify
+        desc: "Fastify z TypeBox TypeProvider — production setup"
+        detail:
+          what: withTypeProvider daje type safety dla TypeBox. genReqId generuje UUID per request. requestIdHeader odczytuje/przekazuje X-Request-Id do downstream services.
+          how: Export type FastifyApp = typeof fastify umożliwia przekazanie instancji do pluginów z pełnymi typami.
+          tips:
+            - 'FastifyApp type importuj w pluginach zamiast any — pełna type safety'
+            - 'disableRequestLogging: true jeśli masz własny hook logowania requestów'
+
+      - code: |
+          import Fastify from 'fastify'
+
+          const fastify = Fastify({
+            logger: true,
+            bodyLimit: 1_048_576,  // 1 MB limit body
+            connectionTimeout: 0,  // bez limitu (nginx zarządza)
+            keepAliveTimeout: 72_000,  // 72s — ponad ALB timeout (60s)
+            maxParamLength: 100,
+            caseSensitive: true,
+            ignoreTrailingSlash: true,
+            ignoreDuplicateSlashes: true
+          })
+
+          // Graceful shutdown
+          const shutdown = async (signal: string) => {
+            fastify.log.info({ signal }, 'Shutting down')
+            await fastify.close()
+            process.exit(0)
+          }
+
+          process.on('SIGTERM', () => shutdown('SIGTERM'))
+          process.on('SIGINT', () => shutdown('SIGINT'))
+        desc: Konfiguracja produkcyjna — limity i graceful shutdown
+        detail:
+          what: bodyLimit chroni przed dużymi payloadami. keepAliveTimeout musi być wyższy niż timeout load balancera. graceful shutdown czeka na zakończenie aktywnych requestów.
+          how: fastify.close() zamyka serwer i wywołuje onClose hooks (zamknięcie DB, cache flush). SIGTERM wysyła Kubernetes podczas skalowania.
+          tips:
+            - 'keepAliveTimeout: 72000 — powyżej AWS ALB default 60s aby uniknąć 502'
+            - 'fastify.close() wywołuje wszystkie onClose hooks — zarejestruj czyszczenie tam'
+
+  - name: Routes i HTTP
+    icon: "🛣️"
+    commands:
+      - code: |
+          // Pełne API CRUD dla zasobu
+          fastify.get('/api/items', async (req, reply) => {
+            const { page = 1, limit = 20 } = req.query as { page?: number; limit?: number }
+            return { items: [], page, limit, total: 0 }
+          })
+
+          fastify.get('/api/items/:id', async (req, reply) => {
+            const { id } = req.params as { id: string }
+            return { id, name: 'Item' }
+          })
+
+          fastify.post('/api/items', async (req, reply) => {
+            reply.code(201)
+            return { id: crypto.randomUUID(), ...req.body as object }
+          })
+
+          fastify.put('/api/items/:id', async (req, reply) => {
+            const { id } = req.params as { id: string }
+            return { id, ...req.body as object, updatedAt: new Date().toISOString() }
+          })
+
+          fastify.patch('/api/items/:id', async (req, reply) => {
+            const { id } = req.params as { id: string }
+            return { id, patched: true }
+          })
+
+          fastify.delete('/api/items/:id', async (req, reply) => {
+            reply.code(204).send()
+          })
+        desc: CRUD — pełny zestaw metod HTTP
+        detail:
+          what: "Shorthand methods: get, post, put, patch, delete, head, options. Każdy przyjmuje (path, options?, handler) lub (path, handler)."
+          how: "reply.code(201).send() — jawne wysłanie. return value — implicit send. Oba działają, ale nie mieszaj w jednym handlerze."
+          tips:
+            - 'DELETE z 204 i pustym body — reply.code(204).send() bez żadnego payload'
+            - 'HEAD = jak GET ale bez body — Fastify obsługuje automatycznie gdy masz GET'
+
+      - code: |
+          // Trasa z pełnymi opcjami
+          fastify.route({
+            method: 'POST',
+            url: '/api/users',
+            schema: {
+              body: {
+                type: 'object',
+                required: ['name', 'email'],
+                properties: {
+                  name: { type: 'string' },
+                  email: { type: 'string', format: 'email' }
+                }
+              },
+              response: { 201: { type: 'object', properties: { id: { type: 'string' } } } }
+            },
+            preHandler: [fastify.authenticate],
+            config: { requiresAuth: true },
+            handler: async (request, reply) => {
+              reply.code(201)
+              return { id: crypto.randomUUID() }
+            }
+          })
+        desc: "fastify.route() — pełna deklaracja trasy"
+        detail:
+          what: fastify.route() jako alternatywa dla shorthand. Przyjmuje jeden obiekt z method, url, schema, preHandler, config, handler.
+          how: method może być stringiem lub tablicą ['GET', 'POST']. Przydatne gdy potrzebujesz jasnej, jawnej deklaracji zamiast shorthand.
+          tips:
+            - 'config — dowolny obiekt dostępny przez request.routeOptions.config — metadata dla hooków'
+            - 'Tablicowe preHandler — wiele middleware per route w kolejności'
+
+      - code: |
+          // Trasy zarejestrowane przez plugin z prefiksem
+          async function v1Routes(fastify: any, opts: any) {
+            fastify.get('/users', async () => ({ version: 'v1', users: [] }))
+            fastify.get('/products', async () => ({ version: 'v1', products: [] }))
+          }
+
+          async function v2Routes(fastify: any, opts: any) {
+            fastify.get('/users', async () => ({ version: 'v2', users: [], meta: {} }))
+            fastify.get('/products', async () => ({ version: 'v2', products: [], filters: [] }))
+          }
+
+          fastify.register(v1Routes, { prefix: '/api/v1' })
+          fastify.register(v2Routes, { prefix: '/api/v2' })
+
+          // GET /api/v1/users → v1
+          // GET /api/v2/users → v2
+        desc: Wersjonowanie API — prefix per plugin
+        detail:
+          what: Każda wersja API to osobny plugin z prefiksem. Trasy /users w v1 i v2 są w pełni niezależne — mogą mieć inne schematy, logikę, middleware.
+          how: prefix jest dodawany do wszystkich tras pluginu. /users wewnątrz pluginu z prefix /api/v1 = /api/v1/users.
+          tips:
+            - 'Wersjonowanie przez plugin — niezależna ewolucja v1 i v2 bez konfliktów'
+            - 'Deprecated wersje usuń z rejestru — nie zostawiaj jako martwego kodu'
+
+  - name: JSON Schema — walidacja
+    icon: "✅"
+    commands:
+      - code: |
+          fastify.post('/users', {
+            schema: {
+              body: {
+                type: 'object',
+                required: ['name', 'email', 'age'],
+                additionalProperties: false,
+                properties: {
+                  name: { type: 'string', minLength: 2, maxLength: 50 },
+                  email: { type: 'string', format: 'email' },
+                  age: { type: 'integer', minimum: 18, maximum: 120 },
+                  role: {
+                    type: 'string',
+                    enum: ['user', 'admin', 'moderator'],
+                    default: 'user'
+                  },
+                  tags: {
+                    type: 'array',
+                    items: { type: 'string', maxLength: 20 },
+                    maxItems: 5,
+                    uniqueItems: true
+                  }
+                }
+              }
+            }
+          }, async (req, reply) => {
+            const body = req.body as {
+              name: string; email: string; age: number
+              role: string; tags?: string[]
+            }
+            reply.code(201)
+            return { id: crypto.randomUUID(), ...body }
+          })
+        desc: JSON Schema body — pełna walidacja
+        detail:
+          what: additionalProperties false odrzuca nieznane pola. default w schema — Fastify wypełnia je automatycznie jeśli nie podane. uniqueItems dla tablic.
+          how: Fastify zwraca 400 z detalami błędów walidacji. Wszystkie pola required muszą być obecne — inaczej błąd przed dotarciem do handlera.
+          tips:
+            - 'additionalProperties: false — ważna ochrona przed nadmiarowymi danymi'
+            - 'default — wypełniane przez Ajv useDefaults: true (domyślnie w Fastify)'
+
+      - code: |
+          // Ponowne użycie schematów przez addSchema
+          fastify.addSchema({
+            $id: 'UserBody',
+            type: 'object',
+            required: ['name', 'email'],
+            properties: {
+              name: { type: 'string', minLength: 2 },
+              email: { type: 'string', format: 'email' }
+            }
+          })
+
+          fastify.addSchema({
+            $id: 'UserResponse',
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              email: { type: 'string' },
+              createdAt: { type: 'string', format: 'date-time' }
+            }
+          })
+
+          // Użyj przez $ref
+          fastify.post('/users', {
+            schema: {
+              body: { $ref: 'UserBody#' },
+              response: { 201: { $ref: 'UserResponse#' } }
+            }
+          }, async (req, reply) => {
+            reply.code(201)
+            return { id: '1', ...req.body as object, createdAt: new Date().toISOString() }
+          })
+
+          // Ten sam schemat w innej trasie
+          fastify.put('/users/:id', {
+            schema: {
+              body: { $ref: 'UserBody#' },
+              response: { 200: { $ref: 'UserResponse#' } }
+            }
+          }, async (req, reply) => {
+            return { id: (req.params as any).id, ...req.body as object, createdAt: new Date().toISOString() }
+          })
+        desc: "addSchema() + $ref — wielokrotne użycie schematów"
+        detail:
+          what: addSchema() rejestruje schemat globalnie z identyfikatorem $id. Inne schematy mogą go referencjonować przez $ref. Eliminuje duplikowanie schematów.
+          how: "$ref: 'UserBody#' — referencja do całego schematu. $ref: 'UserBody#/properties/name' — referencja do konkretnej właściwości."
+          tips:
+            - 'Trzymaj schematy w osobnych plikach schemas/user.schema.ts i importuj'
+            - '$ref działa zarówno dla walidacji jak i dla serializacji response'
+
+  - name: TypeBox
+    icon: "🔷"
+    commands:
+      - code: |
+          import { Type, Static } from '@sinclair/typebox'
+          import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
+          import Fastify from 'fastify'
+
+          // Schema = JSON Schema + TypeScript type w jednym
+          const CreateUser = Type.Object({
+            name: Type.String({ minLength: 2, maxLength: 50 }),
+            email: Type.String({ format: 'email' }),
+            age: Type.Integer({ minimum: 18 }),
+            role: Type.Optional(Type.Union([
+              Type.Literal('user'),
+              Type.Literal('admin')
+            ]))
+          })
+
+          type CreateUserType = Static<typeof CreateUser>
+
+          const UserResponse = Type.Object({
+            id: Type.String({ format: 'uuid' }),
+            name: Type.String(),
+            email: Type.String(),
+            createdAt: Type.String({ format: 'date-time' })
+          })
+
+          const fastify = Fastify().withTypeProvider<TypeBoxTypeProvider>()
+
+          fastify.post('/users', {
+            schema: {
+              body: CreateUser,
+              response: { 201: UserResponse }
+            }
+          }, async (request, reply) => {
+            // request.body jest w pełni typowany!
+            const { name, email, age, role } = request.body
+            reply.code(201)
+            return {
+              id: crypto.randomUUID(),
+              name,
+              email,
+              createdAt: new Date().toISOString()
+            }
+          })
+        desc: TypeBox — schema i typy z jednego źródła
+        detail:
+          what: Type.Object() generuje JSON Schema (do walidacji) i TypeScript type (do IDE). Static<> wyciąga TypeScript interface. Jedno źródło prawdy zamiast dwóch.
+          how: withTypeProvider<TypeBoxTypeProvider>() łączy TypeBox z Fastify type system. Bez tego request.body jest unknown.
+          tips:
+            - 'Type.Optional() zamiast ? — TypeBox wymaga Optional() dla opcjonalnych pól'
+            - 'Type.Partial(Schema) — wszystkie pola Optional naraz — idealne dla PATCH'
+
+      - code: |
+          import { Type, Static } from '@sinclair/typebox'
+          import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
+          import Fastify from 'fastify'
+
+          // Współdzielone typy między schematami
+          const PaginationQuery = Type.Object({
+            page: Type.Optional(Type.Integer({ minimum: 1, default: 1 })),
+            limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100, default: 20 })),
+            sort: Type.Optional(Type.Union([Type.Literal('asc'), Type.Literal('desc')]))
+          })
+
+          const ItemSchema = Type.Object({
+            id: Type.String(),
+            name: Type.String(),
+            price: Type.Number()
+          })
+
+          const ItemsListResponse = Type.Object({
+            items: Type.Array(ItemSchema),
+            total: Type.Integer(),
+            page: Type.Integer(),
+            limit: Type.Integer()
+          })
+
+          const fastify = Fastify().withTypeProvider<TypeBoxTypeProvider>()
+
+          fastify.get('/items', {
+            schema: {
+              querystring: PaginationQuery,
+              response: { 200: ItemsListResponse }
+            }
+          }, async (request) => {
+            const { page = 1, limit = 20, sort = 'asc' } = request.query
+            // page i limit są Integer — TypeBox zadbał o typy
+            return {
+              items: [],
+              total: 0,
+              page,
+              limit
+            }
+          })
+        desc: TypeBox — paginacja i kompozycja schematów
+        detail:
+          what: Type.Array(ItemSchema) — tablica obiektów. Type.Partial(Schema) — wszystkie pola Optional. Schematy można komponować jak TypeScript types.
+          how: PaginationQuery jako współdzielony schemat querystring — użyj go w wielu trasach bez duplikowania.
+          tips:
+            - 'Type.Intersect([A, B]) — połącz dwa schematy (TypeScript intersection type)'
+            - 'Type.Pick(Schema, ["id", "name"]) — wyciągnij pola jak TypeScript Pick'
+
+  - name: Hooks i Lifecycle
+    icon: "🔗"
+    commands:
+      - code: |
+          // Globalny hook logowania requestów
+          fastify.addHook('onRequest', async (request, reply) => {
+            request.log.info({
+              method: request.method,
+              url: request.url,
+              ip: request.ip,
+              userAgent: request.headers['user-agent']
+            }, 'incoming request')
+          })
+
+          // Hook auth — sprawdzenie tokenu
+          fastify.addHook('preHandler', async (request, reply) => {
+            const publicPaths = ['/', '/health', '/api/login']
+            if (publicPaths.includes(request.routerPath)) return
+
+            const auth = request.headers.authorization
+            if (!auth?.startsWith('Bearer ')) {
+              return reply.code(401).send({ error: 'Unauthorized' })
+            }
+          })
+
+          // Hook po odpowiedzi — metryki
+          fastify.addHook('onResponse', async (request, reply) => {
+            request.log.info({
+              url: request.url,
+              statusCode: reply.statusCode,
+              responseTime: reply.elapsedTime
+            }, 'request completed')
+          })
+        desc: addHook() — globalne hooki lifecycle
+        detail:
+          what: addHook(hookName, handler) rejestruje funkcję dla danego punktu lifecycle. Hooki globalne działają dla wszystkich tras. request.routerPath = wzorzec trasy z :param.
+          how: "Dostępne hooki: onRequest, preParsing, preValidation, preHandler, preSerialization, onSend, onResponse, onTimeout, onError, onClose."
+          tips:
+            - 'request.routerPath vs request.url — routerPath to wzorzec /users/:id, url to /users/123'
+            - 'Hooki są async — możesz używać await bez next() callbacku'
+
+      - code: |
+          // onSend — modyfikacja payload
+          fastify.addHook('onSend', async (request, reply, payload) => {
+            // Dodaj X-Request-Id do każdej odpowiedzi
+            reply.header('X-Request-Id', request.id)
+            reply.header('X-Response-Time', `${reply.elapsedTime.toFixed(2)}ms`)
+
+            // Możesz modyfikować payload
+            if (typeof payload === 'string' && reply.statusCode === 200) {
+              try {
+                const data = JSON.parse(payload)
+                return JSON.stringify({
+                  ...data,
+                  _meta: { requestId: request.id, version: '1.0' }
+                })
+              } catch {
+                // nie JSON — zwróć niezmieniony
+              }
+            }
+
+            return payload  // zawsze zwróć payload!
+          })
+        desc: onSend — modyfikacja response przed wysłaniem
+        detail:
+          what: onSend wykonuje się po serializacji ale przed wysłaniem. Musi zwracać payload (może być zmieniony lub oryginalny). reply.elapsedTime w tym miejscu zawiera czas do serializacji.
+          how: payload to string lub Buffer lub Stream. Przy modyfikacji JSON — parse → zmień → stringify. Zwróć null aby anulować payload.
+          tips:
+            - 'Zawsze return payload — bez return Fastify wyśle undefined'
+            - 'Nie używaj onSend do dużych transformacji — to hot path dla każdego requestu'
+
+  - name: Pluginy
+    icon: "🔌"
+    commands:
+      - code: |
+          import fp from 'fastify-plugin'
+          import Fastify from 'fastify'
+
+          // Plugin jako plik src/plugins/db.ts
+          const dbPlugin = fp(async (fastify) => {
+            // Przykład — inicjalizacja klienta bazy danych
+            const pool = {
+              query: async (sql: string, params?: any[]) => ({ rows: [], rowCount: 0 }),
+              connect: async () => ({ release: () => {} }),
+              end: async () => {}
+            }
+
+            fastify.decorate('db', pool)
+
+            // Cleanup przy zamknięciu
+            fastify.addHook('onClose', async () => {
+              await pool.end()
+              fastify.log.info('Database pool closed')
+            })
+          }, {
+            name: 'db',
+            dependencies: ['config'],   // musi być załadowany po 'config'
+            fastify: '>=4.0.0'
+          })
+
+          export default dbPlugin
+        desc: "fp() plugin z onClose cleanup"
+        detail:
+          what: fp() (fastify-plugin) znosi enkapsulację — fastify.db jest widoczne poza pluginem. dependencies deklaruje co musi być załadowane przed tym pluginem.
+          how: onClose hook zwalnia zasoby przy fastify.close() — ważne dla graceful shutdown i testów (każdy test tworzy/zamyka instancję).
+          tips:
+            - 'name w options fp() — Fastify sprawdza duplikaty i wyświetla w diagnostyce'
+            - 'fastify version constraint — chroni przed użyciem pluginu z niekompatybilną wersją'
+
+      - code: |
+          import fp from 'fastify-plugin'
+
+          // Plugin autentykacji JWT
+          const jwtPlugin = fp(async (fastify) => {
+            await fastify.register(import('@fastify/jwt'), {
+              secret: (fastify as any).config?.jwtSecret ?? process.env.JWT_SECRET ?? 'dev'
+            })
+
+            // Dekorator — helper dla tras wymagających auth
+            fastify.decorate('authenticate', async (request: any, reply: any) => {
+              try {
+                await request.jwtVerify()
+              } catch (err) {
+                reply.code(401).send({ error: 'Unauthorized', details: (err as Error).message })
+              }
+            })
+          }, { name: 'jwt-auth', dependencies: ['config'] })
+
+          export default jwtPlugin
+
+          // Użycie w trasie:
+          // fastify.get('/profile', {
+          //   preHandler: [fastify.authenticate]
+          // }, async (req) => {
+          //   return req.user
+          // })
+        desc: Plugin JWT z dekoratorem authenticate
+        detail:
+          what: "@fastify/jwt dodaje request.jwtVerify(), request.jwtSign(). Dekorator authenticate jako preHandler — clean pattern zamiast powtarzania kodu auth w każdej trasie."
+          how: preHandler jako tablica — można stackować middleware. [fastify.authenticate, fastify.authorize('admin')] = chain.
+          tips:
+            - 'await fastify.register(import("@fastify/jwt")) — dynamiczny import dla CJS/ESM compatibility'
+            - 'request.user po jwtVerify() zawiera payload JWT — dostępny w handlerach'
+
+  - name: TypeScript — zaawansowane typy
+    icon: "🔷"
+    commands:
+      - code: |
+          // Declaration merging — rozszerzanie typów Fastify
+          import 'fastify'
+
+          declare module 'fastify' {
+            interface FastifyInstance {
+              config: {
+                jwtSecret: string
+                dbUrl: string
+                redisUrl: string
+                appEnv: 'development' | 'staging' | 'production'
+              }
+              authenticate: (req: FastifyRequest, reply: FastifyReply) => Promise<void>
+            }
+
+            interface FastifyRequest {
+              user: {
+                id: string
+                email: string
+                role: 'user' | 'admin' | 'moderator'
+              } | null
+              ctx: {
+                requestId: string
+                startTime: number
+              }
+            }
+          }
+        desc: Declaration merging — TypeScript types dla Fastify
+        detail:
+          what: "declare module 'fastify' { interface FastifyInstance {} } rozszerza typ instancji bez type assertion. IDE autocomplete i type safety dla dekoratorów."
+          how: Umieść w src/types/fastify.d.ts — importowany automatycznie przez TypeScript. Import typów z osobnych modułów przez import() w declare.
+          tips:
+            - 'Jeden plik types/fastify.d.ts — centralny punkt dla wszystkich rozszerzeń'
+            - 'Bez declaration merging potrzebujesz (fastify as any).db — brzydkie i niebezpieczne'
+
+      - code: |
+          // tsconfig.json dla projektu Fastify
+          // {
+          //   "compilerOptions": {
+          //     "target": "ES2022",
+          //     "module": "NodeNext",
+          //     "moduleResolution": "NodeNext",
+          //     "lib": ["ES2022"],
+          //     "outDir": "./dist",
+          //     "rootDir": "./src",
+          //     "strict": true,
+          //     "esModuleInterop": true,
+          //     "skipLibCheck": true,
+          //     "resolveJsonModule": true,
+          //     "declaration": true,
+          //     "sourceMap": true,
+          //     "paths": { "@/*": ["./src/*"] }
+          //   },
+          //   "include": ["src/**/*"],
+          //   "exclude": ["node_modules", "dist", "**/*.test.ts"]
+          // }
+
+          // Kompilacja i uruchamianie:
+          // npx tsc             -- kompiluj do dist/
+          // npx tsx src/server  -- uruchamiaj TS bez kompilacji (dev)
+          // node dist/server.js -- uruchamiaj skompilowany JS (prod)
+          export {}  // placeholder — powyżej konfiguracja w komentarzu
+        desc: "tsconfig.json — konfiguracja TypeScript dla Fastify"
+        detail:
+          what: "NodeNext module/moduleResolution — dla ESM i CJS compatibility. strict: true — pełna type safety. paths — aliasy importów zamiast ../../.."
+          how: "Fastify v5 jest ESM-first. NodeNext moduleResolution obsługuje .js extension w importach nawet pisząc .ts."
+          tips:
+            - 'NodeNext wymaga rozszerzenia .js w importach: import "./routes.js" (nie .ts)'
+            - 'npm install --save-dev typescript tsx — tsx do uruchamiania TS bez kompilacji w dev'
+
+      - code: |
+          // Typowany plugin z Generic FastifyInstance
+          import {
+            FastifyInstance,
+            FastifyPluginAsync,
+            FastifyPluginOptions
+          } from 'fastify'
+          import fp from 'fastify-plugin'
+
+          interface CachePluginOptions extends FastifyPluginOptions {
+            ttl: number
+            maxItems?: number
+          }
+
+          // FastifyPluginAsync<Options> = typed plugin factory
+          const cachePlugin: FastifyPluginAsync<CachePluginOptions> = async (
+            fastify: FastifyInstance,
+            opts: CachePluginOptions
+          ) => {
+            const cache = new Map<string, { value: unknown; expires: number }>()
+
+            fastify.decorate('cache', {
+              get: (key: string) => {
+                const entry = cache.get(key)
+                if (!entry || Date.now() > entry.expires) return null
+                return entry.value
+              },
+              set: (key: string, value: unknown) => {
+                cache.set(key, { value, expires: Date.now() + opts.ttl * 1000 })
+              }
+            })
+          }
+
+          export default fp(cachePlugin, {
+            name: 'cache-plugin',
+            fastify: '>=4.0.0'
+          })
+
+          // Użycie:
+          // await fastify.register(cachePlugin, { ttl: 300, maxItems: 1000 })
+        desc: FastifyPluginAsync — typowany plugin z opcjami
+        detail:
+          what: FastifyPluginAsync<Options> nadaje typ opcjom pluginu. TypeScript sprawdzi czy register() dostał wymagane opcje. fp() owijanie dla eksponowania dekoratorów.
+          how: "extends FastifyPluginOptions — baza dla własnych opcji. FastifyInstance w argumencie — pełny typ z declaration merging."
+          tips:
+            - 'FastifyPluginAsync vs FastifyPluginCallback — użyj Async dla pluginów z await'
+            - 'opts.ttl w pluginie — Fastify przekazuje je automatycznie z register(plugin, opts)'
+
+  - name: "Pino Logger"
+    icon: "📋"
+    commands:
+      - code: |
+          import Fastify from 'fastify'
+
+          const fastify = Fastify({
+            logger: {
+              level: process.env.LOG_LEVEL ?? 'info',
+              // Produkcja — JSON logi
+              // transport: undefined (domyślnie JSON)
+
+              // Development — czytelny format
+              transport: process.env.NODE_ENV === 'development'
+                ? { target: 'pino-pretty', options: { colorize: true, translateTime: 'SYS:HH:MM:ss' } }
+                : undefined,
+
+              // Redaktuj wrażliwe pola
+              redact: {
+                paths: ['req.headers.authorization', 'req.body.password', '*.creditCard'],
+                censor: '[REDACTED]'
+              }
+            }
+          })
+
+          // Logowanie w handlerach
+          fastify.get('/users/:id', async (request, reply) => {
+            request.log.info({ userId: (request.params as any).id }, 'Fetching user')
+            request.log.warn('User not in cache')
+            request.log.error({ err: new Error('DB timeout') }, 'Database error')
+            return { id: 1 }
+          })
+        desc: Konfiguracja Pino loggera
+        detail:
+          what: Fastify ma wbudowany Pino — najszybszy Node.js logger. redact ukrywa wrażliwe dane z logów. request.log jest bound loggingiem z reqId — śledź request przez wszystkie logi.
+          how: "Pino poziomy: trace, debug, info, warn, error, fatal. request.log vs fastify.log — request.log ma reqId, fastify.log to global logger."
+          tips:
+            - 'pino-pretty tylko dev — na prod JSON logi (Elasticsearch, Grafana Loki)'
+            - 'redact jest kluczowe dla GDPR — authorization header i hasła nigdy nie powinny trafić do logów'
+
+  - name: Testowanie
+    icon: "🧪"
+    commands:
+      - cmd: npm install --save-dev vitest @vitest/coverage-v8
+        desc: Zainstaluj Vitest do testowania
+        detail:
+          what: Vitest to najszybszy framework testowy dla Node.js — kompatybilny z Jest API. Idealny z Fastify bo wspiera ESM natywnie.
+          how: "vitest run — jednorazowo. vitest watch — tryb watch. vitest --coverage — coverage report."
+          tips:
+            - 'npm run test — dodaj "test": "vitest run" do package.json scripts'
+            - '@vitest/coverage-v8 — szybszy coverage przez V8 zamiast Babel'
+
+      - code: |
+          import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+          import Fastify from 'fastify'
+
+          // Tworzy nową instancję Fastify per test suite
+          function buildApp() {
+            const app = Fastify({ logger: false })
+
+            app.get('/health', async () => ({ status: 'ok' }))
+            app.post('/users', async (req, reply) => {
+              reply.code(201)
+              return { id: '1', ...req.body as object }
+            })
+
+            return app
+          }
+
+          describe('API Tests', () => {
+            let app: ReturnType<typeof buildApp>
+
+            beforeAll(async () => {
+              app = buildApp()
+              await app.ready()
+            })
+
+            afterAll(async () => {
+              await app.close()
+            })
+
+            it('GET /health returns ok', async () => {
+              const response = await app.inject({
+                method: 'GET',
+                url: '/health'
+              })
+              expect(response.statusCode).toBe(200)
+              expect(response.json()).toEqual({ status: 'ok' })
+            })
+
+            it('POST /users creates user', async () => {
+              const response = await app.inject({
+                method: 'POST',
+                url: '/users',
+                payload: { name: 'Jan', email: 'jan@test.com' }
+              })
+              expect(response.statusCode).toBe(201)
+              const body = response.json()
+              expect(body.name).toBe('Jan')
+            })
+          })
+        desc: "app.inject() — testy bez uruchamiania serwera"
+        detail:
+          what: app.inject() to wbudowany test client Fastify — wysyła request bezpośrednio do handlera bez TCP. Szybkie, izolowane testy bez portu. response.json() parsuje JSON body.
+          how: "inject({ method, url, payload, headers, query }) — pełna kontrola. response.statusCode, response.json(), response.headers — wyniki."
+          tips:
+            - 'logger: false w testach — bez zaśmiecania output testów logami'
+            - 'await app.ready() — czeka na załadowanie wszystkich pluginów przed testami'
+            - 'Nowa instancja per test file — izolacja, bez shared state'
+
+  - name: "Oficjalne pluginy — instalacja"
+    icon: "🧩"
+    commands:
+      - cmd: npm install @fastify/cors @fastify/helmet @fastify/rate-limit
+        desc: Bezpieczeństwo — CORS, security headers, rate limiting
+        detail:
+          what: "@fastify/cors ustawia Access-Control-* headers. @fastify/helmet dodaje 11 security headers (CSP, HSTS itp.). @fastify/rate-limit limituje requesty per IP."
+          how: "fastify.register(cors, { origin: true }) — dev. fastify.register(helmet) — domyślna konfiguracja bezpieczeństwa. Kolejność register ma znaczenie."
+          tips:
+            - '@fastify/helmet + @fastify/cors rejestruj przed trasami — hooki muszą być widoczne globalnie'
+            - "rate-limit z Redis — @fastify/rate-limit + store: new RedisStore(redisClient)"
+
+      - cmd: npm install @fastify/jwt @fastify/cookie @fastify/session
+        desc: Autentykacja — JWT, cookies, session
+        detail:
+          what: "@fastify/jwt = sign/verify JWT. @fastify/cookie = czytanie/pisanie cookies. @fastify/session = server-side sessions z cookie ID."
+          how: "fastify.register(jwt, { secret }) → request.jwtVerify() + request.jwtSign(). Można łączyć JWT + cookie (refresh token w cookie, access w header)."
+          tips:
+            - '@fastify/cookie jest wymagany przez @fastify/session'
+            - "jwt({ cookie: { cookieName: 'token', signed: true } }) — JWT w cookie zamiast header"
+
+      - cmd: npm install @fastify/swagger @fastify/swagger-ui
+        desc: Dokumentacja API — OpenAPI i Swagger UI
+        detail:
+          what: "@fastify/swagger generuje OpenAPI spec z JSON Schema tras. @fastify/swagger-ui montuje interaktywny Swagger UI pod /documentation."
+          how: "Rejestruj PRZED trasami — swagger musi widzieć wszystkie schematy. Schematy z addSchema() są automatycznie dołączone do spec."
+          tips:
+            - "swagger-ui: { routePrefix: '/docs' } — zmień URL dokumentacji"
+            - 'tags w route options — grupuj endpointy w Swagger UI'
+
+      - cmd: npm install @fastify/multipart @fastify/static
+        desc: Pliki — upload multipart i pliki statyczne
+        detail:
+          what: "@fastify/multipart obsługuje upload plików przez multipart/form-data. @fastify/static serwuje pliki z dysku (HTML, CSS, obrazy, SPA)."
+          how: "request.file() — jeden plik. request.files() — iteruj wiele. Static z root: path.join(__dirname, 'public') serwuje katalog."
+          tips:
+            - "multipart limits: { fileSize: 10 * 1024 * 1024 } — 10MB limit pliku"
+            - "static z wildcard: /* — catch-all dla SPA (React/Vue/Angular)"
+
+      - cmd: npm install @fastify/redis @fastify/postgres @fastify/mongodb
+        desc: Bazy danych — Redis, PostgreSQL, MongoDB adaptery
+        detail:
+          what: "Oficjalne adaptery dekorują instancję Fastify — fastify.redis, fastify.pg, fastify.mongo. Automatyczne zamknięcie połączeń przy shutdown."
+          how: "fastify.register(fastifyRedis, { url: 'redis://localhost' }) → fastify.redis.get/set. @fastify/postgres używa pg pool."
+          tips:
+            - 'Wiele połączeń: register z { namespace: "read" } i { namespace: "write" } — fastify.redis.read, fastify.redis.write'
+            - 'fastify.pg.connect() zwraca klienta dla transakcji — pamiętaj o client.release()'
+
+  - name: "@fastify/swagger — OpenAPI docs"
+    icon: "📄"
+    commands:
+      - code: |
+          import Fastify from 'fastify'
+          import swagger from '@fastify/swagger'
+          import swaggerUI from '@fastify/swagger-ui'
+
+          const fastify = Fastify({ logger: true })
+
+          // Rejestruj PRZED trasami
+          await fastify.register(swagger, {
+            openapi: {
+              info: {
+                title: 'My API',
+                description: 'Dokumentacja API',
+                version: '1.0.0'
+              },
+              servers: [
+                { url: 'http://localhost:3000', description: 'Development' },
+                { url: 'https://api.myapp.com', description: 'Production' }
+              ],
+              components: {
+                securitySchemes: {
+                  Bearer: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'JWT'
+                  }
+                }
+              }
+            }
+          })
+
+          await fastify.register(swaggerUI, {
+            routePrefix: '/documentation',
+            uiConfig: { docExpansion: 'list', deepLinking: true }
+          })
+
+          // Trasa z tagami i security w schema
+          fastify.post('/users', {
+            schema: {
+              tags: ['Users'],
+              summary: 'Utwórz nowego użytkownika',
+              security: [{ Bearer: [] }],
+              body: {
+                type: 'object',
+                required: ['name', 'email'],
+                properties: {
+                  name: { type: 'string' },
+                  email: { type: 'string', format: 'email' }
+                }
+              },
+              response: {
+                201: {
+                  description: 'Użytkownik utworzony',
+                  type: 'object',
+                  properties: { id: { type: 'string' }, name: { type: 'string' } }
+                }
+              }
+            }
+          }, async (req, reply) => {
+            reply.code(201)
+            return { id: crypto.randomUUID(), ...(req.body as object) }
+          })
+
+          await fastify.listen({ port: 3000 })
+          // Dokumentacja pod: http://localhost:3000/documentation
+        desc: "@fastify/swagger + swagger-ui — automatyczna dokumentacja"
+        detail:
+          what: "@fastify/swagger generuje /documentation/json i /documentation/yaml (OpenAPI spec). @fastify/swagger-ui renderuje interaktywny UI. Schematy tras = automatyczna dokumentacja."
+          how: "tags w schema groupują endpointy. security deklaruje wymagania auth per endpoint. summary i description pojawiają się w UI."
+          tips:
+            - 'Dokumentacja jest automatyczna — zero ręcznego pisania YAML jeśli masz JSON Schema'
+            - 'hideUntagged: true w swagger-ui config — ukryj nieoznakowane endpointy'
+
+  - name: "@fastify/cors i @fastify/rate-limit"
+    icon: "🌐"
+    commands:
+      - code: |
+          import Fastify from 'fastify'
+          import cors from '@fastify/cors'
+          import rateLimit from '@fastify/rate-limit'
+
+          const fastify = Fastify()
+
+          // CORS — konfiguracja produkcyjna
+          await fastify.register(cors, {
+            origin: (origin, cb) => {
+              const allowed = ['https://myapp.com', 'https://admin.myapp.com']
+              if (!origin || allowed.includes(origin)) {
+                cb(null, true)
+              } else {
+                cb(new Error('Not allowed by CORS'), false)
+              }
+            },
+            methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
+            exposedHeaders: ['X-Request-Id', 'X-Response-Time'],
+            credentials: true,
+            maxAge: 600
+          })
+
+          // Rate limiting globalne
+          await fastify.register(rateLimit, {
+            max: 100,
+            timeWindow: '1 minute',
+            keyGenerator: (request) => {
+              return request.headers['x-real-ip'] as string
+                ?? request.headers['x-forwarded-for'] as string
+                ?? request.ip
+            },
+            errorResponseBuilder: (request, context) => ({
+              code: 429,
+              error: 'Too Many Requests',
+              message: `Rate limit exceeded. Retry after ${context.after}`,
+              retryAfter: context.after
+            })
+          })
+
+          // Osobny limit dla auth endpoints
+          fastify.post('/auth/login', {
+            config: {
+              rateLimit: { max: 5, timeWindow: '15 minutes' }  // surowiej dla loginu
+            }
+          }, async (req, reply) => {
+            return { token: 'jwt-here' }
+          })
+        desc: "CORS + Rate Limiting — konfiguracja produkcyjna"
+        detail:
+          what: "cors z funkcją origin — dynamiczne sprawdzanie na białej liście. rateLimit z keyGenerator — właściwy IP za proxy/load balancer. Per-route config przez config.rateLimit."
+          how: "maxAge: 600 — przeglądarka cachuje preflight 10 minut. credentials: true wymagane dla cookies cross-origin. keyGenerator używa X-Real-IP za nginx."
+          tips:
+            - 'credentials: true + origin: "*" — nie działa — musisz podać konkretne originy'
+            - 'Per-route rate limit: config: { rateLimit: { max: 5 } } — nadpisuje globalny limit'
+
+  - name: Middleware i autoryzacja
+    icon: "🛡️"
+    commands:
+      - code: |
+          import Fastify from 'fastify'
+          import fp from 'fastify-plugin'
+
+          const fastify = Fastify()
+
+          // Role-based access control
+          const authPlugin = fp(async (fastify) => {
+            fastify.decorate('authenticate', async (req: any, reply: any) => {
+              const token = req.headers.authorization?.slice(7)
+              if (!token) return reply.code(401).send({ error: 'No token' })
+              // verify token...
+              req.user = { id: '1', role: 'user' }
+            })
+
+            fastify.decorate('requireRole', (role: string) => async (req: any, reply: any) => {
+              await fastify.authenticate(req, reply)
+              if (req.user?.role !== role) {
+                return reply.code(403).send({ error: `Requires ${role} role` })
+              }
+            })
+          })
+
+          await fastify.register(authPlugin)
+
+          // Użycie
+          fastify.get('/profile', {
+            preHandler: [fastify.authenticate]
+          } as any, async (req: any) => ({ user: req.user }))
+
+          fastify.get('/admin/stats', {
+            preHandler: [fastify.requireRole('admin')]
+          } as any, async () => ({ stats: {} }))
+        desc: Role-based authorization — decorate pattern
+        detail:
+          what: requireRole factory zwraca middleware z zamkniętą rolą. fastify.requireRole('admin') = async funkcja preHandler. Czyste i wielokrotnego użytku.
+          how: preHandler jako tablica — [fastify.authenticate, checkPermission] — oba wykonają się sekwencyjnie. Pierwszy błąd zatrzymuje chain.
+          tips:
+            - 'Dekorator z parametrem (factory): decorate("requireRole", (role) => async (req, reply) => {})'
+            - 'Dla bardziej złożonego RBAC: fastify-acl-auth lub własna implementacja z role hierarchy'
+
+      - code: |
+          import Fastify from 'fastify'
+
+          const fastify = Fastify()
+
+          // Middleware — request timing
+          fastify.addHook('onRequest', async (request, reply) => {
+            (request as any).startTime = process.hrtime.bigint()
+          })
+
+          fastify.addHook('onResponse', async (request, reply) => {
+            const start = (request as any).startTime as bigint
+            const durationNs = process.hrtime.bigint() - start
+            const durationMs = Number(durationNs) / 1_000_000
+
+            request.log.info({
+              method: request.method,
+              url: request.url,
+              statusCode: reply.statusCode,
+              durationMs: durationMs.toFixed(3)
+            }, 'Request finished')
+          })
+
+          // Context propagation — request-scoped data
+          fastify.decorateRequest('ctx', null)
+
+          fastify.addHook('preHandler', async (request) => {
+            (request as any).ctx = {
+              requestId: request.id,
+              userId: null,
+              startTime: Date.now()
+            }
+          })
+        desc: Timing middleware + context propagation
+        detail:
+          what: process.hrtime.bigint() = nanosecond precision timing. Context object na request — przekazuj dane (userId, requestId) przez cały lifecycle bez globals.
+          how: decorateRequest('ctx', null) deklaruje właściwość. preHandler wypełnia. Handler czyta. Izolowany per-request — bezpieczny w concurrent środowisku.
+          tips:
+            - 'process.hrtime.bigint() dokładniejszy od Date.now() — BigInt, nie float'
+            - 'request.ctx jako typed interface — declare module "fastify" {} dla type safety'
+
+  - name: Error handling
+    icon: "⚠️"
+    commands:
+      - code: |
+          import Fastify, { FastifyError } from 'fastify'
+
+          const fastify = Fastify()
+
+          // Własne klasy błędów
+          class NotFoundError extends Error {
+            statusCode = 404
+            constructor(resource: string, id: string) {
+              super(`${resource} with id ${id} not found`)
+              this.name = 'NotFoundError'
+            }
+          }
+
+          class ValidationError extends Error {
+            statusCode = 422
+            constructor(
+              message: string,
+              public fields: Record<string, string>
+            ) {
+              super(message)
+              this.name = 'ValidationError'
+            }
+          }
+
+          // Globalny handler błędów
+          fastify.setErrorHandler(async (error: FastifyError & { fields?: Record<string, string> }, request, reply) => {
+            // Błędy walidacji Fastify (JSON Schema)
+            if (error.validation) {
+              return reply.code(400).send({
+                error: 'Validation Failed',
+                details: error.validation.map(v => ({
+                  field: v.instancePath.slice(1),
+                  message: v.message
+                }))
+              })
+            }
+
+            // Własne błędy z statusCode
+            if (error.statusCode && error.statusCode < 500) {
+              return reply.code(error.statusCode).send({
+                error: error.name,
+                message: error.message,
+                ...(error.fields && { fields: error.fields })
+              })
+            }
+
+            // 500 — nie ujawniaj detali
+            request.log.error({ err: error }, 'Unhandled error')
+            return reply.code(500).send({ error: 'Internal Server Error' })
+          })
+
+          fastify.get('/users/:id', async (req, reply) => {
+            const { id } = req.params as { id: string }
+            const user = null  // symulacja braku w DB
+            if (!user) throw new NotFoundError('User', id)
+            return user
+          })
+        desc: Customowe klasy błędów + globalny handler
+        detail:
+          what: Klasy błędów z statusCode — jeden throw, setErrorHandler formatuje odpowiedź. error.validation — błędy JSON Schema od Fastify. Czytelny format dla klienta.
+          how: "throw new NotFoundError(...) w handlerze → setErrorHandler → reply.code(404). Nie potrzebujesz try/catch w każdym handlerze."
+          tips:
+            - 'statusCode na klasie błędu — konwencja Fastify, nie standard Node.js Error'
+            - 'Loguj error.stack tylko dla 5xx — nie loguj 4xx jako błędy (to normalny flow)'
+
+  - name: Deployment i produkcja
+    icon: "🚢"
+    commands:
+      - cmd: node --max-old-space-size=512 dist/server.js
+        desc: Uruchom Fastify z limitem pamięci
+        detail:
+          what: --max-old-space-size ustawia limit heap Node.js w MB. Bez limitu Node.js może zużyć całą dostępną RAM i zostać zabity przez OOM killer.
+          how: Dla kontenera 512MB RAM ustaw --max-old-space-size=400 (80%) — zostaw margines dla OS i innych procesów.
+          tips:
+            - 'Ustaw limit na 75-80% dostępnej RAM kontenera'
+            - 'NODE_OPTIONS="--max-old-space-size=512" — przez zmienną środowiskową'
+
+      - cmd: "fastify start --options -- src/app.js"
+        desc: Uruchom przez fastify-cli
+        detail:
+          what: fastify-cli startuje aplikację eksportującą Fastify instance lub factory. Zarządza procesem, logowaniem i graceful shutdown.
+          how: "src/app.js musi eksportować: async function (fastify, opts) {} lub Fastify instance. fastify-cli wstrzykuje dodatkowe pluginy."
+          tips:
+            - '"start": "fastify start src/app.js" — w package.json scripts'
+            - '--port 8080 --address 0.0.0.0 --log-level info — opcje CLI'
+
+      - code: |
+          # Dockerfile dla Fastify
+          FROM node:22-alpine AS builder
+          WORKDIR /app
+          COPY package*.json ./
+          RUN npm ci --only=production
+
+          FROM node:22-alpine AS runtime
+          WORKDIR /app
+          COPY --from=builder /app/node_modules ./node_modules
+          COPY dist/ ./dist/
+          COPY package.json ./
+
+          ENV NODE_ENV=production
+          ENV LOG_LEVEL=info
+
+          EXPOSE 3000
+
+          USER node
+
+          HEALTHCHECK --interval=30s --timeout=10s --start-period=5s \
+            CMD wget -qO- http://localhost:3000/health || exit 1
+
+          CMD ["node", "--max-old-space-size=400", "dist/server.js"]
+        desc: Dockerfile dla Fastify (production)
+        detail:
+          what: Multi-stage build — builder instaluje zależności, runtime kopiuje tylko production node_modules. USER node — nie root. HEALTHCHECK — K8s/Docker sprawdza /health.
+          how: npm ci --only=production pomija devDependencies. Alpine image jest minimalne. dist/ zawiera skompilowany TypeScript.
+          tips:
+            - 'Dodaj /health endpoint przed rejestracją pluginów — dostępny zawsze, bez auth'
+            - 'USER node — nigdy nie uruchamiaj Node.js jako root w kontenerze'
+
+      - code: |
+          // Cluster mode — wykorzystaj wszystkie CPU cores
+          import cluster from 'cluster'
+          import os from 'os'
+
+          if (cluster.isPrimary) {
+            const numCPUs = os.cpus().length
+            console.log(`Master ${process.pid} — forking ${numCPUs} workers`)
+
+            for (let i = 0; i < numCPUs; i++) {
+              cluster.fork()
+            }
+
+            cluster.on('exit', (worker, code) => {
+              console.log(`Worker ${worker.process.pid} died (${code}) — restarting`)
+              cluster.fork()  // auto-restart
+            })
+          } else {
+            // Worker — uruchom serwer Fastify
+            const { default: fastify } = await import('./app.js')
+            await fastify.listen({ port: 3000, host: '0.0.0.0' })
+            console.log(`Worker ${process.pid} started`)
+          }
+        desc: Cluster mode — wiele CPU cores
+        detail:
+          what: Node.js jest single-threaded — cluster fork() uruchamia wiele procesów Worker, każdy na swoim CPU. Na 4-core maszynie masz 4x throughput.
+          how: Procesy Worker współdzielą port TCP (OS load balancuje). Auto-restart martwych workerów. Alternatywa — PM2 cluster mode bez pisania cluster kodu.
+          tips:
+            - 'pm2 start dist/server.js -i max — PM2 zarządza clusterem automatycznie'
+            - 'W K8s/Docker nie potrzebujesz cluster — skaluj przez replicas zamiast'
+
+  - name: Testowanie — zaawansowane
+    icon: "🧪"
+    commands:
+      - code: |
+          import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+          import fp from 'fastify-plugin'
+          import Fastify from 'fastify'
+
+          // Mock DB plugin dla testów
+          const mockDb = fp(async (fastify) => {
+            const users = [
+              { id: '1', name: 'Jan', email: 'jan@test.com' },
+              { id: '2', name: 'Anna', email: 'anna@test.com' }
+            ]
+
+            fastify.decorate('db', {
+              users: {
+                findAll: async () => users,
+                findById: async (id: string) => users.find(u => u.id === id) ?? null,
+                create: async (data: { name: string; email: string }) => ({
+                  id: crypto.randomUUID(),
+                  ...data
+                })
+              }
+            })
+          })
+
+          // Buduje aplikację z mock dependencies
+          async function buildTestApp() {
+            const app = Fastify({ logger: false })
+            await app.register(mockDb)
+            // Zarejestruj trasy
+            app.get('/users', async (req) => {
+              return await (app as any).db.users.findAll()
+            })
+            await app.ready()
+            return app
+          }
+
+          describe('Users API', () => {
+            let app: Awaited<ReturnType<typeof buildTestApp>>
+
+            beforeEach(async () => { app = await buildTestApp() })
+            afterEach(async () => { await app.close() })
+
+            it('GET /users returns all users', async () => {
+              const res = await app.inject({ method: 'GET', url: '/users' })
+              expect(res.statusCode).toBe(200)
+              const body = res.json()
+              expect(body).toHaveLength(2)
+              expect(body[0]).toHaveProperty('name', 'Jan')
+            })
+          })
+        desc: Testy z mock plugin — izolacja zależności
+        detail:
+          what: Mock plugin zastępuje prawdziwą bazę danych w testach. buildTestApp() tworzy izolowaną instancję per test. beforeEach/afterEach — świeży stan dla każdego testu.
+          how: fp() mock plugin rejestruje dane testowe zamiast prawdziwego DB. app.close() w afterEach czyści zasoby i onClose hooks.
+          tips:
+            - 'Nowa instancja Fastify per test — izolacja stanu (nie globalny serwer)'
+            - 'Mock data jako stałe — deterministyczne testy, nie zależne od kolejności'
+
+      - code: |
+          import { describe, it, expect } from 'vitest'
+          import Fastify from 'fastify'
+
+          // Testowanie walidacji JSON Schema
+          async function buildApp() {
+            const app = Fastify({ logger: false })
+
+            app.post('/users', {
+              schema: {
+                body: {
+                  type: 'object',
+                  required: ['name', 'email'],
+                  properties: {
+                    name: { type: 'string', minLength: 2 },
+                    email: { type: 'string', format: 'email' },
+                    age: { type: 'integer', minimum: 18 }
+                  },
+                  additionalProperties: false
+                }
+              }
+            }, async (req, reply) => {
+              reply.code(201)
+              return { id: '1', ...req.body as object }
+            })
+
+            await app.ready()
+            return app
+          }
+
+          describe('Validation', () => {
+            it('rejects missing required fields', async () => {
+              const app = await buildApp()
+              const res = await app.inject({
+                method: 'POST', url: '/users',
+                payload: { name: 'Jan' }  // brak email
+              })
+              expect(res.statusCode).toBe(400)
+              await app.close()
+            })
+
+            it('rejects invalid email format', async () => {
+              const app = await buildApp()
+              const res = await app.inject({
+                method: 'POST', url: '/users',
+                payload: { name: 'Jan', email: 'not-email' }
+              })
+              expect(res.statusCode).toBe(400)
+              await app.close()
+            })
+
+            it('rejects underage users', async () => {
+              const app = await buildApp()
+              const res = await app.inject({
+                method: 'POST', url: '/users',
+                payload: { name: 'Jan', email: 'jan@test.com', age: 16 }
+              })
+              expect(res.statusCode).toBe(400)
+              await app.close()
+            })
+          })
+        desc: Testowanie walidacji — edge cases
+        detail:
+          what: Testuj nie tylko happy path — sprawdź że walidacja działa dla każdego wymagania. Osobny test per reguła — czytelny output gdy coś się psuje.
+          how: app.inject() z nieprawidłowymi payloadami. expect(res.statusCode).toBe(400) — Fastify zwraca 400 dla błędów walidacji JSON Schema.
+          tips:
+            - 'Testuj additionalProperties: false — wyślij dodatkowe pole i sprawdź czy odrzucone'
+            - 'Testuj każdy format (email, uuid, date) — to regresja przed zmianami schematu'
+
+      - cmd: autocannon -c 100 -d 30 http://localhost:3000/api/users
+        desc: Benchmark wydajności z autocannon
+        detail:
+          what: autocannon to HTTP load tester. -c 100 = 100 concurrent connections, -d 30 = 30 sekund testu. Pokazuje req/sec, latencję p50/p99, throughput.
+          how: Porównaj wynik z Express na tym samym endpoincie. Fastify osiąga 30-76k req/sec vs Express 15-30k req/sec.
+          tips:
+            - 'npm install -g autocannon — globalna instalacja'
+            - 'Uruchom bez logowania (logger: false) dla benchmarku — logger dodaje ~20% overhead'
+
+  - name: Wzorce architektoniczne
+    icon: "🏗️"
+    commands:
+      - code: |
+          // Struktura projektu Fastify — Clean Architecture
+          // src/
+          //   app.ts              — Fastify instance + register plugins
+          //   server.ts           — listen() + graceful shutdown
+          //   plugins/
+          //     config.ts         — @fastify/env — zmienne środowiskowe
+          //     db.ts             — połączenie z bazą + fastify.db
+          //     jwt.ts            — @fastify/jwt + fastify.authenticate
+          //     swagger.ts        — @fastify/swagger + @fastify/swagger-ui
+          //     sensible.ts       — @fastify/sensible
+          //   routes/
+          //     v1/
+          //       users/
+          //         index.ts      — GET /api/v1/users, POST /api/v1/users
+          //         schema.ts     — JSON Schema / TypeBox schemas
+          //         handler.ts    — logika handlerów
+          //       products/
+          //         index.ts
+          //   schemas/            — współdzielone addSchema() definicje
+          //     user.schema.ts
+          //     pagination.schema.ts
+          //   types/
+          //     fastify.d.ts      — declaration merging
+          //   test/
+          //     unit/
+          //     integration/
+
+          // src/app.ts
+          import Fastify from 'fastify'
+          import autoload from '@fastify/autoload'
+          import { join } from 'path'
+
+          export function buildApp() {
+            const app = Fastify({ logger: true })
+
+            // Pluginy ładują się z plugins/ — fp() dekoratory widoczne globalnie
+            app.register(autoload, { dir: join(__dirname, 'plugins') })
+
+            // Trasy ładują się po pluginach
+            app.register(autoload, {
+              dir: join(__dirname, 'routes'),
+              options: { prefix: '/api' }
+            })
+
+            return app
+          }
+        desc: Struktura projektu Fastify — Clean Architecture
+        detail:
+          what: "Oficjalna zalecana struktura: plugins/ = współdzielone serwisy (fp()), routes/ = trasy z autoload. Separacja concerns — schema, handler, route registration."
+          how: autoload ładuje plugins/ PRZED routes/ — pluginy muszą być gotowe zanim trasy ich użyją. Zrób buildApp() jako factory — łatwe testowanie.
+          tips:
+            - 'buildApp() zamiast globalnego fastify — możesz tworzyć wiele instancji w testach'
+            - 'Eksportuj app z buildApp() bez listen() — serwer startuje w server.ts'
+
+      - code: |
+          // Repository pattern z Fastify
+          import { FastifyInstance } from 'fastify'
+          import fp from 'fastify-plugin'
+
+          // Interface repozytorium
+          interface UserRepository {
+            findAll(opts: { page: number; limit: number }): Promise<User[]>
+            findById(id: string): Promise<User | null>
+            create(data: CreateUser): Promise<User>
+            update(id: string, data: Partial<User>): Promise<User | null>
+            delete(id: string): Promise<boolean>
+          }
+
+          interface User { id: string; name: string; email: string; createdAt: Date }
+          interface CreateUser { name: string; email: string }
+
+          // Implementacja repozytorium
+          function createUserRepository(db: any): UserRepository {
+            return {
+              findAll: async ({ page, limit }) => {
+                const offset = (page - 1) * limit
+                const result = await db.query(
+                  'SELECT * FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+                  [limit, offset]
+                )
+                return result.rows
+              },
+              findById: async (id) => {
+                const result = await db.query('SELECT * FROM users WHERE id = $1', [id])
+                return result.rows[0] ?? null
+              },
+              create: async (data) => {
+                const result = await db.query(
+                  'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
+                  [data.name, data.email]
+                )
+                return result.rows[0]
+              },
+              update: async (id, data) => {
+                const fields = Object.keys(data).map((k, i) => `${k} = $${i + 2}`).join(', ')
+                const result = await db.query(
+                  `UPDATE users SET ${fields} WHERE id = $1 RETURNING *`,
+                  [id, ...Object.values(data)]
+                )
+                return result.rows[0] ?? null
+              },
+              delete: async (id) => {
+                const result = await db.query('DELETE FROM users WHERE id = $1', [id])
+                return (result.rowCount ?? 0) > 0
+              }
+            }
+          }
+
+          // Plugin rejestrujący repository
+          export default fp(async (fastify: FastifyInstance) => {
+            fastify.decorate('userRepo', createUserRepository((fastify as any).db))
+          })
+        desc: Repository pattern z Fastify decorate
+        detail:
+          what: Repository interface + implementacja + plugin rejestrujący. fastify.userRepo dostępne w trasach. Łatwe mockowanie w testach — podmień implementację.
+          how: "createUserRepository(db) — dependency injection przez parametr (nie global). Plugin fp() = fastify.userRepo widoczne globalnie."
+          tips:
+            - 'Interface UserRepository — mock implementacja w testach to stub z prostymi tablicami'
+            - 'Oddziel interface od implementacji — łatwa migracja ORM lub zmiana bazy'
+
+      - cmd: npm run build && npm run start
+        desc: Kompilacja TypeScript i uruchomienie produkcji
+        detail:
+          what: '"build": "tsc" kompiluje TypeScript do dist/. "start": "node dist/server.js" uruchamia skompilowany JavaScript. Bez tsx/ts-node na produkcji.'
+          how: tsc używa tsconfig.json. Wyjście w dist/ z .js, .d.ts i .map. node dist/server.js — czysty JavaScript bez runtime TypeScript overhead.
+          tips:
+            - 'Dodaj "clean": "rm -rf dist" przed build — uniknij starych plików w dist/'
+            - 'scripts: { "build": "tsc", "start": "node dist/server.js", "dev": "tsx watch src/server.ts" }'
+
+  - name: Wydajność i optymalizacja
+    icon: "⚡"
+    commands:
+      - code: |
+          import Fastify from 'fastify'
+
+          // Fastify z wyłączonym parsowaniem body gdy niepotrzebne
+          const fastify = Fastify({
+            logger: false,  // wyłącz w benchmarkach
+            trustProxy: true  // gdy za reverse proxy
+          })
+
+          // content-type-parser tylko dla JSON — pomiń inne
+          fastify.addContentTypeParser('*', (request, payload, done) => {
+            done(null, null)  // ignoruj inne content-type
+          })
+
+          // Fastify serializuje response przez JSON Schema (Ajv) — 2x szybsze niż JSON.stringify
+          fastify.get('/data', {
+            schema: {
+              response: {
+                200: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'integer' },
+                    name: { type: 'string' },
+                    timestamp: { type: 'integer' }
+                  }
+                }
+              }
+            }
+          }, async () => {
+            return { id: 1, name: 'test', timestamp: Date.now() }
+          })
+        desc: Optymalizacja wydajności — serializer i parser
+        detail:
+          what: "Schema w response aktywuje szybki serializer Ajv — do 2x szybszy niż JSON.stringify. addContentTypeParser('*') odfiltrowuje nieznane content-type zamiast parsowania."
+          how: Pino logger ma ~20% overhead w benchmarkach — wyłącz w testach wydajności. Na produkcji logger jest niezbędny.
+          tips:
+            - 'Schema response = obowiązkowe dla hot paths — wpływ na każdy request'
+            - 'trustProxy: true — gdy za nginx/ALB — poprawia request.ip i protokół'
+
+      - cmd: npm install pino-pretty --save-dev
+        desc: Czytelne logi w development
+        detail:
+          what: pino-pretty formatuje JSON logi Pino do czytelnej formy z kolorami. Używaj TYLKO w dev — na produkcji JSON logi (szybsze, parsowane przez Elasticsearch/Loki).
+          how: "transport: { target: 'pino-pretty' } w konfiguracji Fastify. Automatycznie wykrywa TTY."
+          tips:
+            - 'pino-pretty spowalnia o ~30% — nie używaj w produkcji ani benchmarkach'
+            - '"dev": "NODE_ENV=development tsx src/server.ts" — logger warunkowy przez NODE_ENV'
+
+      - code: |
+          import Fastify from 'fastify'
+
+          const fastify = Fastify({ logger: true })
+
+          // Cache w pamięci — proste i szybkie
+          const cache = new Map<string, { data: unknown; expires: number }>()
+
+          function getCached<T>(key: string): T | null {
+            const entry = cache.get(key)
+            if (!entry || Date.now() > entry.expires) {
+              cache.delete(key)
+              return null
+            }
+            return entry.data as T
+          }
+
+          function setCached(key: string, data: unknown, ttlMs = 60_000) {
+            cache.set(key, { data, expires: Date.now() + ttlMs })
+          }
+
+          // Route z cache
+          fastify.get('/api/products', {
+            schema: {
+              response: {
+                200: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      name: { type: 'string' },
+                      price: { type: 'number' }
+                    }
+                  }
+                }
+              }
+            }
+          }, async (request, reply) => {
+            const cacheKey = 'products:all'
+            const cached = getCached<unknown[]>(cacheKey)
+
+            if (cached) {
+              reply.header('X-Cache', 'HIT')
+              return cached
+            }
+
+            // Symulacja DB query
+            const products = [{ id: '1', name: 'Widget', price: 9.99 }]
+            setCached(cacheKey, products, 60_000)  // 1 minuta
+
+            reply.header('X-Cache', 'MISS')
+            return products
+          })
+
+          await fastify.listen({ port: 3000 })
+        desc: "In-memory cache — Map z TTL"
+        detail:
+          what: Prosty cache w Map z TTL (time-to-live). X-Cache header informuje klienta czy trafił w cache. Dla wielu instancji użyj @fastify/redis zamiast Map.
+          how: setCached z ttlMs w milisekundach. getCached usuwa wygasłe wpisy przy odczycie (lazy eviction). Brak periodicowego cleanup — dla małych cache.
+          tips:
+            - 'Dla produkcji z wieloma instancjami: Redis (fastify.redis.get/setex) — współdzielony cache'
+            - '@fastify/rate-limit ma wbudowany Redis store — ten sam klient dla rate limit i cache'
+
+      - code: |
+          // Streaming dużych danych bez bufferowania w pamięci
+          import Fastify from 'fastify'
+          import { pipeline } from 'stream/promises'
+          import { createReadStream } from 'fs'
+          import { createGzip } from 'zlib'
+
+          const fastify = Fastify()
+
+          // Streaming pliku z kompresją gzip
+          fastify.get('/export/data.json.gz', async (request, reply) => {
+            const filePath = './data/large-export.json'
+
+            reply
+              .header('Content-Type', 'application/gzip')
+              .header('Content-Disposition', 'attachment; filename="data.json.gz"')
+
+            // Pipe: plik → gzip → response
+            const fileStream = createReadStream(filePath)
+            const gzipStream = createGzip()
+
+            reply.send(fileStream.pipe(gzipStream))
+          })
+
+          // Streaming z generatorem — brak bufferowania wyniku
+          fastify.get('/stream/events', async (request, reply) => {
+            reply.header('Content-Type', 'text/event-stream')
+            reply.header('Cache-Control', 'no-cache')
+            reply.header('Connection', 'keep-alive')
+
+            const { Readable } = await import('stream')
+
+            const stream = new Readable({ read() {} })
+            reply.send(stream)
+
+            let i = 0
+            const interval = setInterval(() => {
+              stream.push(`data: ${JSON.stringify({ event: i++, time: Date.now() })}\n\n`)
+              if (i > 10) {
+                clearInterval(interval)
+                stream.push(null)  // koniec streamu
+              }
+            }, 1000)
+          })
+
+          await fastify.listen({ port: 3000 })
+        desc: Streaming — pliki i SSE bez bufferowania
+        detail:
+          what: reply.send(stream) streamuje bez buforowania w pamięci. Pipe przez gzip kompresuje w locie. SSE przez Readable stream — klient dostaje eventy w czasie rzeczywistym.
+          how: "Readable stream: push(data) wysyła chunk. push(null) = koniec. Fastify automatycznie obsługuje backpressure."
+          tips:
+            - 'Streaming niezbędny dla plików >50MB — bufferowanie = crash z OOM'
+            - 'text/event-stream + Cache-Control: no-cache = standardowe SSE headers'
+
+      - cmd: "npx clinic doctor -- node dist/server.js"
+        desc: Profiling wydajności z Clinic.js
+        detail:
+          what: "Clinic.js (npmjs.com/clinic) analizuje wydajność Node.js apps. doctor — automatyczna diagnoza. flame — flame graph CPU. bubbleprof — async profiling."
+          how: "Uruchom clinic doctor, wyślij ruch (autocannon), Ctrl+C — clinic generuje HTML raport z diagnozą."
+          tips:
+            - 'npm install -g clinic — globalna instalacja'
+            - 'clinic flame -- node dist/server.js — flame graph CPU bottlenecks'

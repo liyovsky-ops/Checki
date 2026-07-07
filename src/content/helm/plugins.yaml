@@ -1,0 +1,234 @@
+title: Ekosystem Helm — pluginy i narzędzia
+
+items:
+  - name: helm-diff — podgląd zmian przed upgrade
+    icon: "🔍"
+    desc: |
+      Najpopularniejszy plugin Helm. Pokazuje dokładnie co się zmieni przed helm upgrade
+      — jak git diff dla zasobów Kubernetes. Niezbędny w CI/CD do code review deploymentów.
+      Instalacja: helm plugin install https://github.com/databus23/helm-diff
+
+      Możesz porównać dwie rewizje tej samej release lub zobaczyć diff przed planowanym upgrade.
+      Wynik wygląda jak git diff: linie z - to co znika, + to co się pojawia.
+    code: |
+      # Instalacja:
+      helm plugin install https://github.com/databus23/helm-diff
+
+      # Podgląd zmian przed upgrade (najczęstszy use case):
+      helm diff upgrade myapp bitnami/nginx \
+        -n production \
+        -f values-prod.yaml \
+        --version 15.2.0
+
+      # Przykład output:
+      # production, myapp, Deployment (apps) has changed:
+      # -  replicas: 3
+      # +  replicas: 5
+      # -    image: nginx:1.21.0
+      # +    image: nginx:1.22.0
+
+      # Porównaj dwie istniejące rewizje:
+      helm diff revision myapp 2 3 -n production
+
+      # Diff z bieżącym stanem K8s (wykrywa drift):
+      helm diff release myapp -n production
+
+      # W CI/CD — automatyczny diff jako komentarz do PR:
+      DIFF=$(helm diff upgrade myapp ./chart -f values-prod.yaml --no-color)
+      echo "$DIFF"
+
+  - name: helm-secrets — szyfrowanie wartości (SOPS + Vault)
+    icon: "🔐"
+    desc: |
+      Plugin do bezpiecznego zarządzania sekretami w Helm — integruje z SOPS (Mozilla),
+      HashiCorp Vault, AWS SSM, GCP Secret Manager. Szyfrowane values.yaml możesz
+      bezpiecznie commitować do Git — nikt bez klucza nie odczyta wartości.
+      Instalacja: helm plugin install https://github.com/jkroepke/helm-secrets
+
+      Wzorzec: values.yaml (nieszyfrowane) + secrets.yaml (zaszyfrowane SOPS) → helm secrets install.
+      Szyfrowanie/deszyfrowanie odbywa się transparentnie przy install/upgrade.
+    code: |
+      # Instalacja:
+      helm plugin install https://github.com/jkroepke/helm-secrets
+
+      # Wymagane: SOPS + klucz GPG lub AWS KMS
+      brew install sops
+      gpg --gen-key               # lub użyj istniejącego klucza
+
+      # Zaszyfruj plik values:
+      sops -e secrets.yaml > secrets.enc.yaml
+      # lub helm secrets enc secrets.yaml
+
+      # Zainstaluj z zaszyfrowanymi wartościami:
+      helm secrets install myapp ./mychart \
+        -f values.yaml \
+        -f secrets.enc.yaml \
+        -n production
+
+      # Upgrade z sekretami:
+      helm secrets upgrade myapp ./mychart \
+        -f values.yaml \
+        -f secrets.enc.yaml \
+        -n production --atomic
+
+      # Odszyfruj tymczasowo (np. do edycji):
+      helm secrets edit secrets.enc.yaml
+      # lub: helm secrets view secrets.enc.yaml
+
+      # .sops.yaml — konfiguracja kluczy szyfrowania:
+      # creation_rules:
+      #   - path_regex: secrets.*\.yaml
+      #     pgp: TWOJ_GPG_FINGERPRINT
+
+  - name: helm-unittest — unit testy chartów Helm
+    icon: "🧪"
+    desc: |
+      Plugin do pisania unit testów dla chartów Helm — weryfikuje że szablony generują
+      poprawny YAML dla różnych konfiguracji values. Testy w YAML, szybkie, bez połączenia
+      z K8s. Idealny do CI jako gate przed merge.
+      Instalacja: helm plugin install https://github.com/helm-unittest/helm-unittest
+
+      Testy sprawdzają czy przy danych values.yaml generuje się oczekiwany manifest —
+      czy Service ma właściwy port, czy Deployment ma właściwą liczbę replik, czy Ingress
+      renderuje się tylko gdy enabled=true.
+    code: |
+      # Instalacja:
+      helm plugin install https://github.com/helm-unittest/helm-unittest
+
+      # Struktura testów w charcie:
+      # mychart/
+      #   tests/
+      #     deployment_test.yaml
+      #     service_test.yaml
+      #     ingress_test.yaml
+
+      # mychart/tests/deployment_test.yaml:
+      suite: test deployment
+      templates:
+        - deployment.yaml
+      tests:
+        - it: should render with 3 replicas
+          set:
+            replicaCount: 3
+          asserts:
+            - equal:
+                path: spec.replicas
+                value: 3
+
+        - it: should use custom image tag
+          set:
+            image.tag: "2.0.0"
+          asserts:
+            - matchRegex:
+                path: spec.template.spec.containers[0].image
+                pattern: ":2.0.0$"
+
+        - it: should disable ingress by default
+          templates:
+            - ingress.yaml
+          asserts:
+            - hasDocuments:
+                count: 0     # Ingress NIE jest renderowany gdy enabled=false
+
+      # Uruchom testy:
+      helm unittest ./mychart
+      helm unittest ./mychart -f "tests/*_test.yaml" --color
+
+  - name: helmfile — deklaratywne zarządzanie wieloma releases
+    icon: "📋"
+    desc: |
+      Helmfile to narzędzie (nie plugin Helm) do deklaratywnego zarządzania wieloma
+      Helm releases naraz. Jeden plik helmfile.yaml opisuje wszystkie releases w klastrze —
+      jak "docker-compose" dla Helm. Obsługuje środowiska, zależności między releases i SOPS.
+      Instalacja: brew install helmfile / scoop install helmfile
+
+      Wzorzec: jeden helmfile.yaml per środowisko lub jeden z sekcją environments.
+      helmfile sync instaluje/upgraduje wszystkie releases, helmfile diff pokazuje zmiany,
+      helmfile destroy usuwa wszystko. Idealne do zarządzania całym klastrem jako kod.
+    code: |
+      # helmfile.yaml — przykład dla środowiska produkcyjnego:
+      repositories:
+        - name: bitnami
+          url: https://charts.bitnami.com/bitnami
+        - name: ingress-nginx
+          url: https://kubernetes.github.io/ingress-nginx
+        - name: jetstack
+          url: https://charts.jetstack.io
+
+      environments:
+        production:
+          values:
+            - environments/production.yaml
+
+      releases:
+        - name: ingress-nginx
+          chart: ingress-nginx/ingress-nginx
+          version: 4.9.0
+          namespace: ingress-nginx
+          createNamespace: true
+
+        - name: cert-manager
+          chart: jetstack/cert-manager
+          version: v1.14.0
+          namespace: cert-manager
+          createNamespace: true
+          set:
+            - name: installCRDs
+              value: "true"
+
+        - name: myapp
+          chart: ./charts/myapp
+          version: 0.3.1
+          namespace: production
+          needs:
+            - ingress-nginx/ingress-nginx   # zależność — zainstaluj po ingress
+          values:
+            - values/myapp-{{ .Environment.Name }}.yaml
+
+      # Komendy:
+      helmfile sync              # zainstaluj/upgraduj wszystko
+      helmfile diff              # podgląd wszystkich zmian
+      helmfile apply             # diff + sync razem
+      helmfile destroy           # usuń wszystkie releases
+      helmfile -e production sync  # konkretne środowisko
+
+  - name: Helmify — generuj chart z istniejących manifestów
+    icon: "✨"
+    desc: |
+      Helmify konwertuje istniejące manifesty Kubernetes YAML na Helm chart —
+      automatycznie parametryzuje wartości i tworzy strukturę charta.
+      Idealne narzędzie gdy masz gotowe YAML i chcesz je spakować jako reużywalny chart.
+      Instalacja: brew install helmify / go install github.com/arttor/helmify/cmd/helmify@latest
+
+      Helmify to punkt startowy — wygenerowany chart wymaga ręcznego dopracowania,
+      ale oszczędza godziny pracy na tworzeniu boilerplate. Szczególnie przydatne
+      przy migracji z kubectl apply na Helm.
+    code: |
+      # Instalacja:
+      brew install helmify
+      # lub: go install github.com/arttor/helmify/cmd/helmify@latest
+
+      # Konwertuj manifest(y) na chart:
+      cat my-deployment.yaml | helmify mychart
+
+      # Konwertuj cały katalog manifestów:
+      cat ./manifests/*.yaml | helmify mychart
+
+      # Lub z kustomize:
+      kustomize build ./overlays/production | helmify mychart
+
+      # Co generuje helmify:
+      # mychart/
+      #   Chart.yaml          ← metadane (wypełnij ręcznie)
+      #   values.yaml         ← wyekstrahowane wartości (image, replicas, ports...)
+      #   templates/
+      #     deployment.yaml   ← z {{ .Values.* }} zamiast hardcoded wartości
+      #     service.yaml
+      #     ingress.yaml
+      #     _helpers.tpl
+
+      # Po generowaniu — ręczna praca:
+      helm lint ./mychart          # sprawdź błędy
+      helm template test ./mychart # podejrzyj output
+      # Dodaj required(), default(), komentarze w values.yaml
+      # Dodaj NOTES.txt z informacjami post-install

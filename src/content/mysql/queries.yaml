@@ -1,0 +1,230 @@
+title: "Queries i DML"
+
+items:
+  - name: "SELECT — podstawowe zapytania"
+    icon: "🔍"
+    desc: "SELECT z WHERE, LIKE, IN, BETWEEN, IS NULL — filtrowanie i pobieranie danych."
+    code: |
+      -- Podstawowy SELECT
+      SELECT id, name, email FROM users;
+
+      -- Wszystkie kolumny (unikaj w produkcji)
+      SELECT * FROM users;
+
+      -- WHERE — filtrowanie
+      SELECT * FROM users WHERE role = 'admin';
+      SELECT * FROM users WHERE age > 18 AND status = 'active';
+      SELECT * FROM users WHERE role = 'admin' OR role = 'moderator';
+
+      -- LIKE — wyszukiwanie wzorców
+      SELECT * FROM users WHERE name LIKE 'Jan%';        -- zaczyna się od Jan
+      SELECT * FROM users WHERE email LIKE '%@gmail.com'; -- kończy się na @gmail.com
+      SELECT * FROM products WHERE name LIKE '%laptop%';  -- zawiera laptop
+
+      -- IN — lista wartości
+      SELECT * FROM users WHERE role IN ('admin', 'moderator');
+      SELECT * FROM orders WHERE status IN ('paid', 'shipped');
+
+      -- BETWEEN — zakres (włącznie)
+      SELECT * FROM orders WHERE total BETWEEN 100 AND 500;
+      SELECT * FROM events WHERE event_date BETWEEN '2024-01-01' AND '2024-12-31';
+
+      -- IS NULL / IS NOT NULL
+      SELECT * FROM users WHERE phone IS NULL;
+      SELECT * FROM orders WHERE shipped_at IS NOT NULL;
+
+      -- DISTINCT — unikalne wartości
+      SELECT DISTINCT role FROM users;
+      SELECT DISTINCT city, country FROM addresses;
+
+  - name: "SELECT — sortowanie i paginacja"
+    icon: "📄"
+    desc: "ORDER BY, LIMIT, OFFSET — sortowanie wyników i paginacja."
+    code: |
+      -- ORDER BY — sortowanie
+      SELECT * FROM users ORDER BY name ASC;
+      SELECT * FROM users ORDER BY created_at DESC;
+      SELECT * FROM orders ORDER BY total DESC, created_at ASC;
+
+      -- LIMIT — ogranicz liczbę wyników
+      SELECT * FROM products ORDER BY price DESC LIMIT 10;
+
+      -- LIMIT + OFFSET — paginacja
+      -- Strona 1 (rekordy 1-10)
+      SELECT * FROM products ORDER BY id LIMIT 10 OFFSET 0;
+      -- Strona 2 (rekordy 11-20)
+      SELECT * FROM products ORDER BY id LIMIT 10 OFFSET 10;
+      -- Strona N: OFFSET = (N-1) * pageSize
+
+      -- LIMIT z dwoma argumentami (równoważne)
+      SELECT * FROM products LIMIT 10, 20;  -- offset=10, count=20
+
+      -- Szybka paginacja dla dużych tabel (keyset pagination)
+      SELECT * FROM products
+      WHERE id > 1000
+      ORDER BY id ASC
+      LIMIT 10;
+
+  - name: "CASE WHEN — logika warunkowa"
+    icon: "🔀"
+    desc: "CASE WHEN w SELECT i UPDATE — wyrażenia warunkowe bezpośrednio w SQL."
+    code: |
+      -- CASE WHEN w SELECT
+      SELECT
+          name,
+          total,
+          CASE
+              WHEN total >= 1000 THEN 'Premium'
+              WHEN total >= 500  THEN 'Standard'
+              WHEN total >= 100  THEN 'Basic'
+              ELSE 'Free'
+          END AS tier
+      FROM orders;
+
+      -- CASE z kolumną (prosty case)
+      SELECT
+          name,
+          CASE status
+              WHEN 'active'   THEN 'Aktywny'
+              WHEN 'inactive' THEN 'Nieaktywny'
+              WHEN 'banned'   THEN 'Zablokowany'
+              ELSE 'Nieznany'
+          END AS status_pl
+      FROM users;
+
+      -- CASE w ORDER BY
+      SELECT * FROM tasks
+      ORDER BY
+          CASE priority
+              WHEN 'high'   THEN 1
+              WHEN 'medium' THEN 2
+              WHEN 'low'    THEN 3
+          END;
+
+      -- IF() — skrót dla dwóch wartości
+      SELECT name, IF(premium = 1, 'VIP', 'Standard') AS typ FROM users;
+
+      -- IFNULL() — wartość domyślna dla NULL
+      SELECT name, IFNULL(phone, 'brak') AS telefon FROM users;
+
+      -- COALESCE() — pierwsza nieNULL wartość
+      SELECT COALESCE(phone, mobile, 'brak') AS kontakt FROM users;
+
+  - name: "INSERT INTO"
+    icon: "➕"
+    desc: "Wstawianie pojedynczych i wielu rekordów, INSERT ON DUPLICATE KEY UPDATE."
+    code: |
+      -- Pojedynczy rekord
+      INSERT INTO users (email, name, role)
+      VALUES ('jan@example.com', 'Jan Kowalski', 'user');
+
+      -- Batch insert (wiele rekordów naraz — dużo szybsze niż wiele INSERT)
+      INSERT INTO users (email, name) VALUES
+          ('alice@example.com', 'Alice'),
+          ('bob@example.com',   'Bob'),
+          ('carol@example.com', 'Carol');
+
+      -- Pobierz ID ostatnio wstawionego rekordu
+      SELECT LAST_INSERT_ID();
+
+      -- INSERT ... SELECT — wstaw wyniki zapytania
+      INSERT INTO archive_orders (order_id, user_id, total)
+      SELECT id, user_id, total
+      FROM orders
+      WHERE created_at < DATE_SUB(NOW(), INTERVAL 1 YEAR);
+
+      -- INSERT ON DUPLICATE KEY UPDATE — upsert
+      INSERT INTO user_stats (user_id, login_count, last_login)
+      VALUES (1, 1, NOW())
+      ON DUPLICATE KEY UPDATE
+          login_count = login_count + 1,
+          last_login  = NOW();
+
+      -- REPLACE INTO — usuń istniejący i wstaw nowy (uwaga: zmienia AUTO_INCREMENT)
+      REPLACE INTO settings (key_name, value)
+      VALUES ('theme', 'dark');
+
+  - name: "UPDATE i DELETE"
+    icon: "✏️"
+    desc: "Aktualizacja i usuwanie rekordów — zawsze z WHERE, żeby nie zniszczyć całej tabeli."
+    code: |
+      -- UPDATE — aktualizuj rekordy
+      UPDATE users
+      SET role = 'admin', updated_at = NOW()
+      WHERE email = 'jan@example.com';
+
+      -- UPDATE wiele kolumn
+      UPDATE orders
+      SET status = 'shipped', shipped_at = NOW(), tracking_number = 'XYZ123'
+      WHERE id = 42;
+
+      -- UPDATE z wyrażeniem
+      UPDATE products
+      SET price = price * 1.10  -- podnieś ceny o 10%
+      WHERE category = 'electronics';
+
+      -- UPDATE z LIMIT (bezpieczniejsze)
+      UPDATE logs
+      SET archived = 1
+      WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
+      LIMIT 1000;
+
+      -- DELETE — usuń rekordy
+      DELETE FROM users WHERE id = 5;
+
+      -- DELETE z warunkiem
+      DELETE FROM sessions WHERE expires_at < NOW();
+
+      -- DELETE z LIMIT (bezpieczniejsze dla dużych operacji)
+      DELETE FROM logs
+      WHERE created_at < DATE_SUB(NOW(), INTERVAL 90 DAY)
+      LIMIT 10000;
+
+      -- DELETE z JOIN (usuń na podstawie drugiej tabeli)
+      DELETE u FROM users u
+      JOIN banned_list b ON u.email = b.email;
+
+      -- UWAGA: nigdy nie rób UPDATE/DELETE bez WHERE w produkcji!
+      -- Zabezpiecz się: SET SQL_SAFE_UPDATES = 1;
+
+  - name: Agregacja i GROUP BY
+    icon: "📊"
+    desc: "COUNT, SUM, AVG, MIN, MAX, GROUP BY, HAVING — agregowanie i grupowanie danych."
+    code: |
+      -- Podstawowe funkcje agregujące
+      SELECT
+          COUNT(*)           AS total_users,
+          COUNT(phone)       AS with_phone,    -- NULL jest pomijane
+          MIN(created_at)    AS first_user,
+          MAX(created_at)    AS last_user
+      FROM users;
+
+      -- GROUP BY — grupowanie
+      SELECT role, COUNT(*) AS count
+      FROM users
+      GROUP BY role
+      ORDER BY count DESC;
+
+      -- Grupowanie po wielu kolumnach
+      SELECT
+          YEAR(created_at)  AS rok,
+          MONTH(created_at) AS miesiac,
+          COUNT(*)          AS zamowienia,
+          SUM(total)        AS przychod,
+          AVG(total)        AS srednia
+      FROM orders
+      GROUP BY YEAR(created_at), MONTH(created_at)
+      ORDER BY rok, miesiac;
+
+      -- HAVING — filtrowanie grup (jak WHERE ale po agregacji)
+      SELECT user_id, COUNT(*) AS order_count, SUM(total) AS total_spent
+      FROM orders
+      GROUP BY user_id
+      HAVING order_count >= 5 AND total_spent > 1000
+      ORDER BY total_spent DESC;
+
+      -- GROUP_CONCAT — łącz wartości grupy w string
+      SELECT user_id,
+             GROUP_CONCAT(product_name ORDER BY product_name SEPARATOR ', ') AS produkty
+      FROM order_items
+      GROUP BY user_id;

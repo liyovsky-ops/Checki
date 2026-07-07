@@ -1,0 +1,1175 @@
+title: Komendy Remix
+
+groups:
+  - name: Inicjalizacja
+    commands:
+      - cmd: npx create-remix@latest my-app
+        desc: Utwórz nowy projekt Remix
+        detail:
+          what: Interaktywny kreator projektu Remix. Pyta o TypeScript, deployment target, czy inicjować git. Generuje gotową strukturę z app/routes/, app/root.tsx, vite.config.ts.
+          how: Po utworzeniu cd my-app && npm install && npm run dev. Projekt gotowy na http://localhost:5173.
+          tips:
+            - 'npx create-remix@latest . — w istniejącym katalogu (uważaj na nadpisanie)'
+            - 'Wybierz "Just the basics" dla czystego startu bez demo kodu'
+
+      - cmd: npx create-remix@latest --template remix-run/remix/templates/remix
+        desc: Utwórz projekt z oficjalnego template
+        detail:
+          what: Remix ma oficjalne templates na GitHub — remix-run/remix/templates/. Podstawowy, z Vite, z Cloudflare, z Deno.
+          how: --template przyjmuje ścieżkę GitHub (user/repo/path) lub URL do tar.gz.
+          tips:
+            - '--template remix-run/remix/templates/cloudflare — template Cloudflare Workers'
+            - '--template remix-run/remix/templates/deno — template Deno deploy'
+
+      - cmd: npx create-remix@latest --template epicweb-dev/epic-stack
+        desc: Epic Stack — production-ready Remix template
+        detail:
+          what: Epic Stack od Kenta C. Dottsa — Remix + Prisma + SQLite + Docker + Fly.io + auth + testy. Najlepszy punkt startowy dla production app.
+          how: Zawiera auth, email, dark mode, a11y, testy E2E (Playwright), unit tests (Vitest). Duży ale kompletny.
+          tips:
+            - 'Przejrzyj epic-stack.dev przed użyciem — dużo opinii, dużo wartości'
+            - 'Można usunąć niepotrzebne części po inicjalizacji'
+
+  - name: Dev i Build
+    commands:
+      - cmd: npm run dev
+        desc: Uruchom dev server z HMR
+        detail:
+          what: Startuje Vite dev server z Hot Module Replacement. Serwer Node.js dla SSR uruchamia się automatycznie. Zmiany w plikach = instant update.
+          how: Domyślnie http://localhost:5173. Remix uruchamia zarówno Vite (client) jak i Node.js server (SSR) jednocześnie.
+          tips:
+            - 'PORT=3000 npm run dev — zmień port serwera'
+            - 'Sprawdź terminal — błędy serwera (loader/action) pojawiają się tu, nie w konsoli przeglądarki'
+
+      - cmd: npm run build
+        desc: Zbuduj produkcyjną wersję
+        detail:
+          what: Kompiluje Remix do zoptymalizowanego output. Build/client/ zawiera statyczne assety, build/server/ zawiera server bundle.
+          how: Wybór adaptera w vite.config.ts determinuje format output. Domyślnie Node.js adapter.
+          tips:
+            - 'npm run build && npm start — pełny test produkcyjny lokalnie'
+            - 'Sprawdź rozmiar build/client/assets/ — zbyt duże chunki = problem wydajności'
+
+      - cmd: npm start
+        desc: Uruchom produkcyjny serwer Node.js
+        detail:
+          what: Uruchamia zbudowaną aplikację Remix na Node.js. Wymaga wcześniejszego npm run build. Produkcyjny serwer bez HMR.
+          how: Domyślnie PORT=3000. Ustaw NODE_ENV=production automatycznie przez skrypt.
+          tips:
+            - 'PORT=8080 npm start — custom port w produkcji'
+            - 'Użyj PM2 lub systemd dla process management na VPS'
+
+      - cmd: npx remix vite:build
+        desc: Build z explicit Remix Vite plugin
+        detail:
+          what: Bezpośrednie wywołanie Remix build przez Vite CLI. Przydatne gdy npm run build jest skonfigurowane inaczej lub debugging.
+          how: Odpowiednik npm run build — generuje build/client/ i build/server/.
+          tips:
+            - '--mode production — explicit production mode'
+            - 'DEBUG=remix:compiler npx remix vite:build — debug output kompilatora'
+
+      - cmd: npx remix reveal
+        desc: Ujawnij domyślne pliki konfiguracyjne Remix
+        detail:
+          what: Kopiuje domyślne pliki (entry.client.tsx, entry.server.tsx) do projektu żebyś mógł je dostosować. Przydatne gdy potrzebujesz custom hydration lub server renderer.
+          how: Pliki entry.* są domyślnie ukryte przez Remix. Reveal sprawia że są edytowalne.
+          tips:
+            - 'Potrzebne dla custom streaming setup lub custom React renderer'
+            - 'entry.server.tsx — dostosuj server-side rendering (timeouty, streaming)'
+
+  - name: Struktura projektu
+    commands:
+      - code: |
+          app/
+            root.tsx              # root layout — html, head, body
+            entry.client.tsx      # hydration po stronie klienta
+            entry.server.tsx      # SSR handler
+            routes/
+              _index.tsx          # / (strona główna)
+              about.tsx           # /about
+              blog.tsx            # /blog (layout)
+              blog._index.tsx     # /blog (index)
+              blog.$slug.tsx      # /blog/:slug
+              dashboard.tsx       # /dashboard (layout)
+              dashboard._index.tsx
+              dashboard.settings.tsx
+              _auth.tsx           # layout bez URL prefix
+              _auth.login.tsx     # /login
+              api.users.tsx       # /api/users (resource route)
+              $.tsx               # /* catch-all 404
+          public/
+            favicon.ico
+            robots.txt
+          vite.config.ts
+          remix.config.js         # opcjonalny (stary format)
+        desc: Kompletna struktura katalogów Remix
+        detail:
+          what: app/routes/ — wszystkie trasy (flat routes v2). Dots (.) = separator URL. $ = dynamic param. _ prefix = layout bez URL prefix. $.tsx = catch-all.
+          how: Remix automatycznie mapuje pliki na URL-e według konwencji nazw.
+          tips:
+            - 'app/routes/ — jedyne miejsce gdzie mieszkają trasy'
+            - 'Brak default export w pliku trasy = resource route (API endpoint)'
+
+      - code: |
+          // vite.config.ts — konfiguracja Remix + Vite
+          import { vitePlugin as remix } from "@remix-run/dev";
+          import { defineConfig } from "vite";
+          import tsconfigPaths from "vite-tsconfig-paths";
+
+          export default defineConfig({
+            plugins: [
+              remix({
+                future: {
+                  v3_fetcherPersist: true,
+                  v3_relativeSplatPath: true,
+                  v3_throwAbortReason: true,
+                },
+              }),
+              tsconfigPaths(),
+            ],
+            server: {
+              port: 5173,
+            },
+          });
+        desc: vite.config.ts — konfiguracja projektu Remix
+        detail:
+          what: Remix plugin dla Vite zastępuje remix.config.js. future flags włączają funkcje z następnych wersji Remix.
+          how: tsconfigPaths() obsługuje aliasy z tsconfig.json (np. ~/routes → app/routes).
+          tips:
+            - 'future flags — włącz je wszystkie żeby być gotowym na Remix v3'
+            - 'vite-tsconfig-paths — alias ~ lub @ do app/ katalogu'
+
+  - name: Routing — tworzenie tras
+    commands:
+      - code: |
+          // app/routes/_index.tsx — strona główna /
+          export default function Index() {
+            return <h1>Strona główna</h1>;
+          }
+
+          // app/routes/about.tsx — /about
+          export default function About() {
+            return <h1>O nas</h1>;
+          }
+
+          // app/routes/blog.$slug.tsx — /blog/:slug
+          import type { LoaderFunctionArgs } from "@remix-run/node";
+
+          export async function loader({ params }: LoaderFunctionArgs) {
+            return { slug: params.slug };
+          }
+
+          export default function BlogPost() {
+            return <div>Post</div>;
+          }
+        desc: Trasy — index, statyczna, dynamiczna
+        detail:
+          what: _index.tsx = index route (sama domena lub /blog gdy jest layout blog.tsx). about.tsx = /about. blog.$slug.tsx = /blog/:slug.
+          how: Flat file naming z dots. $ prefix = dynamic segment. _ prefix = ignorowany w URL.
+          tips:
+            - '_index.tsx w routes/ = strona główna /'
+            - 'blog._index.tsx + blog.$slug.tsx = /blog i /blog/:slug z wspólnym layout blog.tsx'
+
+      - code: |
+          // Layout route — app/routes/dashboard.tsx
+          import { Outlet, NavLink } from "@remix-run/react";
+
+          export default function DashboardLayout() {
+            return (
+              <div>
+                <nav>
+                  <NavLink to="/dashboard">Home</NavLink>
+                  <NavLink to="/dashboard/users">Użytkownicy</NavLink>
+                  <NavLink to="/dashboard/settings">Ustawienia</NavLink>
+                </nav>
+                <main>
+                  <Outlet />
+                </main>
+              </div>
+            );
+          }
+
+          // app/routes/dashboard._index.tsx — /dashboard
+          export default function DashboardHome() {
+            return <h1>Witaj w dashboardzie</h1>;
+          }
+
+          // app/routes/dashboard.users.tsx — /dashboard/users
+          export default function DashboardUsers() {
+            return <h1>Użytkownicy</h1>;
+          }
+        desc: Layout route z Outlet i child routes
+        detail:
+          what: dashboard.tsx to layout dla wszystkich dashboard.* tras. <Outlet /> renderuje aktywny child. Każdy child ma własny loader.
+          how: Nested routes uruchamiają loadery równolegle — dashboard.tsx loader + dashboard.users.tsx loader jednocześnie.
+          tips:
+            - 'Nie musisz tworzyć katalogów — flat files z dots zastępują zagnieżdżone katalogi'
+            - 'Outlet context={{ user }} — przekaż dane z layout do children'
+
+      - code: |
+          // Resource route — API endpoint bez HTML
+          // app/routes/api.users.tsx
+          import { json } from "@remix-run/node";
+          import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+
+          // GET /api/users
+          export async function loader({ request }: LoaderFunctionArgs) {
+            const url = new URL(request.url);
+            const page = Number(url.searchParams.get("page") ?? "1");
+            const users = await db.users.findMany({ skip: (page - 1) * 10, take: 10 });
+            return json({ users });
+          }
+
+          // POST /api/users
+          export async function action({ request }: ActionFunctionArgs) {
+            if (request.method !== "POST") {
+              return new Response("Method not allowed", { status: 405 });
+            }
+            const body = await request.json();
+            const user = await db.users.create({ data: body });
+            return json(user, { status: 201 });
+          }
+
+          // BRAK default export — to jest resource route
+        desc: Resource route — REST API bez renderowania HTML
+        detail:
+          what: Plik trasy bez default export to resource route — zwraca JSON/inne dane bez HTML. Idealne dla API endpoints, webhooks, RSS feeds.
+          how: Dostępny przez fetch() z frontendu. Obsługuje wszystkie HTTP metody przez request.method w action().
+          tips:
+            - 'Brak default export = resource route — Remix nie renderuje HTML'
+            - 'Obsługuje GET (loader) i POST/PUT/DELETE (action)'
+
+  - name: Session i Cookie
+    commands:
+      - code: |
+          // Konfiguracja sesji — app/services/session.server.ts
+          import { createCookieSessionStorage } from "@remix-run/node";
+
+          const { getSession, commitSession, destroySession } =
+            createCookieSessionStorage({
+              cookie: {
+                name: "__session",
+                httpOnly: true,
+                maxAge: 60 * 60 * 24 * 7, // 7 dni
+                path: "/",
+                sameSite: "lax",
+                secrets: [process.env.SESSION_SECRET!],
+                secure: process.env.NODE_ENV === "production",
+              },
+            });
+
+          export { getSession, commitSession, destroySession };
+        desc: createCookieSessionStorage — konfiguracja sesji
+        detail:
+          what: Remix session storage w cookie. Dane sesji są szyfrowane i podpisane przez SESSION_SECRET. HttpOnly, Secure dla bezpieczeństwa.
+          how: getSession() odczytuje sesję z nagłówka Cookie. commitSession() serializuje do Set-Cookie header. destroySession() usuwa.
+          tips:
+            - 'SESSION_SECRET w .env — minimum 32 znaki, random string'
+            - 'Opcja: createSessionStorage() dla własnego backend (Redis, DB)'
+
+      - code: |
+          // Użycie sesji w loader i action
+          import { json, redirect } from "@remix-run/node";
+          import { getSession, commitSession, destroySession } from "~/services/session.server";
+
+          // Loader — odczyt sesji
+          export async function loader({ request }: { request: Request }) {
+            const session = await getSession(request.headers.get("Cookie"));
+            const user = session.get("user");
+
+            if (!user) throw redirect("/login");
+            return json({ user });
+          }
+
+          // Action — zapis i usunięcie sesji
+          export async function action({ request }: { request: Request }) {
+            const session = await getSession(request.headers.get("Cookie"));
+            const formData = await request.formData();
+            const intent = formData.get("intent");
+
+            if (intent === "logout") {
+              return redirect("/login", {
+                headers: { "Set-Cookie": await destroySession(session) },
+              });
+            }
+
+            session.set("user", { id: "123", name: "Jan" });
+            return redirect("/dashboard", {
+              headers: { "Set-Cookie": await commitSession(session) },
+            });
+          }
+        desc: Sesja — getSession, commitSession, destroySession w login/logout
+        detail:
+          what: getSession() z Cookie header parsuje sesję. set() dodaje dane. commitSession() w Set-Cookie zapisuje. destroySession() usuwa cookie.
+          how: Zawsze przekazuj Set-Cookie header w Response — bez tego sesja nie jest zapisana w przeglądarce.
+          tips:
+            - 'session.flash("message", "Zalogowano") — jednorazowe wiadomości (flash)'
+            - 'Zawsze commitSession() po session.set() — inaczej dane są utracone'
+
+  - name: Prisma i baza danych
+    commands:
+      - cmd: npx prisma init
+        desc: Zainicjalizuj Prisma w projekcie Remix
+        detail:
+          what: Tworzy prisma/schema.prisma i .env z DATABASE_URL. Prisma to najpopularniejszy ORM w Remix (Epic Stack).
+          how: Zainstaluj najpierw npm install prisma @prisma/client. Potem npx prisma init.
+          tips:
+            - 'Dodaj prisma/ do .gitignore dla migrations jeśli używasz SQLite w dev'
+            - 'DATABASE_URL w .env — nigdy nie commituj do repo'
+
+      - cmd: npx prisma db push
+        desc: Zsynchronizuj schemat Prisma z bazą danych (dev)
+        detail:
+          what: Aktualizuje bazę danych do aktualnego schema bez tworzenia pliku migracji. Idealne do prototypowania.
+          how: Nie tworzy migracji — tylko synchronizuje schema. Dla produkcji użyj prisma migrate deploy.
+          tips:
+            - 'npx prisma db push --force-reset — reset DB i zastosuj schema (niszczy dane!)'
+            - 'Tylko dla development — produkcja wymaga migrate deploy'
+
+      - cmd: npx prisma migrate dev
+        desc: Utwórz i zastosuj migrację SQL
+        detail:
+          what: Generuje plik migracji SQL z różnic w schema.prisma i aplikuje ją na dev DB. Historia migracji w prisma/migrations/.
+          how: Pyta o nazwę migracji. Tworzy nowy plik SQL. Stosuje na lokalnej bazie.
+          tips:
+            - 'npx prisma migrate dev --name "add_user_table" — nazwa migracji'
+            - 'Commituj prisma/migrations/ do repo — historia zmian DB'
+
+      - cmd: npx prisma studio
+        desc: Otwórz Prisma Studio — GUI dla bazy danych
+        detail:
+          what: Przeglądarka danych w przeglądarce — tabele, rekordy, relacje. Nie musisz pisać SQL żeby podejrzeć dane w trakcie development.
+          how: Otwiera się na http://localhost:5555. Możesz edytować, dodawać i usuwać rekordy przez GUI.
+          tips:
+            - 'Idealne do debugowania danych w trakcie development'
+            - 'npx prisma studio --port 5556 — inny port gdy 5555 zajęty'
+
+      - cmd: npx prisma generate
+        desc: Wygeneruj TypeScript client z schema.prisma
+        detail:
+          what: Generuje @prisma/client z typami opartymi na schema.prisma. Uruchamia się automatycznie po prisma migrate dev.
+          how: Ręcznie uruchom po edycji schema.prisma bez migracji. Output w node_modules/@prisma/client.
+          tips:
+            - 'Dodaj postinstall: "prisma generate" w package.json — generuj po npm install'
+            - 'Wymagane po każdej zmianie schema.prisma'
+
+      - code: |
+          // app/services/db.server.ts — singleton PrismaClient
+          import { PrismaClient } from "@prisma/client";
+
+          // Singleton — jeden client w całej aplikacji
+          let prisma: PrismaClient;
+
+          declare global {
+            var __prisma: PrismaClient | undefined;
+          }
+
+          if (process.env.NODE_ENV === "production") {
+            prisma = new PrismaClient();
+          } else {
+            if (!global.__prisma) {
+              global.__prisma = new PrismaClient({
+                log: ["query"],
+              });
+            }
+            prisma = global.__prisma;
+          }
+
+          export { prisma as db };
+
+          // Użycie w loader:
+          // import { db } from "~/services/db.server";
+          // const users = await db.users.findMany();
+        desc: Singleton PrismaClient — db.server.ts dla Remix
+        detail:
+          what: Singleton pattern zapobiega tworzeniu wielu connections w dev (HMR resetuje moduły). Production tworzy jeden client, dev reużywa globalny.
+          how: global.__prisma persist między HMR reload-ami. Plik musi mieć .server.ts — Remix blokuje import po stronie klienta.
+          tips:
+            - '.server.ts sufix — gwarantuje że kod nie trafi do client bundle'
+            - 'log: ["query"] w dev — podgląd SQL queries w terminalu'
+
+  - name: Zmienne środowiskowe i config
+    commands:
+      - code: |
+          // .env — zmienne lokalne (NIE commituj do repo)
+          DATABASE_URL="postgresql://user:pass@localhost:5432/mydb"
+          SESSION_SECRET="super-secret-min-32-chars-random"
+          STRIPE_SECRET_KEY="sk_test_..."
+          PUBLIC_APP_URL="http://localhost:5173"
+
+          // Dostęp w kodzie (Remix używa process.env):
+          // app/routes/webhook.tsx
+          const secret = process.env.STRIPE_SECRET_KEY;
+          const dbUrl = process.env.DATABASE_URL;
+
+          // Walidacja env na starcie — app/env.server.ts
+          import { z } from "zod";
+
+          const envSchema = z.object({
+            DATABASE_URL: z.string().url(),
+            SESSION_SECRET: z.string().min(32),
+            NODE_ENV: z.enum(["development", "production", "test"]),
+          });
+
+          export const env = envSchema.parse(process.env);
+        desc: Zmienne środowiskowe — .env i walidacja z Zod
+        detail:
+          what: Remix używa process.env na serwerze. Brak specjalnego VITE_/NEXT_PUBLIC_ — wszystko jest server-only domyślnie.
+          how: Walidacja env z Zod na starcie aplikacji — natychmiastowy błąd gdy brak wymaganej zmiennej zamiast runtime crash.
+          tips:
+            - 'env.server.ts — importuj env z walidacją zamiast process.env bezpośrednio'
+            - 'Ekspozycja do klienta przez window.ENV w root loader — tylko publiczne dane'
+
+      - code: |
+          // Ekspozycja env do klienta przez root loader
+          // app/root.tsx
+          import { json } from "@remix-run/node";
+          import { useLoaderData } from "@remix-run/react";
+
+          export async function loader() {
+            return json({
+              ENV: {
+                // Tylko publiczne dane
+                APP_URL: process.env.PUBLIC_APP_URL,
+                STRIPE_PUBLIC_KEY: process.env.STRIPE_PUBLIC_KEY,
+                NODE_ENV: process.env.NODE_ENV,
+              },
+            });
+          }
+
+          export default function App() {
+            const { ENV } = useLoaderData<typeof loader>();
+            return (
+              <html>
+                <head><Meta /><Links /></head>
+                <body>
+                  <Outlet />
+                  {/* Dostępne globalnie w przeglądarce */}
+                  <script
+                    dangerouslySetInnerHTML={{
+                      __html: `window.ENV = ${JSON.stringify(ENV)}`,
+                    }}
+                  />
+                  <ScrollRestoration />
+                  <Scripts />
+                </body>
+              </html>
+            );
+          }
+        desc: Publiczne env do klienta — window.ENV przez root loader
+        detail:
+          what: window.ENV = publiczne zmienne środowiskowe dostępne w przeglądarce. Nigdy nie wysyłaj sekretów (DATABASE_URL, SESSION_SECRET) przez ten mechanizm.
+          how: Root loader raz pobiera env, JSON.stringify wbudowuje w HTML. Dostęp przez window.ENV.STRIPE_PUBLIC_KEY w client-side kodzie.
+          tips:
+            - 'Deklaruj window.ENV w types/index.d.ts dla TypeScript'
+            - 'Nigdy SECRET_KEY, DATABASE_URL, SESSION_SECRET — tylko publiczne dane'
+
+  - name: TypeScript i narzędzia
+    commands:
+      - cmd: npm run typecheck
+        desc: Sprawdź typy TypeScript — tsc bez generowania plików
+        detail:
+          what: Uruchamia tsc --noEmit na całym projekcie. Sprawdza typy bez generowania plików. Przydatne w CI/CD.
+          how: Skrypt w package.json. Wymaga tsconfig.json z poprawną konfiguracją.
+          tips:
+            - 'Dodaj do CI: npm run typecheck && npm run build'
+            - 'Remix generuje typy dla routes automatycznie podczas dev/build'
+
+      - cmd: npm run lint
+        desc: Uruchom ESLint na całym projekcie
+        detail:
+          what: ESLint sprawdza jakość kodu — unused variables, import order, React rules. Konfiguracja w eslint.config.js (flat config) lub .eslintrc.
+          how: Remix projects domyślnie mają ESLint przez create-remix. Dodaj @remix-run/eslint-config dla reguł specyficznych dla Remix.
+          tips:
+            - 'npm run lint -- --fix — auto-fix co możliwe'
+            - '@remix-run/eslint-config zawiera reguły dla loader/action patterns'
+
+      - code: |
+          // tsconfig.json — TypeScript dla Remix
+          {
+            "include": ["**/*.ts", "**/*.tsx", ".server/**/*.ts"],
+            "compilerOptions": {
+              "lib": ["DOM", "DOM.Iterable", "ES2022"],
+              "isolatedModules": true,
+              "esModuleInterop": true,
+              "jsx": "react-jsx",
+              "moduleResolution": "Bundler",
+              "resolveJsonModule": true,
+              "target": "ES2022",
+              "strict": true,
+              "allowJs": true,
+              "skipLibCheck": true,
+              "forceConsistentCasingInFileNames": true,
+              "baseUrl": ".",
+              "paths": {
+                "~/*": ["./app/*"]
+              }
+            }
+          }
+        desc: tsconfig.json — konfiguracja TypeScript dla Remix
+        detail:
+          what: Remix wymaga specyficznej konfiguracji TS — moduleResolution Bundler, jsx react-jsx, paths dla aliasu ~/. strict mode rekomendowany.
+          how: ~ alias mapuje do app/ — import ~/routes zamiast ../../routes. Automatycznie obsługiwane przez tsconfigPaths plugin Vite.
+          tips:
+            - '"~/*": ["./app/*"] — standardowy Remix alias dla app/ directory'
+            - 'moduleResolution: "Bundler" — nowy tryb dla Vite projects (TS 5.0+)'
+
+  - name: Testy
+    commands:
+      - cmd: npm test
+        desc: Uruchom testy jednostkowe Vitest
+        detail:
+          what: Vitest to rekomendowany test runner dla Remix — kompatybilny z Vite, szybki, obsługuje ESM. Uruchamia pliki *.test.tsx i *.spec.tsx.
+          how: Konfiguracja w vite.config.ts pod kluczem test. Globalny setup w setupTests.ts.
+          tips:
+            - 'npm test -- --watch — watch mode podczas development'
+            - 'npm test -- --coverage — raport pokrycia kodu'
+
+      - cmd: npx playwright test
+        desc: Uruchom testy E2E Playwright
+        detail:
+          what: Playwright to rekomendowany framework E2E dla Remix. Testuje aplikację jak prawdziwy użytkownik — klikanie, formularze, nawigacja.
+          how: Konfiguracja w playwright.config.ts. Testy w e2e/ lub tests/ katalogach.
+          tips:
+            - 'npx playwright test --ui — interaktywny UI do debugowania testów'
+            - 'npx playwright codegen http://localhost:5173 — generuj testy przez klikanie'
+
+      - code: |
+          // Test loader — Vitest
+          import { describe, it, expect, vi } from "vitest";
+          import { loader } from "~/routes/blog.$slug";
+          import { createRequest } from "@remix-run/node";
+
+          describe("blog.$slug loader", () => {
+            it("zwraca post dla poprawnego sluga", async () => {
+              vi.mock("~/services/db.server", () => ({
+                getPost: vi.fn().mockResolvedValue({
+                  id: "1",
+                  title: "Test Post",
+                  slug: "test-post",
+                }),
+              }));
+
+              const response = await loader({
+                request: new Request("http://localhost/blog/test-post"),
+                params: { slug: "test-post" },
+                context: {},
+              });
+
+              const data = await response.json();
+              expect(data.post.title).toBe("Test Post");
+            });
+
+            it("rzuca 404 dla nieistniejącego posta", async () => {
+              vi.mock("~/services/db.server", () => ({
+                getPost: vi.fn().mockResolvedValue(null),
+              }));
+
+              const response = loader({
+                request: new Request("http://localhost/blog/nie-istnieje"),
+                params: { slug: "nie-istnieje" },
+                context: {},
+              });
+
+              await expect(response).rejects.toMatchObject({ status: 404 });
+            });
+          });
+        desc: Testy loaderów z Vitest i vi.mock
+        detail:
+          what: Loader to zwykła async funkcja — łatwa do testowania bez mount komponentów. vi.mock() podmienia DB calls. Sprawdź status i dane Response.
+          how: createRequest() z @remix-run/node tworzy Request. loader() zwraca Response — await response.json() parsuje dane.
+          tips:
+            - 'Testuj loadery izolowanie — mockuj DB, nie testuj całego stacku'
+            - 'response.status — sprawdź kod HTTP, nie tylko dane'
+
+  - name: Formularze i walidacja
+    commands:
+      - code: |
+          // Podstawowy formularz z action
+          import { Form, useActionData } from "@remix-run/react";
+          import { json, redirect } from "@remix-run/node";
+          import type { ActionFunctionArgs } from "@remix-run/node";
+
+          export async function action({ request }: ActionFunctionArgs) {
+            const formData = await request.formData();
+            const name = String(formData.get("name") ?? "");
+            if (name.length < 2) {
+              return json({ error: "Imię min. 2 znaki" }, { status: 400 });
+            }
+            await saveName(name);
+            return redirect("/success");
+          }
+
+          export default function MyForm() {
+            const data = useActionData<typeof action>();
+            return (
+              <Form method="post">
+                <input name="name" />
+                {data?.error && <p>{data.error}</p>}
+                <button type="submit">Wyślij</button>
+              </Form>
+            );
+          }
+        desc: Formularz HTML z action — walidacja i redirect
+        detail:
+          what: Form + action() to podstawowy pattern Remix. Works bez JS (progressive enhancement). Walidacja po stronie serwera, wynik przez useActionData().
+          how: request.formData() parsuje body. Zwróć json z błędami lub redirect po sukcesie.
+          tips:
+            - 'Zawsze redirect po sukcesie — zapobiega podwójnemu submitowi'
+            - 'useActionData() zwraca undefined po redirect — obsłuż oba przypadki'
+
+      - code: |
+          // useFetcher.Form — submit bez nawigacji
+          import { useFetcher } from "@remix-run/react";
+
+          export function NewsletterWidget() {
+            const fetcher = useFetcher<{ message: string }>();
+            const isSubmitting = fetcher.state !== "idle";
+
+            return (
+              <fetcher.Form method="post" action="/api/newsletter">
+                <input name="email" type="email" required />
+                <button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Zapisywanie..." : "Zapisz się"}
+                </button>
+                {fetcher.data?.message && (
+                  <p>{fetcher.data.message}</p>
+                )}
+              </fetcher.Form>
+            );
+          }
+        desc: fetcher.Form — submit bez zmiany URL
+        detail:
+          what: fetcher.Form działa jak Form ale nie nawiguje. Idealne do widgets, like buttons, inline edycji w dowolnym miejscu strony.
+          how: fetcher.state = idle/loading/submitting. fetcher.data = wynik action. Nie zmienia URL ani nie re-renderuje całej strony.
+          tips:
+            - 'Użyj gdy chcesz submit bez zmiany URL (widget, comment, like)'
+            - 'fetcher.Form vs Form — jedyna różnica to brak nawigacji'
+
+      - code: |
+          // GET form — filtrowanie przez URL params
+          import { Form, useSearchParams } from "@remix-run/react";
+          import { json } from "@remix-run/node";
+          import type { LoaderFunctionArgs } from "@remix-run/node";
+
+          export async function loader({ request }: LoaderFunctionArgs) {
+            const url = new URL(request.url);
+            const q = url.searchParams.get("q") ?? "";
+            const category = url.searchParams.get("category") ?? "all";
+            const results = await search(q, category);
+            return json({ results, q, category });
+          }
+
+          export default function SearchPage() {
+            const [searchParams] = useSearchParams();
+            return (
+              <Form method="get">
+                <input
+                  name="q"
+                  defaultValue={searchParams.get("q") ?? ""}
+                  placeholder="Szukaj..."
+                />
+                <select name="category" defaultValue={searchParams.get("category") ?? "all"}>
+                  <option value="all">Wszystkie</option>
+                  <option value="tech">Tech</option>
+                  <option value="design">Design</option>
+                </select>
+                <button type="submit">Szukaj</button>
+              </Form>
+            );
+          }
+        desc: GET Form — wyszukiwanie przez URL search params
+        detail:
+          what: Form method="get" zmienia URL (dodaje query params) zamiast wywoływać action. Loader odczytuje searchParams. URL jest bookmarkowalny.
+          how: url.searchParams.get("q") w loader. defaultValue w inputach przywraca stan z URL.
+          tips:
+            - 'GET forms są bookmarkable i shareable — idealne dla wyszukiwania'
+            - 'useSubmit() dla dynamicznego submit (onChange na select)'
+
+      - code: |
+          // Obsługa plików — file upload
+          import { json } from "@remix-run/node";
+          import { unstable_createMemoryUploadHandler, unstable_parseMultipartFormData } from "@remix-run/node";
+          import type { ActionFunctionArgs } from "@remix-run/node";
+
+          export async function action({ request }: ActionFunctionArgs) {
+            const uploadHandler = unstable_createMemoryUploadHandler({
+              maxPartSize: 5_000_000, // 5MB
+            });
+
+            const formData = await unstable_parseMultipartFormData(
+              request,
+              uploadHandler
+            );
+
+            const file = formData.get("avatar") as File;
+            if (!file) return json({ error: "Brak pliku" }, { status: 400 });
+
+            const buffer = Buffer.from(await file.arrayBuffer());
+            const url = await uploadToS3(buffer, file.name, file.type);
+
+            return json({ avatarUrl: url });
+          }
+
+          export default function UploadForm() {
+            return (
+              <form method="post" encType="multipart/form-data">
+                <input type="file" name="avatar" accept="image/*" />
+                <button type="submit">Wgraj avatar</button>
+              </form>
+            );
+          }
+        desc: File upload — unstable_parseMultipartFormData
+        detail:
+          what: Remix ma wbudowane API do file uploads. unstable_parseMultipartFormData przetwarza multipart/form-data. createMemoryUploadHandler buforuje w pamięci.
+          how: encType="multipart/form-data" wymagane na form. File dostępny jako Web API File object. buffer = arrayBuffer do S3/dysk.
+          tips:
+            - 'unstable_createFileUploadHandler — zapisz bezpośrednio do dysku zamiast pamięci'
+            - 'maxPartSize — limit rozmiaru pliku per part'
+
+  - name: Auth i Session
+    commands:
+      - code: |
+          // Login flow — kompletny przykład
+          import { json, redirect } from "@remix-run/node";
+          import { Form, useActionData } from "@remix-run/react";
+          import { getSession, commitSession } from "~/services/session.server";
+          import type { ActionFunctionArgs } from "@remix-run/node";
+
+          export async function action({ request }: ActionFunctionArgs) {
+            const session = await getSession(request.headers.get("Cookie"));
+            const formData = await request.formData();
+            const email = String(formData.get("email"));
+            const password = String(formData.get("password"));
+
+            const user = await verifyLogin(email, password);
+
+            if (!user) {
+              return json({ error: "Nieprawidłowy email lub hasło" }, { status: 401 });
+            }
+
+            session.set("userId", user.id);
+            session.flash("success", "Zalogowano pomyślnie!");
+
+            return redirect("/dashboard", {
+              headers: { "Set-Cookie": await commitSession(session) },
+            });
+          }
+
+          export default function Login() {
+            const data = useActionData<typeof action>();
+            return (
+              <Form method="post">
+                <input name="email" type="email" />
+                <input name="password" type="password" />
+                {data?.error && <p>{data.error}</p>}
+                <button type="submit">Zaloguj</button>
+              </Form>
+            );
+          }
+        desc: Login z session.set i commitSession
+        detail:
+          what: Kompletny flow logowania — weryfikacja credentials, zapis userId w sesji, redirect z Set-Cookie. session.flash() dla jednorazowych wiadomości.
+          how: verifyLogin() sprawdza DB. commitSession() serializuje sesję do ciasteczka. Remix automatycznie dołącza cookie do przeglądarki.
+          tips:
+            - 'Nigdy nie przechowuj hasła w sesji — tylko userId'
+            - 'session.flash("key", "val") — jednorazowa wiadomość (np. "Zalogowano!")'
+
+      - code: |
+          // requireUser — helper autoryzacji
+          // app/services/auth.server.ts
+          import { redirect } from "@remix-run/node";
+          import { getSession } from "./session.server";
+
+          export async function requireUser(request: Request) {
+            const session = await getSession(request.headers.get("Cookie"));
+            const userId = session.get("userId");
+
+            if (!userId) {
+              const url = new URL(request.url);
+              throw redirect(`/login?redirectTo=${url.pathname}`);
+            }
+
+            const user = await getUserById(userId);
+            if (!user) {
+              // Sesja wygasła — zniszcz i przekieruj
+              const { destroySession } = await import("./session.server");
+              throw redirect("/login", {
+                headers: { "Set-Cookie": await destroySession(session) },
+              });
+            }
+
+            return user;
+          }
+
+          // Użycie w loaderze:
+          // export async function loader({ request }: LoaderFunctionArgs) {
+          //   const user = await requireUser(request);
+          //   return json({ user });
+          // }
+        desc: requireUser() — helper chroniący trasy
+        detail:
+          what: requireUser() to reużywalny helper sprawdzający auth. Rzuca redirect jeśli user niezalogowany. Używany w loaderach.
+          how: Jedna funkcja, wywołana w każdym chronionym loaderze. Rzucony redirect przerywa loader i przekierowuje natychmiast.
+          tips:
+            - 'redirectTo param — wróć user na żądaną stronę po zalogowaniu'
+            - 'Użyj w każdym loaderze chronionym zamiast powtarzać kod auth'
+
+      - code: |
+          // Logout action
+          import { redirect } from "@remix-run/node";
+          import { getSession, destroySession } from "~/services/session.server";
+          import type { ActionFunctionArgs } from "@remix-run/node";
+
+          export async function action({ request }: ActionFunctionArgs) {
+            const session = await getSession(request.headers.get("Cookie"));
+            return redirect("/login", {
+              headers: { "Set-Cookie": await destroySession(session) },
+            });
+          }
+
+          // W komponencie (Form method="post" action="/logout"):
+          // <Form method="post" action="/logout">
+          //   <button type="submit">Wyloguj</button>
+          // </Form>
+        desc: Logout — destroySession i redirect
+        detail:
+          what: destroySession() usuwa ciasteczko sesji. Redirect na /login. Brak loadera — tylko action. Resource route dla logout.
+          how: Formularz POST do /logout jest prostszy i bezpieczniejszy niż link GET (chroni przed CSRF).
+          tips:
+            - 'Używaj POST dla logout — GET logout podatny na CSRF przez obrazki/iframes'
+            - 'Brak default export w app/routes/logout.tsx — resource route'
+
+  - name: Optymalizacja i wzorce
+    commands:
+      - code: |
+          // clientLoader — client-side caching
+          import { json } from "@remix-run/node";
+          import { useLoaderData } from "@remix-run/react";
+          import type { LoaderFunctionArgs, ClientLoaderFunctionArgs } from "@remix-run/node";
+
+          export async function loader({ params }: LoaderFunctionArgs) {
+            const product = await db.products.findUnique({ where: { id: params.id } });
+            return json({ product });
+          }
+
+          // Cache po stronie klienta — nie odpytuj serwera przy powrocie
+          let cache: Record<string, unknown> = {};
+
+          export async function clientLoader({ serverLoader, params }: ClientLoaderFunctionArgs) {
+            const cacheKey = `product-${params.id}`;
+            if (cache[cacheKey]) return cache[cacheKey];
+
+            const data = await serverLoader();
+            cache[cacheKey] = data;
+            return data;
+          }
+
+          clientLoader.hydrate = true; // uruchom też podczas hydration
+
+          export default function ProductPage() {
+            const { product } = useLoaderData<typeof loader>();
+            return <div>{product?.name}</div>;
+          }
+        desc: clientLoader — cache po stronie klienta
+        detail:
+          what: clientLoader uruchamia się po stronie klienta podczas SPA nawigacji. Możesz cache'ować odpowiedzi i nie odpytywać serwera przy powrocie na stronę.
+          how: serverLoader() wywołuje server loader. clientLoader.hydrate = true — uruchom też przy pierwszym renderowaniu.
+          tips:
+            - 'Przydatne dla rzadko zmieniających się danych (produkty, kategorie)'
+            - 'Invaliduj cache po akcji która zmienia dane'
+
+      - code: |
+          // clientAction — optimistic updates
+          import { useFetcher } from "@remix-run/react";
+          import type { ClientActionFunctionArgs } from "@remix-run/node";
+
+          // app/routes/api.todos.$id.tsx
+          export async function action({ request, params }: { request: Request; params: Record<string, string> }) {
+            const formData = await request.formData();
+            const completed = formData.get("completed") === "true";
+            return await db.todos.update({
+              where: { id: params.id },
+              data: { completed },
+            });
+          }
+
+          // clientAction: natychmiastowy feedback przed serwerem
+          export async function clientAction({ serverAction }: ClientActionFunctionArgs) {
+            const result = await serverAction();
+            // Możesz modyfikować wynik lub dodać client-side logikę
+            return result;
+          }
+
+          export default function TodoItem({ todo }: { todo: { id: string; title: string; completed: boolean } }) {
+            const fetcher = useFetcher();
+            const optimisticCompleted =
+              fetcher.formData ? fetcher.formData.get("completed") === "true" : todo.completed;
+
+            return (
+              <fetcher.Form method="post" action={`/api/todos/${todo.id}`}>
+                <input type="hidden" name="completed" value={String(!optimisticCompleted)} />
+                <button type="submit">
+                  {optimisticCompleted ? "✅" : "⬜"} {todo.title}
+                </button>
+              </fetcher.Form>
+            );
+          }
+        desc: clientAction + optimistic UI z fetcher.formData
+        detail:
+          what: clientAction uruchamia się po stronie klienta przed serverAction. Optimistic UI przez fetcher.formData — aktualizuj UI przed odpowiedzią serwera.
+          how: fetcher.formData jest dostępne podczas "submitting" state. Porównaj z aktualnym stanem żeby pokazać optymistyczny wynik.
+          tips:
+            - 'Optimistic UI = pokaż wynik zanim serwer potwierdzi — lepszy UX'
+            - 'Remix automatycznie wycofuje przy błędzie serwera'
+
+      - code: |
+          // Streaming z defer() — skeleton UI
+          import { defer } from "@remix-run/node";
+          import { Await, useLoaderData } from "@remix-run/react";
+          import { Suspense } from "react";
+
+          export async function loader() {
+            return defer({
+              // Krytyczne — await (blokuje HTML)
+              criticalData: await getCriticalData(),
+              // Wolne — bez await (streaming)
+              slowData: getSlowData(),
+            });
+          }
+
+          export function HydrateFallback() {
+            return <div className="skeleton">Ładowanie...</div>;
+          }
+
+          export default function Page() {
+            const { criticalData, slowData } = useLoaderData<typeof loader>();
+            return (
+              <div>
+                <h1>{criticalData.title}</h1>
+                <Suspense fallback={<div className="skeleton-card" />}>
+                  <Await resolve={slowData} errorElement={<p>Błąd ładowania</p>}>
+                    {(data) => <SlowComponent data={data} />}
+                  </Await>
+                </Suspense>
+              </div>
+            );
+          }
+        desc: defer + HydrateFallback — streaming z skeleton UI
+        detail:
+          what: HydrateFallback wyświetla się podczas hydration gdy dane jeszcze nie dotarły. defer() streamuje wolne dane. Szybszy First Contentful Paint.
+          how: Krytyczne dane blokują HTML (await). Wolne są stream-owane przez Suspense/Await. Serwer nie czeka na wolne dane.
+          tips:
+            - 'HydrateFallback = skeleton podczas hydration'
+            - 'Await errorElement — zawsze obsłuż błędy streamed danych'
+
+      - code: |
+          // revalidation po zewnętrznej mutacji
+          import { useFetcher, useRevalidator } from "@remix-run/react";
+
+          export function LiveDashboard() {
+            const revalidator = useRevalidator();
+
+            // Odśwież dane co 30 sekund
+            useEffect(() => {
+              const interval = setInterval(() => {
+                if (revalidator.state === "idle") {
+                  revalidator.revalidate();
+                }
+              }, 30_000);
+              return () => clearInterval(interval);
+            }, [revalidator]);
+
+            return (
+              <div>
+                <button
+                  onClick={() => revalidator.revalidate()}
+                  disabled={revalidator.state !== "idle"}
+                >
+                  {revalidator.state !== "idle" ? "Odświeżanie..." : "Odśwież"}
+                </button>
+              </div>
+            );
+          }
+        desc: useRevalidator — ręczne odświeżanie loaderów
+        detail:
+          what: useRevalidator() pozwala na programatyczne odświeżenie wszystkich aktywnych loaderów bez nawigacji. Idealne dla dashboardów z live data.
+          how: revalidator.revalidate() wywołuje wszystkie aktywne loadery ponownie. revalidator.state = idle/loading.
+          tips:
+            - 'Sprawdź revalidator.state === "idle" przed kolejnym revalidate'
+            - 'Alternatywa dla polling — odśwież tylko gdy user jest na stronie'
+
+  - name: Narzędzia i debugging
+    commands:
+      - cmd: npm run dev 2>&1 | grep -E "(Error|Warning|error)"
+        desc: Dev server z filtrowaniem błędów w terminalu
+        detail:
+          what: Uruchom dev server i filtruj tylko linie z błędami. Przydatne gdy output serwera jest zbyt verbose.
+          how: Błędy z server-side (loader/action) pojawiają się w terminalu, nie w konsoli przeglądarki — ważne do debugowania SSR.
+          tips:
+            - 'Użyj NODE_OPTIONS="--inspect" npm run dev — remote debugging w Chrome DevTools'
+            - 'Błędy 500 w dev = szczegółowy stack trace w terminalu'
+
+      - cmd: npx remix routes
+        desc: Wyświetl drzewo wszystkich tras aplikacji
+        detail:
+          what: Pokazuje wszystkie trasy wykryte przez Remix z ich hierarchią. Pomaga zrozumieć routing bez patrzenia w pliki.
+          how: Wylistowuje parent/child relacje, typy tras (layout, index, catch-all). Przydatne przy debugowaniu routingu.
+          tips:
+            - 'Porównaj output z oczekiwaną strukturą URL'
+            - 'Sprawdź czy flat routes są poprawnie parsowane przez Remix'
+
+      - code: |
+          // Debugowanie loader — console.log na serwerze
+          export async function loader({ request, params }: LoaderFunctionArgs) {
+            // Logi pojawiają się w TERMINALU, nie w konsoli przeglądarki
+            console.log("Loader wywołany:", {
+              url: request.url,
+              params,
+              headers: Object.fromEntries(request.headers),
+            });
+
+            // Timing
+            const start = Date.now();
+            const data = await db.users.findMany();
+            console.log(`Query zajął: ${Date.now() - start}ms, wyników: ${data.length}`);
+
+            return json({ data });
+          }
+
+          // Debugowanie w action
+          export async function action({ request }: ActionFunctionArgs) {
+            const formData = await request.formData();
+            console.log("FormData:", Object.fromEntries(formData));
+            // ...
+          }
+        desc: Debugowanie loader i action — console.log w terminalu
+        detail:
+          what: Wszystkie console.log w loader/action pojawiają się w terminalu serwera, nie w DevTools przeglądarki. Ważna różnica przy SSR.
+          how: Timing z Date.now() do pomiarów wydajności queries. Log headers i params do debugowania auth i routing.
+          tips:
+            - 'Loader działa na serwerze — logi idą do terminala, nie do przeglądarki'
+            - 'NODE_ENV=development — Remix pokazuje pełne stack trace w UI przy błędach'
+
+      - code: |
+          // Testowanie action z fetch — curl
+          // POST do action
+          // curl -X POST http://localhost:5173/blog/create \
+          //   -H "Content-Type: application/x-www-form-urlencoded" \
+          //   -d "title=Test&content=Hello+World"
+
+          // GET loader jako JSON
+          // curl http://localhost:5173/api/users
+
+          // Z cookies sesji
+          // curl -X POST http://localhost:5173/login \
+          //   -H "Content-Type: application/x-www-form-urlencoded" \
+          //   -d "email=test@example.com&password=secret" \
+          //   -c cookies.txt \
+          //   -L
+
+          // Testowanie w JavaScript
+          const response = await fetch("http://localhost:5173/api/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: "Jan", email: "jan@example.com" }),
+          });
+          const data = await response.json();
+          console.log(data);
+        desc: Testowanie API z curl i fetch — resource routes
+        detail:
+          what: Resource routes (bez default export) to pełne REST API testowalne przez curl lub fetch(). Nie potrzebujesz UI do testowania loaderów i actions.
+          how: loader = GET, action = POST/PUT/DELETE. Content-Type determinuje jak serwer parsuje body.
+          tips:
+            - 'curl -v dla verbose output z headers — sprawdź Set-Cookie, Cache-Control'
+            - 'Thunder Client lub Insomnia jako alternatywa dla curl'
+
+      - cmd: npx vite-bundle-visualizer
+        desc: Wizualizuj rozmiar bundle JavaScript
+        detail:
+          what: Generuje interaktywną wizualizację rozmiaru bundle — które moduły zajmują najwięcej miejsca w client-side JavaScript.
+          how: Uruchom po npm run build. Otwiera przeglądarkę z treemapą wszystkich modułów.
+          tips:
+            - 'npx vite-bundle-visualizer — wymaga build w trybie produkcyjnym'
+            - 'Szukaj dużych bibliotek które można lazy-load-ować przez import()'
+
+  - name: Deploy i adaptery
+    commands:
+      - code: |
+          // vite.config.ts — adapter Vercel
+          import { vitePlugin as remix } from "@remix-run/dev";
+          import { vercelPreset } from "@vercel/remix/vite";
+          import { defineConfig } from "vite";
+
+          export default defineConfig({
+            plugins: [
+              remix({
+                presets: [vercelPreset()],
+              }),
+            ],
+          });
+
+          // .vercel/output/ generuje się automatycznie
+          // git push = deploy na Vercel
+        desc: Deploy na Vercel — vercelPreset() w vite.config.ts
+        detail:
+          what: Vercel Remix adapter automatycznie konfiguruje Serverless Functions i Edge Runtime. Zero manual konfiguracji — git push = deploy.
+          how: Zainstaluj @vercel/remix. Dodaj vercelPreset() do plugins. Vercel wykrywa Remix automatycznie z package.json.
+          tips:
+            - 'npm install @vercel/remix — wymagana paczka'
+            - 'Zmienne środowiskowe w Vercel Dashboard → Settings → Environment Variables'
+
+      - code: |
+          // vite.config.ts — adapter Cloudflare Workers
+          import { vitePlugin as remix } from "@remix-run/dev";
+          import {
+            cloudflareDevProxyVitePlugin as remixCloudflareDevProxy,
+          } from "@remix-run/cloudflare-vite";
+          import { defineConfig } from "vite";
+          import tsconfigPaths from "vite-tsconfig-paths";
+
+          export default defineConfig({
+            plugins: [
+              remixCloudflareDevProxy(),
+              remix({
+                future: { v3_fetcherPersist: true },
+              }),
+              tsconfigPaths(),
+            ],
+          });
+          // wrangler.toml — konfiguracja Cloudflare
+          // npx wrangler deploy — deploy na Cloudflare Workers
+        desc: Deploy na Cloudflare Workers — wrangler
+        detail:
+          what: "@remix-run/cloudflare adapter deployuje na Cloudflare Workers — globalny edge network, ultra-niskie latency. Dostęp do KV, D1, R2."
+          how: remixCloudflareDevProxy() emuluje Cloudflare w dev. wrangler.toml konfiguruje projekt. npx wrangler deploy deployuje.
+          tips:
+            - 'npx wrangler dev — lokalny dev z emulacją Cloudflare'
+            - 'context.env.MY_KV — dostęp do KV Storage w loader/action'
+
+      - cmd: "fly deploy"
+        desc: Deploy na Fly.io — container platform
+        detail:
+          what: Fly.io uruchamia aplikacje jako Docker containers na globalnej sieci. Świetny wybór dla Remix z Epic Stack.
+          how: fly launch — inicjalizacja (Dockerfile, fly.toml). fly deploy — deploy. Automatyczny TLS, global distribution.
+          tips:
+            - 'fly launch — interaktywna inicjalizacja projektu na Fly.io'
+            - 'fly logs — podgląd logów produkcji w real-time'
+
+      - cmd: npx wrangler dev
+        desc: Lokalny dev server emulujący Cloudflare Workers
+        detail:
+          what: Wrangler dev emuluje środowisko Cloudflare lokalnie — KV, D1, R2, Durable Objects. Testuj Cloudflare-specific kod przed deployem.
+          how: Wymaga konfiguracji w wrangler.toml. Dostęp do KV i innych bindingów przez --local flag.
+          tips:
+            - 'npx wrangler dev --local — lokalny KV bez połączenia z Cloudflare'
+            - 'npx wrangler kv:key put --binding MY_KV key "value" — dodaj dane do KV'
+
+      - cmd: npx wrangler deploy
+        desc: Deploy aplikacji na Cloudflare Workers
+        detail:
+          what: Buduje i deployuje aplikację na Cloudflare Workers. Automatyczny global distribution na sieć Cloudflare (200+ lokalizacji).
+          how: Wymaga konta Cloudflare i npx wrangler login. Deploy zajmuje < 30 sekund.
+          tips:
+            - 'npx wrangler login — autoryzacja przed pierwszym deploy'
+            - 'Domena: *.workers.dev domyślnie, własna przez custom domain'

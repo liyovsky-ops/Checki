@@ -1,0 +1,211 @@
+title: "Jobs & Steps"
+
+items:
+  - name: "needs — zależności między jobami"
+    desc: >
+      needs: definiuje które joby muszą zakończyć się sukcesem przed uruchomieniem
+      bieżącego. Domyślnie joby działają równolegle — needs wymusza kolejność.
+      Możesz podać jeden job lub listę.
+    code: |
+      jobs:
+        test:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@v4
+            - run: npm test
+
+        build:
+          needs: test
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@v4
+            - run: npm run build
+
+        deploy:
+          needs: [test, build]
+          runs-on: ubuntu-latest
+          steps:
+            - run: echo "Deploy po teście i buildzie"
+
+  - name: "strategy.matrix — parallel builds"
+    desc: >
+      Matrix pozwala uruchomić job wielokrotnie z różnymi parametrami jednocześnie.
+      Klasyczny use case to testy na wielu wersjach Node.js, Python lub OS.
+      Kombinacje są automatycznie generowane (cross product).
+    code: |
+      jobs:
+        test:
+          runs-on: ${{ matrix.os }}
+          strategy:
+            matrix:
+              os: [ubuntu-latest, windows-latest, macos-latest]
+              node-version: ['18', '20', '22']
+            fail-fast: false  # nie przerywaj innych gdy jedno failuje
+          steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                node-version: ${{ matrix.node-version }}
+            - run: npm test
+
+  - name: "if — warunkowe kroki i joby"
+    desc: >
+      if: pozwala warunkowo uruchomić step lub cały job. Wyrażenia używają
+      kontekstów github.*, steps.*.outcome, env.*. Stały dostęp do
+      functions jak contains(), startsWith(), always(), failure().
+    code: |
+      jobs:
+        deploy:
+          runs-on: ubuntu-latest
+          # Job tylko na main branchu
+          if: github.ref == 'refs/heads/main'
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Deploy do produkcji
+              run: ./deploy.sh
+
+            # Step tylko gdy poprzedni failuje
+            - name: Notify o błędzie
+              if: failure()
+              run: |
+                curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
+                  -d '{"text":"Deploy failed!"}'
+
+            # Step tylko dla określonego aktora
+            - name: Admin-only step
+              if: github.actor == 'admin-bot'
+              run: echo "Tylko dla bota"
+
+  - name: "continue-on-error i timeout-minutes"
+    desc: >
+      continue-on-error: true pozwala jobowi/stepowi zakończyć się sukcesem
+      nawet gdy krok failuje — przydatne dla opcjonalnych checks.
+      timeout-minutes zapobiega zawieszeniu workflow na wiele godzin.
+    code: |
+      jobs:
+        test:
+          runs-on: ubuntu-latest
+          timeout-minutes: 30  # cały job max 30 minut
+
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Testy jednostkowe (wymagane)
+              run: npm test
+
+            - name: Testy e2e (opcjonalne)
+              continue-on-error: true
+              timeout-minutes: 10
+              run: npm run test:e2e
+
+            - name: Lighthouse audit (opcjonalne)
+              continue-on-error: true
+              run: npx lighthouse-ci
+
+  - name: "services — Docker sidecar"
+    desc: >
+      services: uruchamia kontenery Docker jako sidecar dla joba — np. baza danych
+      PostgreSQL lub Redis na czas testów. Dostępne przez hostname = nazwa serwisu.
+      Automatycznie zatrzymywane po zakończeniu joba.
+    code: |
+      jobs:
+        test:
+          runs-on: ubuntu-latest
+
+          services:
+            postgres:
+              image: postgres:16
+              env:
+                POSTGRES_PASSWORD: testpass
+                POSTGRES_DB: testdb
+              ports:
+                - 5432:5432
+              options: >-
+                --health-cmd pg_isready
+                --health-interval 10s
+                --health-timeout 5s
+                --health-retries 5
+
+            redis:
+              image: redis:7
+              ports:
+                - 6379:6379
+
+          steps:
+            - uses: actions/checkout@v4
+            - run: npm test
+              env:
+                DATABASE_URL: "postgresql://postgres:testpass@localhost:5432/testdb"
+                REDIS_URL: "redis://localhost:6379"
+
+  - name: "outputs — przekazywanie danych między jobami"
+    desc: >
+      Job outputs pozwalają przekazać wartości z jednego joba do drugiego.
+      Step ustawia output przez GITHUB_OUTPUT, job deklaruje go w outputs:,
+      kolejny job odczytuje przez needs.job-id.outputs.nazwa.
+    code: |
+      jobs:
+        build:
+          runs-on: ubuntu-latest
+          outputs:
+            version: ${{ steps.get-version.outputs.version }}
+            image-tag: ${{ steps.build.outputs.tag }}
+
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Pobierz wersję
+              id: get-version
+              run: |
+                VERSION=$(cat package.json | jq -r .version)
+                echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+            - name: Build i tag
+              id: build
+              run: |
+                TAG="v$(cat package.json | jq -r .version)-${{ github.sha }}"
+                echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+        deploy:
+          needs: build
+          runs-on: ubuntu-latest
+          steps:
+            - name: Użyj wersji z build joba
+              run: |
+                echo "Deploying version: ${{ needs.build.outputs.version }}"
+                echo "Image tag: ${{ needs.build.outputs.image-tag }}"
+
+  - name: "composite actions — wielokrotnie używalne kroki"
+    desc: >
+      Composite action to lokalna action z wielu kroków — reduces duplication.
+      Definiujesz w .github/actions/nazwa/action.yml, używasz jak każdą action
+      (uses: ./.github/actions/nazwa). Może mieć inputs i outputs.
+    code: |
+      # .github/actions/setup-and-install/action.yml
+      name: Setup and Install
+      description: Checkout, setup Node.js i instalacja zależności
+
+      inputs:
+        node-version:
+          description: Wersja Node.js
+          default: '20'
+
+      runs:
+        using: composite
+        steps:
+          - uses: actions/checkout@v4
+
+          - uses: actions/setup-node@v4
+            with:
+              node-version: ${{ inputs.node-version }}
+              cache: npm
+
+          - run: npm ci
+            shell: bash
+
+      # Użycie w workflow
+      # steps:
+      #   - uses: ./.github/actions/setup-and-install
+      #     with:
+      #       node-version: '22'

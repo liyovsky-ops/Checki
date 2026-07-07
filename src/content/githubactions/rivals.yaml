@@ -1,0 +1,70 @@
+title: "GitHub Actions vs alternatywy CI/CD"
+
+items:
+  - name: GitLab CI
+    icon: "🦊"
+    color: "#fc6d26"
+    tagline: "Self-hosted runners, YAML pipeline, wbudowane registry i packages"
+    pros:
+      - Pełna platforma — kod + CI + registry + issues w jednym miejscu
+      - Self-hosted runners bez limitu minut (własna infrastruktura)
+      - ".gitlab-ci.yml — jeden plik dla całego pipeline"
+      - Wbudowany Docker registry i Package registry
+      - Pipeline jako DAG — bardziej elastyczne niż GitHub Actions jobs
+    cons:
+      - Mniejszy marketplace niż GitHub (mniej gotowych integracji)
+      - Stroma krzywa uczenia dla zaawansowanych funkcji (include, extends)
+      - Self-hosted wymaga utrzymania własnej infrastruktury
+      - Mniej popularne w open source — trudniej znaleźć pomoc
+    vs: GitLab CI gdy masz własne serwery lub wymagania compliance (on-premise). GitHub Actions gdy jesteś na GitHub i chcesz największy marketplace.
+
+  - name: CircleCI
+    icon: "⭕"
+    color: "#343434"
+    tagline: "Orbs, Docker-native, najszybszy cold start — pionier nowoczesnego CI"
+    pros:
+      - Orbs to reużywalne pakiety konfiguracji (jak Actions ale z własnym rejestrem)
+      - Bardzo szybki cold start — szybszy niż GitHub Actions
+      - Wbudowany support dla Docker layers caching
+      - Resource classes — precyzyjny dobór CPU/RAM per job
+      - Test splitting — automatyczny podział testów na równoległe maszyny
+    cons:
+      - Płatny dla prywatnych repo (limity na free tier)
+      - Osobna platforma — poza GitHub (osobny login, konfiguracja)
+      - Mniejszy ekosystem niż GitHub Actions
+      - config.yml może być skomplikowany dla złożonych workflow
+    vs: CircleCI dla wydajności i test splitting w dużych projektach. GitHub Actions dla prostoty i integracji z repo bez dodatkowego konta.
+
+  - name: Jenkins
+    icon: "🏛️"
+    color: "#d33833"
+    tagline: "Self-hosted, Groovy DSL, pełna kontrola — legenda enterprise CI"
+    pros:
+      - Pełna kontrola — własny serwer, własne reguły, własna retencja
+      - 1800+ pluginów — integracja z dosłownie wszystkim
+      - Brak limitów minut — własna infrastruktura
+      - Jenkinsfile (Groovy/declarative) — potężny, ale skomplikowany
+      - On-premise — spełnia wymagania compliance i air-gapped środowisk
+    cons:
+      - Wymaga DevOps do utrzymania serwera Jenkins (aktualizacje, pluginy)
+      - Stara architektura — brak natywnego YAML, skomplikowany UI
+      - Brak cloud-native features (OIDC, environments, matrix) out of the box
+      - Setup nowego projektu jest złożony i czasochłonny
+    vs: Jenkins dla enterprise on-premise z wymaganiami compliance. GitHub Actions dla większości nowych projektów — zero infrastruktury do zarządzania.
+
+  - name: Azure DevOps Pipelines
+    icon: "🔷"
+    color: "#0078d4"
+    tagline: "Microsoft ecosystem, YAML pipelines, integracja z Azure i M365"
+    pros:
+      - Natywna integracja z Azure (AKS, App Service, Container Registry)
+      - Pipeline as code YAML + klasyczny visual designer
+      - Microsoft-hosted agents i self-hosted agents
+      - Wbudowane Boards (Jira-like), Repos (Git), Artifacts (npm/NuGet)
+      - Deployment groups dla on-premise deployments
+    cons:
+      - Skomplikowana konfiguracja w porównaniu do GitHub Actions
+      - UI bywa nieintuicyjny — stroma krzywa uczenia
+      - Integracja z GitHub możliwa, ale clunky
+      - Marketplace mniejszy niż GitHub Actions
+    vs: Azure DevOps gdy jesteś w ekosystemie Microsoft/Azure i masz enterprise compliance. GitHub Actions gdy repo jest na GitHub i nie potrzebujesz całej platformy Azure DevOps.

@@ -1,0 +1,314 @@
+title: State & Data w Nuxt
+
+items:
+  - name: "useState — prosty shared state"
+    desc: >
+      useState to wbudowany Nuxt composable dla współdzielonego stanu między komponentami.
+      SSR-safe — stan jest serializowany z serwera do klienta, eliminując hydration mismatch.
+      Dobry zamiennik Pinia dla małych i średnich aplikacji.
+    code: |
+      // composables/useAppState.ts
+      export const useAppState = () => {
+        // Klucz musi być unikalny — używany do serializacji SSR
+        const user = useState<User | null>('app:user', () => null)
+        const theme = useState<'light' | 'dark'>('app:theme', () => 'light')
+        const notifications = useState<Notification[]>('app:notifications', () => [])
+
+        function setUser(newUser: User | null) {
+          user.value = newUser
+        }
+
+        function addNotification(notification: Notification) {
+          notifications.value.push(notification)
+        }
+
+        function toggleTheme() {
+          theme.value = theme.value === 'light' ? 'dark' : 'light'
+        }
+
+        return { user, theme, notifications, setUser, addNotification, toggleTheme }
+      }
+
+      // Użycie w dowolnym komponencie
+      <script setup lang="ts">
+      const { user, theme, toggleTheme } = useAppState()
+      // Ten sam state w całej aplikacji — bez Pinia
+      </script>
+
+  - name: "Pinia z Nuxt — @pinia/nuxt"
+    desc: >
+      Pinia to oficjalny state management dla Vue 3 i zalecane rozwiązanie dla złożonych
+      aplikacji Nuxt. @pinia/nuxt auto-importuje wszystkie store'y. Store'y są SSR-safe,
+      obsługują plugins, persistencję przez pinia-plugin-persistedstate.
+    code: |
+      // nuxt.config.ts
+      export default defineNuxtConfig({
+        modules: ['@pinia/nuxt'],
+      })
+
+      // stores/user.ts — Pinia store
+      export const useUserStore = defineStore('user', () => {
+        // State
+        const user = ref<User | null>(null)
+        const token = ref<string | null>(null)
+        const isLoading = ref(false)
+
+        // Getters
+        const isAuthenticated = computed(() => !!token.value)
+        const fullName = computed(() =>
+          user.value ? `${user.value.firstName} ${user.value.lastName}` : ''
+        )
+
+        // Actions
+        async function login(email: string, password: string) {
+          isLoading.value = true
+          try {
+            const data = await $fetch('/api/auth/login', {
+              method: 'POST',
+              body: { email, password }
+            })
+            user.value = data.user
+            token.value = data.token
+          } finally {
+            isLoading.value = false
+          }
+        }
+
+        function logout() {
+          user.value = null
+          token.value = null
+        }
+
+        return { user, token, isLoading, isAuthenticated, fullName, login, logout }
+      })
+
+      // Użycie w komponencie — auto-import!
+      <script setup lang="ts">
+      const userStore = useUserStore()
+      const { user, isAuthenticated, login, logout } = storeToRefs(userStore)
+      </script>
+
+  - name: "useFetch z cache i revalidation"
+    desc: >
+      useFetch cachuje dane po stronie serwera i klienta. Klucz cache można kontrolować.
+      refreshNuxtData odświeża konkretne lub wszystkie dane. clearNuxtData czyści cache.
+      getCachedData do zaawansowanej kontroli cache.
+    code: |
+      <script setup lang="ts">
+      // Cache z automatycznym kluczem (URL)
+      const { data: posts, refresh } = await useFetch('/api/posts', {
+        // Niestandardowy klucz cache
+        key: 'homepage-posts',
+
+        // Cache po stronie serwera (tylko SSR)
+        getCachedData(key, nuxtApp) {
+          return nuxtApp.payload.data[key] || nuxtApp.static.data[key]
+        },
+
+        // Transformacja danych przed cache
+        transform: (data) => ({
+          posts: data.items,
+          total: data.total,
+          cachedAt: new Date(),
+        }),
+      })
+
+      // Ręczne odświeżenie
+      async function refreshPosts() {
+        await refresh()
+        // lub
+        await refreshNuxtData('homepage-posts')
+      }
+
+      // Wyczyść i pobierz od nowa
+      async function invalidateAndRefresh() {
+        clearNuxtData('homepage-posts')
+        await refresh()
+      }
+
+      // Watch — auto-refresh gdy zmienia się query
+      const search = ref('')
+      const { data: results } = await useFetch('/api/search', {
+        query: { q: search },
+        watch: [search],
+        debounce: 300,  // @vueuse/core
+      })
+      </script>
+
+  - name: "useNuxtData — współdzielony cache"
+    desc: >
+      useNuxtData daje dostęp do danych z cache useFetch/useAsyncData przez klucz.
+      Idealny do optimistic updates — zmodyfikuj dane lokalnie, potem synchronizuj
+      z serwerem. Eliminuje potrzebę duplikowania fetchów.
+    code: |
+      // Strona listy posts — fetchuje dane z kluczem
+      // pages/posts/index.vue
+      <script setup lang="ts">
+      const { data: posts } = await useFetch('/api/posts', { key: 'posts-list' })
+      </script>
+
+      // Strona detalu — odczytuje z cache bez nowego fetcha
+      // pages/posts/[id].vue
+      <script setup lang="ts">
+      const route = useRoute()
+
+      // Dostęp do listy z cache — bez nowego requestu
+      const { data: postsList } = useNuxtData<Post[]>('posts-list')
+      const cachedPost = computed(() =>
+        postsList.value?.find(p => p.id === Number(route.params.id))
+      )
+
+      // Jeśli nie ma w cache — fetch
+      const { data: post } = await useFetch(`/api/posts/${route.params.id}`, {
+        default: () => cachedPost.value,  // optymistyczna wartość
+      })
+      </script>
+
+      // Optimistic update po tworzeniu posta
+      <script setup lang="ts">
+      async function createPost(formData: CreatePostDto) {
+        const { data: posts } = useNuxtData<Post[]>('posts-list')
+        const tempPost = { id: -1, ...formData, createdAt: new Date() }
+
+        // Dodaj optimistycznie
+        posts.value = [tempPost, ...(posts.value || [])]
+
+        try {
+          const newPost = await $fetch('/api/posts', { method: 'POST', body: formData })
+          // Zastąp tymczasowy post prawdziwym
+          posts.value = posts.value?.map(p => p.id === -1 ? newPost : p) || []
+        } catch {
+          // Cofnij
+          posts.value = posts.value?.filter(p => p.id !== -1) || []
+        }
+      }
+      </script>
+
+  - name: "$fetch — bezpośrednie HTTP requesty"
+    desc: >
+      $fetch to Nuxt wrapper nad ofetch — inteligentny klient HTTP. Automatycznie
+      serializuje/deserializuje JSON, parsuje błędy, obsługuje baseURL z runtimeConfig.
+      Używaj $fetch w event handlerach (nie useAsyncData) — np. po kliknięciu przycisku.
+    code: |
+      <script setup lang="ts">
+      // $fetch w event handlerze — NIE w setup (używaj useFetch dla SSR)
+      async function submitForm() {
+        try {
+          const result = await $fetch('/api/posts', {
+            method: 'POST',
+            body: {
+              title: form.title,
+              content: form.content,
+            },
+          })
+          await navigateTo(`/posts/${result.id}`)
+        } catch (err) {
+          // $fetch rzuca FetchError z statusCode i data
+          if (err.statusCode === 422) {
+            errors.value = err.data.errors
+          }
+        }
+      }
+
+      // DELETE
+      async function deletePost(id: number) {
+        await $fetch(`/api/posts/${id}`, { method: 'DELETE' })
+        await refreshNuxtData('posts-list')
+      }
+
+      // Z headers i query
+      const data = await $fetch('/api/protected', {
+        headers: { Authorization: `Bearer ${token.value}` },
+        query: { include: ['author', 'comments'] },
+      })
+      </script>
+
+  - name: "useLazyAsyncData — dane nieblokujące nawigacji"
+    desc: >
+      useLazyAsyncData nie czeka na dane przed wyrenderowaniem strony. Strona ładuje
+      się natychmiast, dane pojawiają się po chwili (wraz z pending state).
+      Idealny dla danych niekrytycznych — komentarze, rekomendacje, sidebary.
+    code: |
+      <script setup lang="ts">
+      // Nie blokuje renderowania strony
+      const {
+        data: comments,
+        pending: loadingComments,
+        error: commentsError,
+        refresh: refreshComments,
+      } = useLazyAsyncData(
+        'post-comments',
+        () => $fetch(`/api/posts/${postId}/comments`)
+      )
+      </script>
+
+      <template>
+        <section>
+          <h2>Komentarze</h2>
+
+          <!-- Skeleton podczas ładowania -->
+          <template v-if="loadingComments">
+            <CommentSkeleton v-for="i in 3" :key="i" />
+          </template>
+
+          <!-- Błąd -->
+          <div v-else-if="commentsError" class="error">
+            Nie udało się załadować komentarzy.
+            <button @click="refreshComments">Spróbuj ponownie</button>
+          </div>
+
+          <!-- Dane -->
+          <template v-else>
+            <CommentCard
+              v-for="comment in comments"
+              :key="comment.id"
+              :comment="comment"
+            />
+          </template>
+        </section>
+      </template>
+
+  - name: "Server-side data fetching pattern"
+    desc: >
+      Najlepszy wzorzec w Nuxt — fetch danych na serwerze przez server route, potem
+      useAsyncData w komponencie. Dane są dostępne w HTML bez dodatkowego clientside
+      fetcha — idealne dla SEO i FCP (First Contentful Paint).
+    code: |
+      // server/api/products/[id].get.ts
+      export default defineEventHandler(async (event) => {
+        const id = getRouterParam(event, 'id')
+        const config = useRuntimeConfig(event)
+
+        // Zapytanie do bazy — tylko na serwerze
+        const product = await db.product.findUnique({
+          where: { id: Number(id) },
+          include: { category: true, images: true },
+        })
+
+        if (!product) {
+          throw createError({ statusCode: 404, statusMessage: 'Product not found' })
+        }
+
+        return product
+      })
+
+      // pages/products/[id].vue
+      <script setup lang="ts">
+      const route = useRoute()
+
+      // Dane renderowane na serwerze — w HTML od razu
+      const { data: product } = await useAsyncData(
+        `product-${route.params.id}`,
+        () => $fetch(`/api/products/${route.params.id}`)
+      )
+
+      // Obsługa braku produktu
+      if (!product.value) {
+        throw createError({ statusCode: 404, statusMessage: 'Nie znaleziono produktu' })
+      }
+
+      useSeoMeta({
+        title: () => product.value?.name,
+        ogImage: () => product.value?.images[0]?.url,
+      })
+      </script>

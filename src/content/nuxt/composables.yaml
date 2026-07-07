@@ -1,0 +1,292 @@
+title: Nuxt Composables
+
+items:
+  - name: "useFetch — pobieranie danych"
+    desc: >
+      useFetch to główny sposób pobierania danych w Nuxt. Działa zarówno na serwerze (SSR)
+      jak i po stronie klienta. Automatycznie deduplicuje requesty, obsługuje loading/error
+      state, cache przez useNuxtData oraz reactive query params.
+    code: |
+      <script setup lang="ts">
+      // Podstawowe użycie
+      const { data, pending, error, refresh } = await useFetch('/api/posts')
+
+      // Z typowaniem
+      interface Post {
+        id: number
+        title: string
+        body: string
+      }
+
+      const { data: posts } = await useFetch<Post[]>('/api/posts')
+
+      // Z opcjami — query params, headers, transform
+      const { data: filteredPosts } = await useFetch('/api/posts', {
+        query: { page: 1, limit: 10, category: 'vue' },
+        headers: { 'Authorization': `Bearer ${token}` },
+        transform: (posts) => posts.filter(p => p.published),
+        key: 'filtered-posts',  // klucz cache
+      })
+
+      // Watch — re-fetch gdy zmienia się param
+      const page = ref(1)
+      const { data: pagedPosts } = await useFetch('/api/posts', {
+        watch: [page],
+        query: { page },
+      })
+      </script>
+
+  - name: "useAsyncData — pełna kontrola fetchowania"
+    desc: >
+      useAsyncData daje więcej kontroli niż useFetch. Używasz go gdy chcesz wywołać
+      własną funkcję async (baza danych, SDK, custom logic) zamiast prostego URL.
+      Wymaga unikalnego klucza jako pierwszego argumentu.
+    code: |
+      <script setup lang="ts">
+      // Custom async function — np. wywołanie Prisma, Supabase, SDK
+      const { data: users, pending, error } = await useAsyncData(
+        'users-list',
+        () => $fetch('/api/users'),
+      )
+
+      // Z parametrem — re-fetch gdy id się zmienia
+      const route = useRoute()
+      const { data: post } = await useAsyncData(
+        `post-${route.params.id}`,
+        () => $fetch(`/api/posts/${route.params.id}`)
+      )
+
+      // Lazy — nie blokuje nawigacji, ładuje po mount
+      const { data: comments, pending: loadingComments } = await useLazyAsyncData(
+        'comments',
+        () => $fetch('/api/comments')
+      )
+
+      // Opcje
+      const { data } = await useAsyncData(
+        'my-data',
+        () => $fetch('/api/data'),
+        {
+          default: () => [],       // wartość domyślna przed załadowaniem
+          transform: (d) => d.items,
+          pick: ['id', 'name'],    // wybierz tylko potrzebne pola
+          watch: [someRef],        // re-fetch gdy zmienia się ref
+        }
+      )
+      </script>
+
+  - name: "useLazyFetch / useLazyAsyncData"
+    desc: >
+      Lazy warianty nie blokują nawigacji do strony — strona ładuje się od razu,
+      dane pojawiają się po chwili. Używaj pending do pokazania skeleton/spinner.
+      Idealny dla danych niekrytycznych (sidebar, rekomendacje, komentarze).
+    code: |
+      <script setup lang="ts">
+      // useLazyFetch — strona załaduje się natychmiast
+      const { data: recommendations, pending } = useLazyFetch('/api/recommendations')
+
+      // useLazyAsyncData
+      const { data: comments, pending: loadingComments } = useLazyAsyncData(
+        'comments',
+        () => $fetch('/api/comments')
+      )
+      </script>
+
+      <template>
+        <div>
+          <!-- Skeleton podczas ładowania -->
+          <div v-if="pending" class="skeleton">
+            <div v-for="i in 3" :key="i" class="skeleton-card" />
+          </div>
+
+          <!-- Dane po załadowaniu -->
+          <ul v-else>
+            <li v-for="item in recommendations" :key="item.id">
+              {{ item.title }}
+            </li>
+          </ul>
+        </div>
+      </template>
+
+  - name: "useState — shared reactive state"
+    desc: >
+      useState to SSR-safe zamiennik dla ref() gdy chcesz współdzielić stan między
+      komponentami i stronami. Stan jest serializowany z serwera do klienta — nie
+      ma problemu z hydration mismatch. Alternatywa dla Pinia w prostych przypadkach.
+    code: |
+      // composables/useCounter.ts — custom composable z useState
+      export const useCounter = () => {
+        const count = useState('counter', () => 0)
+
+        function increment() { count.value++ }
+        function decrement() { count.value-- }
+        function reset() { count.value = 0 }
+
+        return { count, increment, decrement, reset }
+      }
+
+      // Użycie w dowolnym komponencie — ten sam stan
+      <script setup lang="ts">
+      const { count, increment, decrement } = useCounter()
+
+      // Dostęp do stanu globalnego z dowolnego miejsca
+      const user = useState('current-user', () => null)
+      const theme = useState<'light' | 'dark'>('theme', () => 'light')
+      </script>
+
+  - name: "useRoute i useRouter — nawigacja"
+    desc: >
+      useRoute daje dostęp do aktualnej trasy (params, query, hash, path, meta).
+      useRouter pozwala na programową nawigację, sprawdzenie historii i hook
+      beforeEach. Oba są auto-importowane w Nuxt.
+    code: |
+      <script setup lang="ts">
+      const route = useRoute()
+      const router = useRouter()
+
+      // Odczytaj parametry i query
+      console.log(route.params.id)      // /posts/42 → "42"
+      console.log(route.query.page)     // /posts?page=2 → "2"
+      console.log(route.path)           // "/posts/42"
+      console.log(route.meta.requiresAuth)  // z definePageMeta
+
+      // Programowa nawigacja
+      function goToPost(id: number) {
+        router.push(`/posts/${id}`)
+      }
+
+      // Z obiektem — type-safe
+      router.push({ name: 'posts-id', params: { id: 42 } })
+
+      // Zamień historię (bez new entry)
+      router.replace('/login')
+
+      // Wróć
+      router.back()
+
+      // navigateTo — Nuxt helper
+      await navigateTo('/dashboard')
+      await navigateTo('/login', { replace: true })
+      await navigateTo('https://nuxt.com', { external: true })
+      </script>
+
+  - name: "useCookie — server-side cookies"
+    desc: >
+      useCookie to SSR-safe sposób na czytanie i ustawianie cookies. Działa
+      zarówno na serwerze (Set-Cookie header) jak i po stronie klienta
+      (document.cookie). Reactive — zmiana wartości automatycznie ustawia cookie.
+    code: |
+      <script setup lang="ts">
+      // Prosta cookie
+      const colorScheme = useCookie('color-scheme', {
+        default: () => 'light',
+        maxAge: 60 * 60 * 24 * 365,  // rok w sekundach
+        sameSite: 'lax',
+      })
+
+      // Zmiana — automatycznie ustawia cookie
+      colorScheme.value = 'dark'
+
+      // Cookie z obiektem (auto-serialize/deserialize JSON)
+      const userPrefs = useCookie<{ lang: string; notifications: boolean }>('user-prefs', {
+        default: () => ({ lang: 'pl', notifications: true }),
+      })
+
+      userPrefs.value.lang = 'en'  // auto-zapisuje
+
+      // Cookie z tokenem auth
+      const token = useCookie('auth-token', {
+        httpOnly: true,
+        secure: true,
+        maxAge: 60 * 60 * 24 * 7,  // tydzień
+      })
+      </script>
+
+  - name: "useRuntimeConfig — zmienne środowiskowe"
+    desc: >
+      useRuntimeConfig udostępnia zmienne z nuxt.config.ts runtimeConfig.
+      Publiczne zmienne (dostępne wszędzie), prywatne zmienne (tylko serwer).
+      Automatycznie nadpisywane przez zmienne środowiskowe z .env.
+    code: |
+      // nuxt.config.ts
+      export default defineNuxtConfig({
+        runtimeConfig: {
+          // Prywatne — tylko na serwerze
+          databaseUrl: process.env.DATABASE_URL,
+          jwtSecret: process.env.JWT_SECRET,
+          // Publiczne — dostępne wszędzie (ostrożnie!)
+          public: {
+            apiBase: process.env.NUXT_PUBLIC_API_BASE || '/api',
+            appName: 'Moja Aplikacja',
+          }
+        }
+      })
+
+      // Użycie w server route (server/api/users.get.ts)
+      export default defineEventHandler(async (event) => {
+        const config = useRuntimeConfig(event)
+        const db = await connect(config.databaseUrl)  // prywatne
+        return db.query('SELECT * FROM users')
+      })
+
+      // Użycie w komponencie (tylko publiczne!)
+      <script setup lang="ts">
+      const config = useRuntimeConfig()
+      const apiBase = config.public.apiBase  // '/api'
+      const appName = config.public.appName  // 'Moja Aplikacja'
+      </script>
+
+  - name: "useRequestHeaders — nagłówki requestu"
+    desc: >
+      useRequestHeaders pozwala odczytać nagłówki HTTP requestu na serwerze.
+      Przydatne do przekazywania cookie auth do zewnętrznego API podczas SSR,
+      odczytu Accept-Language, User-Agent itp.
+    code: |
+      <script setup lang="ts">
+      // Pobierz cookie z requestu (np. do auth w useFetch)
+      const headers = useRequestHeaders(['cookie', 'authorization'])
+
+      // Przekaż nagłówki do API call podczas SSR
+      const { data } = await useFetch('/api/profile', {
+        headers: headers,
+      })
+
+      // Odczyt Accept-Language
+      const { 'accept-language': lang } = useRequestHeaders(['accept-language'])
+      </script>
+
+  - name: "useNuxtData, clearNuxtData, refreshNuxtData"
+    desc: >
+      useNuxtData daje dostęp do cache danych z useFetch/useAsyncData przez klucz.
+      clearNuxtData usuwa cache (np. po mutation). refreshNuxtData wymusza re-fetch
+      wszystkich lub wybranych danych.
+    code: |
+      <script setup lang="ts">
+      // Dostęp do cache przez klucz
+      const { data: cachedPosts } = useNuxtData('posts')
+
+      // Optimistic update po POST
+      async function createPost(newPost: Post) {
+        const { data: posts } = useNuxtData<Post[]>('posts')
+
+        // Optimistic — dodaj lokalnie natychmiast
+        posts.value = [...(posts.value || []), newPost]
+
+        try {
+          await $fetch('/api/posts', { method: 'POST', body: newPost })
+        } catch {
+          // Rollback — wyczyść cache i re-fetch
+          clearNuxtData('posts')
+        }
+      }
+
+      // Wyczyść konkretny lub wszystkie cache
+      clearNuxtData('posts')      // konkretny klucz
+      clearNuxtData(['posts', 'users'])  // wiele kluczy
+      clearNuxtData()             // wszystko
+
+      // Odśwież konkretne lub wszystkie dane
+      await refreshNuxtData('posts')
+      await refreshNuxtData(['posts', 'categories'])
+      await refreshNuxtData()     // all
+      </script>

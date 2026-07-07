@@ -1,0 +1,247 @@
+title: Routing w Astro
+
+items:
+  - name: File-based routing — struktura
+    desc: >
+      Astro używa file-based routingu — pliki w src/pages/ automatycznie
+      tworzą ścieżki URL. Obsługuje .astro, .md, .mdx pliki.
+      Każdy plik staje się osobną stroną.
+    code: |
+      src/pages/
+        index.astro          → /
+        about.astro          → /about
+        contact.astro        → /contact
+        blog/
+          index.astro        → /blog
+          [slug].astro       → /blog/my-post (dynamiczny)
+          [...slug].astro    → /blog/a/b/c   (catch-all)
+        api/
+          users.ts           → /api/users (endpoint)
+        404.astro            → Strona błędu 404
+
+  - name: Dynamiczne trasy [slug].astro
+    desc: >
+      Pliki w nawiasach kwadratowych tworzą dynamiczne trasy. Musisz zdefiniować
+      getStaticPaths() aby Astro wiedziało jakie URL-e wygenerować przy budowaniu.
+    code: |
+      ---
+      // src/pages/blog/[slug].astro
+      import { getCollection } from 'astro:content';
+
+      // getStaticPaths() zwraca listę wszystkich możliwych tras
+      export async function getStaticPaths() {
+        const posts = await getCollection('blog');
+        return posts.map((post) => ({
+          params: { slug: post.slug },
+          props: { post },
+        }));
+      }
+
+      // Teraz możesz użyć post z props
+      const { post } = Astro.props;
+      const { Content } = await post.render();
+      ---
+
+      <html>
+        <head><title>{post.data.title}</title></head>
+        <body>
+          <h1>{post.data.title}</h1>
+          <Content />
+        </body>
+      </html>
+
+  - name: Catch-all trasy [...slug].astro
+    desc: >
+      [...slug] dopasowuje wiele segmentów URL jednocześnie. Parametr slug
+      jest tablicą stringów. Używany dla zagnieżdżonej dokumentacji.
+    code: |
+      ---
+      // src/pages/docs/[...slug].astro
+      // Dopasowuje: /docs/getting-started, /docs/api/auth, /docs/a/b/c
+
+      export async function getStaticPaths() {
+        const docs = await getCollection('docs');
+        return docs.map((doc) => ({
+          params: {
+            // undefined dla root /docs, lub 'api/auth' dla /docs/api/auth
+            slug: doc.slug === 'index' ? undefined : doc.slug,
+          },
+          props: { doc },
+        }));
+      }
+
+      const { doc } = Astro.props;
+      const { Content } = await doc.render();
+      const { title, description } = doc.data;
+      ---
+
+      <article>
+        <h1>{title}</h1>
+        <p class="lead">{description}</p>
+        <Content />
+      </article>
+
+  - name: getStaticPaths() — generowanie tras
+    desc: >
+      getStaticPaths() jest wymagane dla dynamicznych tras w trybie SSG.
+      Zwraca tablicę obiektów { params, props }. Params to URL segmenty,
+      props to dane przekazywane do strony.
+    code: |
+      ---
+      // src/pages/[category]/[slug].astro
+      export async function getStaticPaths() {
+        // Zwróć tablicę wszystkich możliwych kombinacji
+        return [
+          {
+            params: { category: 'tutorials', slug: 'getting-started' },
+            props: { title: 'Getting Started', content: '...' },
+          },
+          {
+            params: { category: 'tutorials', slug: 'advanced' },
+            props: { title: 'Advanced Guide', content: '...' },
+          },
+          {
+            params: { category: 'api', slug: 'reference' },
+            props: { title: 'API Reference', content: '...' },
+          },
+        ];
+      }
+
+      const { category, slug } = Astro.params;
+      const { title, content } = Astro.props;
+      ---
+
+      <h1>[{category}] {title}</h1>
+
+  - name: Paginacja z paginate()
+    desc: >
+      Astro dostarcza helper paginate() w getStaticPaths() do automatycznej
+      paginacji. Generuje trasy /blog/1, /blog/2 itd.
+    code: |
+      ---
+      // src/pages/blog/[page].astro
+      import { getCollection } from 'astro:content';
+
+      export async function getStaticPaths({ paginate }) {
+        const posts = await getCollection('blog');
+        // Posortuj od najnowszego
+        const sortedPosts = posts.sort(
+          (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+        );
+        // Generuj strony po 10 postów
+        return paginate(sortedPosts, { pageSize: 10 });
+      }
+
+      const { page } = Astro.props;
+      // page.data — posty na tej stronie
+      // page.currentPage — numer strony
+      // page.lastPage — ostatnia strona
+      // page.url.next — URL następnej strony
+      // page.url.prev — URL poprzedniej strony
+      ---
+
+      {page.data.map((post) => <article>{post.data.title}</article>)}
+
+      {page.url.prev && <a href={page.url.prev}>← Nowsze</a>}
+      {page.url.next && <a href={page.url.next}>Starsze →</a>}
+
+  - name: Middleware — przetwarzanie requestów
+    desc: >
+      Middleware w Astro przechwytuje każdy request przed renderowaniem strony.
+      Możesz sprawdzać autentykację, modyfikować response, dodawać headery.
+    code: |
+      // src/middleware.ts
+      import { defineMiddleware } from 'astro:middleware';
+
+      export const onRequest = defineMiddleware(async (context, next) => {
+        const { request, cookies, redirect } = context;
+        const url = new URL(request.url);
+
+        // Sprawdź autentykację dla chronionych tras
+        if (url.pathname.startsWith('/dashboard')) {
+          const session = cookies.get('session');
+          if (!session) {
+            return redirect('/login');
+          }
+        }
+
+        // Dodaj dane do context.locals (dostępne w stronach)
+        context.locals.user = await getUser(cookies.get('session')?.value);
+
+        // Kontynuuj do strony
+        const response = await next();
+
+        // Modyfikuj response (np. dodaj header)
+        response.headers.set('X-Frame-Options', 'DENY');
+
+        return response;
+      });
+
+  - name: API Endpoints (.ts files)
+    desc: >
+      Pliki .ts w src/pages/api/ tworzą REST API endpoints.
+      Eksportuj named functions GET, POST, PUT, DELETE.
+      Zwracaj Response lub użyj helpera z Astro.
+    code: |
+      // src/pages/api/posts.ts
+      import type { APIRoute } from 'astro';
+
+      export const GET: APIRoute = async ({ url }) => {
+        const limit = url.searchParams.get('limit') ?? '10';
+
+        const posts = await db.posts.findMany({
+          take: parseInt(limit),
+          orderBy: { createdAt: 'desc' },
+        });
+
+        return new Response(JSON.stringify(posts), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      };
+
+      export const POST: APIRoute = async ({ request }) => {
+        const body = await request.json();
+
+        if (!body.title || !body.content) {
+          return new Response(
+            JSON.stringify({ error: 'title i content są wymagane' }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const post = await db.posts.create({ data: body });
+        return new Response(JSON.stringify(post), { status: 201 });
+      };
+
+  - name: Redirect i obsługa błędów
+    desc: >
+      Astro dostarcza redirect() do przekierowań i własnych stron błędów.
+      Plik 404.astro obsługuje wszystkie nieznalezione strony.
+    code: |
+      ---
+      // src/pages/old-url.astro — przekierowanie
+      return Astro.redirect('/new-url', 301);
+      ---
+
+      // --- W getStaticPaths lub endpointach: ---
+      import { redirect } from 'astro';
+      throw redirect('/login');
+
+      // --- src/pages/404.astro ---
+      ---
+      const { pathname } = Astro.url;
+      ---
+      <html>
+        <head><title>404 — Nie znaleziono</title></head>
+        <body>
+          <h1>Strona nie istnieje</h1>
+          <p>Szukałeś: <code>{pathname}</code></p>
+          <a href="/">Wróć do strony głównej</a>
+        </body>
+      </html>
+
+      // --- src/pages/500.astro — strona błędu serwera ---
+      ---
+      ---
+      <h1>Wystąpił błąd serwera</h1>

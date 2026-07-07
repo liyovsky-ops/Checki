@@ -1,0 +1,316 @@
+title: Walidatory — @field_validator, @model_validator, Annotated
+
+labels:
+  items: Typy walidatorów
+
+intro: >
+  Pydantic v2 oferuje dwa główne dekoratory: @field_validator dla pojedynczych pól
+  i @model_validator dla całego modelu. Obie mają tryby "before" (przed koercją typów)
+  i "after" (po walidacji). Alternatywa: Annotated z AfterValidator/BeforeValidator
+  dla reużywalnych ograniczeń bez powtarzania kodu.
+
+items:
+  - name: "@field_validator — podstawy"
+    desc: >
+      @field_validator('nazwa_pola') dekoruje classmethod który waliduje lub transformuje
+      jedno pole. mode='after' (domyślnie) — wartość jest już skonwertowana do docelowego typu.
+      mode='before' — wartość jest surowym inputem (string, dict itp.) przed koercją.
+    code: |
+      from pydantic import BaseModel, field_validator
+
+      class User(BaseModel):
+          name: str
+          email: str
+          age: int
+
+          @field_validator("name")
+          @classmethod
+          def name_must_not_be_empty(cls, v: str) -> str:
+              v = v.strip()
+              if not v:
+                  raise ValueError("Imię nie może być puste")
+              return v.title()   # zwróć przetworzoną wartość
+
+          @field_validator("email")
+          @classmethod
+          def email_must_be_lowercase(cls, v: str) -> str:
+              return v.lower()
+
+          @field_validator("age")
+          @classmethod
+          def age_must_be_positive(cls, v: int) -> int:
+              if v < 0:
+                  raise ValueError("Wiek musi być >= 0")
+              if v > 150:
+                  raise ValueError("Wiek > 150 jest nieprawdopodobny")
+              return v
+
+      user = User(name="  łukasz  ", email="L@EXAMPLE.COM", age=30)
+      print(user.name)   # Łukasz (stripped + title)
+      print(user.email)  # l@example.com (lowercase)
+
+  - name: "@field_validator — mode='before'"
+    desc: >
+      mode='before' uruchamia walidator PRZED koercją Pydantic — otrzymujesz surowy input.
+      Przydatne gdy chcesz przetransformować dane przed walidacją typu,
+      np. parsowanie stringa na listę przez przecinek.
+    code: |
+      from pydantic import BaseModel, field_validator
+
+      class TaggedItem(BaseModel):
+          name: str
+          tags: list[str]
+
+          @field_validator("tags", mode="before")
+          @classmethod
+          def parse_tags_from_string(cls, v):
+              # Przyjmij string "python,pydantic,fastapi" lub listę
+              if isinstance(v, str):
+                  return [tag.strip() for tag in v.split(",") if tag.strip()]
+              return v
+
+      # Działa z listą
+      item1 = TaggedItem(name="Kurs", tags=["python", "pydantic"])
+      # Działa ze stringiem przez przecinek
+      item2 = TaggedItem(name="Kurs", tags="python, pydantic, fastapi")
+      print(item2.tags)  # ['python', 'pydantic', 'fastapi']
+
+  - name: "@model_validator — walidacja między polami"
+    desc: >
+      @model_validator(mode='after') dostaje gotową instancję modelu — możesz
+      walidować zależności między polami. mode='before' dostaje surowy dict przed
+      tworzeniem instancji. Zwróć self (after) lub dane (before).
+    code: |
+      from pydantic import BaseModel, model_validator
+      from typing import Optional
+
+      class DateRange(BaseModel):
+          start_date: str
+          end_date: str
+          max_days: Optional[int] = None
+
+          @model_validator(mode="after")
+          def end_must_be_after_start(self) -> "DateRange":
+              if self.end_date < self.start_date:
+                  raise ValueError(
+                      f"end_date ({self.end_date}) musi być >= start_date ({self.start_date})"
+                  )
+              return self
+
+      class PasswordForm(BaseModel):
+          password: str
+          password_confirm: str
+
+          @model_validator(mode="after")
+          def passwords_must_match(self) -> "PasswordForm":
+              if self.password != self.password_confirm:
+                  raise ValueError("Hasła nie są identyczne")
+              return self
+
+      # Walidacja między polami
+      r = DateRange(start_date="2024-01-01", end_date="2024-12-31")
+      # DateRange(start_date="2024-12-31", end_date="2024-01-01") → ValueError
+
+  - name: "Annotated z AfterValidator i BeforeValidator"
+    desc: >
+      Annotated[typ, validator] pozwala definiować reużywalne typy z logiką walidacji.
+      AfterValidator(fn) — wywołuje fn po walidacji Pydantic.
+      BeforeValidator(fn) — wywołuje fn przed. Komponowalny jak klocki LEGO.
+    code: |
+      from pydantic import BaseModel
+      from pydantic.functional_validators import AfterValidator, BeforeValidator
+      from typing import Annotated
+
+      def strip_string(v: str) -> str:
+          return v.strip()
+
+      def to_lowercase(v: str) -> str:
+          return v.lower()
+
+      def must_be_positive(v: int) -> int:
+          if v <= 0:
+              raise ValueError("Musi być > 0")
+          return v
+
+      # Reużywalne typy
+      CleanStr = Annotated[str, BeforeValidator(strip_string)]
+      LowerEmail = Annotated[str, BeforeValidator(strip_string), AfterValidator(to_lowercase)]
+      PositiveInt = Annotated[int, AfterValidator(must_be_positive)]
+
+      class Product(BaseModel):
+          name: CleanStr          # strip whitespace
+          sku: LowerEmail         # strip + lowercase (reużywam tego samego)
+          quantity: PositiveInt   # musi być > 0
+          price: PositiveInt
+
+      p = Product(name="  Laptop  ", sku="  SKU-123  ", quantity=5, price=2999)
+      print(p.name)      # Laptop
+      print(p.sku)       # sku-123
+      print(p.quantity)  # 5
+
+  - name: PlainValidator i WrapValidator
+    desc: >
+      PlainValidator(fn) zastępuje CAŁĄ logikę walidacji Pydantic — sam decydujesz
+      co zwrócić. WrapValidator(fn) dostaje handler — możesz wywołać standardową
+      walidację Pydantic i dodać logikę przed/po.
+    code: |
+      from pydantic import BaseModel
+      from pydantic.functional_validators import PlainValidator, WrapValidator
+      from typing import Annotated, Any
+
+      def parse_int_from_anything(v: Any) -> int:
+          """Akceptuj int, str i bytes — konwertuj na int."""
+          if isinstance(v, bytes):
+              v = v.decode()
+          try:
+              return int(v)
+          except (ValueError, TypeError):
+              raise ValueError(f"Nie można skonwertować {type(v).__name__!r} na int")
+
+      FlexibleInt = Annotated[int, PlainValidator(parse_int_from_anything)]
+
+      def wrap_with_logging(v: Any, handler, info) -> int:
+          print(f"Walidacja: {v!r}")
+          result = handler(v)   # standardowa walidacja Pydantic
+          print(f"Wynik: {result!r}")
+          return result
+
+      LoggedInt = Annotated[int, WrapValidator(wrap_with_logging)]
+
+      class Example(BaseModel):
+          flexible: FlexibleInt
+          logged: LoggedInt
+
+      e = Example(flexible=b"42", logged="99")
+      print(e.flexible)  # 42
+      print(e.logged)    # 99
+
+  - name: Field() — ograniczenia liczbowe i stringowe
+    desc: >
+      Field() z parametrami gt, ge, lt, le, multiple_of dla liczb.
+      min_length, max_length, pattern dla stringów.
+      min_length, max_length dla list. Błędy zawierają czytelny opis ograniczenia.
+    code: |
+      from pydantic import BaseModel, Field
+      from typing import Optional
+
+      class Product(BaseModel):
+          name: str = Field(
+              min_length=3,
+              max_length=100,
+              description="Nazwa produktu"
+          )
+          price: float = Field(gt=0, lt=100_000, description="Cena w PLN")
+          quantity: int = Field(ge=0, le=10_000)
+          discount: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+          tags: list[str] = Field(default=[], max_length=10)
+          sku: str = Field(
+              pattern=r"^[A-Z]{2}-\d{4}$",
+              description="Format: XX-0000 (np. PL-1234)"
+          )
+
+      p = Product(
+          name="Laptop Pro",
+          price=4999.99,
+          quantity=50,
+          sku="PL-1234",
+      )
+      # Field(gt=0) → price musi być > 0 (nie >= 0)
+      # Field(ge=0) → quantity musi być >= 0
+
+  - name: conint, constr, conlist — constraint types
+    desc: >
+      conint(), constr(), confloat(), conlist() tworzą typy z ograniczeniami.
+      Alternatywa dla Annotated — bardziej zwięzła składnia.
+      W v2 są aliasami Annotated — ten sam efekt, inny styl.
+    code: |
+      from pydantic import BaseModel, conint, constr, confloat, conlist
+
+      class Order(BaseModel):
+          # conint — całkowita z ograniczeniem
+          quantity: conint(gt=0, le=1000)
+
+          # constr — string z wzorcem i długością
+          reference: constr(pattern=r"^ORD-\d{6}$", min_length=10)
+
+          # confloat — float z zakresem
+          discount_pct: confloat(ge=0.0, le=100.0) = 0.0
+
+          # conlist — lista z ograniczeniem długości
+          items: conlist(str, min_length=1, max_length=50)
+
+      o = Order(
+          quantity=5,
+          reference="ORD-123456",
+          items=["laptop", "myszka"],
+      )
+      print(o.quantity)     # 5
+      print(o.reference)    # ORD-123456
+
+  - name: Walidatory wielu pól jednocześnie
+    desc: >
+      @field_validator może obsługiwać wiele pól naraz — podaj listę nazw.
+      Walidator wywołuje się osobno dla każdego pola z listy.
+      Przydatne gdy ta sama logika dotyczy kilku pól.
+    code: |
+      from pydantic import BaseModel, field_validator
+
+      class Address(BaseModel):
+          street: str
+          city: str
+          country: str
+
+          @field_validator("street", "city", "country")
+          @classmethod
+          def must_not_be_blank(cls, v: str) -> str:
+              v = v.strip()
+              if not v:
+                  raise ValueError("Pole nie może być puste")
+              return v.title()
+
+          @field_validator("country")
+          @classmethod
+          def validate_country_code(cls, v: str) -> str:
+              valid = {"PL", "DE", "FR", "GB", "US"}
+              if v.upper() not in valid:
+                  raise ValueError(f"Nieznany kraj: {v}. Dozwolone: {valid}")
+              return v.upper()
+
+      a = Address(street="krakowska 1 ", city=" kraków", country="pl")
+      print(a.street)   # Krakowska 1
+      print(a.country)  # PL
+
+  - name: model_validator mode='before' — preprocessowanie dict
+    desc: >
+      mode='before' na model_validator dostaje surowy dict (lub obiekt) przed
+      tworzeniem modelu. Pozwala przetransformować strukturę danych np. przy
+      migracji starego API albo normalizacji nazw pól.
+    code: |
+      from pydantic import BaseModel, model_validator
+      from typing import Any
+
+      class UserV2(BaseModel):
+          """Model który akceptuje też stary format API (v1)."""
+          first_name: str
+          last_name: str
+          email: str
+
+          @model_validator(mode="before")
+          @classmethod
+          def handle_legacy_format(cls, data: Any) -> Any:
+              if isinstance(data, dict):
+                  # Stary format: {"name": "Jan Kowalski", "mail": "..."}
+                  if "name" in data and "first_name" not in data:
+                      parts = data.pop("name", "").split(" ", 1)
+                      data["first_name"] = parts[0]
+                      data["last_name"] = parts[1] if len(parts) > 1 else ""
+                  if "mail" in data and "email" not in data:
+                      data["email"] = data.pop("mail")
+              return data
+
+      # Nowy format
+      u1 = UserV2(first_name="Jan", last_name="Kowalski", email="j@example.com")
+      # Stary format — działa!
+      u2 = UserV2(**{"name": "Jan Kowalski", "mail": "j@example.com"})
+      print(u2.first_name)  # Jan
+      print(u2.last_name)   # Kowalski

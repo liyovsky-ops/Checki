@@ -1,0 +1,526 @@
+title: Komendy Deno
+
+groups:
+  - name: Podstawowe komendy CLI
+    icon: "🦕"
+    commands:
+      - cmd: deno run --allow-net --allow-read script.ts
+        desc: Uruchom skrypt TypeScript z uprawnieniami
+        detail:
+          what: Deno uruchamia TypeScript natywnie bez kompilacji. Uprawnienia muszą być jawnie podane.
+          how: Bez flag uprawnień skrypt ma zero dostępu do sieci, plików i systemu — sandbox domyślny.
+          tips:
+            - "deno run -A script.ts — wszystkie uprawnienia (tylko development!)"
+            - "deno run --watch script.ts — auto-restart przy zmianach pliku"
+            - "deno run --allow-net=api.com script.ts — tylko do wybranego hosta"
+
+      - cmd: deno init my-project
+        desc: Utwórz nowy projekt Deno
+        detail:
+          what: Tworzy katalog z deno.json, main.ts i main_test.ts — gotową strukturę projektu.
+          how: deno.json to odpowiednik package.json — tasks, imports, compilerOptions, unstable flags.
+          tips:
+            - "deno init . — inicjalizuj w bieżącym katalogu"
+            - 'deno.json tasks: { "dev": "deno run -A --watch main.ts" }'
+            - "Nie potrzebujesz tsc, tsconfig.json ani żadnego dodatkowego narzędzia"
+
+      - cmd: deno task dev
+        desc: Uruchom zdefiniowane zadanie z deno.json
+        detail:
+          what: Wykonuje skrypt zdefiniowany w sekcji "tasks" pliku deno.json — odpowiednik npm run.
+          how: Tasks to shell commands z pełną obsługą zmiennych środowiskowych i potoków.
+          tips:
+            - "deno task — lista wszystkich dostępnych zadań"
+            - "deno task build && deno task test — chain zadań"
+            - 'Definiuj: { "tasks": { "dev": "deno run -A --watch main.ts" } }'
+
+      - cmd: deno repl
+        desc: Uruchom interaktywną sesję REPL
+        detail:
+          what: Read-Eval-Print Loop — interaktywna powłoka JavaScript/TypeScript w terminalu.
+          how: Obsługuje TypeScript, await na poziomie top-level i dostęp do wszystkich Deno APIs.
+          tips:
+            - "deno repl --allow-net — REPL z dostępem do sieci"
+            - "Ctrl+C dwukrotnie lub .exit — wyjście z REPL"
+            - "const x = await fetch('https://example.com') — await działa bezpośrednio"
+
+      - cmd: deno eval "console.log(Deno.version.deno)"
+        desc: Wykonaj kod TypeScript inline z CLI
+        detail:
+          what: Uruchamia fragment kodu TypeScript bezpośrednio z linii poleceń — bez pliku.
+          how: Przydatne do quick one-linerów, testowania wyrażeń i skryptów w shell scriptach.
+          tips:
+            - "deno eval 'import { join } from \"jsr:@std/path\"; console.log(join(\"a\",\"b\"))'"
+            - "deno eval --allow-net 'const r = await fetch(\"https://api.com\"); console.log(await r.json())'"
+            - "echo 'console.log(42)' | deno - — odczyt z stdin"
+
+      - cmd: deno upgrade
+        desc: Zaktualizuj Deno do najnowszej wersji
+        detail:
+          what: Pobiera i zastępuje binarny Deno najnowszą stabilną wersją bez zewnętrznego managera.
+          how: Deno aktualizuje samego siebie — nie potrzebujesz npm, brew ani apt.
+          tips:
+            - "deno upgrade --version 2.1.0 — konkretna wersja"
+            - "deno upgrade --canary — bleeding edge build"
+            - "deno --version — sprawdź aktualną wersję przed i po upgrade"
+
+  - name: Zarządzanie paczkami
+    icon: "📦"
+    commands:
+      - cmd: deno add jsr:@std/assert
+        desc: Dodaj paczkę z JSR do projektu
+        detail:
+          what: Instaluje paczkę z JSR (JavaScript Registry) i dodaje do sekcji imports w deno.json.
+          how: JSR to TypeScript-first rejestr od Deno team — następca deno.land/x z auto-generated docs.
+          tips:
+            - "deno add jsr:@hono/hono jsr:@oak/oak — kilka paczek naraz"
+            - "Import potem: import { Hono } from '@hono/hono'; (bez jsr: bo jest w importmap)"
+            - "deno remove jsr:@std/assert — usuń paczkę z deno.json"
+
+      - cmd: deno add npm:zod
+        desc: Dodaj paczkę npm do projektu Deno
+        detail:
+          what: Deno 2.0 obsługuje npm paczki przez prefix npm:. Instaluje do node_modules lokalnie.
+          how: Deno pobiera paczki z npm registry i buforuje lokalnie. Generuje lock file.
+          tips:
+            - "deno add npm:express npm:zod npm:drizzle-orm — popularne paczki npm"
+            - "import { z } from 'zod'; — po deno add npm:zod działa normalnie"
+            - "Możesz też: import { z } from 'npm:zod'; — bez instalacji (inline)"
+
+      - cmd: "import { serve } from 'jsr:@std/http/server';"
+        desc: Import bezpośredni z JSR bez deno add
+        detail:
+          what: "Możesz importować z JSR bezpośrednio w kodzie przez jsr: prefix — bez wcześniejszej instalacji."
+          how: Deno pobierze i buforuje paczkę przy pierwszym uruchomieniu. Powtórne uruchomienia są szybkie.
+          tips:
+            - "'jsr:@std/path@^1.0' — konkretna wersja lub zakres semver"
+            - "DENO_DIR=~/.cache/deno — lokalizacja cache dla paczek"
+            - "deno cache script.ts — pobierz wszystkie importy bez uruchamiania"
+
+      - cmd: "import express from 'npm:express';"
+        desc: "Import paczki npm bezpośrednio przez npm: prefix"
+        detail:
+          what: "Deno 2.0 obsługuje paczki npm przez npm: prefix importowany inline — bez package.json."
+          how: Pobiera z npm registry, buforuje w DENO_DIR. Obsługuje CommonJS i ESM automatycznie.
+          tips:
+            - "'npm:express@4' — konkretna wersja z npm"
+            - "npm:@types/express — typy TypeScript z DefinitelyTyped"
+            - "Większość paczek npm działa — Express, Fastify, Prisma, Drizzle, Zod"
+
+      - cmd: deno install -g -A -n myapp jsr:@myorg/myapp
+        desc: Zainstaluj globalnie narzędzie CLI
+        detail:
+          what: Instaluje skrypt Deno jako globalne polecenie CLI dostępne w całym systemie.
+          how: Tworzy wrapper script w ~/.deno/bin/ i dodaje go do PATH. -n ustawia nazwę komendy.
+          tips:
+            - "deno install -g npm:typescript — zainstaluj tsc globalnie przez Deno"
+            - "~/.deno/bin/ — katalog globalnych narzędzi (dodaj do PATH)"
+            - "deno uninstall -g myapp — usuń globalne narzędzie"
+
+      - cmd: deno cache --reload script.ts
+        desc: Pobierz i odśwież cache zależności
+        detail:
+          what: Pobiera wszystkie importy skryptu bez uruchamiania kodu. --reload wymusza ponowne pobranie.
+          how: Przydatne w CI/CD do pre-cachowania zależności przed uruchomieniem.
+          tips:
+            - "deno cache script.ts — pobierz bez --reload (używa cache)"
+            - "DENO_DIR=/projekt/.deno-cache — custom cache dla projektu w CI"
+            - "deno info script.ts — pokaż drzewo zależności"
+
+  - name: Wbudowane narzędzia (zero config)
+    icon: "🔧"
+    commands:
+      - cmd: deno fmt
+        desc: Formatuj kod (wbudowany formatter)
+        detail:
+          what: Formatuje wszystkie pliki TypeScript, JavaScript, JSON, Markdown i YAML w projekcie.
+          how: Wbudowany, oparty na dprint. Zero konfiguracji — formatuje cały projekt jedną komendą.
+          tips:
+            - "deno fmt --check — sprawdź bez modyfikacji (CI/CD)"
+            - "deno fmt src/main.ts — formatuj konkretny plik"
+            - "deno.json: { \"fmt\": { \"lineWidth\": 100, \"indentWidth\": 2 } } — konfiguracja"
+
+      - cmd: deno lint
+        desc: Sprawdź kod linterem (wbudowany)
+        detail:
+          what: Uruchamia wbudowany linter oparty na regułach ESLint. Zero konfiguracji, zero instalacji.
+          how: Wykrywa typowe błędy, nieużywane zmienne, problemy z typami i antywzorce.
+          tips:
+            - "deno lint --fix — auto-naprawa gdzie możliwe"
+            - "deno lint src/ — lint tylko wybranego katalogu"
+            - "deno.json: { \"lint\": { \"rules\": { \"exclude\": [\"no-explicit-any\"] } } }"
+
+      - cmd: deno test
+        desc: Uruchom wszystkie testy (wbudowany test runner)
+        detail:
+          what: Znajdzie i uruchomi wszystkie pliki *_test.ts i *.test.ts. Bez Jest, bez konfiguracji.
+          how: Każdy test zdefiniowany przez Deno.test(). Obsługuje async/await, subtests i BDD.
+          tips:
+            - "deno test --watch — auto-restart testów przy zmianach"
+            - "deno test --filter 'dodaj' — uruchom testy pasujące do wzorca"
+            - "deno test --coverage=./cov && deno coverage ./cov — raport pokrycia kodu"
+
+      - cmd: deno bench
+        desc: Uruchom benchmarki (wbudowany)
+        detail:
+          what: Wykonuje funkcje zdefiniowane przez Deno.bench() i mierzy ich wydajność.
+          how: Uruchamia funkcję wielokrotnie, mierzy ops/sec i wypisuje statystyki (min, max, avg).
+          tips:
+            - "deno bench --filter 'sort' — uruchom benchmarki pasujące do wzorca"
+            - "Deno.bench('quicksort', () => { quicksort([...arr]); })"
+            - "deno bench --json — wynik jako JSON do integracji z CI"
+
+      - cmd: deno doc ./mod.ts
+        desc: Generuj dokumentację z kodu
+        detail:
+          what: Generuje dokumentację API z komentarzy JSDoc w plikach TypeScript.
+          how: Czyta komentarze /** */ i typy TypeScript — generuje czytelny output w terminalu lub HTML.
+          tips:
+            - "deno doc jsr:@std/path — dokumentacja zewnętrznej paczki"
+            - "deno doc --html --output=./docs . — wygeneruj statyczne HTML docs"
+            - "Komentarze /** @param */ i /** @returns */ są obsługiwane"
+
+      - cmd: deno compile --allow-net --output myapp main.ts
+        desc: Skompiluj do samodzielnego pliku wykonywalnego
+        detail:
+          what: Tworzy pojedynczy plik binarny zawierający runtime Deno i kod aplikacji. Nie wymaga Deno na docelowej maszynie.
+          how: Bundle TypeScript + V8 snapshot → jeden plik. Docelowa maszyna nie musi mieć zainstalowanego Deno.
+          tips:
+            - "deno compile --target x86_64-pc-windows-msvc main.ts — cross-compile dla Windows"
+            - "deno compile --target aarch64-apple-darwin main.ts — dla Apple Silicon"
+            - "--include ./static — dołącz pliki statyczne do binarnego"
+
+      - cmd: deno coverage ./cov_profile
+        desc: Wygeneruj raport pokrycia kodu
+        detail:
+          what: Analizuje dane pokrycia zebrane przez deno test --coverage i generuje raport.
+          how: Dane pokrycia zapisywane są jako pliki w podanym katalogu. deno coverage przetwarza je na raport.
+          tips:
+            - "deno test --coverage=./cov && deno coverage ./cov — standardowy flow"
+            - "deno coverage --lcov ./cov > lcov.info — format LCOV dla narzędzi CI"
+            - "deno coverage --html ./cov — raport HTML z podświetleniem linii"
+
+      - cmd: deno info jsr:@std/path
+        desc: Wyświetl informacje o paczce i drzewo zależności
+        detail:
+          what: Pokazuje metadane paczki lub skryptu — wersję, zależności, rozmiar i lokalizację w cache.
+          how: Analizuje importy rekurencyjnie i buduje pełne drzewo zależności.
+          tips:
+            - "deno info script.ts — drzewo zależności lokalnego skryptu"
+            - "deno info --json jsr:@hono/hono — output jako JSON"
+            - "Przydatne do debugowania problemów z zależnościami"
+
+  - name: Uprawnienia
+    icon: "🔒"
+    commands:
+      - cmd: deno run --allow-net=api.example.com:443 script.ts
+        desc: Dostęp do sieci — tylko wybrany host i port
+        detail:
+          what: Ogranicza dostęp sieciowy do konkretnego hosta i portu. Próba połączenia z innym hostem rzuci błąd.
+          how: "Format: --allow-net=host:port. Możesz podać wiele hostów po przecinku."
+          tips:
+            - "--allow-net=localhost,api.github.com — kilka hostów"
+            - "--allow-net — wszystkie hosty (ostrożnie!)"
+            - "--deny-net=evil.com --allow-net — zablokuj konkretny host"
+
+      - cmd: deno run --allow-read=./data --allow-write=./output script.ts
+        desc: Dostęp do plików — tylko wybrane katalogi
+        detail:
+          what: Ogranicza odczyt i zapis do konkretnych ścieżek. Dostęp poza nimi rzuci PermissionDeniedError.
+          how: Ścieżki mogą być katalogami lub plikami. Względne i bezwzględne ścieżki działają.
+          tips:
+            - "--allow-read=.,./config.json — bieżący katalog i konkretny plik"
+            - "-R -W — skróty dla --allow-read i --allow-write (Deno 2.x)"
+            - "--allow-read=/etc/hosts — dostęp do konkretnego pliku systemowego"
+
+      - cmd: deno run --allow-env=PORT,DATABASE_URL script.ts
+        desc: Dostęp do zmiennych środowiskowych — tylko wybrane
+        detail:
+          what: Ogranicza dostęp do zmiennych env. Deno.env.get('OTHER_VAR') zwróci undefined.
+          how: Lista zmiennych po przecinku. --allow-env bez listy — dostęp do wszystkich.
+          tips:
+            - "--env-file=.env --allow-env — załaduj .env i ogranicz dostęp"
+            - "-E PORT,DATABASE_URL — skrót (Deno 2.x)"
+            - "Deno.env.get('PORT') ?? '3000' — wartość domyślna jeśli brak"
+
+      - cmd: deno run --allow-run=git,deno script.ts
+        desc: Uprawnienie do uruchamiania procesów — tylko wybrane komendy
+        detail:
+          what: Pozwala na Deno.Command() tylko dla wymienionych komend. Próba uruchomienia innej rzuci błąd.
+          how: Lista komend po przecinku. Daje kontrolę nad tym, jakie procesy może tworzyć skrypt.
+          tips:
+            - "--allow-run — wszystkie procesy (ryzykowne!)"
+            - "--allow-run=git — skrypt może wywołać tylko git"
+            - "new Deno.Command('git', { args: ['status'] }) — wymaga --allow-run=git"
+
+      - cmd: deno run --deny-net=internal.corp.com --allow-net script.ts
+        desc: Jawne odrzucenie konkretnego hosta przy ogólnym allow-net
+        detail:
+          what: --deny-* ma wyższy priorytet niż --allow-*. Pozwala na ogólny dostęp z wyjątkami.
+          how: Przydatne gdy chcesz pozwolić na ruch internetowy, ale zablokować intranety.
+          tips:
+            - "--deny-net=169.254.0.0/16 --allow-net — blokuj link-local (AWS metadata)"
+            - "--deny-write=/etc --allow-write — zapis wszędzie OPRÓCZ /etc"
+            - "--deny-env=SECRET_KEY --allow-env — dostęp do wszystkich env OPRÓCZ SECRET_KEY"
+
+      - cmd: "const status = await Deno.permissions.query({ name: 'net', host: 'api.com' });"
+        desc: Sprawdź stan uprawnienia w runtime
+        detail:
+          what: Programowe sprawdzenie czy uprawnienie jest 'granted', 'denied' czy 'prompt' (nierozstrzygnięte).
+          how: Deno.permissions to async API do query, request i revoke uprawnień w trakcie działania.
+          tips:
+            - "status.state === 'granted' — uprawnienie przyznane"
+            - "await Deno.permissions.request({ name: 'net' }) — poproś użytkownika"
+            - "await Deno.permissions.revoke({ name: 'read' }) — cofnij uprawnienie"
+
+  - name: Runtime APIs — Deno namespace
+    icon: "⚙️"
+    commands:
+      - cmd: "const tekst = await Deno.readTextFile('./plik.txt');"
+        desc: Odczyt pliku jako tekst UTF-8
+        detail:
+          what: Deno.readTextFile zwraca Promise<string> — zawartość pliku jako tekst.
+          how: Wewnętrznie używa Deno.readFile i dekoduje UTF-8. Wymaga --allow-read.
+          tips:
+            - "const bajty = await Deno.readFile('./img.png'); — jako Uint8Array"
+            - "for await (const wpis of Deno.readDir('./src')) { ... } — listowanie katalogu"
+            - "Deno.readTextFileSync('./plik.txt') — wersja synchroniczna"
+
+      - cmd: "await Deno.writeTextFile('./wynik.txt', 'dane');"
+        desc: Zapis tekstu do pliku
+        detail:
+          what: Deno.writeTextFile zapisuje string do pliku (tworzy lub nadpisuje). Wymaga --allow-write.
+          how: Koduje string do UTF-8 i zapisuje do pliku. Zwraca Promise<void>.
+          tips:
+            - "{ append: true } — dołącz do istniejącego pliku"
+            - "await Deno.writeFile('./bin', new Uint8Array([0,1,2])); — bajty"
+            - "Deno.writeTextFileSync('./plik.txt', 'tekst'); — synchronicznie"
+
+      - cmd: "const port = Deno.env.get('PORT') ?? '3000';"
+        desc: Odczyt zmiennej środowiskowej
+        detail:
+          what: Deno.env.get() zwraca string lub undefined. Wymaga --allow-env lub --allow-env=PORT.
+          how: Deno.env to obiekt z metodami get, set, delete i toObject(). Nie ma auto-ładowania .env.
+          tips:
+            - "Deno.env.set('TRYB', 'prod'); — ustaw zmienną"
+            - "Deno.env.toObject() — wszystkie zmienne jako Record<string, string>"
+            - "deno run --env-file=.env --allow-env main.ts — załaduj plik .env"
+
+      - cmd: "Deno.serve({ port: 8080 }, (req) => new Response('OK'));"
+        desc: Uruchom wbudowany serwer HTTP
+        detail:
+          what: Deno.serve to wbudowany HTTP server oparty na Web APIs — Request in, Response out.
+          how: Obsługuje HTTP/1.1, HTTP/2, TLS, WebSocket upgrade. Wymaga --allow-net.
+          tips:
+            - "{ port: 8080, hostname: '0.0.0.0' } — bind na wszystkich interfejsach"
+            - "Deno.serve({ cert, key }, handler) — HTTPS z TLS"
+            - "server.finished — Promise który resolves gdy serwer się zamknie"
+
+      - cmd: "const { stdout } = await new Deno.Command('git', { args: ['status'], stdout: 'piped' }).output();"
+        desc: Uruchom proces zewnętrzny i odczytaj wyjście
+        detail:
+          what: Deno.Command zastąpiło Deno.run (usunięte). Uruchamia procesy z pełną kontrolą I/O.
+          how: .output() zwraca Promise z { code, stdout, stderr } jako Uint8Array. Wymaga --allow-run.
+          tips:
+            - "new TextDecoder().decode(stdout) — zdekoduj wynik na string"
+            - ".spawn() — uruchom bez czekania, zwraca ChildProcess"
+            - "--allow-run=git — ogranicz uprawnienie do konkretnej komendy"
+
+      - cmd: "const kv = await Deno.openKv();"
+        desc: Otwórz wbudowaną bazę danych KV
+        detail:
+          what: Deno KV to transakcyjna baza klucz-wartość wbudowana w runtime. Lokalnie SQLite, na Deploy — globalnie.
+          how: Klucze to tablice (path hierarchy). Wartości to dowolne serializowalne dane.
+          tips:
+            - "await kv.set(['users', id], { name, email }); — zapis"
+            - "const r = await kv.get(['users', id]); r.value — odczyt"
+            - "--unstable-kv wymagane lokalnie, nie na Deno Deploy"
+
+      - cmd: "Deno.cron('daily', '0 0 * * *', async () => { await doJob(); });"
+        desc: Zaplanuj zadanie cron
+        detail:
+          what: Deno.cron uruchamia funkcję według harmonogramu cron. Na Deploy zarządzane przez infrastrukturę.
+          how: Cron expression (5 pól) definiuje harmonogram. Callback może być async. Wymaga --unstable-cron.
+          tips:
+            - "'* * * * *' — co minutę"
+            - "'0 */6 * * *' — co 6 godzin"
+            - "{ backoffSchedule: [1000, 5000] } — retry przy błędach"
+
+      - cmd: "const watcher = Deno.watchFs('./src', { recursive: true });"
+        desc: Obserwuj zmiany w systemie plików
+        detail:
+          what: Deno.watchFs zwraca async iterable zdarzeń systemu plików. Wymaga --allow-read.
+          how: "Zdarzenia: 'create', 'modify', 'remove', 'access', 'other'. Recursive obserwuje podkatalogi."
+          tips:
+            - "for await (const { kind, paths } of watcher) { ... } — pętla zdarzeń"
+            - "watcher.close() — zatrzymaj obserwatora"
+            - "Używane do hot reload, build tools i file sync"
+
+  - name: Web APIs wbudowane
+    icon: "🌐"
+    commands:
+      - cmd: "const resp = await fetch('https://api.example.com/data');"
+        desc: Wykonaj żądanie HTTP przez wbudowane fetch API
+        detail:
+          what: fetch to globalnie dostępne Web API — dokładnie ta sama funkcja co w przeglądarce.
+          how: Zwraca Promise<Response>. Obsługuje GET, POST, PUT, DELETE, headers, body. Wymaga --allow-net.
+          tips:
+            - "const json = await resp.json(); — parsuj JSON"
+            - "fetch(url, { method: 'POST', body: JSON.stringify(dane), headers: {'Content-Type': 'application/json'} })"
+            - "resp.ok — true jeśli status 200-299"
+
+      - cmd: "const ws = new WebSocket('wss://echo.websocket.org');"
+        desc: Klient WebSocket (wbudowane Web API)
+        detail:
+          what: WebSocket jest dostępny globalnie — tak jak w przeglądarce. Deno wspiera też WebSocket server.
+          how: Wymaga --allow-net. Obsługuje wss:// (SSL) i ws:// (plain text).
+          tips:
+            - "ws.onmessage = (e) => console.log(e.data); — odbiór wiadomości"
+            - "ws.send('hello'); — wysyłanie"
+            - "WebSocket server: użyj Deno.serve i Deno.upgradeWebSocket(req)"
+
+      - cmd: "const url = new URL('https://api.com/users?page=2&limit=10');"
+        desc: Parsowanie i budowanie URL (wbudowane Web API)
+        detail:
+          what: URL to standard Web API do bezpiecznego parsowania i manipulacji adresami URL.
+          how: Odporny na błędy ręcznego string manipulation. Dostępny globalnie bez importów.
+          tips:
+            - "url.searchParams.get('page') — odczyt query param"
+            - "url.searchParams.set('sort', 'asc') — modyfikacja params"
+            - "url.pathname — '/users', url.hostname — 'api.com'"
+
+      - cmd: "const req = new Request('https://api.com', { method: 'POST', body: JSON.stringify(data) });"
+        desc: Tworzenie obiektów Request i Response (wbudowane Web API)
+        detail:
+          what: Request i Response to standard Web API — te same co używa fetch i Deno.serve.
+          how: Pozwalają na programowe tworzenie i inspekcję żądań HTTP. Dostępne globalnie.
+          tips:
+            - "Response.json(data) — skrót dla JSON response z nagłówkiem Content-Type"
+            - "new Response(body, { status: 201, headers: { 'X-Custom': 'val' } })"
+            - "await req.json() — parsuj body jako JSON"
+
+      - cmd: "const data = await new Response(stream).arrayBuffer();"
+        desc: ReadableStream i konwersja strumieni
+        detail:
+          what: Deno obsługuje Web Streams API — ReadableStream, WritableStream, TransformStream.
+          how: Strumienie pozwalają na przetwarzanie danych chunk-by-chunk bez ładowania całości do pamięci.
+          tips:
+            - "const reader = stream.getReader(); const { value, done } = await reader.read();"
+            - "fetch(url).then(r => r.body) — body odpowiedzi HTTP to ReadableStream"
+            - "ReadableStream.from(asyncIterable) — z async iterable do stream"
+
+      - cmd: "const blob = new Blob(['Hello, World!'], { type: 'text/plain' });"
+        desc: Blob i FormData (wbudowane Web APIs)
+        detail:
+          what: Blob i FormData to standardowe interfejsy do pracy z danymi binarnymi i formularzami.
+          how: Dostępne globalnie. FormData używany do multipart/form-data (upload plików).
+          tips:
+            - "await blob.text() — tekst z Blob; await blob.arrayBuffer() — bajty"
+            - "const fd = new FormData(); fd.append('file', blob, 'filename.txt');"
+            - "fetch(url, { method: 'POST', body: formData }) — upload pliku"
+
+  - name: Deno KV — wbudowana baza danych
+    icon: "🗄️"
+    commands:
+      - cmd: "await kv.set(['users', 'u001'], { name: 'Łukasz', age: 30 });"
+        desc: Zapisz wartość w Deno KV
+        detail:
+          what: kv.set zapisuje dowolną serializowalną wartość pod kluczem (tablica path segments).
+          how: Klucz to tablica — hierarchiczna struktura. Wartości można odczytać przez kv.get z tym samym kluczem.
+          tips:
+            - "Klucze: ['users', id] — prefix + identyfikator (jak namespace)"
+            - "await kv.set(['config', 'theme'], 'dark', { expireIn: 3600000 }); — TTL w ms"
+            - "kv.set zwraca { ok: true, versionstamp: '...' }"
+
+      - cmd: "const { value, versionstamp } = await kv.get(['users', 'u001']);"
+        desc: Odczytaj wartość z Deno KV
+        detail:
+          what: kv.get zwraca { key, value, versionstamp }. value to null jeśli klucz nie istnieje.
+          how: versionstamp to string identyfikujący wersję — używany do optymistycznej blokady w atomic.
+          tips:
+            - "value === null — klucz nie istnieje"
+            - "const entries = await kv.getMany([['a'], ['b'], ['c']]); — batch odczyt"
+            - "versionstamp używany w .atomic().check() do CAS (Compare-And-Swap)"
+
+      - cmd: "for await (const entry of kv.list({ prefix: ['users'] })) { ... }"
+        desc: Listuj klucze z prefiksem
+        detail:
+          what: kv.list zwraca async iterable wpisów pasujących do prefiksu — jak scan w Redis.
+          how: Iteruje klucze w lexicographic order. Obsługuje paginację i ograniczenie wyników.
+          tips:
+            - "kv.list({ prefix: ['users'], limit: 10 }) — max 10 wyników"
+            - "kv.list({ prefix: ['users'], start: ['users', 'b'] }) — od konkretnego klucza"
+            - "for await (const { key, value } of lista) { ... } — destrukturyzacja"
+
+      - cmd: "await kv.atomic().check({ key, versionstamp }).set(key, newVal).commit();"
+        desc: Atomowa transakcja (Compare-And-Swap)
+        detail:
+          what: kv.atomic() grupuje operacje w transakcję. .check() zapobiega race conditions przez CAS.
+          how: "Jeśli check nie przejdzie (inny zapis między odczytem a commitem), commit zwraca { ok: false }."
+          tips:
+            - ".set().delete().sum() — łańcuch operacji w jednej transakcji"
+            - "if (!result.ok) { /* retry */ } — obsłuż konflikt"
+            - ".sum(['counter'], 1n) — atomowy BigInt increment (liczniki, statystyki)"
+
+      - cmd: "const queue = await kv.listenQueue((msg) => { console.log(msg); });"
+        desc: Kolejka wiadomości w Deno KV
+        detail:
+          what: Deno KV ma wbudowaną kolejkę wiadomości. kv.enqueue() wstawia, kv.listenQueue() konsumuje.
+          how: Gwarantuje dostarczenie (at-least-once). Na Deno Deploy kolejka jest trwała i globalnie dostępna.
+          tips:
+            - "await kv.enqueue({ task: 'sendEmail', to: 'user@example.com' }); — wstawianie"
+            - "{ delay: 5000 } — opóźnione dostarczenie (5 sekund)"
+            - "Idealne do background jobs, email sending, webhooks"
+
+  - name: Deploy i kompilacja
+    icon: "🚀"
+    commands:
+      - cmd: deno compile --allow-net --allow-read --output dist/server main.ts
+        desc: Kompiluj do samodzielnego pliku binarnego
+        detail:
+          what: Tworzy jeden plik wykonywalny zawierający Deno runtime i cały kod aplikacji. Zero dependencies.
+          how: Bundle kodu + V8 snapshot → plik binarny. Na docelowej maszynie nie trzeba instalować Deno.
+          tips:
+            - "--target x86_64-pc-windows-msvc — cross-compile dla Windows z Linux/macOS"
+            - "--target aarch64-apple-darwin — dla Apple Silicon Mac"
+            - "--include ./static — dołącz pliki statyczne do binarnego"
+
+      - cmd: deployctl deploy --project=my-app main.ts
+        desc: Deploy aplikacji na Deno Deploy (edge hosting)
+        detail:
+          what: Wdraża aplikację Deno na globalną infrastrukturę edge (35+ regionów, zero cold start).
+          how: deployctl to CLI dla Deno Deploy. Wymaga konta na deploy.deno.com i tokenu API.
+          tips:
+            - "deno install -A jsr:@deno/deployctl — instalacja deployctl"
+            - "DENO_DEPLOY_TOKEN=xxx deployctl deploy — token z dashboard"
+            - "GitHub Actions: denoland/deployctl@v1 action — automatyczny CI/CD"
+
+      - cmd: deno run --allow-all --unstable-kv --env-file=.env main.ts
+        desc: Uruchom z wszystkimi potrzebnymi flagami (development)
+        detail:
+          what: Kombinacja flag dla wygodnego developmentu — wszystkie uprawnienia, unstable API, plik .env.
+          how: -A to skrót dla --allow-all. Nie używaj w produkcji — definiuj minimalne uprawnienia.
+          tips:
+            - "deno task dev — lepiej zdefiniuj task w deno.json zamiast długiej flagi"
+            - "deno.json: { 'unstable': ['kv', 'cron'] } — unstable w config, nie w CLI"
+            - "{ 'tasks': { 'dev': 'deno run -A --watch --env-file=.env main.ts' } }"
+
+      - cmd: deno check main.ts
+        desc: Sprawdź typy TypeScript bez uruchamiania kodu
+        detail:
+          what: Uruchamia pełny type checker TypeScript na plikach bez ich wykonania. Odpowiednik tsc --noEmit.
+          how: Używa wbudowanego TypeScript compilera. Szybsze niż uruchamianie kodu — tylko analiza typów.
+          tips:
+            - "deno check **/*.ts — sprawdź wszystkie pliki TypeScript w projekcie"
+            - "deno check --remote main.ts — sprawdź też typy importów z URL"
+            - "Używaj w CI przed deploym: deno check && deno test && deployctl deploy"
+
+      - cmd: "const lib = Deno.dlopen('./mylib.so', { add: { parameters: ['i32', 'i32'], result: 'i32' } });"
+        desc: Załaduj bibliotekę natywną (FFI)
+        detail:
+          what: Deno.dlopen ładuje biblioteki natywne (.so/.dll/.dylib) i wywołuje funkcje C ABI.
+          how: Definiujesz sygnaturę funkcji (typy parametrów i wynik). Wymaga --allow-ffi lub --unstable-ffi.
+          tips:
+            - "lib.symbols.add(5, 3) — wywołanie funkcji natywnej"
+            - "lib.close() — zwolnij bibliotekę po użyciu"
+            - "Przydatne do integracji z bibliotekami C/Rust/Go bez przepisywania"

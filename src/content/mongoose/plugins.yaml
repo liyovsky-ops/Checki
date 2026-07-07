@@ -1,0 +1,33 @@
+title: Ekosystem Mongoose
+
+items:
+  - name: mongoose-paginate-v2
+    desc: "Plugin do paginacji — Model.paginate(filter, { page, limit, sort, populate }). Zwraca docs, totalDocs, totalPages, hasPrevPage, hasNextPage. Standard de facto dla paginacji w Mongoose."
+    icon: "📄"
+  - name: "@typegoose/typegoose"
+    desc: "Definiuj Mongoose modele przez klasy TypeScript z dekoratorami. @prop(), @pre(), @modelOptions(). Generuje Schema automatycznie — zero duplikacji między typami TS a Schema Mongoose."
+    icon: "🏷️"
+  - name: mongoose-autopopulate
+    desc: "Automatycznie populuje pola z ref bez jawnego .populate() w każdym query. Dodaj autopopulate na pole Schema i zapomnij o ręcznym populate. Wygoda kosztem dodatkowych queries."
+    icon: "⚡"
+  - name: mongoose-lean-virtuals
+    desc: "Dodaje wirtualne pola do wyników .lean(). Normalnie lean() pomija virtuale — ten plugin to naprawia. Użyj .lean({ virtuals: true }) po dodaniu pluginu do Schema."
+    icon: "🔮"
+  - name: mongoose-unique-validator
+    desc: Lepsza obsługa błędów unique constraint. Zamiast surowego MongoServerError E11000, rzuca Mongoose ValidationError z czytelnym komunikatem. Spójna obsługa błędów walidacji.
+    icon: "🛡️"
+  - name: mongoose-slug-updater
+    desc: Automatycznie generuje i aktualizuje URL-friendly slug z pola (np. title → my-post-title). Konfigurowalny separator, unikalne slugi, obsługa kolizji.
+    icon: "🔗"
+  - name: "@casl/mongoose"
+    desc: Integracja CASL (authorization library) z Mongoose. accessibleBy(ability) filtruje query według uprawnień użytkownika. Type-safe permission checks na poziomie query.
+    icon: "🔐"
+  - name: mongoosastic
+    desc: Synchronizacja Mongoose z Elasticsearch. Dokumenty zapisane przez Mongoose są automatycznie indeksowane w ES. Model.search() wykonuje ES query. Real-time full-text search.
+    icon: "🔍"
+  - name: mongoose-history
+    desc: Automatyczny audit trail dla dokumentów. Przechowuje historię zmian w osobnej kolekcji — kto zmienił, kiedy, co było przed zmianą. Plug-and-play versioning.
+    icon: "📜"
+  - name: mongoose-aggregate-paginate-v2
+    desc: "Paginacja dla aggregation pipeline — Model.aggregatePaginate(aggregate, { page, limit }). Uzupełnienie mongoose-paginate-v2 dla złożonych agregacji z $lookup i $group."
+    icon: "📊"

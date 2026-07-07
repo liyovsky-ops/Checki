@@ -1,0 +1,1459 @@
+title: Three.js — wzorce i API
+
+groups:
+  - name: Setup sceny
+    icon: "🎬"
+    commands:
+      - code: |
+          import * as THREE from 'three';
+
+          const scene    = new THREE.Scene();
+          const camera   = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+          const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+          renderer.setSize(window.innerWidth, window.innerHeight);
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          document.body.appendChild(renderer.domElement);
+
+          camera.position.z = 5;
+        desc: Podstawowa scena Three.js
+        detail:
+          what: Trzy fundamenty — Scene (kontener obiektów), Camera (punkt widzenia), Renderer (WebGL output do canvas).
+          how: PerspectiveCamera(fov, aspect, near, far). FOV 75° daje naturalny widok. setPixelRatio(min(dpr,2)) zapobiega rozmyciu na Retina bez overkill na 4K.
+          tips:
+            - 'scene.background = new THREE.Color(0x111111) — kolor tła'
+            - 'document.body.style.margin = "0" — usuń margines przeglądarki'
+
+      - code: |
+          const renderer = new THREE.WebGLRenderer({
+            antialias: true,         // wygładzanie krawędzi (MSAA)
+            alpha: true,             // przeźroczyste tło (tło HTML widoczne)
+            powerPreference: 'high-performance',
+            logarithmicDepthBuffer: true, // eliminuje Z-fighting
+          });
+
+          renderer.setSize(window.innerWidth, window.innerHeight);
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          renderer.outputColorSpace = THREE.SRGBColorSpace; // poprawne kolory
+          renderer.toneMapping       = THREE.ACESFilmicToneMapping;
+          renderer.toneMappingExposure = 1.0;
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+        desc: Renderer — pełna konfiguracja produkcyjna
+        detail:
+          what: WebGLRenderer to serce Three.js — tłumaczy scenę na piksele przez WebGL. Każda opcja ma wpływ na jakość lub wydajność.
+          how: antialias=true daje MSAA 4x. outputColorSpace=SRGB konieczne od r152+. ACESFilmicToneMapping daje filmowy wygląd kolorów z HDR env map.
+          tips:
+            - 'alpha:true wymagane gdy chcesz przeźroczyste tło (canvas nakładka na HTML)'
+            - 'PCFSoftShadowMap = miękkie cienie; BasicShadowMap = wydajny ale ostry'
+
+      - code: |
+          // Render loop — uruchamiaj KAŻDĄ klatkę
+          const clock = new THREE.Clock();
+
+          function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = clock.getDelta(); // czas od ostatniej klatki (sekundy)
+
+            // Aktualizuj fizykę i animacje przez delta (frame-rate independent!)
+            mesh.rotation.y += 1.0 * delta; // 1 radian/sekunda — zawsze
+
+            renderer.render(scene, camera);
+          }
+
+          animate(); // uruchom pętlę
+        desc: Pętla animacji z delta time
+        detail:
+          what: requestAnimationFrame wywołuje callback przed każdym malowaniem ekranu (~60fps). delta time gwarantuje tę samą prędkość animacji niezależnie od FPS.
+          how: "Bez delta time: rotation.y += 0.01 da inne prędkości na 30fps vs 144fps. Z delta: rotation.y += speed * delta zawsze taka sama prędkość."
+          tips:
+            - 'clock.getElapsedTime() — całkowity czas od startu (do efektów sinusoidalnych)'
+            - 'cancelAnimationFrame(animId) — zatrzymaj pętlę (cleanup React component)'
+
+      - code: |
+          // Responsywny canvas — reaguje na zmianę rozmiaru okna
+          function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix(); // WYMAGANE po zmianie parametrów
+
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          }
+
+          window.addEventListener('resize', onResize);
+
+          // W React — cleanup
+          // useEffect(() => {
+          //   window.addEventListener('resize', onResize);
+          //   return () => window.removeEventListener('resize', onResize);
+          // }, []);
+        desc: Resize handler — responsywny canvas
+        detail:
+          what: Three.js nie reaguje automatycznie na zmianę rozmiaru okna. Musisz ręcznie zaktualizować aspect kamery i rozmiar renderera.
+          how: camera.updateProjectionMatrix() musi być wywołane po każdej zmianie FOV, near, far lub aspect — inaczej obraz będzie zniekształcony.
+          tips:
+            - 'Użyj ResizeObserver zamiast window resize dla canvas w kontenerze (nie fullscreen)'
+            - 'renderer.setPixelRatio przy resize — użytkownik może przeciągnąć okno między monitorami'
+
+      - code: |
+          // canvas w konkretnym kontenerze (nie fullscreen)
+          const container = document.getElementById('canvas-container');
+
+          const renderer = new THREE.WebGLRenderer({ antialias: true });
+          container.appendChild(renderer.domElement);
+
+          function updateSize() {
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+          }
+
+          const resizeObserver = new ResizeObserver(updateSize);
+          resizeObserver.observe(container);
+          updateSize(); // inicjalny rozmiar
+        desc: Canvas w kontenerze (nie fullscreen)
+        detail:
+          what: Gdy Three.js renderuje w div-ie zamiast fullscreen, musisz obserwować rozmiar kontenera, nie okna.
+          how: ResizeObserver jest dokładniejszy od window.resize — reaguje gdy kontener zmienia rozmiar niezależnie od okna.
+          tips:
+            - 'resizeObserver.disconnect() — cleanup gdy komponent unmontowany'
+            - 'renderer.domElement.style.display = "block" — usuwa dolny margines canvas'
+
+  - name: Geometria i Mesh
+    icon: "📐"
+    commands:
+      - code: |
+          // Podstawowe geometrie wbudowane
+          const box      = new THREE.BoxGeometry(1, 1, 1);           // (w, h, d)
+          const sphere   = new THREE.SphereGeometry(0.5, 32, 16);   // (r, widthSeg, heightSeg)
+          const plane    = new THREE.PlaneGeometry(2, 2, 10, 10);   // (w, h, wSeg, hSeg)
+          const cylinder = new THREE.CylinderGeometry(0.5, 0.5, 1, 32); // (rTop, rBot, h, seg)
+          const torus    = new THREE.TorusGeometry(0.5, 0.2, 16, 32);   // (r, tube, radSeg, tubSeg)
+          const cone     = new THREE.ConeGeometry(0.5, 1, 32);          // (r, h, seg)
+
+          const material = new THREE.MeshStandardMaterial({ color: 0x049ef4 });
+          const mesh     = new THREE.Mesh(box, material);
+          scene.add(mesh);
+        desc: Wbudowane geometrie — BoxGeometry, SphereGeometry i inne
+        detail:
+          what: Three.js dostarcza ~20 gotowych geometrii. Segmenty (32, 16) określają gładkość — więcej = ładniej ale wolniej. Geometrie są automatycznie buforowane przez GPU.
+          how: Pierwszy argument SphereGeometry to promień, potem segmenty szerokości i wysokości. Minimum 8-16 segmentów dla gładkiej kuli.
+          tips:
+            - 'Małe obiekty tła — używaj mniej segmentów (8-16) dla wydajności'
+            - 'geometry.dispose() — zwolnij VRAM gdy mesh usunięty ze sceny'
+
+      - code: |
+          // TorusKnot — skomplikowany węzeł toroidalny
+          const knotGeo = new THREE.TorusKnotGeometry(0.5, 0.15, 200, 20, 2, 3);
+
+          // Icosahedron — wielościan regularny (bardziej równomierny od sfery)
+          const icoGeo = new THREE.IcosahedronGeometry(0.5, 3); // (r, detail)
+
+          // Lathe — bryła obrotowa z krzywej 2D
+          const points = [];
+          for (let i = 0; i < 10; i++) {
+            points.push(new THREE.Vector2(Math.sin(i * 0.2) * 0.3 + 0.2, i * 0.1));
+          }
+          const latheGeo = new THREE.LatheGeometry(points, 32);
+
+          // Extrude Shape — wytłaczanie kształtu 2D do 3D
+          const shape = new THREE.Shape();
+          shape.moveTo(0, 0);
+          shape.lineTo(1, 0);
+          shape.lineTo(1, 1);
+          shape.lineTo(0, 1);
+          shape.closePath();
+
+          const extrudeSettings = { depth: 0.5, bevelEnabled: true, bevelSize: 0.1 };
+          const extrudeGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+        desc: Zaawansowane geometrie — TorusKnot, Lathe, Extrude
+        detail:
+          what: Three.js oferuje geometrie proceduralne — LatheGeometry tworzy bryły obrotowe (wazy, butelki), ExtrudeGeometry wytłacza 2D shapes do 3D (napisy, loga).
+          how: LatheGeometry przyjmuje tablicę punktów Vector2 definiujących profil i obraca je 360°. Extrude wymaga THREE.Shape — działa jak svg path.
+          tips:
+            - 'THREE.Font + TextGeometry — renderowanie tekstu 3D z pliku .typeface.json'
+            - 'THREE.ShapeGeometry(shape) — płaski kształt 2D bez wytłaczania'
+
+      - code: |
+          // BufferGeometry — własna geometria z wierzchołków
+          const geometry = new THREE.BufferGeometry();
+
+          // Trójkąt
+          const vertices = new Float32Array([
+            -0.5, -0.5, 0,  // wierzchołek 0
+             0.5, -0.5, 0,  // wierzchołek 1
+             0,   0.5,  0,  // wierzchołek 2
+          ]);
+
+          geometry.setAttribute(
+            'position',
+            new THREE.BufferAttribute(vertices, 3) // 3 floaty na wierzchołek
+          );
+
+          // UV coordinates (opcjonalne — dla tekstur)
+          const uvs = new Float32Array([0, 0, 1, 0, 0.5, 1]);
+          geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+
+          // Normalne (wymagane dla MeshStandardMaterial)
+          geometry.computeVertexNormals();
+
+          const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial());
+          scene.add(mesh);
+        desc: BufferGeometry — własna geometria z Float32Array
+        detail:
+          what: BufferGeometry to fundament wszystkich geometrii Three.js. Dane wierzchołków (position, normal, uv, color) przechowujesz w Float32Array i wysyłasz bezpośrednio do GPU.
+          how: setAttribute('position', new BufferAttribute(array, 3)) — 3 = liczba komponentów na wierzchołek (x,y,z). computeVertexNormals() automatycznie oblicza normalne z pozycji.
+          tips:
+            - 'geometry.setIndex(indices) — indeksowane wierzchołki (oszczędza pamięć GPU)'
+            - 'attribute.needsUpdate = true — gdy modyfikujesz dane po stworzeniu'
+
+      - code: |
+          // Proceduralna siatka terenu
+          const width = 10, height = 10;
+          const widthSeg = 50, heightSeg = 50;
+
+          const geometry = new THREE.PlaneGeometry(width, height, widthSeg, heightSeg);
+          geometry.rotateX(-Math.PI / 2); // płasko jak podłoga
+
+          const posAttr = geometry.attributes.position;
+
+          for (let i = 0; i < posAttr.count; i++) {
+            const x = posAttr.getX(i);
+            const z = posAttr.getZ(i);
+            // Simplex/Perlin noise dla naturalnego terenu
+            const y = Math.sin(x * 0.5) * Math.cos(z * 0.5) * 1.5;
+            posAttr.setY(i, y);
+          }
+
+          geometry.computeVertexNormals(); // przelicz normalne po modyfikacji
+          posAttr.needsUpdate = true;
+        desc: Modyfikacja wierzchołków — proceduralny teren
+        detail:
+          what: Możesz modyfikować pozycje wierzchołków istniejącej geometrii po jej stworzeniu — proceduralne animacje, symulacje wody, morphing.
+          how: geometry.attributes.position zwraca BufferAttribute. getX/getY/getZ/setY umożliwiają odczyt i zapis per-wierzchołek. computeVertexNormals() musi być wywołane po modyfikacji.
+          tips:
+            - 'npm install simplex-noise — Simplex Noise do naturalnie wyglądającego terenu'
+            - 'Animuj teren w pętli: setY(i, noise(x + time)) + needsUpdate = true każdą klatkę'
+
+      - code: |
+          // Points — cząstki / gwiazdy / efekty
+          const count = 5000;
+          const positions = new Float32Array(count * 3);
+
+          for (let i = 0; i < count; i++) {
+            positions[i * 3]     = (Math.random() - 0.5) * 20; // x
+            positions[i * 3 + 1] = (Math.random() - 0.5) * 20; // y
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 20; // z
+          }
+
+          const geometry = new THREE.BufferGeometry();
+          geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+          const material = new THREE.PointsMaterial({
+            size: 0.05,
+            color: 0xffffff,
+            sizeAttenuation: true, // mniejsze punkty dalej od kamery
+            map: starTexture,
+            alphaTest: 0.5,
+          });
+
+          const particles = new THREE.Points(geometry, material);
+          scene.add(particles);
+        desc: Points — system cząsteczek / pole gwiazd
+        detail:
+          what: THREE.Points renderuje każdy wierzchołek geometrii jako punkt (punkt na ekranie). Wydajny sposób na tysiące cząstek — 50k punktów to jeden draw call.
+          how: PointsMaterial.size to rozmiar punktu w jednostkach świata (lub pikselach jeśli sizeAttenuation=false). alphaTest=0.5 odcina przeźroczysty obszar tekstury.
+          tips:
+            - 'sizeAttenuation: false — stały rozmiar niezależnie od odległości (2D UI overlay)'
+            - 'Aktualizuj pozycje każdą klatkę: posAttr.needsUpdate = true dla animacji'
+
+      - code: |
+          import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+          // Połącz wiele geometrii w jedną — ogromna optymalizacja
+          const geometries = [];
+
+          for (let i = 0; i < 1000; i++) {
+            const geo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+            // Przesuń każdą geometrię (wierzchołki w world space)
+            geo.translate(
+              (Math.random() - 0.5) * 10,
+              (Math.random() - 0.5) * 10,
+              (Math.random() - 0.5) * 10
+            );
+            geometries.push(geo);
+          }
+
+          const merged = mergeGeometries(geometries);
+          const mesh   = new THREE.Mesh(merged, material);
+          scene.add(mesh);
+
+          // Zwolnij oryginały
+          geometries.forEach(g => g.dispose());
+        desc: mergeGeometries — łączenie geometrii (optymalizacja draw calls)
+        detail:
+          what: Każdy Mesh = 1 draw call. 1000 meshy = 1000 draw calls = wolno. mergeGeometries łączy wiele geometrii w jedną = 1 draw call. Ogromna różnica wydajności.
+          how: geo.translate() przesuwa wierzchołki w przestrzeni lokalnej przed scaleniem — inaczej wszystkie lądują w centrum (0,0,0).
+          tips:
+            - 'Sprawdź: renderer.info.render.calls — liczba draw calls w ostatniej klatce'
+            - 'Merge działa tylko gdy wszystkie obiekty mają ten sam material'
+
+  - name: Materiały
+    icon: "🎨"
+    commands:
+      - code: |
+          // MeshStandardMaterial — PBR metalness/roughness (standard 2024)
+          const material = new THREE.MeshStandardMaterial({
+            color: new THREE.Color('#049ef4'),
+            metalness: 0.0,   // 0=plastik, 1=metal (nie używaj pomiędzy!)
+            roughness: 0.5,   // 0=lustro, 1=całkowicie matowy
+            envMapIntensity: 1.0, // siła refleksji env map
+          });
+
+          // Zmiana parametrów w runtime
+          material.color.set(0xff0000);
+          material.metalness  = 1.0;
+          material.roughness  = 0.1;
+          // material.needsUpdate = true — NIE potrzebne dla tych właściwości
+        desc: MeshStandardMaterial — PBR podstawy
+        detail:
+          what: Physically Based Rendering — materiał który zachowuje się jak prawdziwe materiały fizyczne. Metalness/roughness to najpopularniejszy model PBR (vs specular/glossiness).
+          how: "Zasada: metale mają metalness=1 i dowolny roughness. Niemetale mają metalness=0. Wartości pomiędzy są dla \"zardzewiałego metalu\" itd."
+          tips:
+            - 'Bez envMap metalMaterial wygląda płasko — dodaj Environment map dla refleksji'
+            - 'color: 0x000000 dla czarnego metalu (lśniący) + metalness:1 + roughness:0'
+
+      - code: |
+          // Ładowanie tekstur PBR
+          const loader = new THREE.TextureLoader();
+
+          const albedo    = loader.load('/textures/metal/albedo.jpg');
+          const normal    = loader.load('/textures/metal/normal.jpg');
+          const roughness = loader.load('/textures/metal/roughness.jpg');
+          const metalness = loader.load('/textures/metal/metalness.jpg');
+          const ao        = loader.load('/textures/metal/ao.jpg');
+
+          // Ustawienia powtarzania
+          [albedo, normal, roughness, metalness, ao].forEach(t => {
+            t.wrapS = THREE.RepeatWrapping;
+            t.wrapT = THREE.RepeatWrapping;
+            t.repeat.set(2, 2);
+          });
+
+          const material = new THREE.MeshStandardMaterial({
+            map:          albedo,
+            normalMap:    normal,
+            roughnessMap: roughness,
+            metalnessMap: metalness,
+            aoMap:        ao,
+            aoMapIntensity: 1.0,
+          });
+
+          // Mesh musi mieć UV2 dla aoMap
+          mesh.geometry.setAttribute('uv2', mesh.geometry.attributes.uv);
+        desc: Zestaw tekstur PBR — albedo, normal, roughness, metalness, AO
+        detail:
+          what: Realistyczne materiały wymagają zestawu map tekstur. Normal map symuluje drobne nierówności bez dodatkowych polygonów. AO map dodaje cienie w szczelинach.
+          how: RepeatWrapping pozwala powtarzać teksturę na dużych powierzchniach. UV2 to drugi zestaw koordynatów UV wymagany przez aoMap.
+          tips:
+            - 'Darmowe tekstury PBR: ambientcg.com, polyhaven.com — wszystkie CC0'
+            - 'normalMap.encoding = THREE.LinearEncoding — normalne NIE są w sRGB!'
+
+      - code: |
+          // Environment Map — HDRI refleksje ze wszystkich stron
+          import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+          import { PMREMGenerator } from 'three';
+
+          const pmremGenerator = new THREE.PMREMGenerator(renderer);
+          pmremGenerator.compileEquirectangularShader();
+
+          new RGBELoader()
+            .setPath('/hdri/')
+            .load('studio.hdr', (hdrTexture) => {
+              const envMap = pmremGenerator.fromEquirectangular(hdrTexture).texture;
+
+              scene.background = envMap;    // tło
+              scene.environment = envMap;   // refleksje na WSZYSTKICH materialach
+
+              hdrTexture.dispose();
+              pmremGenerator.dispose();
+            });
+        desc: Environment Map (HDRI) — refleksje i tło
+        detail:
+          what: HDRI (High Dynamic Range Image) to panoramiczne zdjęcie otoczenia używane jako źródło refleksji. scene.environment automatycznie aplikuje refleksje na wszystkich materialach z envMapIntensity > 0.
+          how: PMREMGenerator konwertuje equirectangular HDRI do cube map którą GPU może próbkować. .hdr to format 32-bit float (HDR) — lepsze refleksje niż .jpg.
+          tips:
+            - 'Darmowe HDRI: polyhaven.com/hdris — pełna kolekcja CC0'
+            - 'scene.backgroundBlurriness = 0.5 — rozmyj tło nie wpływając na refleksje'
+
+      - code: |
+          // ShaderMaterial — fale sinusoidalne na siatce
+          const waterMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+              uTime:      { value: 0 },
+              uBigWavesElevation:  { value: 0.2 },
+              uBigWavesFrequency: { value: new THREE.Vector2(4, 1.5) },
+              uBigWavesSpeed:     { value: 0.75 },
+              uDepthColor:        { value: new THREE.Color('#186691') },
+              uSurfaceColor:      { value: new THREE.Color('#9bd8ff') },
+            },
+            vertexShader: `
+              uniform float uTime;
+              uniform float uBigWavesElevation;
+              uniform vec2  uBigWavesFrequency;
+              uniform float uBigWavesSpeed;
+              varying float vElevation;
+
+              void main() {
+                vec4 modelPosition = modelMatrix * vec4(position, 1.0);
+                float elevation = sin(modelPosition.x * uBigWavesFrequency.x + uTime * uBigWavesSpeed)
+                                * sin(modelPosition.z * uBigWavesFrequency.y + uTime * uBigWavesSpeed)
+                                * uBigWavesElevation;
+                modelPosition.y += elevation;
+                vElevation = elevation;
+                gl_Position = projectionMatrix * viewMatrix * modelPosition;
+              }
+            `,
+            fragmentShader: `
+              uniform vec3  uDepthColor;
+              uniform vec3  uSurfaceColor;
+              varying float vElevation;
+
+              void main() {
+                float mixStrength = (vElevation + 0.2) * 3.0;
+                vec3  color = mix(uDepthColor, uSurfaceColor, mixStrength);
+                gl_FragColor = vec4(color, 1.0);
+              }
+            `,
+          });
+
+          // W pętli:
+          waterMaterial.uniforms.uTime.value = clock.getElapsedTime();
+        desc: ShaderMaterial — animowane fale (GLSL vertex shader)
+        detail:
+          what: Vertex shader może przesuwać wierzchołki na GPU w czasie rzeczywistym — bez żadnego kosztu CPU. Tutaj symulacja wody przez funkcje sinus na osi Y.
+          how: varying vElevation przekazuje wysokość z vertex do fragment shadera — używamy jej do miksowania koloru głębokiej i płytkiej wody.
+          tips:
+            - 'modelMatrix * vec4(position, 1.0) — position w world space (po transformacjach mesha)'
+            - 'Three.js automatycznie injectuje: projectionMatrix, viewMatrix, modelMatrix, position, uv, normal'
+
+      - code: |
+          // MeshPhysicalMaterial — szkło / refrakcja
+          const glassMaterial = new THREE.MeshPhysicalMaterial({
+            color:        0xffffff,
+            metalness:    0,
+            roughness:    0,
+            transmission: 1.0,   // 1 = przezroczyste jak szkło
+            thickness:    0.5,   // grubość dla efektu refrakcji
+            ior:          1.5,   // index of refraction (szkło=1.5, woda=1.33, diament=2.42)
+            transparent:  true,
+            envMapIntensity: 1.5,
+          });
+
+          // Konieczne dla transmission:
+          renderer.capabilities.isWebGL2; // WebGL2 wymagane
+          // Dodaj do renderera:
+          // new THREE.WebGLRenderer({ ... }) — WebGL2 domyślnie w nowoczesnych przegl.
+        desc: MeshPhysicalMaterial — szkło z refrakcją
+        detail:
+          what: transmission symuluje przepuszczanie światła przez materiał (szkło, kryształ, woda). ior (Index of Refraction) określa jak bardzo światło ugina się przechodząc przez materiał.
+          how: Transmission wymaga WebGL2 i osobnego render pass — Three.js obsługuje to automatycznie gdy transmission > 0. Wymaga envMap dla realistycznych wyników.
+          tips:
+            - 'ior: 1.0 = brak refrakcji, 1.5 = szkło, 2.42 = diament'
+            - 'thickness: 0 = flat glass, > 0 = gruba bryła z silniejszą refrakcją'
+
+      - code: |
+          // Animowany gradient — DataTexture jako kolor dynamiczny
+          const size = 256;
+          const data = new Uint8Array(size * size * 4); // RGBA
+
+          for (let i = 0; i < size * size; i++) {
+            const x = (i % size) / size;
+            const y = Math.floor(i / size) / size;
+            data[i * 4]     = x * 255;         // R
+            data[i * 4 + 1] = y * 255;         // G
+            data[i * 4 + 2] = (1 - x) * 255;  // B
+            data[i * 4 + 3] = 255;             // A (opacity)
+          }
+
+          const gradientTexture = new THREE.DataTexture(data, size, size);
+          gradientTexture.needsUpdate = true;
+
+          const material = new THREE.MeshBasicMaterial({
+            map: gradientTexture,
+          });
+        desc: DataTexture — programowy gradient / proceduralna tekstura
+        detail:
+          what: DataTexture pozwala tworzyć tekstury bezpośrednio z Uint8Array bez ładowania pliku. Idealne do proceduralnych wzorców, map gradientów, noise textures.
+          how: Uint8Array o rozmiarze width * height * 4 (RGBA). Każde 4 bajty = jeden piksel (R,G,B,A od 0 do 255).
+          tips:
+            - 'THREE.FloatType + Float32Array — 32-bit precision dla HDR lub obliczeń naukowych'
+            - 'texture.needsUpdate = true — wymagane po ręcznej modyfikacji danych'
+
+  - name: Oświetlenie
+    icon: "💡"
+    commands:
+      - code: |
+          // AmbientLight — równomierne globalne oświetlenie (brak cieni)
+          const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+          scene.add(ambientLight);
+
+          // Bez AmbientLight ciemne strony obiektów są całkowicie czarne
+          // Typowo: AmbientLight 0.2-0.5 + DirectionalLight 1.0
+
+          // HemisphereLight — gradient niebo/ziemia (lepszy niż Ambient)
+          const hemiLight = new THREE.HemisphereLight(
+            0x87ceeb, // kolor nieba (góra)
+            0x8b7355, // kolor ziemi (dół)
+            0.6       // intensywność
+          );
+          scene.add(hemiLight);
+        desc: AmbientLight i HemisphereLight — globalne oświetlenie
+        detail:
+          what: AmbientLight oświetla wszystkie obiekty równomiernie z każdej strony — eliminuje całkowite czernie. HemisphereLight to ulepszenie — kolor zależy od normalnej powierzchni (niebo vs ziemia).
+          how: HemisphereLight jest bardziej realistyczny dla zewnętrznych scen — górne powierzchnie (skyColor), dolne powierzchnie (groundColor).
+          tips:
+            - 'Intensywność 0.4-0.6 dla naturalnego wyglądu z env map (nie prześwietl)'
+            - 'Nie rzuca cieni — używaj zawsze z innym źródłem światła'
+
+      - code: |
+          // DirectionalLight — słońce (równoległe promienie)
+          const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+          dirLight.position.set(5, 10, 5);
+          dirLight.castShadow = true;
+
+          // Konfiguracja cieni (jakość vs wydajność)
+          dirLight.shadow.mapSize.width  = 2048; // rozdzielczość shadow map
+          dirLight.shadow.mapSize.height = 2048;
+          dirLight.shadow.camera.near    = 0.5;
+          dirLight.shadow.camera.far     = 50;
+          dirLight.shadow.camera.left    = -10; // obszar rzucania cieni
+          dirLight.shadow.camera.right   = 10;
+          dirLight.shadow.camera.top     = 10;
+          dirLight.shadow.camera.bottom  = -10;
+          dirLight.shadow.bias           = -0.001; // fix "shadow acne"
+
+          scene.add(dirLight);
+          scene.add(dirLight.target); // cel światła (domyślnie 0,0,0)
+
+          // Obiekty muszą mieć castShadow i receiveShadow
+          mesh.castShadow    = true;
+          floor.receiveShadow = true;
+        desc: DirectionalLight — słońce z cieniami
+        detail:
+          what: DirectionalLight emituje równoległe promienie (jak słońce). Jeden DirectionalLight może rzucać cienie na całą scenę przez ortograficzną shadow camera.
+          how: shadow.camera.left/right/top/bottom określają prostokąt w którym rzucane są cienie. Ustaw go jak najmniejszy zawierający całą scenę — lepsze cienie.
+          tips:
+            - 'shadow.bias = -0.001 naprawia "shadow acne" (samoprzycieniowanie z artefaktami)'
+            - 'mapSize.width = 4096 — bardzo ostre cienie ale dużo VRAM (2048 zazwyczaj wystarczy)'
+
+      - code: |
+          // PointLight — żarówka (promienie we wszystkich kierunkach)
+          const pointLight = new THREE.PointLight(
+            0xff6600, // kolor
+            1.0,      // intensywność
+            10,       // distance (0 = nieskończony)
+            2         // decay (2 = fizycznie poprawny)
+          );
+          pointLight.position.set(2, 3, 2);
+          pointLight.castShadow = true;
+          pointLight.shadow.mapSize.width  = 1024;
+          pointLight.shadow.mapSize.height = 1024;
+          scene.add(pointLight);
+
+          // Helper wizualny (tylko dev)
+          const helper = new THREE.PointLightHelper(pointLight, 0.2);
+          scene.add(helper);
+        desc: PointLight — żarówka z decay
+        detail:
+          what: PointLight emituje światło we wszystkich kierunkach od jednego punktu jak żarówka. decay=2 to fizycznie poprawne wygaszanie (intensywność spada z kwadratem odległości).
+          how: distance=0 = nieskończony zasięg (wolniej). Ustaw distance = 2-3× zasięg który chcesz dla wydajności.
+          tips:
+            - 'PointLight cienie są drogie — 6 shadow map (jeden per kierunek). Używaj oszczędnie'
+            - 'PointLightHelper pokazuje sferę pomocniczą w edytorze — usuń przed produkcją'
+
+      - code: |
+          // SpotLight — reflektor (stożek światła)
+          const spotLight = new THREE.SpotLight(
+            0xffffff, // kolor
+            2.0,      // intensywność
+            15,       // distance
+            Math.PI / 6, // angle — ½ kąta stożka (30°)
+            0.3,      // penumbra — rozmycie krawędzi (0=ostry, 1=bardzo rozmyty)
+            2         // decay
+          );
+          spotLight.position.set(0, 5, 0);
+          spotLight.target.position.set(0, 0, 0); // kierunek
+          spotLight.castShadow = true;
+          scene.add(spotLight);
+          scene.add(spotLight.target);
+
+          // Animacja — obracaj target
+          function animate() {
+            const t = clock.getElapsedTime();
+            spotLight.target.position.x = Math.sin(t) * 3;
+            spotLight.target.updateMatrixWorld(); // WYMAGANE po zmianie target
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+          }
+        desc: SpotLight — animowany reflektor sceniczny
+        detail:
+          what: SpotLight to stożek światła — reflektor, latarnia, lampka biurowa. angle to pół kąta stożka (PI/6 = 30° = stożek 60°). penumbra rozmywa krawędź stożka.
+          how: spotLight.target to osobny Object3D — musisz go dodać do sceny. Przy ruchu target wywołaj target.updateMatrixWorld().
+          tips:
+            - 'penumbra 0.2-0.5 dla miękkich, naturalnych reflektorów'
+            - 'SpotLight cienie używają perspektywicznej shadow camera — lepiej wyglądają niż Directional'
+
+      - code: |
+          // RectAreaLight — prostokątny panel świetlny (LED panel, okno)
+          import { RectAreaLightHelper } from 'three/addons/helpers/RectAreaLightHelper.js';
+          import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
+
+          // Wymagana inicjalizacja biblioteki
+          RectAreaLightUniformsLib.init();
+
+          const rectLight = new THREE.RectAreaLight(
+            0xffffff, // kolor
+            5,        // intensywność
+            4,        // szerokość
+            2         // wysokość
+          );
+          rectLight.position.set(0, 3, -2);
+          rectLight.lookAt(0, 0, 0);
+          scene.add(rectLight);
+
+          // Helper
+          const rectHelper = new RectAreaLightHelper(rectLight);
+          scene.add(rectHelper);
+
+          // Działa TYLKO z MeshStandardMaterial i MeshPhysicalMaterial
+        desc: RectAreaLight — panel LED / okno
+        detail:
+          what: RectAreaLight emituje światło z prostokątnej powierzchni — idealny do lamp LED, okien, ekranów TV. Daje miękkie, naturalne oświetlenie bez cieni (brak shadow support).
+          how: Wymagana inicjalizacja RectAreaLightUniformsLib przed użyciem. Działa tylko z MeshStandardMaterial/Physical — nie z Basic, Lambert, Phong.
+          tips:
+            - 'Brak obsługi cieni — kompensuj baked lightmaps lub SSAO postprocessing'
+            - 'RectAreaLight intensywność mierzona w lumenach (nie willowy) — duże wartości normalne'
+
+  - name: Pętla animacji
+    icon: "🔄"
+    commands:
+      - code: |
+          // requestAnimationFrame — standardowa pętla
+          let animationId;
+
+          function animate() {
+            animationId = requestAnimationFrame(animate);
+
+            // Aktualizacje sceny
+            cube.rotation.y += 0.01;
+
+            renderer.render(scene, camera);
+          }
+
+          animate();
+
+          // Zatrzymanie (np. cleanup React useEffect)
+          // cancelAnimationFrame(animationId);
+        desc: requestAnimationFrame — podstawowa pętla renderowania
+        detail:
+          what: requestAnimationFrame synchronizuje rendering z odświeżaniem ekranu (60fps, 120fps, 144fps). Przeglądarka automatycznie pauzuje gdy zakładka nieaktywna — oszczędza CPU/GPU.
+          how: Zapisz ID z requestAnimationFrame — możesz go anulować przez cancelAnimationFrame(id). Kluczowe przy React/Vue gdzie komponenty się odmontowują.
+          tips:
+            - 'requestAnimationFrame wywołuje callback z timestamp (milliseconds) — możesz go użyć do delta'
+            - 'Nigdy nie używaj setInterval do renderowania 3D — nie synchronizuje się z ekranem'
+
+      - code: |
+          // Clock — precyzyjny czas dla animacji
+          const clock = new THREE.Clock();
+
+          function animate() {
+            requestAnimationFrame(animate);
+
+            const elapsedTime = clock.getElapsedTime(); // od startu (sekundy)
+            const delta       = clock.getDelta();        // od ostatniego wywołania
+
+            // Frame-rate independent movement (zawsze ta sama prędkość)
+            mesh.position.x = Math.sin(elapsedTime) * 2; // oscylacja
+
+            // Ruch z prędkością 2 jednostki/sekunda — niezależny od FPS
+            mesh.position.z += 2.0 * delta;
+
+            renderer.render(scene, camera);
+          }
+
+          // UWAGA: clock.getDelta() zwraca 0 jeśli wywołasz dwa razy w tej samej klatce!
+          // Wywołuj getDelta() TYLKO raz na klatkę na początku animate()
+        desc: THREE.Clock — delta time i elapsed time
+        detail:
+          what: THREE.Clock to wrapper na Date.now(). getDelta() zwraca czas od ostatniego wywołania (sekundy). getElapsedTime() to całkowity czas od stworzenia clocka.
+          how: "Zasada: używaj delta dla ruchu (speed × delta), elapsedTime dla oscylacji (sin/cos — nie dryftuje z czasem jak += delta accumulator)."
+          tips:
+            - 'Zatrzymaj clock: clock.stop() / wznów: clock.start()'
+            - 'Dla multiplayer/fizyki — synchronizuj czas z serwerem, nie używaj lokalnego Clock'
+
+      - code: |
+          // AnimationMixer — skeletal animation z GLTF
+          import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+          const loader  = new GLTFLoader();
+          let   mixer;
+
+          loader.load('/models/character.glb', (gltf) => {
+            scene.add(gltf.scene);
+
+            mixer = new THREE.AnimationMixer(gltf.scene);
+
+            // Odtwarzaj animację "Walk"
+            const walkClip   = THREE.AnimationClip.findByName(gltf.animations, 'Walk');
+            const walkAction = mixer.clipAction(walkClip);
+            walkAction.play();
+
+            // Inny clip
+            const idleAction = mixer.clipAction(gltf.animations[0]);
+            idleAction.play();
+          });
+
+          function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            if (mixer) mixer.update(delta); // WYMAGANE każdą klatkę
+
+            renderer.render(scene, camera);
+          }
+        desc: AnimationMixer — odtwarzanie animacji szkieletowych z GLTF
+        detail:
+          what: AnimationMixer zarządza klipami animacji z pliku .glb. Animuje kości (skeleton), morphs i wartości dowolnych właściwości. Wymaga mixer.update(delta) każdą klatkę.
+          how: clipAction(clip) zwraca AnimationAction — kontrolujesz play/pause/stop/setLoop. Jeden mixer obsługuje wszystkie animacje jednego obiektu (i jego dzieci).
+          tips:
+            - 'action.setLoop(THREE.LoopOnce) + action.clampWhenFinished = true — zagraj raz i zostań na końcu'
+            - 'action.crossFadeTo(otherAction, 0.3) — płynne przejście między animacjami w 0.3s'
+
+      - code: |
+          // GSAP z Three.js — tweening właściwości obiektów 3D
+          import gsap from 'gsap';
+
+          // Animuj pozycję w 1 sekundę
+          gsap.to(mesh.position, {
+            x: 3,
+            duration: 1,
+            ease: 'power2.out',
+          });
+
+          // Animuj obrót
+          gsap.to(mesh.rotation, {
+            y: Math.PI * 2, // pełny obrót 360°
+            duration: 2,
+            repeat: -1,     // nieskończone powtarzanie
+            ease: 'none',
+          });
+
+          // Timeline — sekwencja animacji
+          const tl = gsap.timeline();
+          tl.to(mesh.position, { y: 2, duration: 0.5 })
+            .to(mesh.rotation, { y: Math.PI, duration: 0.3 })
+            .to(mesh.position, { y: 0, duration: 0.5, ease: 'bounce.out' });
+        desc: GSAP — tweening i timeline animacji
+        detail:
+          what: GSAP (GreenSock Animation Platform) to profesjonalna biblioteka do tweeningu. Doskonale współpracuje z Three.js — animuje dowolne właściwości numeryczne obiektów 3D.
+          how: gsap.to(object, props) interpoluje właściwości od obecnej wartości do docelowej. ease określa krzywą interpolacji (power2.out, bounce.out, elastic itd.).
+          tips:
+            - 'npm install gsap — darmowy dla większości zastosowań'
+            - 'gsap.ticker.add(() => renderer.render(scene, camera)) — GSAP może zastąpić requestAnimationFrame'
+
+      - code: |
+          // Morphing między kształtami (morph targets)
+          // Geometria musi mieć morphAttributes.position
+
+          const geometry = new THREE.SphereGeometry(1, 32, 32);
+
+          // Stwórz morph target (np. rozciągnięta kula = jajko)
+          const posAttr = geometry.attributes.position;
+          const morphPositions = new Float32Array(posAttr.array.length);
+
+          for (let i = 0; i < posAttr.count; i++) {
+            morphPositions[i * 3]     = posAttr.getX(i) * 1.5; // rozciągnij X
+            morphPositions[i * 3 + 1] = posAttr.getY(i) * 0.5; // ściśnij Y
+            morphPositions[i * 3 + 2] = posAttr.getZ(i) * 1.5;
+          }
+
+          geometry.morphAttributes.position = [
+            new THREE.BufferAttribute(morphPositions, 3),
+          ];
+
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.morphTargetInfluences[0] = 0; // 0 = oryginał, 1 = morph target
+          scene.add(mesh);
+
+          // Animuj morph
+          gsap.to(mesh.morphTargetInfluences, { '0': 1, duration: 2, yoyo: true, repeat: -1 });
+        desc: Morph Targets — interpolacja między kształtami geometrii
+        detail:
+          what: Morph targets (blend shapes) pozwalają na interpolację między różnymi kształtami tej samej topologii. Używane do animacji mimiki twarzy, deformacji organicznych.
+          how: geometry.morphAttributes.position = tablica alternatywnych pozycji wierzchołków. mesh.morphTargetInfluences[i] kontroluje wagi mieszania (0-1).
+          tips:
+            - 'GLTF modele z Blendera mogą zawierać morph targets — THREE.js obsługuje je automatycznie'
+            - 'mesh.updateMorphTargets() — wymagane po ręcznym stworzeniu morph targets'
+
+  - name: Ładowanie zasobów
+    icon: "📦"
+    commands:
+      - code: |
+          import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+          const loader = new GLTFLoader();
+
+          loader.load(
+            '/models/scene.glb',
+            (gltf) => {
+              // Sukces
+              console.log(gltf.scene);     // Object3D z hierarchią
+              console.log(gltf.animations); // AnimationClip[]
+              console.log(gltf.cameras);   // Camera[]
+
+              gltf.scene.traverse(child => {
+                if (child.isMesh) {
+                  child.castShadow = true;
+                  child.receiveShadow = true;
+                }
+              });
+
+              scene.add(gltf.scene);
+            },
+            (progress) => {
+              const percent = (progress.loaded / progress.total * 100).toFixed(0);
+              console.log(`Ładowanie: ${percent}%`);
+            },
+            (error) => console.error('Błąd:', error)
+          );
+        desc: GLTFLoader — ładowanie modeli .glb / .gltf
+        detail:
+          what: GLTF (GL Transmission Format) to standard formatu 3D dla sieci — jak JPEG dla grafiki 3D. .glb = binary (jeden plik), .gltf = JSON (z oddzielnymi .bin i teksturami).
+          how: GLTFLoader to add-on — importuj z 'three/addons/'. gltf.scene to root Object3D z całą hierarchią. Animacje, kamery, light dostępne jako tablice.
+          tips:
+            - 'Użyj Draco compression w Blenderze przed eksportem — pliki 5-10× mniejsze'
+            - 'gltf.scene.scale.set(0.01, 0.01, 0.01) — często modele z Blendera mają złą skalę'
+
+      - code: |
+          // DRACOLoader — dekompresja skompresowanych GLTF
+          import { GLTFLoader  } from 'three/addons/loaders/GLTFLoader.js';
+          import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+          const dracoLoader = new DRACOLoader();
+          // Draco decoder WASM — skopiuj do /public/draco/ z node_modules
+          dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+
+          const gltfLoader = new GLTFLoader();
+          gltfLoader.setDRACOLoader(dracoLoader);
+
+          gltfLoader.load('/models/compressed.glb', (gltf) => {
+            scene.add(gltf.scene);
+          });
+
+          // Draco zdekompresuje geometrię w Web Worker — nie blokuje UI
+        desc: DRACOLoader — kompresja geometrii GLTF
+        detail:
+          what: Draco to algorytm Google kompresujący geometrię 3D (wierzchołki, normalne, UV). Kompresuje modele o 70-90% — plik 10MB może stać się 1MB.
+          how: Decoder WASM może być hostowany lokalnie (z node_modules) lub przez CDN Google. Dekompresja działa w Web Worker — nie blokuje głównego wątku.
+          tips:
+            - 'W Blenderze: Eksport GLTF → zaznacz "Draco compression" — gotowe'
+            - 'CDN Google gstatic.com — działa, ale dla produkcji hostuj lokalnie dla kontroli wersji'
+
+      - code: |
+          // LoadingManager — jeden manager dla wielu loaderów
+          const manager = new THREE.LoadingManager(
+            // onLoad — wszystko załadowane
+            () => {
+              console.log('Wszystko załadowane!');
+              document.getElementById('loading').style.display = 'none';
+              animate(); // Zacznij render po załadowaniu
+            },
+            // onProgress
+            (url, loaded, total) => {
+              const progress = Math.round(loaded / total * 100);
+              document.getElementById('progress').textContent = `${progress}%`;
+              console.log(`Ładowanie: ${url} (${loaded}/${total})`);
+            },
+            // onError
+            (url) => console.error(`Błąd ładowania: ${url}`)
+          );
+
+          // Przypisz manager do loaderów
+          const textureLoader = new THREE.TextureLoader(manager);
+          const gltfLoader    = new GLTFLoader(manager);
+
+          // Ładuj zasoby — onLoad wywołane gdy WSZYSTKIE gotowe
+          const texture1 = textureLoader.load('/textures/ground.jpg');
+          const texture2 = textureLoader.load('/textures/sky.jpg');
+          gltfLoader.load('/models/scene.glb', (gltf) => scene.add(gltf.scene));
+        desc: LoadingManager — pasek postępu i callback po załadowaniu wszystkiego
+        detail:
+          what: LoadingManager śledzi wiele loaderów jednocześnie. onLoad wywołany gdy WSZYSTKIE zasoby (tekstury, modele, dźwięki) są gotowe. Idealne do ekranu ładowania.
+          how: Stwórz manager przed loaderami i przekaż go do konstruktorów loaderów. Jeden manager może obsługiwać TextureLoader, GLTFLoader, AudioLoader itp.
+          tips:
+            - 'Zacznij render (animate()) dopiero w onLoad — unikniesz klatki z brakującymi teksturami'
+            - 'manager.itemStart(url) / manager.itemEnd(url) — ręczne śledzenie własnych zasobów'
+
+      - code: |
+          // CubeTextureLoader — skybox / env map z 6 obrazów
+          const cubeLoader = new THREE.CubeTextureLoader();
+          cubeLoader.setPath('/textures/skybox/');
+
+          const skyboxTexture = cubeLoader.load([
+            'px.jpg', 'nx.jpg', // +X, -X
+            'py.jpg', 'ny.jpg', // +Y, -Y
+            'pz.jpg', 'nz.jpg', // +Z, -Z
+          ]);
+
+          // Skybox jako tło
+          scene.background = skyboxTexture;
+
+          // Environment map dla refleksji na metalach
+          scene.environment = skyboxTexture;
+
+          // Lub na konkretnym materiale
+          const material = new THREE.MeshStandardMaterial({
+            envMap: skyboxTexture,
+            metalness: 1.0,
+            roughness: 0.0,
+          });
+        desc: CubeTextureLoader — skybox z 6 obrazów
+        detail:
+          what: CubeTexture to 6 obrazów (ściany sześcianu) tworzących panoramę nieba lub otoczenia. Używana jako tło sceny i/lub źródło refleksji dla metali.
+          how: "Kolejność: +X, -X, +Y, -Y, +Z, -Z. Obraz +X to prawa strona sześcianu. setPath() ustawia prefix URL dla wszystkich 6 obrazów."
+          tips:
+            - 'Dla lepszej jakości refleksji użyj HDRI z RGBELoader (miękki blur, HDR) zamiast cube'
+            - 'Darmowe skybox: opengameart.org, humus.name/3D/Cubemaps/'
+
+      - code: |
+          import { FontLoader    } from 'three/addons/loaders/FontLoader.js';
+          import { TextGeometry  } from 'three/addons/geometries/TextGeometry.js';
+
+          const fontLoader = new FontLoader();
+
+          fontLoader.load('/fonts/helvetiker_regular.typeface.json', (font) => {
+            const textGeometry = new TextGeometry('Hello Three.js', {
+              font,
+              size:    0.5,
+              depth:   0.1,       // głębokość wyciągnięcia
+              curveSegments: 12,  // gładkość krzywych czcionki
+              bevelEnabled:  true,
+              bevelThickness: 0.03,
+              bevelSize:      0.02,
+              bevelSegments:  5,
+            });
+
+            textGeometry.center(); // wycentruj geometrię
+
+            const textMesh = new THREE.Mesh(
+              textGeometry,
+              new THREE.MeshMatcapMaterial({ matcap: matcapTexture })
+            );
+            scene.add(textMesh);
+          });
+        desc: FontLoader + TextGeometry — tekst 3D
+        detail:
+          what: TextGeometry tworzy geometrię 3D z tekstu używając czcionki w formacie .typeface.json. Każda litera to BufferGeometry z opcjonalnym bevellingiem (zaokrąglone krawędzie).
+          how: Czcionki typeface.json generujesz z TTF/OTF na facetype.js.com lub korzystasz z gotowych z examples/fonts/ Three.js.
+          tips:
+            - 'textGeometry.center() — przesuwa geometrię tak żeby środek był na 0,0,0'
+            - 'Zamiast TextGeometry użyj Drei <Text> (R3F) — SDF rendering, skaluje się bez pikselizacji'
+
+  - name: Interakcja
+    icon: "🖱️"
+    commands:
+      - code: |
+          // Raycaster — wykrywanie kliknięć na obiektach 3D
+          const raycaster = new THREE.Raycaster();
+          const mouse     = new THREE.Vector2();
+
+          window.addEventListener('mousemove', (event) => {
+            // Normalizuj pozycję myszy do [-1, 1]
+            mouse.x = (event.clientX / window.innerWidth)  * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1; // Y odwrócone
+          });
+
+          function animate() {
+            requestAnimationFrame(animate);
+
+            // Aktualizuj ray z pozycji myszy i kamery
+            raycaster.setFromCamera(mouse, camera);
+
+            // Sprawdź przecięcia (true = sprawdzaj dzieci)
+            const intersects = raycaster.intersectObjects(scene.children, true);
+
+            if (intersects.length > 0) {
+              const hit = intersects[0]; // najbliższy obiekt
+              console.log('Trafiono:', hit.object.name);
+              console.log('Punkt trafienia:', hit.point);   // Vector3
+              console.log('Odległość:', hit.distance);
+              hit.object.material.color.set(0xff0000); // podświetl
+            }
+
+            renderer.render(scene, camera);
+          }
+        desc: Raycaster — mouse picking, klikanie obiektów 3D
+        detail:
+          what: Raycaster emituje promień z pozycji myszy przez scenę i zwraca listę obiektów które przecina. Standardowy sposób obsługi kliknięć i hover w scenach 3D.
+          how: mouse.x/y muszą być w zakresie [-1,1] (NDC). Uwaga na Y — w DOM Y rośnie w dół, w NDC rośnie w górę — stąd negacja.
+          tips:
+            - 'intersects[0] = najbliższy obiekt (najmniejsza distance). Tablica posortowana'
+            - 'raycaster.intersectObject(specificMesh) — sprawdź tylko konkretny obiekt (szybciej)'
+
+      - code: |
+          import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+          const controls = new OrbitControls(camera, renderer.domElement);
+
+          // Konfiguracja
+          controls.enableDamping  = true;  // płynna inercja (WYMAGANE: controls.update() w animate)
+          controls.dampingFactor  = 0.05;
+          controls.enablePan      = true;  // pan myszą (środkowy przycisk)
+          controls.enableZoom     = true;
+          controls.autoRotate     = false; // automatyczna rotacja
+          controls.autoRotateSpeed = 2.0;
+
+          // Ograniczenia
+          controls.minDistance = 2;           // minimalny zoom
+          controls.maxDistance = 20;          // maksymalny zoom
+          controls.maxPolarAngle = Math.PI / 2; // nie można patrzeć pod podłogę
+
+          // Zapis i odtwarzanie stanu kamery
+          controls.saveState();   // zapisz
+          controls.reset();       // przywróć zapisany stan
+
+          function animate() {
+            requestAnimationFrame(animate);
+            controls.update(); // WYMAGANE gdy enableDamping = true
+            renderer.render(scene, camera);
+          }
+        desc: OrbitControls — obracanie kamery myszą
+        detail:
+          what: OrbitControls umożliwia orbitowanie kamery wokół punktu docelowego (target). Lewy przycisk = obrót, środkowy = pan, scroll = zoom.
+          how: controls.update() MUSI być wywoływane każdą klatkę gdy enableDamping=true. Bez update() inercja nie działa.
+          tips:
+            - 'controls.target.set(0, 1, 0) — zmień punkt orbity (domyślnie 0,0,0)'
+            - 'controls.addEventListener("change", render) — render on-demand bez pętli (oszczędność CPU)'
+
+      - code: |
+          import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+          const controls = new PointerLockControls(camera, document.body);
+
+          // Zablokuj kursor na kliknięcie
+          document.addEventListener('click', () => controls.lock());
+
+          controls.addEventListener('lock',   () => console.log('FPS mode ON'));
+          controls.addEventListener('unlock', () => console.log('FPS mode OFF'));
+
+          // Ruch WASD
+          const keys = {};
+          document.addEventListener('keydown', (e) => { keys[e.code] = true; });
+          document.addEventListener('keyup',   (e) => { keys[e.code] = false; });
+
+          function animate() {
+            requestAnimationFrame(animate);
+            if (controls.isLocked) {
+              const speed = 0.1;
+              if (keys['KeyW']) controls.moveForward(speed);
+              if (keys['KeyS']) controls.moveForward(-speed);
+              if (keys['KeyA']) controls.moveRight(-speed);
+              if (keys['KeyD']) controls.moveRight(speed);
+            }
+            renderer.render(scene, camera);
+          }
+        desc: PointerLockControls — kamera FPS (first person)
+        detail:
+          what: PointerLockControls blokuje kursor myszy na canvas i używa jej ruchu do obracania kamery jak w grze FPS. Wymaga kliknięcia użytkownika (polityka przeglądarek).
+          how: controls.lock() prosi przeglądarkę o zablokowanie kursora. Escape odblokowuje. isLocked sprawdza czy kursor jest zablokowany przed ruchem.
+          tips:
+            - 'delta = clock.getDelta() → controls.moveForward(speed * delta) — frame-rate independent'
+            - 'FlyControls to alternatywa bez grawitacji (loty, eksploracja kosmosu)'
+
+      - code: |
+          import { DragControls } from 'three/addons/controls/DragControls.js';
+
+          const draggableObjects = [cube, sphere, torus];
+
+          const dragControls = new DragControls(
+            draggableObjects,
+            camera,
+            renderer.domElement
+          );
+
+          dragControls.addEventListener('dragstart', (event) => {
+            orbitControls.enabled = false; // wyłącz OrbitControls podczas drag
+            event.object.material.emissive.set(0x44aa88);
+          });
+
+          dragControls.addEventListener('drag', (event) => {
+            // event.object.position — aktualizowana automatycznie
+            console.log('Przesuwam:', event.object.position);
+          });
+
+          dragControls.addEventListener('dragend', (event) => {
+            orbitControls.enabled = true; // przywróć OrbitControls
+            event.object.material.emissive.set(0x000000);
+          });
+        desc: DragControls — przeciąganie obiektów 3D myszą
+        detail:
+          what: DragControls pozwala użytkownikowi przeciągać wybrane obiekty 3D myszą. Automatycznie obsługuje raycasting i aktualizację pozycji.
+          how: Przekaż tablicę obiektów które można przeciągać. Przy DragControls + OrbitControls wyłącz orbit podczas drag żeby nie wchodziły w konflikt.
+          tips:
+            - 'Drag ograniczony do płaszczyzny XZ: dragControls.transformGroup = false'
+            - 'Ograniczanie ruchu: w evencie drag — snapowanie do siatki, boundingBox'
+
+      - code: |
+          // Klikanie z tooltipem i highlight
+          const highlightMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffff00, emissive: 0x444400
+          });
+          const originalMaterials = new Map();
+          let   hoveredObject = null;
+
+          window.addEventListener('click', () => {
+            raycaster.setFromCamera(mouse, camera);
+            const hits = raycaster.intersectObjects(interactiveObjects);
+
+            if (hits.length > 0) {
+              const obj = hits[0].object;
+              console.log(`Kliknięto: ${obj.name}`);
+              // Dispatch custom event
+              obj.dispatchEvent({ type: 'click', object: obj });
+            }
+          });
+
+          window.addEventListener('mousemove', () => {
+            raycaster.setFromCamera(mouse, camera);
+            const hits = raycaster.intersectObjects(interactiveObjects);
+
+            if (hits.length > 0) {
+              const obj = hits[0].object;
+              if (obj !== hoveredObject) {
+                if (hoveredObject) hoveredObject.material = originalMaterials.get(hoveredObject);
+                originalMaterials.set(obj, obj.material);
+                obj.material  = highlightMaterial;
+                hoveredObject = obj;
+                document.body.style.cursor = 'pointer';
+              }
+            } else {
+              if (hoveredObject) hoveredObject.material = originalMaterials.get(hoveredObject);
+              hoveredObject = null;
+              document.body.style.cursor = 'default';
+            }
+          });
+        desc: Hover highlight i klikanie — interaktywne obiekty
+        detail:
+          what: Kombinacja Raycaster + material swap tworzy efekt podświetlenia przy najechaniu — standard dla interaktywnych konfiguratorów 3D i gier.
+          how: Przechowuj oryginalne materiały w Map żeby móc je przywrócić. Porównuj z hoveredObject żeby nie zmieniać materiału wielokrotnie na tym samym obiekcie.
+          tips:
+            - 'document.body.style.cursor = "pointer" — sygnalizuje klikalność użytkownikowi'
+            - 'Grupuj interaktywne obiekty w osobną tablicę — raycaster sprawdza tylko je (wydajność)'
+
+  - name: Postprocessing i efekty
+    icon: "✨"
+    commands:
+      - code: |
+          import { EffectComposer }  from 'three/addons/postprocessing/EffectComposer.js';
+          import { RenderPass }      from 'three/addons/postprocessing/RenderPass.js';
+          import { ShaderPass }      from 'three/addons/postprocessing/ShaderPass.js';
+
+          // Setup EffectComposer
+          const composer = new EffectComposer(renderer);
+
+          // Pierwszy pass: renderuj scenę normalnie
+          const renderPass = new RenderPass(scene, camera);
+          composer.addPass(renderPass);
+
+          // W pętli animacji — compositor zamiast renderer
+          function animate() {
+            requestAnimationFrame(animate);
+            // ZAMIAST: renderer.render(scene, camera);
+            composer.render();
+          }
+        desc: EffectComposer — setup pipeline postprocessingu
+        detail:
+          what: EffectComposer zastępuje bezpośrednie renderer.render(). Renderuje scenę do FBO (framebuffer object), a potem przepuszcza przez łańcuch ShaderPass-ów.
+          how: RenderPass musi być PIERWSZYM passem — renderuje scenę Three.js. Następne passy (BloomPass, FXAA itd.) przetwarzają wynik jak filtry fotograficzne.
+          tips:
+            - 'composer.setSize(w, h) — nie zapomnij przy resize (tak samo jak renderer)'
+            - 'Porównanie wydajności: każdy pass = dodatkowy fullscreen quad render'
+
+      - code: |
+          import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+          const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            1.5,  // strength — siła blooma
+            0.4,  // radius — rozmycie
+            0.85  // threshold — próg jasności (0-1)
+          );
+
+          composer.addPass(bloomPass);
+
+          // Tweak w runtime
+          bloomPass.strength   = 2.0;
+          bloomPass.radius     = 0.5;
+          bloomPass.threshold  = 0.7;
+
+          // Selective bloom — tylko emissive obiekty świecą
+          // Ustaw mesh.layers.enable(1) i bloomPass tylko na layerze 1
+          // (zaawansowane — wymaga dwóch composerów)
+        desc: UnrealBloomPass — efekt świecenia (bloom / glow)
+        detail:
+          what: Bloom symuluje rozpraszanie się światła w obiektywie aparatu — jasne obiekty "przelewają" się na sąsiednie piksele. Efekt z gier Unreal Engine.
+          how: threshold określa minimalną jasność piksela żeby zaczął "świecić". strength i radius kontrolują intensywność i zasięg. Emmisive materials + bloom = świecące obiekty.
+          tips:
+            - 'threshold = 0 = wszytko świeci (psychodeliczny efekt). threshold > 0.9 = tylko najjaśniejsze'
+            - 'Bloom + ACESFilmicToneMapping = filmowy wygląd. Ustaw renderer.toneMappingExposure'
+
+      - code: |
+          import { ShaderPass  }   from 'three/addons/postprocessing/ShaderPass.js';
+          import { FXAAShader  }   from 'three/addons/shaders/FXAAShader.js';
+          import { GammaCorrectionShader } from 'three/addons/shaders/GammaCorrectionShader.js';
+
+          // FXAA — Fast Approximate Anti-Aliasing (gdy WebGLRenderer antialias nie działa z composer)
+          const fxaaPass = new ShaderPass(FXAAShader);
+          fxaaPass.material.uniforms['resolution'].value.x = 1 / window.innerWidth;
+          fxaaPass.material.uniforms['resolution'].value.y = 1 / window.innerHeight;
+          composer.addPass(fxaaPass);
+
+          // Gamma correction (gdy renderer.outputColorSpace = LinearSRGBColorSpace)
+          const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
+          composer.addPass(gammaCorrectionPass);
+
+          // Przy resize — zaktualizuj FXAA resolution
+          function onResize() {
+            fxaaPass.material.uniforms['resolution'].value.set(
+              1 / window.innerWidth,
+              1 / window.innerHeight
+            );
+          }
+        desc: FXAA i GammaCorrection — antyaliasing w composerze
+        detail:
+          what: EffectComposer renderuje do FBO które nie obsługuje MSAA (hardware antialiasing). FXAA to post-process antyaliasing — mniej ostry ale działa z composerów.
+          how: FXAA wymaga rozdzielczości jako uniform. GammaCorrectionShader konieczny jeśli renderer używa LinearSRGBColorSpace zamiast SRGBColorSpace.
+          tips:
+            - 'SMAAPass (Subpixel Morphological AA) — lepszy od FXAA, 3 passy zamiast 1'
+            - 'Ostatni pass: pass.renderToScreen = true — domyślnie ostatni i tak renderuje na ekran'
+
+      - code: |
+          import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
+
+          const outlinePass = new OutlinePass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            scene,
+            camera
+          );
+
+          outlinePass.edgeStrength  = 3.0;
+          outlinePass.edgeGlow      = 0.5;
+          outlinePass.edgeThickness = 1.0;
+          outlinePass.pulsePeriod   = 0;    // 0 = brak pulsowania, > 0 = pulsuje (sekundy)
+          outlinePass.visibleEdgeColor.set(0x00ff88);   // kolor widocznych krawędzi
+          outlinePass.hiddenEdgeColor.set(0x888888);    // kolor ukrytych krawędzi
+
+          composer.addPass(outlinePass);
+
+          // Ustaw obiekty do podświetlenia
+          outlinePass.selectedObjects = [selectedMesh];
+
+          // Dynamicznie — przy hover
+          window.addEventListener('mousemove', () => {
+            const hits = raycaster.intersectObjects(scene.children, true);
+            outlinePass.selectedObjects = hits.length > 0 ? [hits[0].object] : [];
+          });
+        desc: OutlinePass — podświetlenie krawędzi zaznaczonych obiektów
+        detail:
+          what: OutlinePass rysuje kolorowy kontur wokół wybranych obiektów. Standard w grach strategicznych (zaznaczenie jednostki), edytorach 3D, konfiguratorach produktów.
+          how: outlinePass.selectedObjects = [mesh1, mesh2] — wystarczy przypisać tablicę obiektów. Outline pojawia się automatycznie wokół wszystkich na liście.
+          tips:
+            - 'pulsePeriod = 1.5 — pulsujące podświetlenie dla "questy" / "do zebrania"'
+            - 'Zagnieżdżone meshe: przekaż grupę (Group) lub ustaw selectedObjects na wszystkich childach'
+
+      - code: |
+          import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+
+          // SSAO — Screen Space Ambient Occlusion (cienie w załamaniach)
+          const ssaoPass = new SSAOPass(
+            scene,
+            camera,
+            window.innerWidth,
+            window.innerHeight
+          );
+
+          ssaoPass.kernelRadius = 16;   // promień próbkowania
+          ssaoPass.minDistance  = 0.005;
+          ssaoPass.maxDistance  = 0.1;
+
+          composer.addPass(ssaoPass);
+
+          // Tryby debugowania
+          ssaoPass.output = SSAOPass.OUTPUT.Default;  // normalny render
+          // ssaoPass.output = SSAOPass.OUTPUT.SSAO;  // tylko mapa AO
+          // ssaoPass.output = SSAOPass.OUTPUT.Blur;  // rozmyta AO
+        desc: SSAOPass — Screen Space Ambient Occlusion
+        detail:
+          what: SSAO dodaje realistyczne cienie kontaktowe w zagłębieniach powierzchni — tam gdzie obiekty są blisko siebie lub mają wklęsłą geometrię. Znacząco poprawia realność sceny.
+          how: SSAO próbkuje głębokość w okolicy każdego piksela i szacuje ile otaczającej geometrii go zasłania. kernelRadius to zasięg próbkowania w pikselach.
+          tips:
+            - 'SSAO jest kosztowny wydajnościowo — sprawdź FPS przed i po'
+            - 'Dla R3F: @react-three/postprocessing oferuje <SSAO> z lepszym API'
+
+  - name: Instancing i optymalizacja
+    icon: "⚡"
+    commands:
+      - code: |
+          // InstancedMesh — 1 draw call dla tysięcy identycznych obiektów
+          const count    = 10000;
+          const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+          const material = new THREE.MeshStandardMaterial({ color: 0x049ef4 });
+
+          const instancedMesh = new THREE.InstancedMesh(geometry, material, count);
+          instancedMesh.castShadow    = true;
+          instancedMesh.receiveShadow = true;
+          scene.add(instancedMesh);
+
+          // Ustaw transformacje dla każdej instancji
+          const dummy = new THREE.Object3D();
+
+          for (let i = 0; i < count; i++) {
+            dummy.position.set(
+              (Math.random() - 0.5) * 20,
+              (Math.random() - 0.5) * 20,
+              (Math.random() - 0.5) * 20
+            );
+            dummy.rotation.set(
+              Math.random() * Math.PI,
+              Math.random() * Math.PI,
+              0
+            );
+            dummy.scale.setScalar(Math.random() * 2 + 0.5);
+            dummy.updateMatrix(); // WYMAGANE przed setMatrixAt
+            instancedMesh.setMatrixAt(i, dummy.matrix);
+          }
+
+          instancedMesh.instanceMatrix.needsUpdate = true; // WYMAGANE po ustawieniu
+
+          // Kolor per instancja
+          const color = new THREE.Color();
+          instancedMesh.setColorAt(0, color.set(0xff0000));
+          instancedMesh.instanceColor.needsUpdate = true;
+        desc: InstancedMesh — tysiące obiektów w 1 draw call
+        detail:
+          what: InstancedMesh renderuje N kopii tej samej geometrii/materiału w jednym draw call na GPU. 10000 sześcianów = 1 draw call zamiast 10000. Kluczowa optymalizacja dla cząstek, traw, lasów.
+          how: dummy (Object3D) służy jako tymczasowy kontener do obliczenia matrix. updateMatrix() konwertuje position/rotation/scale do 4x4 matrix. setMatrixAt(index, matrix) przekazuje ją do GPU.
+          tips:
+            - 'instanceMatrix.needsUpdate = true — ZAWSZE po modyfikacji transform którejkolwiek instancji'
+            - 'instancedMesh.count = activeCount — zmień ile instancji jest renderowane (bez tworzenia nowego)'
+
+      - code: |
+          import { LOD } from 'three';
+
+          // LOD — Level of Detail (różne modele zależnie od odległości)
+          const lod = new THREE.LOD();
+
+          // Wysoka szczegółowość (blisko)
+          const highGeo  = new THREE.SphereGeometry(1, 64, 32);
+          const highMesh = new THREE.Mesh(highGeo, material);
+          lod.addLevel(highMesh, 0);   // widoczny od 0 jednostek
+
+          // Średnia szczegółowość
+          const midGeo  = new THREE.SphereGeometry(1, 16, 8);
+          const midMesh = new THREE.Mesh(midGeo, material);
+          lod.addLevel(midMesh, 10);   // widoczny od 10 jednostek
+
+          // Niska szczegółowość (daleko)
+          const lowGeo  = new THREE.SphereGeometry(1, 6, 4);
+          const lowMesh = new THREE.Mesh(lowGeo, material);
+          lod.addLevel(lowMesh, 30);   // widoczny od 30 jednostek
+
+          scene.add(lod);
+
+          // WYMAGANE w pętli:
+          function animate() {
+            lod.update(camera); // automatycznie przełącza LOD
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+          }
+        desc: LOD — Level of Detail (różna szczegółowość zależnie od odległości)
+        detail:
+          what: LOD automatycznie przełącza między wersjami modelu o różnej liczbie polygonów zależnie od odległości od kamery. Blisko = wysoka jakość, daleko = prosty model.
+          how: addLevel(mesh, minDistance). Gdy kamera jest dalej niż minDistance od LOD, przełącza na ten level. lod.update(camera) musi być wywoływany każdą klatkę.
+          tips:
+            - 'Trzeci argument addLevel: hysteresis — zapobiega przeskakiwaniu na granicy odległości'
+            - 'Dla dużych scen (gry) LOD jest konieczny — bez niego odległe drzewa/budynki zabijają GPU'
+
+      - code: |
+          // Monitorowanie wydajności renderer.info
+          function logRendererInfo() {
+            const info = renderer.info;
+            console.log(`Draw calls: ${info.render.calls}`);
+            console.log(`Triangles:  ${info.render.triangles}`);
+            console.log(`Geometries: ${info.memory.geometries}`);
+            console.log(`Textures:   ${info.memory.textures}`);
+          }
+
+          // Frustum culling — wyklucz obiekty poza polem widzenia
+          // Domyślnie true — three.js robi to automatycznie
+          mesh.frustumCulled = true;
+
+          // Wyłącz dla obiektów które NIE mają bounding box (niektóre niestandardowe)
+          mesh.frustumCulled = false;
+
+          // Ręczna aktualizacja bounding sphere (gdy modyfikujesz wierzchołki)
+          mesh.geometry.computeBoundingSphere();
+          mesh.geometry.computeBoundingBox();
+
+          // Dispose — WYMAGANE żeby zwolnić VRAM
+          function removeMesh(mesh) {
+            scene.remove(mesh);
+            mesh.geometry.dispose();       // VRAM geometrii
+            mesh.material.dispose();       // VRAM materiału
+            if (mesh.material.map) mesh.material.map.dispose(); // VRAM tekstury
+          }
+        desc: Profilowanie i optymalizacja — renderer.info, dispose, culling
+        detail:
+          what: renderer.info pokazuje liczbę draw calls, triangles i zasobów GPU w pamięci. Dispose zwalnia VRAM — bez dispose() następują wycieki pamięci GPU przy dynamicznym tworzeniu/usuwaniu obiektów.
+          how: Każda geometria, materiał i tekstura zajmuje VRAM. dispose() wysyła sygnał GPU żeby zwolnił pamięć. Brak dispose() = wyciek VRAM przy długim użytkowaniu.
+          tips:
+            - 'renderer.info.reset() — zresetuj liczniki (by stats były per-frame)'
+            - 'Cel: draw calls < 100 dla 60fps na średnim GPU. Użyj instancing/merge gdy więcej'
+
+      - code: |
+          // Texture Atlas — wiele tekstur w jednym obrazie
+          // Zamiast 100 tekstur 256x256 → 1 tekstura 4096x4096 z 256 kaflami
+          // = 1 załadowanie GPU, 100× mniej texture bind calls
+
+          // Shared geometries — jedna geometria dla wielu meshy
+          const sharedGeometry = new THREE.BoxGeometry(1, 1, 1);
+
+          for (let i = 0; i < 1000; i++) {
+            // Różne materiały, TA SAMA geometria (współdzielona)
+            const mesh = new THREE.Mesh(
+              sharedGeometry, // referencja — nie kopia!
+              new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff })
+            );
+            mesh.position.set(Math.random() * 20, Math.random() * 20, 0);
+            scene.add(mesh);
+          }
+          // sharedGeometry to 1 upload do GPU, nie 1000
+
+          // Dispose shared geometry — usuń TYLKO gdy wszystkie meshe usunięte
+          // (Three.js zlicza referencje od r152)
+
+          // WebWorker dla heavy computations (nie blokuj main thread)
+          // const worker = new Worker('/workers/terrain-generator.js');
+          // worker.postMessage({ seed: 12345, size: 256 });
+          // worker.onmessage = (e) => { geometry.setAttribute('position', ...) };
+        desc: Texture Atlas i współdzielone geometrie — optymalizacja pamięci GPU
+        detail:
+          what: GPU ma koszt przełączania tekstur i geometrii. Współdzielenie geometrii między meshami oznacza jeden upload do VRAM zamiast N kopii. Texture atlas redukuje liczbę bind calls.
+          how: W Three.js geometria jest obiektem JavaScript — możesz przypisać tę samą referencję do wielu Mesh. GPU widzi jedną geometrię, ale różne transformacje przez matrix.
+          tips:
+            - 'Użyj r3f "instanced-mesh" + drei — automates all this for you'
+            - 'Three.js BufferGeometry.clone() tworzy kopię (nowy VRAM). Unikaj gdy niepotrzebne'

@@ -1,0 +1,349 @@
+title: Hooks i Lifecycle
+
+items:
+  - name: Cykl życia requestu
+    desc: >
+      Fastify ma szczegółowy lifecycle z 10+ punktami haka. Każdy hook to punkt
+      w przetwarzaniu requestu gdzie możesz wstrzyknąć logikę. Hooki wykonują się
+      w kolejności rejestracji i mogą być async. Błąd w haku przerywa cykl i
+      przekazuje do setErrorHandler.
+    code: |
+      // Kolejność wykonania hooków Fastify:
+      //
+      // 1. onRequest        — request przyjęty przez serwer (przed parsingiem)
+      // 2. preParsing       — przed parsowaniem body
+      // 3. preValidation    — przed walidacją JSON Schema
+      // 4. preHandler       — przed wywołaniem handlera route
+      // 5. [Handler]        — właściwy handler route
+      // 6. preSerialization — przed serializacją response
+      // 7. onSend           — tuż przed wysłaniem response
+      // 8. onResponse       — po wysłaniu response (klient już dostał dane)
+      // 9. onTimeout        — gdy request przekroczy timeout
+      // 10. onError         — gdy wystąpi błąd w którymkolwiek kroku
+
+      import Fastify from 'fastify'
+
+      const fastify = Fastify({ logger: true })
+
+      // Globalny hook — wykonuje się dla KAŻDEGO requestu
+      fastify.addHook('onRequest', async (request, reply) => {
+        fastify.log.info({ url: request.url }, 'Request received')
+      })
+
+      fastify.get('/test', async (request, reply) => {
+        return { ok: true }
+      })
+
+  - name: onRequest — pierwsza linia obrony
+    desc: >
+      onRequest wykonuje się jako pierwszy — zanim body jest parsowane. Idealne
+      do odrzucania requestów bez weryfikacji tokenu (np. zły IP, brak nagłówka).
+      Można zakończyć request przez reply.send() bez przechodzenia dalej.
+    code: |
+      import Fastify from 'fastify'
+
+      const fastify = Fastify()
+
+      // Blokowanie IP
+      fastify.addHook('onRequest', async (request, reply) => {
+        const blockedIPs = ['1.2.3.4', '5.6.7.8']
+        const clientIP = request.ip
+
+        if (blockedIPs.includes(clientIP)) {
+          reply.code(403).send({ error: 'Forbidden' })
+        }
+      })
+
+      // Wymuszanie HTTPS
+      fastify.addHook('onRequest', async (request, reply) => {
+        const proto = request.headers['x-forwarded-proto']
+        if (proto && proto !== 'https') {
+          const httpsUrl = `https://${request.hostname}${request.url}`
+          reply.redirect(httpsUrl, 301)
+        }
+      })
+
+      // Rate limiting manualny (przykład — używaj @fastify/rate-limit)
+      const requestCounts = new Map<string, number>()
+
+      fastify.addHook('onRequest', async (request, reply) => {
+        const key = request.ip
+        const count = (requestCounts.get(key) ?? 0) + 1
+        requestCounts.set(key, count)
+
+        if (count > 100) {
+          reply.code(429).send({ error: 'Too Many Requests' })
+        }
+      })
+
+      fastify.get('/', async () => ({ ok: true }))
+      await fastify.listen({ port: 3000 })
+
+  - name: preHandler — autentykacja i autoryzacja
+    desc: >
+      preHandler to najczęściej używany hook dla auth. Wykonuje się po walidacji,
+      przed handlerem. Możesz dodać jako globalny (dla wszystkich tras) lub jako
+      opcja konkretnej trasy (preHandler w route options).
+    code: |
+      import Fastify from 'fastify'
+
+      const fastify = Fastify()
+
+      // Globalny preHandler — JWT autentykacja
+      fastify.addHook('preHandler', async (request, reply) => {
+        // Pomiń publiczne endpointy
+        const publicPaths = ['/health', '/login', '/register']
+        if (publicPaths.includes(request.url)) return
+
+        const auth = request.headers.authorization
+        if (!auth?.startsWith('Bearer ')) {
+          return reply.code(401).send({ error: 'Missing token' })
+        }
+
+        const token = auth.slice(7)
+        // Weryfikuj token (np. przez @fastify/jwt)
+        // request.user = verifyToken(token)
+      })
+
+      // preHandler per-route — autoryzacja
+      fastify.get('/admin/stats', {
+        preHandler: async (request, reply) => {
+          const user = (request as any).user
+          if (!user || user.role !== 'admin') {
+            reply.code(403).send({ error: 'Admin only' })
+          }
+        }
+      }, async (request, reply) => {
+        return { stats: { users: 100, revenue: 50000 } }
+      })
+
+      fastify.get('/health', async () => ({ status: 'ok' }))
+      await fastify.listen({ port: 3000 })
+
+  - name: onSend — modyfikacja response przed wysłaniem
+    desc: >
+      onSend pozwala modyfikować payload tuż przed wysłaniem do klienta.
+      Czwarty argument payload to serializowany string/Buffer. Możesz go zastąpić
+      lub dodać nagłówki odpowiedzi. Przydatne do kompresji, cachowania, dodawania metadanych.
+    code: |
+      import Fastify from 'fastify'
+
+      const fastify = Fastify()
+
+      // Dodawanie nagłówków do każdej odpowiedzi
+      fastify.addHook('onSend', async (request, reply, payload) => {
+        reply.header('X-Request-Id', request.id)
+        reply.header('X-Response-Time', `${Date.now()}ms`)
+        return payload  // musi zwrócić payload
+      })
+
+      // Modyfikacja payload — owijanie w envelope
+      fastify.addHook('onSend', async (request, reply, payload) => {
+        // Tylko dla tras API
+        if (!request.url.startsWith('/api/')) return payload
+
+        // Parsuj i owij w standard envelope
+        if (typeof payload === 'string' && reply.statusCode < 400) {
+          const data = JSON.parse(payload)
+          return JSON.stringify({
+            success: true,
+            data,
+            timestamp: new Date().toISOString()
+          })
+        }
+
+        return payload
+      })
+
+      fastify.get('/api/users', async () => ({ users: [{ id: 1 }] }))
+      await fastify.listen({ port: 3000 })
+
+  - name: onResponse — logowanie i metryki
+    desc: >
+      onResponse wykonuje się po tym jak klient już otrzymał odpowiedź — nie można
+      jej zmienić. Idealne do logowania czasu odpowiedzi, zbierania metryk,
+      audytu. reply.elapsedTime zawiera czas przetwarzania w ms.
+    code: |
+      import Fastify from 'fastify'
+
+      const fastify = Fastify()
+
+      // Zbieranie metryk
+      const metrics = {
+        requestCount: 0,
+        totalTime: 0,
+        statusCodes: {} as Record<number, number>
+      }
+
+      fastify.addHook('onResponse', async (request, reply) => {
+        metrics.requestCount++
+        metrics.totalTime += reply.elapsedTime
+
+        const code = reply.statusCode
+        metrics.statusCodes[code] = (metrics.statusCodes[code] ?? 0) + 1
+
+        fastify.log.info({
+          method: request.method,
+          url: request.url,
+          statusCode: reply.statusCode,
+          responseTime: `${reply.elapsedTime.toFixed(2)}ms`
+        }, 'Request completed')
+      })
+
+      fastify.get('/metrics', async () => metrics)
+      fastify.get('/api/data', async () => ({ data: 'response' }))
+
+      await fastify.listen({ port: 3000 })
+
+  - name: onError — obsługa błędów w lifecycle
+    desc: >
+      onError hook wykonuje się gdy błąd jest przechwycony w lifecycle.
+      Różni się od setErrorHandler — onError to hook (można mieć wiele),
+      setErrorHandler to jeden handler. onError nie może zmienić odpowiedzi —
+      służy głównie do logowania i monitoringu.
+    code: |
+      import Fastify from 'fastify'
+
+      const fastify = Fastify()
+
+      // Hook do logowania błędów (np. do Sentry)
+      fastify.addHook('onError', async (request, reply, error) => {
+        // Loguj do zewnętrznego systemu
+        if (error.statusCode === undefined || error.statusCode >= 500) {
+          console.error('Server error:', {
+            error: error.message,
+            stack: error.stack,
+            url: request.url,
+            method: request.method,
+            userId: (request as any).user?.id
+          })
+          // await sentry.captureException(error)
+        }
+      })
+
+      // setErrorHandler — formatuje odpowiedź
+      fastify.setErrorHandler(async (error, request, reply) => {
+        const statusCode = error.statusCode ?? 500
+
+        return reply.code(statusCode).send({
+          error: statusCode >= 500 ? 'Internal Server Error' : error.message,
+          code: error.code,
+          requestId: request.id
+        })
+      })
+
+      fastify.get('/fail', async () => {
+        throw Object.assign(new Error('Something went wrong'), { statusCode: 503 })
+      })
+
+      await fastify.listen({ port: 3000 })
+
+  - name: preParsing i preValidation — kontrola danych wejściowych
+    desc: >
+      preParsing wykonuje się przed parsowaniem body (dostęp do raw stream).
+      preValidation wykonuje się po parsowaniu ale przed JSON Schema validation.
+      Można w preValidation modyfikować request.body przed walidacją.
+    code: |
+      import Fastify from 'fastify'
+
+      const fastify = Fastify()
+
+      // preParsing — logowanie raw body (ostrożnie z dużymi payloadami)
+      fastify.addHook('preParsing', async (request, reply, payload) => {
+        fastify.log.debug({
+          contentType: request.headers['content-type'],
+          contentLength: request.headers['content-length']
+        }, 'Parsing body')
+        return payload  // musi zwrócić payload
+      })
+
+      // preValidation — normalizacja danych przed walidacją
+      fastify.addHook('preValidation', async (request, reply) => {
+        if (request.body && typeof request.body === 'object') {
+          const body = request.body as Record<string, unknown>
+
+          // Trimuj stringi
+          for (const key of Object.keys(body)) {
+            if (typeof body[key] === 'string') {
+              body[key] = (body[key] as string).trim()
+            }
+          }
+
+          // Normalizuj email do lowercase
+          if (typeof body.email === 'string') {
+            body.email = body.email.toLowerCase()
+          }
+        }
+      })
+
+      fastify.post('/users', {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['name', 'email'],
+            properties: {
+              name: { type: 'string' },
+              email: { type: 'string', format: 'email' }
+            }
+          }
+        }
+      }, async (request) => {
+        return { created: true, ...request.body as object }
+      })
+
+      await fastify.listen({ port: 3000 })
+
+  - name: Scoped hooks w pluginach
+    desc: >
+      Hooki zdefiniowane wewnątrz pluginu działają tylko dla tras tego pluginu
+      (enkapsulacja). Dzięki temu możesz mieć różną logikę auth dla różnych
+      sekcji API — np. /admin z surowszą walidacją, /public bez auth.
+    code: |
+      import Fastify from 'fastify'
+      import fp from 'fastify-plugin'
+
+      const fastify = Fastify()
+
+      // Plugin publiczny — bez auth
+      async function publicRoutes(fastify: any) {
+        fastify.get('/health', async () => ({ status: 'ok' }))
+        fastify.post('/login', async (req: any, reply: any) => {
+          return { token: 'jwt-token-here' }
+        })
+      }
+
+      // Plugin chroniony — z auth hookiem
+      async function protectedRoutes(fastify: any) {
+        // Hook tylko dla tras w tym pluginie
+        fastify.addHook('preHandler', async (req: any, reply: any) => {
+          if (!req.headers.authorization) {
+            reply.code(401).send({ error: 'Unauthorized' })
+          }
+          req.user = { id: '1', role: 'user' }  // z JWT
+        })
+
+        fastify.get('/profile', async (req: any) => {
+          return { user: req.user }
+        })
+
+        fastify.get('/dashboard', async (req: any) => {
+          return { dashboard: true, userId: req.user.id }
+        })
+      }
+
+      // Plugin admin — z surowszą kontrolą
+      async function adminRoutes(fastify: any) {
+        fastify.addHook('preHandler', async (req: any, reply: any) => {
+          if (req.user?.role !== 'admin') {
+            reply.code(403).send({ error: 'Admin only' })
+          }
+        })
+
+        fastify.get('/admin/users', async () => ({ users: [] }))
+      }
+
+      fastify.register(publicRoutes)
+      fastify.register(protectedRoutes, { prefix: '/api' })
+      fastify.register(adminRoutes, { prefix: '/admin' })
+
+      await fastify.listen({ port: 3000 })

@@ -1,0 +1,118 @@
+labels:
+  concepts: Kluczowe koncepcje
+  whenToUse: Kiedy używać Fastify?
+  firstComponent: Pierwsza aplikacja Fastify
+  firstComponentLang: typescript
+
+intro:
+  title: Czym jest Fastify?
+  desc: >
+    Fastify to webowy framework dla Node.js zoptymalizowany pod kątem wydajności i
+    minimalnego narzutu. Osiąga do 76 000 requestów na sekundę — 2-3× więcej niż Express.
+    Kluczowe cechy to JSON Schema validation (Ajv), encapsulated plugin system,
+    pełna obsługa TypeScript oraz wbudowany logger Pino. Każda funkcjonalność
+    jest pluginem — sam Fastify jest zbiorem pluginów. Idealne do REST API,
+    mikroserwisów i aplikacji gdzie wydajność ma znaczenie.
+
+concepts:
+  - title: Server Instance
+    desc: >
+      Fastify() tworzy instancję serwera. Wszystko — trasy, pluginy, hooki — rejestruje
+      się na niej. Serwer jest obiektem z metodami listen(), register(), addHook(),
+      decorate(). Startuje asynchronicznie przez await fastify.listen().
+    icon: "🚀"
+  - title: Plugin System
+    desc: >
+      Każdy plugin to funkcja async (fastify, opts) => {} rejestrowana przez fastify.register().
+      Pluginy są encapsulowane — dekoratory i trasy zdefiniowane w pluginie nie wyciekają na
+      zewnątrz. fastify-plugin (fp) znosi enkapsulację gdy chcesz współdzielić funkcjonalność.
+    icon: "🔌"
+  - title: JSON Schema Validation
+    desc: >
+      Fastify waliduje request i serializuje response przez JSON Schema (Ajv). Schemat
+      przekazujesz jako opcję route (schema.body, schema.params, schema.querystring,
+      schema.response). Serializacja response jest 2× szybsza niż JSON.stringify().
+    icon: "✅"
+  - title: Hooks & Lifecycle
+    desc: >
+      Fastify ma rozbudowany cykl życia requestu z hakami w każdym punkcie — onRequest,
+      preValidation, preHandler, onSend, onResponse, onError i inne. addHook() rejestruje
+      funkcję wykonywaną w danym punkcie. Hooki mogą być globalne lub scoped (w pluginie).
+    icon: "🔗"
+  - title: Decorators
+    desc: >
+      fastify.decorate() dodaje właściwość lub metodę do instancji serwera.
+      decorateRequest() / decorateReply() rozszerzają obiekty request i reply.
+      Dekoratory to sposób na współdzielenie połączeń DB, helperów i serwisów
+      między routami bez globalnych zmiennych.
+    icon: "🎨"
+  - title: TypeScript Support
+    desc: >
+      Fastify ma wbudowane typy TypeScript. Generic FastifyInstance, FastifyRequest<{Body, Params,
+      Querystring}> i FastifyReply pozwalają na pełną type safety. Alternatywnie TypeBox
+      (T.Object, T.String) generuje JSON Schema i TypeScript typy jednocześnie.
+    icon: "🔷"
+
+whenToUse:
+  - REST API wymagające wysokiej wydajności (fintech, IoT, real-time)
+  - Mikroserwisy gdzie liczy się throughput i latencja
+  - Node.js API bez ciężkiego frameworka (alternatywa Express z type safety)
+  - Projekty TypeScript gdzie JSON Schema validation jest priorytetem
+  - Aplikacje z wieloma pluginami i potrzebą enkapsulacji
+  - Gdy potrzebujesz wbudowanego Pino loggera i OpenTelemetry
+
+firstComponent: |
+  # Instalacja
+  npm install fastify
+
+  # src/server.ts
+  import Fastify from 'fastify'
+
+  const fastify = Fastify({
+    logger: true  // wbudowany Pino logger
+  })
+
+  // Prosta trasa GET
+  fastify.get('/', async (request, reply) => {
+    return { hello: 'world' }
+  })
+
+  // Trasa z walidacją JSON Schema
+  fastify.post('/users', {
+    schema: {
+      body: {
+        type: 'object',
+        required: ['name', 'email'],
+        properties: {
+          name: { type: 'string', minLength: 2 },
+          email: { type: 'string', format: 'email' }
+        }
+      },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            id: { type: 'number' },
+            name: { type: 'string' },
+            email: { type: 'string' }
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    const { name, email } = request.body as { name: string; email: string }
+    reply.code(201)
+    return { id: Date.now(), name, email }
+  })
+
+  // Start serwera
+  const start = async () => {
+    try {
+      await fastify.listen({ port: 3000, host: '0.0.0.0' })
+    } catch (err) {
+      fastify.log.error(err)
+      process.exit(1)
+    }
+  }
+
+  start()

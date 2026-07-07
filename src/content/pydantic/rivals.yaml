@@ -1,0 +1,98 @@
+title: Pydantic vs inne biblioteki walidacji
+
+items:
+  - name: attrs / cattrs
+    icon: "🔧"
+    color: "#cc2936"
+    tagline: Klasy z automatycznym __init__, __repr__, __eq__ — bez type hints walidacji
+    desc: >
+      attrs (i jego nakładka cattrs do konwersji) to biblioteka do definiowania klas
+      danych przez dekoratory. Starsza od dataclasses — inspirowała ich projektantów.
+      Pydantic skupia się na walidacji i serializacji, attrs na ergonomii klas.
+      cattrs dodaje konwersję dict↔klasa, ale bez takiej głębi walidacji jak Pydantic.
+    pros:
+      - "Bardzo szybkie — brak narzutu walidacji przy tworzeniu instancji"
+      - "Elastyczne — możesz włączyć lub wyłączyć walidację"
+      - "Doskonałe do klas domenowych bez potrzeby walidacji danych wejściowych"
+      - "cattrs obsługuje złożone struktury z Union, Generic"
+    cons:
+      - "Brak wbudowanej walidacji — musisz pisać validators ręcznie"
+      - "Słabsza integracja z ekosystemem FastAPI/JSON Schema"
+      - "cattrs wymaga ręcznej rejestracji konwerterów dla własnych typów"
+      - "Mniej czytelne błędy niż Pydantic ValidationError"
+    vs: >
+      Użyj attrs gdy budujesz wewnętrzne klasy domenowe gdzie walidacja nie jest
+      krytyczna i priorytet to szybkość. Użyj Pydantic gdy walidacja danych z zewnątrz
+      (API, JSON, env) jest kluczowa lub potrzebujesz JSON Schema.
+
+  - name: dataclasses (stdlib)
+    icon: "🐍"
+    color: "#3572A5"
+    tagline: Wbudowane w Python — klasy danych bez walidacji i bez zależności
+    desc: >
+      dataclasses z biblioteki standardowej dają @dataclass — automatyczny __init__,
+      __repr__, __eq__. Zero zależności. Pydantic obsługuje dataclasses przez
+      pydantic.dataclasses.dataclass — dodaje walidację do stdlib @dataclass.
+      Wybór: stdlib = zero overhead, Pydantic dataclass = walidacja bez zmiany API.
+    pros:
+      - "Zero zewnętrznych zależności — wbudowane w Python 3.7+"
+      - "Pydantic może rozszerzyć stdlib @dataclass o walidację bez zmiany kodu"
+      - "Prostsze dla klas wewnętrznych bez potrzeby walidacji"
+      - "Mniejszy narzut pamięci niż BaseModel"
+    cons:
+      - "Brak walidacji typów przy inicjalizacji — type hints to tylko adnotacje"
+      - "Brak serializacji (model_dump, model_dump_json)"
+      - "Brak JSON Schema"
+      - "Brak wsparcia dla Annotated constraints, Field(), validators"
+    vs: >
+      Stdlib @dataclass gdy: wewnętrzne struktury danych, zero zależności, brak potrzeby
+      walidacji. pydantic.dataclasses.dataclass gdy: masz istniejący kod z @dataclass
+      i chcesz dodać walidację bez przepisywania. FastAPI akceptuje oba.
+
+  - name: marshmallow
+    icon: "🍬"
+    color: "#e91e63"
+    tagline: Dojrzały serializer/deserializer — schema-first, nie type-hint-first
+    desc: >
+      Marshmallow (2012) to dojrzała biblioteka do serializacji i deserializacji
+      — starszy paradygmat: Schema jako osobna klasa z Field() declaracją.
+      Nie używa type hints do walidacji. Pydantic jest type-hint-native i generuje
+      JSON Schema automatycznie. Marshmallow wymaga ręcznego pisania Schema.
+    pros:
+      - "Bardzo dojrzała — 10+ lat w produkcji, stabilne API"
+      - "Elastyczny — pełna kontrola nad marshallingiem per pole"
+      - "Duży ekosystem — marshmallow-sqlalchemy, apispec, flask-smorest"
+      - "Działanie oddzielone od modelu — jedna klasa, wiele schematów"
+    cons:
+      - "Verbose — dużo boilerplate (osobna Schema klasa dla każdego modelu)"
+      - "Nie używa type hints — brak autocomplete i type checking w IDE"
+      - "Brak automatycznego JSON Schema (wymaga apispec)"
+      - "Wolniejszy od Pydantic v2 (bez Rust core)"
+    vs: >
+      Marshmallow gdy: istniejący projekt z marshmallow i nie chcesz migrować,
+      lub potrzebujesz wielu różnych serializacji dla jednej klasy domenowej.
+      Pydantic gdy: nowy projekt, FastAPI, type hints, automatyczny JSON Schema.
+
+  - name: TypedDict
+    icon: "📝"
+    color: "#555555"
+    tagline: Stdlib hint dla dict z określonymi kluczami — zero walidacji runtime
+    desc: >
+      TypedDict (PEP 589, Python 3.8+) pozwala annotować dict z konkretnymi kluczami
+      i typami — ale TYLKO dla narzędzi statycznych (mypy, pyright). Zero walidacji
+      w runtime. Pydantic akceptuje TypedDict jako model — waliduje przy inicjalizacji.
+      TypedDict to hint, Pydantic to runtime validator.
+    pros:
+      - "Zero runtime overhead — zwykły dict pod spodem"
+      - "Wbudowany w stdlib — zero zależności"
+      - "Dobra integracja z mypy i pyright"
+      - "FastAPI akceptuje TypedDict jako request/response model"
+    cons:
+      - "Zero walidacji w runtime — {'age': 'abc'} przejdzie bez błędu"
+      - "Brak walidatorów, Field(), constraints"
+      - "Brak model_dump(), model_validate_json(), JSON Schema"
+      - "Brak dziedziczenia i computed fields"
+    vs: >
+      TypedDict gdy: dokumentujesz strukturę dict dla mypy, masz legacy code z dict
+      i nie chcesz zmieniać struktury, lub potrzebujesz zero-overhead. Pydantic gdy
+      potrzebujesz rzeczywistej walidacji i serializacji w runtime.
